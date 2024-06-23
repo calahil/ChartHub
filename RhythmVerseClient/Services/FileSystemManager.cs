@@ -9,13 +9,10 @@ namespace RhythmVerseClient.Services
 {
     public class FileSystemManager
     {
-        // Phaseshift Path (Where Nautilus looks for rb3con files by default)
         public string PhaseshiftDir { get; set; }
 
-        // Phaseshift Music Path (Where Nautilus writes the converted files to)
         public string PhaseshiftMusicDir { get; set; }
 
-        // The App's Root Path
         public string RhythmverseAppPath { get; set; }
 
         public string DownloadDir { get; set; }
@@ -25,12 +22,16 @@ namespace RhythmVerseClient.Services
         private SettingsManager<AppSettings> _settingsManager;
         private MainPage _mainPage;
 
+        public const string ZIP_FILE_URL = "https://calahil.github.io/nautilus.zip";
+        public static readonly string NautilusDirectoryPath = Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RhythmVerseClient"), "nautilus");
+        public static readonly string ZipFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nautilus.zip");
+
         public ObservableCollection<ResourceWatcher> ResourceWatcher { get; set; } = [];
 
 
         private FileSystemManager(SettingsManager<AppSettings> settingsManager, MainPage mainPage)
         {
-            RhythmverseAppPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "rhythmverse");
+            RhythmverseAppPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RhythmVerseClient");
             string baseDir = Path.Combine(RhythmverseAppPath, "nautilus");
             PhaseshiftDir = ConstructPath(baseDir, "phaseshift");
             PhaseshiftMusicDir = ConstructPath(PhaseshiftDir, "Music");
@@ -41,7 +42,7 @@ namespace RhythmVerseClient.Services
             CloneHeroSongsDir = _settingsManager.Get("CloneHeroSongLocation");
             ResourceWatcher.Add(new(DownloadDir, WatcherType.File, _mainPage));
             ResourceWatcher.Add(new(CloneHeroSongsDir, WatcherType.Directory, _mainPage));
-
+            Initialize();
         }
 
         // Helper to build paths

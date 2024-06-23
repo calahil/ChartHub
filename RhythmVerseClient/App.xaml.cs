@@ -1,12 +1,13 @@
-﻿namespace RhythmVerseClient
+﻿using RhythmVerseClient.Services;
+
+namespace RhythmVerseClient
 {
     public partial class App : Application
     {
-        public App()
+        public App(IServiceProvider serviceProvider)
         {
             InitializeComponent();
-
-            MainPage = new MainPage();
+            MainPage = serviceProvider.GetRequiredService<MainPage>();
         }
     }
 }

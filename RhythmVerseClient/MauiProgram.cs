@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using RhythmVerseClient.Services;
+using RhythmVerseClient.ViewModels;
 using SettingsManager;
 
 namespace RhythmVerseClient
@@ -30,6 +31,9 @@ namespace RhythmVerseClient
                 return new SettingsManager<AppSettings>(settings, settingsFilePath);
             });
             builder.Services.AddSingleton<IKeystrokeSender, WindowsKeystrokeSender>();
+
+            builder.Services.AddSingleton<MainViewModel>();
+            builder.Services.AddTransient<MainPage>();
 
             return builder.Build();
         }
