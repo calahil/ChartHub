@@ -24,14 +24,14 @@ namespace RhythmVerseClient
             builder.Services.AddSingleton(new AppSettings());
 
             // Register the SettingsManager as a singleton
-            builder.Services.AddSingleton<ISettingsManager<AppSettings>>(serviceProvider =>
+            builder.Services.AddSingleton<SettingsManager<AppSettings>>(serviceProvider =>
             {
                 var settings = serviceProvider.GetRequiredService<AppSettings>();
                 var settingsFilePath = Path.Combine(FileSystem.AppDataDirectory, "appsettings.json");
                 return new SettingsManager<AppSettings>(settings, settingsFilePath);
             });
             builder.Services.AddSingleton<IKeystrokeSender, WindowsKeystrokeSender>();
-
+            builder.Services.AddSingleton<IFileSystemManager, FileSystemManager>();
             builder.Services.AddSingleton<MainViewModel>();
             builder.Services.AddTransient<MainPage>();
 

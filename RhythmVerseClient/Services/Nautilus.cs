@@ -13,10 +13,10 @@ namespace RhythmVerseClient.Services
 
         private string nautilisEXE;
 
-        private readonly FileSystemManager _fileSystem;
+        private readonly IFileSystemManager _fileSystem;
         private readonly IKeystrokeSender _keystrokeSender;
 
-        public Nautilus(FileSystemManager fileSystem, IKeystrokeSender keystrokeSender)
+        public Nautilus(IFileSystemManager fileSystem, IKeystrokeSender keystrokeSender)
         {
             _fileSystem = fileSystem;
             _keystrokeSender = keystrokeSender;

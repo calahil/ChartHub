@@ -20,16 +20,15 @@ namespace RhythmVerseClient.Services
         public string CloneHeroSongsDir { get; set; }
 
         private SettingsManager<AppSettings> _settingsManager;
-        private MainPage _mainPage;
 
         public const string ZIP_FILE_URL = "https://calahil.github.io/nautilus.zip";
         public static readonly string NautilusDirectoryPath = Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RhythmVerseClient"), "nautilus");
         public static readonly string ZipFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nautilus.zip");
 
-        public ObservableCollection<ResourceWatcher> ResourceWatcher { get; set; } = [];
+        public ObservableCollection<ResourceWatcher> ResourceWatchers { get; set; } = [];
 
 
-        private FileSystemManager(SettingsManager<AppSettings> settingsManager, MainPage mainPage)
+        public FileSystemManager(SettingsManager<AppSettings> settingsManager)
         {
             RhythmverseAppPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RhythmVerseClient");
             string baseDir = Path.Combine(RhythmverseAppPath, "nautilus");
@@ -37,12 +36,38 @@ namespace RhythmVerseClient.Services
             PhaseshiftMusicDir = ConstructPath(PhaseshiftDir, "Music");
 
             _settingsManager = settingsManager;
-            _mainPage = mainPage;
             DownloadDir = _settingsManager.Get("DownloadLocation");
             CloneHeroSongsDir = _settingsManager.Get("CloneHeroSongLocation");
-            ResourceWatcher.Add(new(DownloadDir, WatcherType.File, _mainPage));
-            ResourceWatcher.Add(new(CloneHeroSongsDir, WatcherType.Directory, _mainPage));
             Initialize();
+        }
+
+        public void AddWatcher(string path, WatcherType watcherType)
+        {
+            var watcher = new ResourceWatcher();
+            watcher.Initialize(path, watcherType);
+            watcher.DirectoryNotFound += (sender, message) => OnDirectoryNotFound(message);
+            watcher.ErrorOccurred += (sender, message) => OnErrorOccurred(message);
+
+            ResourceWatchers.Add(watcher);
+        }
+
+        public void RemoveWatcher(string path)
+        {
+            var watcher = ResourceWatchers.FirstOrDefault(w => w.DirectoryPath == path);
+            if (watcher != null)
+            {
+                ResourceWatchers.Remove(watcher);
+            }
+        }
+
+        private void OnDirectoryNotFound(string directoryPath)
+        {
+            // Handle directory not found scenario
+        }
+
+        private void OnErrorOccurred(string errorMessage)
+        {
+            // Handle errors
         }
 
         // Helper to build paths

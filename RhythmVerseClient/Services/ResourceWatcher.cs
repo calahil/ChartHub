@@ -9,43 +9,44 @@ namespace RhythmVerseClient.Services
         File
     }
 
-    public class ResourceWatcher
+    public class ResourceWatcher : IResourceWatcher
     {
         public ObservableCollection<FileData> Data { get; set; }
-        public string DirectoryPath { get; set; }
-        private readonly FileSystemWatcher fileSystemWatcher;
-        // Hash check for our filenames to stop duplicates
+        public string DirectoryPath { get; private set; }
+        private FileSystemWatcher fileSystemWatcher;
         private HashSet<string> existingEntries;
         private WatcherType _watcherType;
-        private MainPage _mainPage;
 
-        public ResourceWatcher(string path, WatcherType watcherType, MainPage mainPage)
+        public event EventHandler<string> DirectoryNotFound;
+        public event EventHandler<string> ErrorOccurred;
+
+        public ResourceWatcher()
+        {
+            Data = new ObservableCollection<FileData>();
+            fileSystemWatcher = new FileSystemWatcher();
+            existingEntries = new HashSet<string>();
+        }
+
+        public void Initialize(string path, WatcherType watcherType)
         {
             DirectoryPath = path;
-            _mainPage = mainPage;
             _watcherType = watcherType;
-            Data = [];
-            fileSystemWatcher = new FileSystemWatcher
-            {
-                Path = DirectoryPath,
-                NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName,
-                Filter = "*.*"
-            };
 
-            // Add event handlers for the DownloadDir watcher
+            fileSystemWatcher.Path = DirectoryPath;
+            fileSystemWatcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName;
+            fileSystemWatcher.Filter = "*.*";
             fileSystemWatcher.Changed += OnChanged;
             fileSystemWatcher.Created += OnChanged;
             fileSystemWatcher.Deleted += OnChanged;
             fileSystemWatcher.Renamed += OnChanged;
-
             fileSystemWatcher.EnableRaisingEvents = true;
-            existingEntries = [];
+
+            RefreshItems();
         }
 
         private void OnChanged(object source, FileSystemEventArgs e)
         {
             RefreshItems();
-
         }
 
         public void RefreshItems()
@@ -63,7 +64,7 @@ namespace RhythmVerseClient.Services
                             if (!existingEntries.Contains(directory))
                             {
                                 string directoryName = Path.GetFileName(directory);
-                                Data.Add(new FileData(directoryName, directory)); // Assuming directories are songs
+                                Data.Add(new FileData(directoryName, directory));
                                 existingEntries.Add(directory);
                             }
                         }
@@ -75,7 +76,7 @@ namespace RhythmVerseClient.Services
                             if (!existingEntries.Contains(file))
                             {
                                 string displayName = Path.GetFileName(file);
-                                Data.Add(new FileData(displayName, file)); // Assuming files are not songs
+                                Data.Add(new FileData(displayName, file));
                                 existingEntries.Add(file);
                             }
                         }
@@ -84,7 +85,7 @@ namespace RhythmVerseClient.Services
             }
             else
             {
-                _mainPage.DisplayAlert("Directory Not Found", $"The directory {DirectoryPath} does not exist.", "OK");
+                DirectoryNotFound?.Invoke(this, DirectoryPath);
             }
         }
 
@@ -92,26 +93,19 @@ namespace RhythmVerseClient.Services
         {
             if (Directory.Exists(DirectoryPath))
             {
-                int totalFiles;
-
                 switch (_watcherType)
                 {
                     case WatcherType.Directory:
-                        totalFiles = Directory.GetDirectories(DirectoryPath).Length;
-
-                        return totalFiles;
+                        return Directory.GetDirectories(DirectoryPath).Length;
                     case WatcherType.File:
-                        totalFiles = Directory.GetFiles(DirectoryPath).Length;
-
-                        return totalFiles;
+                        return Directory.GetFiles(DirectoryPath).Length;
                     default:
                         return 0;
-
                 }
             }
             else
             {
-                _mainPage.DisplayAlert("Directory Not Found", $"The directory {DirectoryPath} does not exist.", "OK");
+                DirectoryNotFound?.Invoke(this, DirectoryPath);
                 return 0;
             }
         }
@@ -119,105 +113,58 @@ namespace RhythmVerseClient.Services
         public void OpenLocation(int index)
         {
             var selectedItem = Data[index];
-            string? directoryPath;
+            string directoryPath = _watcherType == WatcherType.Directory ? selectedItem.FilePath : Path.GetDirectoryName(selectedItem.FilePath);
 
             try
             {
-                switch (_watcherType)
-                {
-                    case WatcherType.Directory:
-                        directoryPath = selectedItem.FilePath;
-                        break;
-                    case WatcherType.File:
-                        directoryPath = Path.GetDirectoryName(selectedItem.FilePath);
-                        break;
-                    default:
-                        directoryPath = selectedItem.FilePath;
-                        break;
-                }
-
                 if (Directory.Exists(directoryPath))
                 {
-                    // Open the file location in the default file explorer
                     Process.Start("explorer.exe", directoryPath);
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error opening file location: {ex.Message}");
+                ErrorOccurred?.Invoke(this, $"Error opening file location: {ex.Message}");
             }
         }
 
         public async Task DeleteItem(int index)
         {
-
             var selectedItem = Data[index];
 
             if (Directory.Exists(DirectoryPath))
             {
-
-                switch (_watcherType)
+                try
                 {
-                    case WatcherType.Directory:
-                        if (selectedItem != null && Directory.Exists(selectedItem.FilePath))
-                        {
-                            var test = _mainPage.DisplayAlert("Confirmation", "Do you want to proceed?", "Yes", "No");
-
-                            if (test.Result)
+                    switch (_watcherType)
+                    {
+                        case WatcherType.Directory:
+                            if (Directory.Exists(selectedItem.FilePath))
                             {
-                                try
-                                {
-                                    Directory.Delete(selectedItem.FilePath, true);
-
-                                    Data.RemoveAt(index);
-                                    existingEntries.Remove(selectedItem.FilePath);
-                                }
-                                catch (Exception ex)
-                                {
-                                    await _mainPage.DisplayAlert("Error", $"Failed to delete the directory: {ex.Message}", "OK");
-                                }
+                                Directory.Delete(selectedItem.FilePath, true);
+                                Data.RemoveAt(index);
+                                existingEntries.Remove(selectedItem.FilePath);
                             }
-                        }
-                        else
-                        {
-                            await _mainPage.DisplayAlert("Error", $"The directory: {selectedItem?.FilePath} does not exist", "OK");
-                        }
-                        break;
-                    case WatcherType.File:
-                        if (selectedItem != null && File.Exists(selectedItem.FilePath))
-                        {
-                            var test = _mainPage.DisplayAlert("Confirmation", "Do you want to proceed?", "Yes", "No");
-
-                            if (test.Result)
+                            break;
+                        case WatcherType.File:
+                            if (File.Exists(selectedItem.FilePath))
                             {
-                                try
-                                {
-                                    File.Delete(selectedItem.FilePath);
-                                    Data.RemoveAt(index);
-                                    existingEntries.Remove(selectedItem.FilePath);
-                                }
-                                catch (Exception ex)
-                                {
-                                    await _mainPage.DisplayAlert("Error", $"Failed to delete the file: {ex.Message}", "OK");
-                                }
+                                File.Delete(selectedItem.FilePath);
+                                Data.RemoveAt(index);
+                                existingEntries.Remove(selectedItem.FilePath);
                             }
-                        }
-                        else
-                        {
-                            await _mainPage.DisplayAlert("Error", $"The file: {selectedItem?.FilePath} does not exist", "OK");
-                        }
-                        break;
-                    default:
-                        break;
-
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ErrorOccurred?.Invoke(this, $"Failed to delete the item: {ex.Message}");
                 }
             }
             else
             {
-                await _mainPage.DisplayAlert("Directory Not Found", $"The directory {DirectoryPath} does not exist.", "OK");
+                DirectoryNotFound?.Invoke(this, DirectoryPath);
             }
-
-
         }
 
         public void AddItem(string itemName, string itemPath)
@@ -225,6 +172,7 @@ namespace RhythmVerseClient.Services
             Data.Add(new FileData(itemName, itemPath));
         }
     }
+
 
 
     public class FileData(string displayName, string filePath)
