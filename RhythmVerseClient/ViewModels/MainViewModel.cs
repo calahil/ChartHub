@@ -14,8 +14,8 @@ namespace RhythmVerseClient.ViewModels
         public MainViewModel(IFileSystemManager fileSystemManager)
         {
             FileManager = fileSystemManager;
-            FileManager.AddWatcher(FileManager.)
-            _fileSystemManager.ResourceWatcher[1].Initialize(FileManager.CloneHeroSongsDir, WatcherType.Directory, mainPage);
+            FileManager.AddWatcher(FileManager.CloneHeroSongsDir, WatcherType.Directory);
+            FileManager.AddWatcher(FileManager.DownloadDir, WatcherType.File);
         }
     }
 }

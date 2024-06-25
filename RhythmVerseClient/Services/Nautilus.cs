@@ -123,7 +123,7 @@ namespace RhythmVerseClient.Services
 
             Program.Kill();
             Program.WaitForExit();
-            _fileSystem.ResourceWatcher[0]?.RefreshItems();
+            _fileSystem.ResourceWatchers[0]?.RefreshItems();
         }
     }
 

@@ -4,40 +4,97 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Windows.Data.Xml.Dom;
+using Windows.Storage;
 
 namespace RhythmVerseClient.Services
 {
-    public class FileSystemManager
+    public class FileSystemManager : IFileSystemManager
     {
-        public string PhaseshiftDir { get; set; }
+        public string PhaseshiftDir
+        {
+            get => _appSettings.PhaseshiftDirectory;
+            set { _appSettings.PhaseshiftDirectory = value; _settingsManager.Save(); }
+        }
 
-        public string PhaseshiftMusicDir { get; set; }
 
-        public string RhythmverseAppPath { get; set; }
 
-        public string DownloadDir { get; set; }
+        public string PhaseshiftMusicDir
+        {
+            get => _appSettings.PhaseshiftMusicDirectory;
+            set { _appSettings.PhaseshiftMusicDirectory = value; _settingsManager.Save(); }
+        }
 
-        public string CloneHeroSongsDir { get; set; }
+        public string RhythmverseAppPath
+        {
+            get => _appSettings.RhythmverseAppPath;
+            set { _appSettings.RhythmverseAppPath = value; _settingsManager.Save(); }
+        }
 
-        private SettingsManager<AppSettings> _settingsManager;
+        public string DownloadDir
+        {
+            get => _appSettings.DownloadLocation;
+            set { _appSettings.DownloadLocation = value; _settingsManager.Save(); }
+        }
+
+        public string CloneHeroSongsDir
+        {
+            get => _appSettings.CloneHeroSongLocation;
+            set { _appSettings.CloneHeroSongLocation = value; _settingsManager.Save(); }
+        }
+
+        private ISettingsManager<AppSettings> _settingsManager;
+        private AppSettings _appSettings;
 
         public const string ZIP_FILE_URL = "https://calahil.github.io/nautilus.zip";
-        public static readonly string NautilusDirectoryPath = Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RhythmVerseClient"), "nautilus");
+
+        public string NautilusDirectoryPath
+        {
+            get => _appSettings.NautilusDirectoryPath;
+            set { _appSettings.NautilusDirectoryPath = value; _settingsManager.Save(); }
+        }
+
         public static readonly string ZipFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nautilus.zip");
 
         public ObservableCollection<ResourceWatcher> ResourceWatchers { get; set; } = [];
 
 
-        public FileSystemManager(SettingsManager<AppSettings> settingsManager)
+        public FileSystemManager(ISettingsManager<AppSettings> settingsManager)
         {
-            RhythmverseAppPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RhythmVerseClient");
-            string baseDir = Path.Combine(RhythmverseAppPath, "nautilus");
-            PhaseshiftDir = ConstructPath(baseDir, "phaseshift");
-            PhaseshiftMusicDir = ConstructPath(PhaseshiftDir, "Music");
-
             _settingsManager = settingsManager;
-            DownloadDir = _settingsManager.Get("DownloadLocation");
-            CloneHeroSongsDir = _settingsManager.Get("CloneHeroSongLocation");
+
+            _appSettings = settingsManager.Settings;
+
+            if (RhythmverseAppPath == "first_install")
+            {
+                RhythmverseAppPath = ApplicationData.Current.LocalFolder.Path;
+            }
+
+            if (NautilusDirectoryPath == "first_install")
+            {
+                NautilusDirectoryPath = Path.Combine(RhythmverseAppPath, "nautilus");
+            }
+
+            if (PhaseshiftDir == "first_install")
+            {
+                PhaseshiftDir = ConstructPath(NautilusDirectoryPath, "phaseshift");
+            }
+
+            if (PhaseshiftMusicDir == "first_install")
+            {
+
+                PhaseshiftMusicDir = ConstructPath(PhaseshiftDir, "Music");
+            }
+
+            if (DownloadDir == "first_install")
+            {
+                DownloadDir = "C:\\";
+            }
+
+            if (CloneHeroSongsDir == "first_install")
+            {
+                CloneHeroSongsDir = "C:\\";
+            }
             Initialize();
         }
 
