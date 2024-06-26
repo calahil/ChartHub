@@ -20,7 +20,7 @@ namespace RhythmVerseClient.Services
         {
             _fileSystem = fileSystem;
             _keystrokeSender = keystrokeSender;
-            nautilisEXE = Path.Combine(Constants.NautilusDirectoryPath, "Nautilus.exe");
+            //nautilisEXE = Path.Combine(Constants.NautilusDirectoryPath, "Nautilus.exe");
         }
 
         public async Task InitializeAsync()
@@ -130,9 +130,9 @@ namespace RhythmVerseClient.Services
     public static class Constants
     {
         public const string NAUTILUS_ARGS = "-clonehero";
-        public const string ZIP_FILE_URL = "https://calahil.github.io/nautilus.zip";
+        /*public const string ZIP_FILE_URL = "https://calahil.github.io/nautilus.zip";
         public static readonly string NautilusDirectoryPath = Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "rhythmverse"), "nautilus");
-        public static readonly string ZipFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nautilus.zip");
+        public static readonly string ZipFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nautilus.zip");*/
     }
 
     public static class User32
