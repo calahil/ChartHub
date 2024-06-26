@@ -1,6 +1,9 @@
 ﻿using SettingsManager;
+using SharpCompress.Archives;
+using SharpCompress.Common;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -47,8 +50,8 @@ namespace RhythmVerseClient.Services
             set { _appSettings.CloneHeroSongLocation = value; _settingsManager.Save(); }
         }
 
-        private ISettingsManager<AppSettings> _settingsManager;
-        private AppSettings _appSettings;
+        private readonly ISettingsManager<AppSettings> _settingsManager;
+        private readonly AppSettings _appSettings;
 
         public const string ZIP_FILE_URL = "https://calahil.github.io/nautilus.zip";
 
@@ -86,14 +89,14 @@ namespace RhythmVerseClient.Services
 
             if (DownloadDir == "first_install")
             {
-                DownloadDir = "C:\\";
+                DownloadDir = ConstructPath(PhaseshiftDir, "downloads"); ;
             }
 
             if (CloneHeroSongsDir == "first_install")
             {
-                CloneHeroSongsDir = "C:\\";
+                var cloneHeroDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Clone Hero");
+                CloneHeroSongsDir = ConstructPath(cloneHeroDataDir, "Songs");
             }
-            Initialize();
         }
 
         public void AddWatcher(string path, WatcherType watcherType)
@@ -115,14 +118,26 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        private void OnDirectoryNotFound(string directoryPath)
+        public ResourceWatcher GetDownloadWatcher()
         {
-            // Handle directory not found scenario
+            return ResourceWatchers[1];
         }
 
-        private void OnErrorOccurred(string errorMessage)
+        public ResourceWatcher GetCloneHeroSongWatcher()
+        {
+            return ResourceWatchers[0];
+        }
+
+        private static void OnDirectoryNotFound(string directoryPath)
+        {
+            // Handle directory not found scenario
+            CreateDirectoryIfNotExists(directoryPath);
+        }
+
+        private static void OnErrorOccurred(string errorMessage)
         {
             // Handle errors
+            Debug.WriteLine(errorMessage);
         }
 
         // Helper to build paths
@@ -131,9 +146,54 @@ namespace RhythmVerseClient.Services
             return Path.Combine(pathSegments);
         }
 
-        public void Initialize()
+        public async Task Initialize()
         {
+            var nautilisEXE = Path.Combine(NautilusDirectoryPath, "Nautilus.exe");
+
+            if (!File.Exists(ZipFilePath) && !File.Exists(nautilisEXE))
+            {
+                await DownloadFileAsync();
+
+                ExtractZipFile();
+            }
+
+            if (File.Exists(ZipFilePath) && File.Exists(nautilisEXE))
+            {
+                File.Delete(ZipFilePath);
+            }
+
+            CreateDirectoryIfNotExists(PhaseshiftDir);
             CreateDirectoryIfNotExists(PhaseshiftMusicDir);
+            CreateDirectoryIfNotExists(DownloadDir);
+
+            AddWatcher(CloneHeroSongsDir, WatcherType.Directory);
+            AddWatcher(DownloadDir, WatcherType.File);
+        }
+
+        private static async Task DownloadFileAsync()
+        {
+            HttpClient client = new();
+
+            byte[] data = await client.GetByteArrayAsync(ZIP_FILE_URL);
+            await File.WriteAllBytesAsync(ZipFilePath, data);
+        }
+
+        private void ExtractZipFile()
+        {
+            if (!Directory.Exists(NautilusDirectoryPath))
+            {
+                Directory.CreateDirectory(RhythmverseAppPath);
+            }
+
+            using var archive = ArchiveFactory.Open(ZipFilePath);
+            foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
+            {
+                entry.WriteToDirectory(RhythmverseAppPath, new ExtractionOptions
+                {
+                    ExtractFullPath = true,
+                    Overwrite = true
+                });
+            }
         }
 
         private static void CreateDirectoryIfNotExists(string directoryPath)

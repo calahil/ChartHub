@@ -17,22 +17,21 @@
 
     <ContentPage Title="Downloads">
         <StackLayout>
-            <Label Text="Welcome to Tab 2"
-                   VerticalOptions="CenterAndExpand" 
-                   HorizontalOptions="CenterAndExpand" />
-            <Entry Placeholder="Enter text here" 
-                   VerticalOptions="CenterAndExpand" 
-                   HorizontalOptions="CenterAndExpand" />
+            <ListView x:Name="DownloadList"
+                    VerticalOptions="CenterAndExpand" 
+                    HorizontalOptions="CenterAndExpand">
+                
+            </ListView>
         </StackLayout>
     </ContentPage>
 
     <ContentPage Title="Clone Hero Songs">
         <StackLayout>
-            <Label Text="Welcome to Tab 3"
-                   VerticalOptions="CenterAndExpand" 
-                   HorizontalOptions="CenterAndExpand" />
-            <Switch VerticalOptions="CenterAndExpand" 
-                    HorizontalOptions="CenterAndExpand" />
+            <ListView x:Name="CloneHeroList"
+                    VerticalOptions="CenterAndExpand" 
+                    HorizontalOptions="CenterAndExpand">
+
+            </ListView>
         </StackLayout>
     </ContentPage>
 

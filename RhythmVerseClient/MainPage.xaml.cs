@@ -11,6 +11,9 @@ namespace RhythmVerseClient
         {
             InitializeComponent();
             BindingContext = mainView;
+
+            DownloadList.ItemsSource = mainView.DownloadWatcher.Data;
+            CloneHeroList.ItemsSource = mainView.CloneHeroSongsWatcher.Data;
         }
 
         private void OnButtonClicked(object sender, EventArgs e)

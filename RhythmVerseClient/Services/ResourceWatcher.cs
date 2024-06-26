@@ -12,19 +12,19 @@ namespace RhythmVerseClient.Services
     public class ResourceWatcher : IResourceWatcher
     {
         public ObservableCollection<FileData> Data { get; set; }
-        public string DirectoryPath { get; private set; }
-        private FileSystemWatcher fileSystemWatcher;
+        public string DirectoryPath { get; private set; } = string.Empty;
+        private readonly FileSystemWatcher fileSystemWatcher;
         private HashSet<string> existingEntries;
         private WatcherType _watcherType;
 
-        public event EventHandler<string> DirectoryNotFound;
-        public event EventHandler<string> ErrorOccurred;
+        public event EventHandler<string>? DirectoryNotFound;
+        public event EventHandler<string>? ErrorOccurred;
 
         public ResourceWatcher()
         {
-            Data = new ObservableCollection<FileData>();
+            Data = [];
             fileSystemWatcher = new FileSystemWatcher();
-            existingEntries = new HashSet<string>();
+            existingEntries = [];
         }
 
         public void Initialize(string path, WatcherType watcherType)
@@ -46,7 +46,18 @@ namespace RhythmVerseClient.Services
 
         private void OnChanged(object source, FileSystemEventArgs e)
         {
-            RefreshItems();
+            if (MainThread.IsMainThread)
+            {
+                RefreshItems();
+            }
+            else
+            {
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    RefreshItems();
+                });
+
+            }
         }
 
         public void RefreshItems()
@@ -93,15 +104,12 @@ namespace RhythmVerseClient.Services
         {
             if (Directory.Exists(DirectoryPath))
             {
-                switch (_watcherType)
+                return _watcherType switch
                 {
-                    case WatcherType.Directory:
-                        return Directory.GetDirectories(DirectoryPath).Length;
-                    case WatcherType.File:
-                        return Directory.GetFiles(DirectoryPath).Length;
-                    default:
-                        return 0;
-                }
+                    WatcherType.Directory => Directory.GetDirectories(DirectoryPath).Length,
+                    WatcherType.File => Directory.GetFiles(DirectoryPath).Length,
+                    _ => 0,
+                };
             }
             else
             {
@@ -113,7 +121,7 @@ namespace RhythmVerseClient.Services
         public void OpenLocation(int index)
         {
             var selectedItem = Data[index];
-            string directoryPath = _watcherType == WatcherType.Directory ? selectedItem.FilePath : Path.GetDirectoryName(selectedItem.FilePath);
+            string? directoryPath = _watcherType == WatcherType.Directory ? selectedItem.FilePath : Path.GetDirectoryName(selectedItem.FilePath);
 
             try
             {
@@ -128,7 +136,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        public async Task DeleteItem(int index)
+        public void DeleteItem(int index)
         {
             var selectedItem = Data[index];
 

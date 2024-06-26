@@ -11,11 +11,16 @@ namespace RhythmVerseClient.ViewModels
     {
         public IFileSystemManager FileManager { get; }
 
+        public ResourceWatcher DownloadWatcher { get; set; }
+        public ResourceWatcher CloneHeroSongsWatcher {  get; set; }
+
         public MainViewModel(IFileSystemManager fileSystemManager)
         {
             FileManager = fileSystemManager;
-            FileManager.AddWatcher(FileManager.CloneHeroSongsDir, WatcherType.Directory);
-            FileManager.AddWatcher(FileManager.DownloadDir, WatcherType.File);
+            FileManager.Initialize();
+            
+            DownloadWatcher = FileManager.GetDownloadWatcher();
+            CloneHeroSongsWatcher = FileManager.GetCloneHeroSongWatcher();
         }
     }
 }

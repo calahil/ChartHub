@@ -15,6 +15,9 @@ namespace RhythmVerseClient.Services
 
         void AddWatcher(string path, WatcherType watcherType);
         void RemoveWatcher(string path);
+        ResourceWatcher GetDownloadWatcher();
+        ResourceWatcher GetCloneHeroSongWatcher();
+        Task Initialize();
     }
 
 

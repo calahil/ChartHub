@@ -34,13 +34,8 @@ namespace RhythmVerseClient
             }
 
             string json = File.ReadAllText(destinationFilePath);
-            var jsonSerializerOptions = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase // Use camelCase for JSON property names
-            };
-
-        AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json, jsonSerializerOptions)
+       
+        AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json, JsonCerealOptions.Instance)
                 ?? throw new JsonException("Failed to deserialize settings.");
 
 

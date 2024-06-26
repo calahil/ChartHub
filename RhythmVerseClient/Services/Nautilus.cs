@@ -5,27 +5,20 @@ using System.Runtime.InteropServices;
 
 namespace RhythmVerseClient.Services
 {
-    public partial class Nautilus
+    public partial class Nautilus(IFileSystemManager fileSystem, IKeystrokeSender keystrokeSender)
     {
         public ProcessStartInfo? CmdArgs { get; set; }
         public Process? Program { get; set; }
         public nint Hwnd { get; set; }
 
-        private string nautilisEXE;
+        //private string nautilisEXE;
 
-        private readonly IFileSystemManager _fileSystem;
-        private readonly IKeystrokeSender _keystrokeSender;
+        private readonly IFileSystemManager _fileSystem = fileSystem;
+        private readonly IKeystrokeSender _keystrokeSender = keystrokeSender;
 
-        public Nautilus(IFileSystemManager fileSystem, IKeystrokeSender keystrokeSender)
+        public static void Initialize()
         {
-            _fileSystem = fileSystem;
-            _keystrokeSender = keystrokeSender;
-            //nautilisEXE = Path.Combine(Constants.NautilusDirectoryPath, "Nautilus.exe");
-        }
-
-        public async Task InitializeAsync()
-        {
-            if (!File.Exists(Constants.ZipFilePath) && !File.Exists(nautilisEXE))
+            /*if (!File.Exists(Constants.ZipFilePath) && !File.Exists(nautilisEXE))
             {
                 await DownloadFileAsync();
             }
@@ -38,40 +31,14 @@ namespace RhythmVerseClient.Services
             if (File.Exists(Constants.ZipFilePath) && File.Exists(nautilisEXE))
             {
                 File.Delete(Constants.ZipFilePath);
-            }
+            }*/
 
-            if (Constants.NAUTILUS_ARGS != null && nautilisEXE != null)
-            {
-                CmdArgs = new(nautilisEXE, Constants.NAUTILUS_ARGS);
-            }
+            //if (Constants.NAUTILUS_ARGS != null && nautilisEXE != null)
+            //{
+            //    CmdArgs = new(nautilisEXE, Constants.NAUTILUS_ARGS);
+            //}
         }
-
-        private async Task DownloadFileAsync()
-        {
-            HttpClient client = new();
-
-            byte[] data = await client.GetByteArrayAsync(Constants.ZIP_FILE_URL);
-            await File.WriteAllBytesAsync(Constants.ZipFilePath, data);
-        }
-
-        private void ExtractZipFile()
-        {
-            if (!Directory.Exists(Constants.NautilusDirectoryPath))
-            {
-                Directory.CreateDirectory(_fileSystem.RhythmverseAppPath);
-            }
-
-            using var archive = ArchiveFactory.Open(Constants.ZipFilePath);
-            foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
-            {
-                entry.WriteToDirectory(_fileSystem.RhythmverseAppPath, new ExtractionOptions
-                {
-                    ExtractFullPath = true,
-                    Overwrite = true
-                });
-            }
-        }
-
+        
         public void Run()
         {
             if (CmdArgs == null)
@@ -135,19 +102,23 @@ namespace RhythmVerseClient.Services
         public static readonly string ZipFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nautilus.zip");*/
     }
 
-    public static class User32
+    public static partial class User32
     {
-        [DllImport("user32.dll")]
-        public static extern bool SetForegroundWindow(nint hWnd);
+        [LibraryImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool SetForegroundWindow(nint hWnd);
 
-        [DllImport("user32.dll")]
-        public static extern bool ShowWindowAsync(nint hWnd, int nCmdShow);
+        [LibraryImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool ShowWindowAsync(nint hWnd, int nCmdShow);
 
-        [DllImport("user32.dll", SetLastError = true)]
-        public static extern bool BringWindowToTop(nint hWnd);
+        [LibraryImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool BringWindowToTop(nint hWnd);
 
-        [DllImport("user32.dll", SetLastError = true)]
-        public static extern bool ShowWindow(nint hWnd, uint nCmdShow);
+        [LibraryImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static partial bool ShowWindow(nint hWnd, uint nCmdShow);
     }
 
     public static class VirtualKeyCodes
