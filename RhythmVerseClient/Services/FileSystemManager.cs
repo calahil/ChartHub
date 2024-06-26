@@ -13,33 +13,37 @@ namespace RhythmVerseClient.Services
     {
         public string PhaseshiftDir
         {
-            get => _appSettings.PhaseshiftDirectory;
+            get => _appSettings.PhaseshiftDirectory ?? String.Empty;
             set { _appSettings.PhaseshiftDirectory = value; _settingsManager.Save(); }
         }
 
-
+        public string NautilusDirectoryPath
+        {
+            get => _appSettings.NautilusDirectoryPath ?? String.Empty;
+            set { _appSettings.NautilusDirectoryPath = value; _settingsManager.Save(); }
+        }
 
         public string PhaseshiftMusicDir
         {
-            get => _appSettings.PhaseshiftMusicDirectory;
+            get => _appSettings.PhaseshiftMusicDirectory ?? String.Empty;
             set { _appSettings.PhaseshiftMusicDirectory = value; _settingsManager.Save(); }
         }
 
         public string RhythmverseAppPath
         {
-            get => _appSettings.RhythmverseAppPath;
+            get => _appSettings.RhythmverseAppPath ?? String.Empty;
             set { _appSettings.RhythmverseAppPath = value; _settingsManager.Save(); }
         }
 
         public string DownloadDir
         {
-            get => _appSettings.DownloadLocation;
+            get => _appSettings.DownloadLocation ?? String.Empty;
             set { _appSettings.DownloadLocation = value; _settingsManager.Save(); }
         }
 
         public string CloneHeroSongsDir
         {
-            get => _appSettings.CloneHeroSongLocation;
+            get => _appSettings.CloneHeroSongLocation ?? String.Empty;
             set { _appSettings.CloneHeroSongLocation = value; _settingsManager.Save(); }
         }
 
@@ -47,12 +51,6 @@ namespace RhythmVerseClient.Services
         private AppSettings _appSettings;
 
         public const string ZIP_FILE_URL = "https://calahil.github.io/nautilus.zip";
-
-        public string NautilusDirectoryPath
-        {
-            get => _appSettings.NautilusDirectoryPath;
-            set { _appSettings.NautilusDirectoryPath = value; _settingsManager.Save(); }
-        }
 
         public static readonly string ZipFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nautilus.zip");
 
