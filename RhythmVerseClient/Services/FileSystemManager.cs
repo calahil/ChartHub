@@ -1,4 +1,5 @@
-﻿using SettingsManager;
+﻿using Microsoft.Extensions.FileSystemGlobbing;
+using SettingsManager;
 using SharpCompress.Archives;
 using SharpCompress.Common;
 using System.Collections.Generic;
@@ -97,16 +98,19 @@ namespace RhythmVerseClient.Services
                 var cloneHeroDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Clone Hero");
                 CloneHeroSongsDir = ConstructPath(cloneHeroDataDir, "Songs");
             }
-
+            AddWatchers(2);
         }
 
-        public void AddWatcher()
+        public void AddWatchers(int count)
         {
-            var watcher = new ResourceWatcher();
-            watcher.DirectoryNotFound += (sender, message) => OnDirectoryNotFound(message);
-            watcher.ErrorOccurred += (sender, message) => OnErrorOccurred(message);
+            for (int i = 0; i <= count; i++)
+            {
+                var watcher = new ResourceWatcher();
+                watcher.DirectoryNotFound += (sender, message) => OnDirectoryNotFound(message);
+                watcher.ErrorOccurred += (sender, message) => OnErrorOccurred(message);
 
-            ResourceWatchers.Add(watcher);
+                ResourceWatchers.Add(watcher);
+            }
         }
 
         public void RemoveWatcher(string path)
@@ -120,12 +124,12 @@ namespace RhythmVerseClient.Services
 
         public ResourceWatcher GetDownloadWatcher()
         {
-            return ResourceWatchers[1];
+            return ResourceWatchers[0];
         }
 
         public ResourceWatcher GetCloneHeroSongWatcher()
         {
-            return ResourceWatchers[0];
+            return ResourceWatchers[1];
         }
 
         private static void OnDirectoryNotFound(string directoryPath)
@@ -166,8 +170,8 @@ namespace RhythmVerseClient.Services
             CreateDirectoryIfNotExists(PhaseshiftMusicDir);
             CreateDirectoryIfNotExists(DownloadDir);
 
-            AddWatcher(CloneHeroSongsDir, WatcherType.Directory);
-            AddWatcher(DownloadDir, WatcherType.File);
+            GetCloneHeroSongWatcher().Initialize(CloneHeroSongsDir, WatcherType.Directory);
+            GetDownloadWatcher().Initialize(DownloadDir, WatcherType.File);
         }
 
         private static async Task DownloadFileAsync()

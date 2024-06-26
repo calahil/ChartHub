@@ -13,7 +13,7 @@ namespace RhythmVerseClient.Services
         string DownloadDir { get; set; }
         string CloneHeroSongsDir { get; set; }
 
-        void AddWatcher(string path, WatcherType watcherType);
+        void AddWatchers(int count);
         void RemoveWatcher(string path);
         ResourceWatcher GetDownloadWatcher();
         ResourceWatcher GetCloneHeroSongWatcher();

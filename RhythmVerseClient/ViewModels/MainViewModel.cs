@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.FileSystemGlobbing;
-using RhythmVerseClient.Services;
+﻿using RhythmVerseClient.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,10 +18,9 @@ namespace RhythmVerseClient.ViewModels
         {
             FileManager = fileSystemManager;
             FileManager.Initialize();
-
-
-            watcher.Initialize(path, watcherType);
-
+            
+            DownloadWatcher = FileManager.GetDownloadWatcher();
+            CloneHeroSongsWatcher = FileManager.GetCloneHeroSongWatcher();
             DownloadWatcher.LoadItems();
             CloneHeroSongsWatcher.LoadItems();
         }
