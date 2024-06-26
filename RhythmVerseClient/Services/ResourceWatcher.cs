@@ -1,5 +1,8 @@
-﻿using System.Collections.ObjectModel;
+﻿using Microsoft.UI.Xaml.Controls;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 
 namespace RhythmVerseClient.Services
 {
@@ -36,69 +39,122 @@ namespace RhythmVerseClient.Services
             fileSystemWatcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName;
             fileSystemWatcher.Filter = "*.*";
             fileSystemWatcher.Changed += OnChanged;
-            fileSystemWatcher.Created += OnChanged;
-            fileSystemWatcher.Deleted += OnChanged;
-            fileSystemWatcher.Renamed += OnChanged;
+            fileSystemWatcher.Created += OnCreated;
+            fileSystemWatcher.Deleted += OnDeleted;
+            fileSystemWatcher.Renamed += OnRenamed;
             fileSystemWatcher.EnableRaisingEvents = true;
 
-            RefreshItems();
+            //RefreshItems();
+        }
+
+        private void OnRenamed(object sender, RenamedEventArgs e)
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                string itemName = String.Empty;
+                string oldItemName = String.Empty;
+
+                if (e.Name == null || e.OldName == null)
+                {
+                    itemName = Path.GetFileName(e.FullPath);
+                    oldItemName = Path.GetFileName(e.OldFullPath);
+                }
+                UpdateItem(e.Name ?? itemName, e.FullPath, e.OldName ?? oldItemName, e.OldFullPath);
+            });
+        }
+
+        private void OnDeleted(object sender, FileSystemEventArgs e)
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                string itemName = String.Empty;
+                if (e.Name == null)
+                {
+                    itemName = Path.GetFileName(e.FullPath);
+                }
+                DeleteItem(e.Name ?? itemName, e.FullPath);
+            });
+        }
+
+        private void OnCreated(object sender, FileSystemEventArgs e)
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                string itemName = String.Empty;
+                if (e.Name == null)
+                {
+                    itemName = Path.GetFileName(e.FullPath);
+                }
+
+                AddItem(e.Name ?? itemName, e.FullPath);
+            });
+
         }
 
         private void OnChanged(object source, FileSystemEventArgs e)
         {
-            if (MainThread.IsMainThread)
+            MainThread.BeginInvokeOnMainThread(() =>
             {
-                RefreshItems();
-            }
-            else
-            {
-                MainThread.BeginInvokeOnMainThread(() =>
-                {
-                    RefreshItems();
-                });
+                //string itemName = String.Empty;
 
-            }
+                if (e.Name == null)
+                {
+                    //itemName = Path.GetFileName(e.FullPath);
+                }
+                //UpdateItem(e.Name ?? itemName, e.FullPath, e.OldName ?? oldItemName, e.OldFullPath);
+            });
         }
 
-        public void RefreshItems()
+        public void LoadItems()
         {
             if (Directory.Exists(DirectoryPath))
             {
-                var existingEntries = new HashSet<string>(Data.Select(d => d.FilePath));
+                string[] items = [];
 
                 switch (_watcherType)
                 {
                     case WatcherType.Directory:
-                        string[] directories = Directory.GetDirectories(DirectoryPath);
-                        foreach (string directory in directories)
-                        {
-                            if (!existingEntries.Contains(directory))
-                            {
-                                string directoryName = Path.GetFileName(directory);
-                                Data.Add(new FileData(directoryName, directory));
-                                existingEntries.Add(directory);
-                            }
-                        }
+                        items = Directory.GetDirectories(DirectoryPath);
+
                         break;
                     case WatcherType.File:
-                        string[] files = Directory.GetFiles(DirectoryPath);
-                        foreach (string file in files)
-                        {
-                            if (!existingEntries.Contains(file))
-                            {
-                                string displayName = Path.GetFileName(file);
-                                Data.Add(new FileData(displayName, file));
-                                existingEntries.Add(file);
-                            }
-                        }
+                        items = Directory.GetFiles(DirectoryPath);
+
                         break;
                 }
+                foreach (string item in items)
+                {
+                    // TODO: needs error handling or does CleanUp do a good enough job
+                    if (!existingEntries.Contains(item))
+                    {
+                        var itemName = Path.GetFileName(item);
+                        var compareData = new FileData(itemName, item);
+
+                        AddItem(itemName, item);
+                    }
+                }
+                //CleanUp();
             }
             else
             {
                 DirectoryNotFound?.Invoke(this, DirectoryPath);
             }
         }
+
+        /*private void CleanUp()
+        {
+            foreach (string item in existingEntries)
+            {
+                for
+                existingEntries.Remove(item);
+                string itemName = Path.GetFileName(item);
+                var index = Data.IndexOf(new FileData(itemName, item));
+                if (index != -1)
+                {
+                    Data.RemoveAt(index);
+                }
+            }
+        }*/
 
         public int GetItemCount()
         {
@@ -136,7 +192,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        public void DeleteItem(int index)
+        public void DeleteFile(int index)
         {
             var selectedItem = Data[index];
 
@@ -149,7 +205,7 @@ namespace RhythmVerseClient.Services
                         case WatcherType.Directory:
                             if (Directory.Exists(selectedItem.FilePath))
                             {
-                                Directory.Delete(selectedItem.FilePath, true);
+                                //Directory.Delete(selectedItem.FilePath, true);
                                 Data.RemoveAt(index);
                                 existingEntries.Remove(selectedItem.FilePath);
                             }
@@ -157,7 +213,7 @@ namespace RhythmVerseClient.Services
                         case WatcherType.File:
                             if (File.Exists(selectedItem.FilePath))
                             {
-                                File.Delete(selectedItem.FilePath);
+                                //File.Delete(selectedItem.FilePath);
                                 Data.RemoveAt(index);
                                 existingEntries.Remove(selectedItem.FilePath);
                             }
@@ -178,19 +234,98 @@ namespace RhythmVerseClient.Services
         public void AddItem(string itemName, string itemPath)
         {
             Data.Add(new FileData(itemName, itemPath));
+            existingEntries.Add(itemPath);
+        }
+
+        public void DeleteItem(string itemName, string itemPath)
+        {
+            var itemToDelete = new FileData(itemName, itemPath);
+            var index = Data.IndexOf(itemToDelete);
+
+            if (index != -1)
+            {
+                Data.RemoveAt(index);
+            }
+            if (existingEntries.Contains(itemPath))
+            {
+                existingEntries.Remove(itemPath);
+            }
+        }
+
+        public void UpdateItem(string itemName, string itemPath, string oldItemName, string oldItemPath)
+        {
+            var itemToEdit = Data.FirstOrDefault(item => item.FilePath == oldItemPath);
+
+            if (itemToEdit != null)
+            {
+                itemToEdit.FilePath = itemPath;
+                itemToEdit.DisplayName = itemName;
+            }
         }
     }
 
-
-
-    public class FileData(string displayName, string filePath)
+    public class FileData : INotifyPropertyChanged
     {
-        public string DisplayName { get; set; } = displayName;
-        public string FilePath { get; set; } = filePath;
+        private string _displayName;
+        private string _filePath;
+
+        public string DisplayName
+        {
+            get => _displayName;
+            set
+            {
+                if (_displayName != value)
+                {
+                    _displayName = value;
+                    OnPropertyChanged(nameof(DisplayName));
+                }
+            }
+        }
+
+        public string FilePath
+        {
+            get => _filePath;
+            set
+            {
+                if (_filePath != value)
+                {
+                    _filePath = value;
+                    OnPropertyChanged(nameof(FilePath));
+                }
+            }
+        }
+
+        public FileData(string displayName, string filePath)
+        {
+            _displayName = displayName;
+            _filePath = filePath;
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         public override string ToString()
         {
             return DisplayName;
         }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is FileData other)
+            {
+                return this.DisplayName == other.DisplayName && this.FilePath == other.FilePath;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(DisplayName, FilePath);
+        }
     }
+
 }

@@ -97,12 +97,12 @@ namespace RhythmVerseClient.Services
                 var cloneHeroDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Clone Hero");
                 CloneHeroSongsDir = ConstructPath(cloneHeroDataDir, "Songs");
             }
+
         }
 
-        public void AddWatcher(string path, WatcherType watcherType)
+        public void AddWatcher()
         {
             var watcher = new ResourceWatcher();
-            watcher.Initialize(path, watcherType);
             watcher.DirectoryNotFound += (sender, message) => OnDirectoryNotFound(message);
             watcher.ErrorOccurred += (sender, message) => OnErrorOccurred(message);
 
