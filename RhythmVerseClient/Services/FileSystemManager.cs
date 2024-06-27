@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.FileSystemGlobbing;
+using Microsoft.VisualBasic.FileIO;
 using SettingsManager;
 using SharpCompress.Archives;
 using SharpCompress.Common;
@@ -55,7 +56,7 @@ namespace RhythmVerseClient.Services
         private readonly AppSettings _appSettings;
 
         public const string ZIP_FILE_URL = "https://calahil.github.io/nautilus.zip";
-
+        
         public static readonly string ZipFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nautilus.zip");
 
         public ObservableCollection<ResourceWatcher> ResourceWatchers { get; set; } = [];
@@ -99,6 +100,30 @@ namespace RhythmVerseClient.Services
                 CloneHeroSongsDir = ConstructPath(cloneHeroDataDir, "Songs");
             }
             AddWatchers(2);
+        }
+
+        public async Task Initialize()
+        {
+            var nautilisEXE = Path.Combine(NautilusDirectoryPath, "Nautilus.exe");
+
+            if (!File.Exists(ZipFilePath) && !File.Exists(nautilisEXE))
+            {
+                await DownloadFileAsync();
+
+                ExtractZipFile();
+            }
+
+            if (File.Exists(ZipFilePath) && File.Exists(nautilisEXE))
+            {
+                File.Delete(ZipFilePath);
+            }
+
+            CreateDirectoryIfNotExists(PhaseshiftDir);
+            CreateDirectoryIfNotExists(PhaseshiftMusicDir);
+            CreateDirectoryIfNotExists(DownloadDir);
+
+            GetCloneHeroSongWatcher().Initialize(CloneHeroSongsDir, WatcherType.Directory);
+            GetDownloadWatcher().Initialize(DownloadDir, WatcherType.File);
         }
 
         public void AddWatchers(int count)
@@ -150,36 +175,20 @@ namespace RhythmVerseClient.Services
             return Path.Combine(pathSegments);
         }
 
-        public async Task Initialize()
-        {
-            var nautilisEXE = Path.Combine(NautilusDirectoryPath, "Nautilus.exe");
-
-            if (!File.Exists(ZipFilePath) && !File.Exists(nautilisEXE))
-            {
-                await DownloadFileAsync();
-
-                ExtractZipFile();
-            }
-
-            if (File.Exists(ZipFilePath) && File.Exists(nautilisEXE))
-            {
-                File.Delete(ZipFilePath);
-            }
-
-            CreateDirectoryIfNotExists(PhaseshiftDir);
-            CreateDirectoryIfNotExists(PhaseshiftMusicDir);
-            CreateDirectoryIfNotExists(DownloadDir);
-
-            GetCloneHeroSongWatcher().Initialize(CloneHeroSongsDir, WatcherType.Directory);
-            GetDownloadWatcher().Initialize(DownloadDir, WatcherType.File);
-        }
-
         private static async Task DownloadFileAsync()
         {
             HttpClient client = new();
 
             byte[] data = await client.GetByteArrayAsync(ZIP_FILE_URL);
             await File.WriteAllBytesAsync(ZipFilePath, data);
+        }
+
+        private static void CreateDirectoryIfNotExists(string directoryPath)
+        {
+            if (!Directory.Exists(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
         }
 
         private void ExtractZipFile()
@@ -197,14 +206,6 @@ namespace RhythmVerseClient.Services
                     ExtractFullPath = true,
                     Overwrite = true
                 });
-            }
-        }
-
-        private static void CreateDirectoryIfNotExists(string directoryPath)
-        {
-            if (!Directory.Exists(directoryPath))
-            {
-                Directory.CreateDirectory(directoryPath);
             }
         }
 

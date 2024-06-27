@@ -1,6 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <TabbedPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+            xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
             xmlns:local="clr-namespace:RhythmVerseClient"
             x:Class="RhythmVerseClient.MainPage"
             xmlns:models="clr-namespace:RhythmVerseClient.ViewModels"
@@ -20,7 +21,11 @@
     </ContentPage>
 
     <ContentPage Title="Downloads" x:Name="DownloadPage">
-        <CollectionView ItemsSource="{Binding DownloadWatcher.Data}" SelectionMode="Single">
+        <ContentPage.Resources>
+            <toolkit:AppThemeObject Light="dark.png" Dark="light.png" x:Key="MyTheme" />
+        </ContentPage.Resources>
+        <CollectionView ItemsSource="{Binding DownloadWatcher.Data}" SelectionMode="Single"
+                        x:Name="DownloadList">
             <CollectionView.ItemsLayout>
                 <!-- Set Span to 1 for single item per row -->
                 <GridItemsLayout Orientation="Vertical" Span="1" />

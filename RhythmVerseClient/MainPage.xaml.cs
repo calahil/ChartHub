@@ -12,10 +12,17 @@ namespace RhythmVerseClient
             InitializeComponent();
             BindingContext = mainView;
 
+
+            DownloadList.SelectionChanged += DownloadList_SelectionChanged;
             //DownloadPage.BindingContext = mainView.DownloadWatcher;
             //CloneHeroPage.BindingContext = mainView.CloneHeroSongsWatcher;
             //DownloadList.ItemsSource = mainView.DownloadWatcher.Data;
             //CloneHeroList.ItemsSource = mainView.CloneHeroSongsWatcher.Data;
+        }
+
+        private void DownloadList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            throw new NotImplementedException();
         }
 
         private void OnButtonClicked(object sender, EventArgs e)

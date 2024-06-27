@@ -1,4 +1,5 @@
 ﻿using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.CustomAttributes;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -12,6 +13,15 @@ namespace RhythmVerseClient.Services
         File
     }
 
+    public enum WatcherFileType
+    {
+        Rar,
+        Zip,
+        RB3CON,
+        CloneHero,
+        Unknown
+    }
+
     public class ResourceWatcher : IResourceWatcher
     {
         public ObservableCollection<FileData> Data { get; set; }
@@ -20,6 +30,10 @@ namespace RhythmVerseClient.Services
         private HashSet<string> existingEntries;
         private WatcherType _watcherType;
 
+
+        private static readonly byte[] ZipSignature = [0x50, 0x4B, 0x03, 0x04];
+        private static readonly byte[] RarSignature = "Rar!"u8.ToArray();
+        private static readonly byte[] Rb3ConSignature = "CON"u8.ToArray();
 
         public event EventHandler<string>? DirectoryNotFound;
         public event EventHandler<string>? ErrorOccurred;
@@ -48,6 +62,42 @@ namespace RhythmVerseClient.Services
             //RefreshItems();
         }
 
+        public async void LoadItems()
+        {
+            if (Directory.Exists(DirectoryPath))
+            {
+                string[] items = [];
+
+                switch (_watcherType)
+                {
+                    case WatcherType.Directory:
+                        items = Directory.GetDirectories(DirectoryPath);
+
+                        break;
+                    case WatcherType.File:
+                        items = Directory.GetFiles(DirectoryPath);
+
+                        break;
+                }
+                foreach (string item in items)
+                {
+                    // TODO: needs error handling or does CleanUp do a good enough job
+                    if (!existingEntries.Contains(item))
+                    {
+                        var itemName = Path.GetFileName(item);
+                        //var fileType = await
+
+                        await AddItem(itemName, item);
+                    }
+                }
+                //CleanUp();
+            }
+            else
+            {
+                DirectoryNotFound?.Invoke(this, DirectoryPath);
+            }
+        }
+
         private void OnRenamed(object sender, RenamedEventArgs e)
         {
             MainThread.BeginInvokeOnMainThread(() =>
@@ -60,7 +110,7 @@ namespace RhythmVerseClient.Services
                     itemName = Path.GetFileName(e.FullPath);
                     oldItemName = Path.GetFileName(e.OldFullPath);
                 }
-                UpdateItem(e.Name ?? itemName, e.FullPath, e.OldName ?? oldItemName, e.OldFullPath);
+                UpdateItem(e.Name ?? itemName, e.FullPath, e.OldFullPath).RunSynchronously();
             });
         }
 
@@ -94,7 +144,7 @@ namespace RhythmVerseClient.Services
 
         private void OnChanged(object source, FileSystemEventArgs e)
         {
-            MainThread.BeginInvokeOnMainThread(() =>
+            /*MainThread.BeginInvokeOnMainThread(() =>
             {
                 //string itemName = String.Empty;
 
@@ -103,59 +153,57 @@ namespace RhythmVerseClient.Services
                     //itemName = Path.GetFileName(e.FullPath);
                 }
                 //UpdateItem(e.Name ?? itemName, e.FullPath, e.OldName ?? oldItemName, e.OldFullPath);
-            });
+            });*/
         }
 
-        public void LoadItems()
+        public static async Task<WatcherFileType> GetFileTypeAsync(string filePath)
         {
-            if (Directory.Exists(DirectoryPath))
+            byte[] fileSignature = new byte[4];
+
+            try
             {
-                string[] items = [];
+                using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
+                await fs.ReadAsync(fileSignature, 0, fileSignature.Length);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reading file: {ex.Message}");
+                return WatcherFileType.Unknown;
+            }
 
-                switch (_watcherType)
-                {
-                    case WatcherType.Directory:
-                        items = Directory.GetDirectories(DirectoryPath);
-
-                        break;
-                    case WatcherType.File:
-                        items = Directory.GetFiles(DirectoryPath);
-
-                        break;
-                }
-                foreach (string item in items)
-                {
-                    // TODO: needs error handling or does CleanUp do a good enough job
-                    if (!existingEntries.Contains(item))
-                    {
-                        var itemName = Path.GetFileName(item);
-                        var compareData = new FileData(itemName, item);
-
-                        AddItem(itemName, item);
-                    }
-                }
-                //CleanUp();
+            if (fileSignature.Length >= ZipSignature.Length && fileSignature.AsSpan().Slice(0, ZipSignature.Length).SequenceEqual(ZipSignature))
+            {
+                return WatcherFileType.Zip;
+            }
+            else if (fileSignature.Length >= RarSignature.Length && fileSignature.AsSpan().Slice(0, RarSignature.Length).SequenceEqual(RarSignature))
+            {
+                return WatcherFileType.Rar;
+            }
+            else if (fileSignature.Length >= Rb3ConSignature.Length && fileSignature.AsSpan().Slice(0, Rb3ConSignature.Length).SequenceEqual(Rb3ConSignature))
+            {
+                return WatcherFileType.RB3CON;
+            }
+            else if (File.GetAttributes(filePath).HasFlag(FileAttributes.Directory))
+            {
+                return WatcherFileType.CloneHero;
             }
             else
             {
-                DirectoryNotFound?.Invoke(this, DirectoryPath);
+                return WatcherFileType.Unknown;
             }
         }
 
-        /*private void CleanUp()
+        public static string GetIconForFileType(WatcherFileType fileType)
         {
-            foreach (string item in existingEntries)
+            return fileType switch
             {
-                for
-                existingEntries.Remove(item);
-                string itemName = Path.GetFileName(item);
-                var index = Data.IndexOf(new FileData(itemName, item));
-                if (index != -1)
-                {
-                    Data.RemoveAt(index);
-                }
-            }
-        }*/
+                WatcherFileType.Rar => "rar.png",
+                WatcherFileType.Zip => "zip.png",
+                WatcherFileType.RB3CON => "rb3.png",
+                WatcherFileType.CloneHero => "clonehero.png",
+                _ => "unknown.png",
+            };
+        }
 
         public int GetItemCount()
         {
@@ -232,43 +280,48 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        public void AddItem(string itemName, string itemPath)
+        public async Task AddItem(string itemName, string itemPath)
         {
-            Data.Add(new FileData(itemName, itemPath));
+            var fileType = await GetFileTypeAsync(itemPath);
+            var imageFile = GetIconForFileType(fileType);
+            Data.Add(new FileData(itemName, itemPath, fileType, imageFile));
             existingEntries.Add(itemPath);
         }
 
-        public void DeleteItem(string itemName, string itemPath)
+        public async Task DeleteItem(string itemName, string itemPath)
         {
-            var itemToDelete = new FileData(itemName, itemPath);
+            var fileType = await GetFileTypeAsync(itemPath);
+            var imageFile = GetIconForFileType(fileType);
+            var itemToDelete = new FileData(itemName, itemPath, fileType, imageFile);
             var index = Data.IndexOf(itemToDelete);
 
             if (index != -1)
             {
                 Data.RemoveAt(index);
             }
-            if (existingEntries.Contains(itemPath))
-            {
-                existingEntries.Remove(itemPath);
-            }
+            existingEntries.Remove(itemPath);
         }
 
-        public void UpdateItem(string itemName, string itemPath, string oldItemName, string oldItemPath)
+        public async Task UpdateItem(string itemName, string itemPath, string oldItemPath)
         {
             var itemToEdit = Data.FirstOrDefault(item => item.FilePath == oldItemPath);
 
             if (itemToEdit != null)
             {
+                itemToEdit.FileType = await GetFileTypeAsync(itemPath);
+                var imageFile = GetIconForFileType(itemToEdit.FileType);
                 itemToEdit.FilePath = itemPath;
                 itemToEdit.DisplayName = itemName;
             }
         }
     }
 
-    public class FileData : INotifyPropertyChanged
+    public class FileData(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile) : INotifyPropertyChanged
     {
-        private string _displayName;
-        private string _filePath;
+        private string _displayName = displayName;
+        private string _filePath = filePath;
+        private string _imageFile = imageFile;
+        private WatcherFileType _fileType = watcherFileType;
 
         public string DisplayName
         {
@@ -296,13 +349,33 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        public FileData(string displayName, string filePath)
+        public string ImageFile
         {
-            _displayName = displayName;
-            _filePath = filePath;
+            get => _imageFile;
+            set
+            {
+                if (_imageFile != value)
+                {
+                    _imageFile = value;
+                    OnPropertyChanged(nameof(ImageFile));
+                }
+            }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public WatcherFileType FileType
+        {
+            get => _fileType;
+            set
+            {
+                if (_fileType != value)
+                {
+                    _fileType = value;
+                    OnPropertyChanged(nameof(FileType));
+                }
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
@@ -314,7 +387,7 @@ namespace RhythmVerseClient.Services
             return DisplayName;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is FileData other)
             {

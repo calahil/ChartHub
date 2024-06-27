@@ -3,6 +3,7 @@ using RhythmVerseClient.Services;
 using RhythmVerseClient.ViewModels;
 using SettingsManager;
 using System.Text.Json;
+using CommunityToolkit.Maui;
 
 namespace RhythmVerseClient
 {
@@ -13,6 +14,7 @@ namespace RhythmVerseClient
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
+                .UseMauiCommunityToolkit()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

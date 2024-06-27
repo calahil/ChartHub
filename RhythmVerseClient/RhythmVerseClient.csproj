@@ -59,6 +59,16 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <None Remove="Resources\Images\clonehero.png" />
+	  <None Remove="Resources\Images\folder.png" />
+	  <None Remove="Resources\Images\rar.png" />
+	  <None Remove="Resources\Images\rb3.png" />
+	  <None Remove="Resources\Images\unknown.png" />
+	  <None Remove="Resources\Images\zip.png" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="CommunityToolkit.Maui" Version="9.0.1" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="6.0.1" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="8.0.60" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.60" />
