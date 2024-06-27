@@ -1,5 +1,6 @@
 ﻿using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.CustomAttributes;
+using RhythmVerseClient.Utilities;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -17,8 +18,9 @@ namespace RhythmVerseClient.Services
     {
         Rar,
         Zip,
-        RB3CON,
+        Con,
         CloneHero,
+        SevenZip,
         Unknown
     }
 
@@ -34,6 +36,7 @@ namespace RhythmVerseClient.Services
         private static readonly byte[] ZipSignature = [0x50, 0x4B, 0x03, 0x04];
         private static readonly byte[] RarSignature = "Rar!"u8.ToArray();
         private static readonly byte[] Rb3ConSignature = "CON"u8.ToArray();
+        private static readonly byte[] SevenZipSignature = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
 
         public event EventHandler<string>? DirectoryNotFound;
         public event EventHandler<string>? ErrorOccurred;
@@ -158,7 +161,7 @@ namespace RhythmVerseClient.Services
 
         public static async Task<WatcherFileType> GetFileTypeAsync(string filePath)
         {
-            byte[] fileSignature = new byte[4];
+            byte[] fileSignature = new byte[6];
 
             try
             {
@@ -181,11 +184,15 @@ namespace RhythmVerseClient.Services
             }
             else if (fileSignature.Length >= Rb3ConSignature.Length && fileSignature.AsSpan().Slice(0, Rb3ConSignature.Length).SequenceEqual(Rb3ConSignature))
             {
-                return WatcherFileType.RB3CON;
+                return WatcherFileType.Con;
             }
             else if (File.GetAttributes(filePath).HasFlag(FileAttributes.Directory))
             {
                 return WatcherFileType.CloneHero;
+            }
+            else if (fileSignature.AsSpan().Slice(0, SevenZipSignature.Length).SequenceEqual(SevenZipSignature))
+            {
+                return WatcherFileType.SevenZip;
             }
             else
             {
@@ -199,9 +206,10 @@ namespace RhythmVerseClient.Services
             {
                 WatcherFileType.Rar => "rar.png",
                 WatcherFileType.Zip => "zip.png",
-                WatcherFileType.RB3CON => "rb3.png",
+                WatcherFileType.Con => "rb.png",
+                WatcherFileType.SevenZip => "sevenzip.png",
                 WatcherFileType.CloneHero => "clonehero.png",
-                _ => "unknown.png",
+                _ => "blank.png",
             };
         }
 
@@ -284,7 +292,22 @@ namespace RhythmVerseClient.Services
         {
             var fileType = await GetFileTypeAsync(itemPath);
             var imageFile = GetIconForFileType(fileType);
-            Data.Add(new FileData(itemName, itemPath, fileType, imageFile));
+            string fileSize;
+
+            switch (_watcherType)
+                {
+                case WatcherType.File:
+                    var info = new FileInfo(itemPath);
+                    fileSize = Toolbox.ConvertFileSize(info.Length);
+                    break;
+                case WatcherType.Directory:
+                    fileSize = Toolbox.ConvertFileSize(Toolbox.GetDirectorySize(itemPath));
+                    break;
+                default:
+                    fileSize = "0B";
+                    break;
+            }            
+            Data.Add(new FileData(itemName, itemPath, fileType, imageFile, fileSize));
             existingEntries.Add(itemPath);
         }
 
@@ -292,7 +315,9 @@ namespace RhythmVerseClient.Services
         {
             var fileType = await GetFileTypeAsync(itemPath);
             var imageFile = GetIconForFileType(fileType);
-            var itemToDelete = new FileData(itemName, itemPath, fileType, imageFile);
+            var info = new FileInfo(itemPath);
+            var fileSize = Toolbox.ConvertFileSize(info.Length);
+            var itemToDelete = new FileData(itemName, itemPath, fileType, imageFile, fileSize);
             var index = Data.IndexOf(itemToDelete);
 
             if (index != -1)
@@ -316,12 +341,13 @@ namespace RhythmVerseClient.Services
         }
     }
 
-    public class FileData(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile) : INotifyPropertyChanged
+    public class FileData(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile, string fileSize) : INotifyPropertyChanged
     {
         private string _displayName = displayName;
         private string _filePath = filePath;
         private string _imageFile = imageFile;
         private WatcherFileType _fileType = watcherFileType;
+        private string _fileSize = fileSize;
 
         public string DisplayName
         {
@@ -375,6 +401,18 @@ namespace RhythmVerseClient.Services
             }
         }
 
+        public string FileSize
+        {
+            get => _fileSize;
+            set
+            {
+                if (_fileSize != value)
+                {
+                    _fileSize = value;
+                    OnPropertyChanged(nameof(FileSize));
+                }
+            }
+        }
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
