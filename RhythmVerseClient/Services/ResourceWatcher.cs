@@ -20,6 +20,7 @@ namespace RhythmVerseClient.Services
         private HashSet<string> existingEntries;
         private WatcherType _watcherType;
 
+
         public event EventHandler<string>? DirectoryNotFound;
         public event EventHandler<string>? ErrorOccurred;
 
