@@ -35,15 +35,17 @@
                     <Grid Padding="10">
                         <!-- Define one row and two columns -->
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="36" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="36" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <!-- Bind properties to labels -->
-                        <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="0" />
-                        <Label Text="{Binding FilePath}" Grid.Row="0" Grid.Column="1" />
+                        <Image Source="{Binding ImageFile}" Grid.Row="0" Grid.Column="0" />
+                        <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="1" />
+                        <Label Text="{Binding FilePath}" Grid.Row="0" Grid.Column="2" />
                     </Grid>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
@@ -61,15 +63,17 @@
                     <Grid Padding="10">
                         <!-- Define one row and two columns -->
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="36" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="36" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <!-- Bind properties to labels -->
-                        <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="0" />
-                        <Label Text="{Binding FilePath}" Grid.Row="0" Grid.Column="1" />
+                        <Image Source="{Binding ImageFile}" Grid.Row="0" Grid.Column="0" />
+                        <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="1" />
+                        <Label Text="{Binding FilePath}" Grid.Row="0" Grid.Column="2" />
                     </Grid>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
