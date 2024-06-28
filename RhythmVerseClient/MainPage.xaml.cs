@@ -14,6 +14,8 @@ namespace RhythmVerseClient
 
 
             DownloadList.SelectionChanged += DownloadList_SelectionChanged;
+            CloneHeroList.SelectionChanged += DownloadList_SelectionChanged;
+            CloneHeroList.GestureRecognizers.
             //DownloadPage.BindingContext = mainView.DownloadWatcher;
             //CloneHeroPage.BindingContext = mainView.CloneHeroSongsWatcher;
             //DownloadList.ItemsSource = mainView.DownloadWatcher.Data;

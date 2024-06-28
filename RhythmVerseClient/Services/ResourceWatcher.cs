@@ -21,6 +21,7 @@ namespace RhythmVerseClient.Services
         Con,
         CloneHero,
         SevenZip,
+        Directory,
         Unknown
     }
 
@@ -170,6 +171,10 @@ namespace RhythmVerseClient.Services
             }
             catch (Exception ex)
             {
+                if (Directory.Exists(filePath))
+                {
+                    return WatcherFileType.CloneHero;
+                }
                 Console.WriteLine($"Error reading file: {ex.Message}");
                 return WatcherFileType.Unknown;
             }
@@ -193,6 +198,10 @@ namespace RhythmVerseClient.Services
             else if (fileSignature.AsSpan().Slice(0, SevenZipSignature.Length).SequenceEqual(SevenZipSignature))
             {
                 return WatcherFileType.SevenZip;
+            }
+            else if (Directory.Exists(filePath))
+            {
+                return WatcherFileType.CloneHero;
             }
             else
             {

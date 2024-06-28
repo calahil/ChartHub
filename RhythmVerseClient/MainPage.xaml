@@ -57,27 +57,32 @@
     </ContentPage>
 
     <ContentPage Title="Clone Hero Songs" x:Name="CloneHeroPage">
-        <CollectionView ItemsSource="{Binding CloneHeroSongsWatcher.Data}" SelectionMode="Single">
+        <CollectionView ItemsSource="{Binding CloneHeroSongsWatcher.Data}" SelectionMode="Single"
+                        x:Name="CloneHeroList">
             <CollectionView.ItemsLayout>
                 <!-- Set Span to 1 for single item per row -->
                 <GridItemsLayout Orientation="Vertical" Span="1" />
             </CollectionView.ItemsLayout>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="services:FileData">
-                    <Grid Padding="10">
+                    <Grid Padding="10" ColumnSpacing="5">
                         <!-- Define one row and two columns -->
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="36" />
+                            <RowDefinition Height="40" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="36" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <!-- Bind properties to labels -->
-                        <Image Source="{Binding ImageFile}" Grid.Row="0" Grid.Column="0" />
-                        <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="1" />
-                        <Label Text="{Binding FilePath}" Grid.Row="0" Grid.Column="2" />
+                        <Image Source="{Binding ImageFile}" Grid.Row="0" Grid.Column="0" Aspect="AspectFill" />
+                        <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="1" FontAutoScalingEnabled="False" VerticalTextAlignment="Center" />
+                        <Label Text="{Binding FileSize}" Grid.Row="0" Grid.Column="2" FontAutoScalingEnabled="False" VerticalTextAlignment="Center" />
+                        <Label Text="{Binding FileType}" Grid.Row="0" Grid.Column="3" FontAutoScalingEnabled="False" VerticalTextAlignment="Center" />
+                        <Label Text="{Binding FilePath}" Grid.Row="0" Grid.Column="4" FontAutoScalingEnabled="False" VerticalTextAlignment="Center" />
                     </Grid>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
