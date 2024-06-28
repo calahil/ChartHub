@@ -9,20 +9,13 @@ namespace RhythmVerseClient.ViewModels
 {
     public class MainViewModel
     {
-        public IFileSystemManager FileManager { get; }
+        
 
-        public ResourceWatcher DownloadWatcher { get; set; }
-        public ResourceWatcher CloneHeroSongsWatcher {  get; set; }
+        
 
-        public MainViewModel(IFileSystemManager fileSystemManager)
+        public MainViewModel()
         {
-            FileManager = fileSystemManager;
-            FileManager.Initialize();
             
-            DownloadWatcher = FileManager.GetDownloadWatcher();
-            CloneHeroSongsWatcher = FileManager.GetCloneHeroSongWatcher();
-            DownloadWatcher.LoadItems();
-            CloneHeroSongsWatcher.LoadItems();
         }
     }
 }

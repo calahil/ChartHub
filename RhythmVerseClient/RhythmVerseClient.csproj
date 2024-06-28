@@ -86,4 +86,10 @@
 	  </None>
 	</ItemGroup>
 
+	<ItemGroup>
+	  <MauiXaml Update="Controls\FancyName.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
+	</ItemGroup>
+
 </Project>

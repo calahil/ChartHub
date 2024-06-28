@@ -52,6 +52,7 @@ namespace RhythmVerseClient
             builder.Services.AddSingleton<IKeystrokeSender, WindowsKeystrokeSender>();
             builder.Services.AddSingleton<IFileSystemManager, FileSystemManager>();
             builder.Services.AddSingleton<MainViewModel>();
+            builder.Services.AddSingleton<DownloadViewModel>();
             builder.Services.AddTransient<MainPage>();
 
             return builder.Build();

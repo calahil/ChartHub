@@ -352,34 +352,23 @@ namespace RhythmVerseClient.Services
 
     public class FileData(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile, string fileSize) : INotifyPropertyChanged
     {
+        private string _imageFile = imageFile;
+        private bool _checked = false;
         private string _displayName = displayName;
         private string _filePath = filePath;
-        private string _imageFile = imageFile;
         private WatcherFileType _fileType = watcherFileType;
         private string _fileSize = fileSize;
 
-        public string DisplayName
-        {
-            get => _displayName;
-            set
-            {
-                if (_displayName != value)
-                {
-                    _displayName = value;
-                    OnPropertyChanged(nameof(DisplayName));
-                }
-            }
-        }
 
-        public string FilePath
+        public bool Checked
         {
-            get => _filePath;
+            get => _checked;
             set
             {
-                if (_filePath != value)
+                if (_checked != value)
                 {
-                    _filePath = value;
-                    OnPropertyChanged(nameof(FilePath));
+                    _checked = value;
+                    OnPropertyChanged(nameof(Checked));
                 }
             }
         }
@@ -393,6 +382,19 @@ namespace RhythmVerseClient.Services
                 {
                     _imageFile = value;
                     OnPropertyChanged(nameof(ImageFile));
+                }
+            }
+        }
+
+        public string DisplayName
+        {
+            get => _displayName;
+            set
+            {
+                if (_displayName != value)
+                {
+                    _displayName = value;
+                    OnPropertyChanged(nameof(DisplayName));
                 }
             }
         }
@@ -422,6 +424,20 @@ namespace RhythmVerseClient.Services
                 }
             }
         }
+
+        public string FilePath
+        {
+            get => _filePath;
+            set
+            {
+                if (_filePath != value)
+                {
+                    _filePath = value;
+                    OnPropertyChanged(nameof(FilePath));
+                }
+            }
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)

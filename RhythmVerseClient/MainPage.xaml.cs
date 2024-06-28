@@ -6,16 +6,24 @@ namespace RhythmVerseClient
 {
     public partial class MainPage : TabbedPage
     {
+        public IFileSystemManager FileManager { get; }
+        public ResourceWatcher DownloadWatcher { get; set; }
+        public ResourceWatcher CloneHeroSongsWatcher { get; set; }
 
-        public MainPage(MainViewModel mainView)
+        public MainPage(IFileSystemManager fileSystemManager)
         {
             InitializeComponent();
-            BindingContext = mainView;
+            BindingContext = 
+            FileManager = fileSystemManager;
+            FileManager.Initialize();
 
+            DownloadWatcher = FileManager.GetDownloadWatcher();
+            CloneHeroSongsWatcher = FileManager.GetCloneHeroSongWatcher();
+            DownloadWatcher.LoadItems();
+            CloneHeroSongsWatcher.LoadItems();
 
             DownloadList.SelectionChanged += DownloadList_SelectionChanged;
             CloneHeroList.SelectionChanged += DownloadList_SelectionChanged;
-            CloneHeroList.GestureRecognizers.
             //DownloadPage.BindingContext = mainView.DownloadWatcher;
             //CloneHeroPage.BindingContext = mainView.CloneHeroSongsWatcher;
             //DownloadList.ItemsSource = mainView.DownloadWatcher.Data;

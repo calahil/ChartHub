@@ -1,12 +1,11 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
-<TabbedPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+﻿<TabbedPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
             xmlns:local="clr-namespace:RhythmVerseClient"
             x:Class="RhythmVerseClient.MainPage"
             xmlns:models="clr-namespace:RhythmVerseClient.ViewModels"
             xmlns:services="clr-namespace:RhythmVerseClient.Services"
-            x:DataType="models:MainViewModel">
+            xmlns:control="clr-namespace:RhythmVerseClient.Controls">
 
     <ContentPage Title="RhythmVerse">
         <StackLayout>
@@ -21,39 +20,55 @@
     </ContentPage>
 
     <ContentPage Title="Downloads" x:Name="DownloadPage">
-        <ContentPage.Resources>
-            <toolkit:AppThemeObject Light="dark.png" Dark="light.png" x:Key="MyTheme" />
-        </ContentPage.Resources>
-        <CollectionView ItemsSource="{Binding DownloadWatcher.Data}" SelectionMode="Single"
+        <ContentPage.BindingContext>
+            <models:DownloadViewModel />
+        </ContentPage.BindingContext>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Header Grid -->
+            <Grid Grid.Row="0" ColumnSpacing="5" Padding="5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <CheckBox Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" CheckedChanged="OnCheckAllChanged" />
+                <Button Text="Display Name" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Start" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
+                <Button Text="File Type" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Start" Command="{Binding SortCommand}" CommandParameter="FileType" />
+                <Button Text="File Size" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Start" Command="{Binding SortCommand}" CommandParameter="FileSize" />
+            </Grid>
+            
+            <CollectionView ItemsSource="{Binding DataItems}" SelectionMode="Single"
                         x:Name="DownloadList">
             <CollectionView.ItemsLayout>
                 <!-- Set Span to 1 for single item per row -->
                 <GridItemsLayout Orientation="Vertical" Span="1" />
             </CollectionView.ItemsLayout>
-            <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="services:FileData">
-                    <Grid Padding="10" ColumnSpacing="5">
-                        <!-- Define one row and two columns -->
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="36" />
-                        </Grid.RowDefinitions>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="36" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <!-- Bind properties to labels -->
-                        <Image Source="{Binding ImageFile}" Grid.Row="0" Grid.Column="0" />
-                        <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="1" FontAutoScalingEnabled="False" VerticalTextAlignment="Center" />
-                        <Label Text="{Binding FileSize}" Grid.Row="0" Grid.Column="2" FontAutoScalingEnabled="False" VerticalTextAlignment="Center" />
-                        <Label Text="{Binding FileType}" Grid.Row="0" Grid.Column="3" FontAutoScalingEnabled="False" VerticalTextAlignment="Center" />
-                        <Label Text="{Binding FilePath}" Grid.Row="0" Grid.Column="4" />
-                    </Grid>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnSpacing="5" Padding="5">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <CheckBox IsChecked="{Binding Checked}" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />
+                            <control:FancyName Grid.Column="1" />
+                            <Label Text="{Binding FileType}" Grid.Column="2" HorizontalOptions="Start" />
+                            <Label Text="{Binding FileSize}" Grid.Column="3" HorizontalOptions="Start" />
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
     </ContentPage>
 
     <ContentPage Title="Clone Hero Songs" x:Name="CloneHeroPage">
