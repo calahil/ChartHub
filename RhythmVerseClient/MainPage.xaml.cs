@@ -10,10 +10,11 @@ namespace RhythmVerseClient
         public ResourceWatcher DownloadWatcher { get; set; }
         public ResourceWatcher CloneHeroSongsWatcher { get; set; }
 
-        public MainPage(IFileSystemManager fileSystemManager)
+        public MainPage(IFileSystemManager fileSystemManager, MainViewModel mainView, DownloadViewModel downloadViewModel)
         {
             InitializeComponent();
-            BindingContext = 
+            BindingContext = mainView;
+            DownloadPage.BindingContext = downloadViewModel;
             FileManager = fileSystemManager;
             FileManager.Initialize();
 

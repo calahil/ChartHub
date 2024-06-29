@@ -19,10 +19,7 @@
         </StackLayout>
     </ContentPage>
 
-    <ContentPage Title="Downloads" x:Name="DownloadPage">
-        <ContentPage.BindingContext>
-            <models:DownloadViewModel />
-        </ContentPage.BindingContext>
+    <ContentPage Title="Downloads" x:Name="DownloadPage" x:DataType="models:DownloadViewModel">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -38,7 +35,11 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <CheckBox Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" CheckedChanged="OnCheckAllChanged" />
+                <CheckBox Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center">
+                    <CheckBox.Behaviors>
+                        <toolkit:EventToCommandBehavior EventName="CheckedChanged" Command="{Binding CheckAllCommand}" />
+                    </CheckBox.Behaviors>
+                </CheckBox>
                 <Button Text="Display Name" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Start" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
                 <Button Text="File Type" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Start" Command="{Binding SortCommand}" CommandParameter="FileType" />
                 <Button Text="File Size" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Start" Command="{Binding SortCommand}" CommandParameter="FileSize" />
@@ -51,7 +52,7 @@
                 <GridItemsLayout Orientation="Vertical" Span="1" />
             </CollectionView.ItemsLayout>
                 <CollectionView.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:DataType="services:FileData">
                         <Grid ColumnSpacing="5" Padding="5">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -60,7 +61,7 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <CheckBox IsChecked="{Binding Checked}" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />
+                            <CheckBox IsChecked="{Binding Checked}" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />                           
                             <control:FancyName Grid.Column="1" />
                             <Label Text="{Binding FileType}" Grid.Column="2" HorizontalOptions="Start" />
                             <Label Text="{Binding FileSize}" Grid.Column="3" HorizontalOptions="Start" />
