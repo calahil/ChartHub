@@ -22,6 +22,7 @@ namespace RhythmVerseClient
             CloneHeroSongsWatcher = FileManager.GetCloneHeroSongWatcher();
             DownloadWatcher.LoadItems();
             CloneHeroSongsWatcher.LoadItems();
+            downloadViewModel.DataItems = DownloadWatcher.Data;
 
             DownloadList.SelectionChanged += DownloadList_SelectionChanged;
             CloneHeroList.SelectionChanged += DownloadList_SelectionChanged;
@@ -33,7 +34,7 @@ namespace RhythmVerseClient
 
         private void DownloadList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
-            throw new NotImplementedException();
+            //throw new NotImplementedException();
         }
 
         private void OnButtonClicked(object sender, EventArgs e)

@@ -16,13 +16,14 @@ namespace RhythmVerseClient.Services
 
     public enum WatcherFileType
     {
-        Rar,
-        Zip,
+       
         Con,
         CloneHero,
-        SevenZip,
         Directory,
-        Unknown
+        Rar,
+        SevenZip,
+        Unknown,
+        Zip
     }
 
     public class ResourceWatcher : IResourceWatcher
@@ -301,22 +302,22 @@ namespace RhythmVerseClient.Services
         {
             var fileType = await GetFileTypeAsync(itemPath);
             var imageFile = GetIconForFileType(fileType);
-            string fileSize;
+            long sizeBytes;
 
             switch (_watcherType)
                 {
                 case WatcherType.File:
                     var info = new FileInfo(itemPath);
-                    fileSize = Toolbox.ConvertFileSize(info.Length);
+                    sizeBytes = info.Length;
                     break;
                 case WatcherType.Directory:
-                    fileSize = Toolbox.ConvertFileSize(Toolbox.GetDirectorySize(itemPath));
+                    sizeBytes = Toolbox.GetDirectorySize(itemPath);
                     break;
                 default:
-                    fileSize = "0B";
+                    sizeBytes = 0;
                     break;
             }            
-            Data.Add(new FileData(itemName, itemPath, fileType, imageFile, fileSize));
+            Data.Add(new FileData(itemName, itemPath, fileType, imageFile, sizeBytes));
             existingEntries.Add(itemPath);
         }
 
@@ -325,8 +326,7 @@ namespace RhythmVerseClient.Services
             var fileType = await GetFileTypeAsync(itemPath);
             var imageFile = GetIconForFileType(fileType);
             var info = new FileInfo(itemPath);
-            var fileSize = Toolbox.ConvertFileSize(info.Length);
-            var itemToDelete = new FileData(itemName, itemPath, fileType, imageFile, fileSize);
+            var itemToDelete = new FileData(itemName, itemPath, fileType, imageFile, info.Length);
             var index = Data.IndexOf(itemToDelete);
 
             if (index != -1)
@@ -350,15 +350,15 @@ namespace RhythmVerseClient.Services
         }
     }
 
-    public class FileData(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile, string fileSize) : INotifyPropertyChanged
+    public class FileData(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile, long sizeBytes) : INotifyPropertyChanged
     {
         private string _imageFile = imageFile;
         private bool _checked = false;
         private string _displayName = displayName;
         private string _filePath = filePath;
         private WatcherFileType _fileType = watcherFileType;
-        private string _fileSize = fileSize;
-
+        private string _fileSize = Toolbox.ConvertFileSize(sizeBytes);
+        private long _sizeBytes = sizeBytes;
 
         public bool Checked
         {
@@ -435,6 +435,16 @@ namespace RhythmVerseClient.Services
                     _filePath = value;
                     OnPropertyChanged(nameof(FilePath));
                 }
+            }
+        }
+
+        public long SizeBytes
+        {
+            get => _sizeBytes;
+            set
+            {
+                _sizeBytes = value;
+                OnPropertyChanged(nameof(SizeBytes));
             }
         }
 

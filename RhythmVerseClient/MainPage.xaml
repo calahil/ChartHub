@@ -29,24 +29,29 @@
             <!-- Header Grid -->
             <Grid Grid.Row="0" ColumnSpacing="5" Padding="5">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <CheckBox Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center">
+                <Grid Grid.Column="0" HorizontalOptions="Fill" VerticalOptions="Center">
+                    <Button Command="{Binding CheckAllCommand}" HorizontalOptions="Fill" />
+                    <CheckBox IsChecked="{Binding IsAllChecked}" VerticalOptions="Center" HorizontalOptions="Center" Opacity="100" Color="#000000" IsEnabled="True"/>
+                </Grid>
+                <!--<CheckBox Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" InputTransparent="False">
                     <CheckBox.Behaviors>
                         <toolkit:EventToCommandBehavior EventName="CheckedChanged" Command="{Binding CheckAllCommand}" />
                     </CheckBox.Behaviors>
-                </CheckBox>
-                <Button Text="Display Name" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Start" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
-                <Button Text="File Type" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Start" Command="{Binding SortCommand}" CommandParameter="FileType" />
-                <Button Text="File Size" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Start" Command="{Binding SortCommand}" CommandParameter="FileSize" />
+                </CheckBox>-->
+                <!--<Button Grid.Column="0" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />-->
+                <Button Text="Display Name" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
+                <Button Text="File Type" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileType" />
+                <Button Text="File Size" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />
             </Grid>
             
             <CollectionView ItemsSource="{Binding DataItems}" SelectionMode="Single"
-                        x:Name="DownloadList">
+                        x:Name="DownloadList" Grid.Row="1">
             <CollectionView.ItemsLayout>
                 <!-- Set Span to 1 for single item per row -->
                 <GridItemsLayout Orientation="Vertical" Span="1" />
@@ -55,16 +60,16 @@
                     <DataTemplate x:DataType="services:FileData">
                         <Grid ColumnSpacing="5" Padding="5">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
 
                             <CheckBox IsChecked="{Binding Checked}" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />                           
                             <control:FancyName Grid.Column="1" />
-                            <Label Text="{Binding FileType}" Grid.Column="2" HorizontalOptions="Start" />
-                            <Label Text="{Binding FileSize}" Grid.Column="3" HorizontalOptions="Start" />
+                            <Label Text="{Binding FileType}" Grid.Column="2" HorizontalOptions="Center" />
+                            <Label Text="{Binding FileSize}" Grid.Column="3" HorizontalOptions="Center" />
                         </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>

@@ -23,38 +23,64 @@ namespace RhythmVerseClient.ViewModels
         public ICommand SortCommand { get; }
         public ICommand CheckAllCommand { get; }
 
+        private bool _isAllChecked;
+        public bool IsAllChecked
+        {
+            get => _isAllChecked;
+            set
+            {
+                if (_isAllChecked != value)
+                {
+                    _isAllChecked = value;
+                    OnPropertyChanged();
+                    CheckAllItems(value);
+                }
+            }
+        }
         public DownloadViewModel()
         {
             DataItems = new ObservableCollection<FileData>();
             SortCommand = new Command<string>(SortData);
-            CheckAllCommand = new Command(CheckAllItems);
+            CheckAllCommand = new Command(CheckAllItemsCommand);
+        }
+
+        private void CheckAllItemsCommand()
+        {
+            IsAllChecked = !IsAllChecked;
         }
 
         public void SortData(string columnName)
         {
             if (_isAscending)
             {
-                DataItems = new ObservableCollection<FileData>(DataItems.OrderBy(x => GetPropertyValue(x, columnName)));
+                DataItems = new ObservableCollection<FileData>(DataItems.OrderBy(x => GetSortablePropertyValue(x, columnName)));
             }
             else
             {
-                DataItems = new ObservableCollection<FileData>(DataItems.OrderByDescending(x => GetPropertyValue(x, columnName)));
+                DataItems = new ObservableCollection<FileData>(DataItems.OrderByDescending(x => GetSortablePropertyValue(x, columnName)));
             }
 
             _isAscending = !_isAscending;
         }
 
-        private object GetPropertyValue(object obj, string propertyName)
+        private object? GetSortablePropertyValue(FileData item, string propertyName)
         {
-            return obj.GetType().GetProperty(propertyName).GetValue(obj, null);
+            switch (propertyName)
+            {
+                case nameof(FileData.FileSize):
+                    return item.SizeBytes;
+                case nameof(FileData.FileType):
+                    return item.FileType;
+                default:
+                    return item.GetType().GetProperty(propertyName)?.GetValue(item, null);
+            }
         }
 
-        private void CheckAllItems()
+        public void CheckAllItems(bool isChecked)
         {
-            bool newValue = !DataItems.All(item => item.Checked);
             foreach (var item in DataItems)
             {
-                item.Checked = newValue;
+                item.Checked = isChecked;
             }
             OnPropertyChanged(nameof(DataItems)); // Notify the UI to update
         }
