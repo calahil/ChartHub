@@ -15,6 +15,8 @@ namespace RhythmVerseClient
             InitializeComponent();
             BindingContext = mainView;
             DownloadPage.BindingContext = downloadViewModel;
+            ContextMenuFlyOut.BindingContext = downloadViewModel;
+            ContextMenuFlyOut.
             FileManager = fileSystemManager;
             FileManager.Initialize();
 
@@ -35,6 +37,7 @@ namespace RhythmVerseClient
         private void DownloadList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
             //throw new NotImplementedException();
+            
         }
 
         private void OnButtonClicked(object sender, EventArgs e)

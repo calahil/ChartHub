@@ -49,7 +49,12 @@
                 <Button Text="File Type" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileType" />
                 <Button Text="File Size" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />
             </Grid>
-            
+            <control:ContextMenuFlyout 
+            x:Name="ContextMenuFlyOut"
+            MenuCommands="{Binding Path=MenuCommandsDeleteOpenExtract}"
+            SelectedFile="{Binding SelectedFile}" 
+            BindingContext="{Binding DataItems}"
+            Grid.Row="1" />
             <CollectionView ItemsSource="{Binding DataItems}" SelectionMode="Single"
                         x:Name="DownloadList" Grid.Row="1">
             <CollectionView.ItemsLayout>
