@@ -4,6 +4,7 @@ using RhythmVerseClient.ViewModels;
 using SettingsManager;
 using System.Text.Json;
 using CommunityToolkit.Maui;
+using RhythmVerseClient.Pages;
 
 namespace RhythmVerseClient
 {
@@ -54,6 +55,7 @@ namespace RhythmVerseClient
             builder.Services.AddSingleton<MainViewModel>();
             builder.Services.AddSingleton<DownloadViewModel>();
             builder.Services.AddTransient<MainPage>();
+            builder.Services.AddTransient<DownloadPage>();
 
             return builder.Build();
         }

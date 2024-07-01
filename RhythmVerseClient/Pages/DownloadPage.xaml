@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"             
+             xmlns:services="clr-namespace:RhythmVerseClient.Services"
+             xmlns:models="clr-namespace:RhythmVerseClient.ViewModels"
+             xmlns:control="clr-namespace:RhythmVerseClient.Controls"
+             x:Class="RhythmVerseClient.Pages.DownloadPage"
+             x:DataType="models:DownloadViewModel"
+             Title="DownloadPage">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header Grid -->
+        <Grid Grid.Row="0" ColumnSpacing="5" Padding="5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0" HorizontalOptions="Fill" VerticalOptions="Center">
+                <Button Command="{Binding CheckAllCommand}" HorizontalOptions="Fill" />
+                <CheckBox IsChecked="{Binding IsAllChecked}" VerticalOptions="Center" HorizontalOptions="Center" Opacity="100" Color="#000000" IsEnabled="True"/>
+            </Grid>
+           
+            <Button Text="Display Name" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
+            <Button Text="File Type" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileType" />
+            <Button Text="File Size" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />
+        </Grid>
+        <CollectionView ItemsSource="{Binding DataItems}" SelectionMode="Single"
+                     x:Name="DownloadList" Grid.Row="1">
+            <CollectionView.ItemsLayout>
+                <GridItemsLayout Orientation="Vertical" Span="1" />
+            </CollectionView.ItemsLayout>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="services:FileData">
+                    <Grid ColumnSpacing="5" Padding="5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <CheckBox IsChecked="{Binding Checked}" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />
+                        <control:FancyName Grid.Column="1" />
+                        <Label Text="{Binding FileType}" Grid.Column="2" HorizontalOptions="Center" />
+                        <Label Text="{Binding FileSize}" Grid.Column="3" HorizontalOptions="Center" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
+</ContentPage>

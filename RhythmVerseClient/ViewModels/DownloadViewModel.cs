@@ -20,7 +20,6 @@ namespace RhythmVerseClient.ViewModels
                 OnPropertyChanged();
             }
         }
-        public CollectionView DownloadViewList { get; set; }
 
 
         private bool _isAscending = true;
@@ -53,9 +52,9 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        public DownloadViewModel()
+        public DownloadViewModel(FileSystemManager fileSystem)
         {
-            DataItems = new ObservableCollection<FileData>();
+            DataItems = fileSystem.GetDownloadWatcher().Data;
             SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
            
