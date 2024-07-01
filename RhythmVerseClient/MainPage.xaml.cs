@@ -10,13 +10,14 @@ namespace RhythmVerseClient
         public ResourceWatcher DownloadWatcher { get; set; }
         public ResourceWatcher CloneHeroSongsWatcher { get; set; }
 
-        public MainPage(IFileSystemManager fileSystemManager, MainViewModel mainView, DownloadViewModel downloadViewModel)
+        public MainPage(IFileSystemManager fileSystemManager, MainViewModel mainView, DownloadViewModel downloadView)
         {
             InitializeComponent();
             BindingContext = mainView;
-            DownloadPage.BindingContext = downloadViewModel;
-            ContextMenuFlyOut.BindingContext = downloadViewModel;
-            ContextMenuFlyOut.
+            DownloadPage.BindingContext = downloadView;
+
+            //ContextMenuFlyOut.BindingContext = downloadViewModel;
+            
             FileManager = fileSystemManager;
             FileManager.Initialize();
 
@@ -24,9 +25,11 @@ namespace RhythmVerseClient
             CloneHeroSongsWatcher = FileManager.GetCloneHeroSongWatcher();
             DownloadWatcher.LoadItems();
             CloneHeroSongsWatcher.LoadItems();
-            downloadViewModel.DataItems = DownloadWatcher.Data;
+           // ContextMenuFlyOut.GenerateContextMenuItems();
+            downloadView.DataItems = DownloadWatcher.Data;
+            downloadView.DownloadViewList = DownloadList;
 
-            DownloadList.SelectionChanged += DownloadList_SelectionChanged;
+            //DownloadList.SelectionChanged += DownloadList_SelectionChanged;
             CloneHeroList.SelectionChanged += DownloadList_SelectionChanged;
             //DownloadPage.BindingContext = mainView.DownloadWatcher;
             //CloneHeroPage.BindingContext = mainView.CloneHeroSongsWatcher;

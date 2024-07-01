@@ -3,8 +3,8 @@ using System.ComponentModel;
 using System.Data;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Microsoft.UI.Xaml.Controls;
 using RhythmVerseClient.Services;
-using static RhythmVerseClient.Controls.ContextMenuFlyout;
 
 namespace RhythmVerseClient.ViewModels
 {
@@ -20,14 +20,12 @@ namespace RhythmVerseClient.ViewModels
                 OnPropertyChanged();
             }
         }
+        public CollectionView DownloadViewList { get; set; }
+
 
         private bool _isAscending = true;
         public ICommand SortCommand { get; }
         public ICommand CheckAllCommand { get; }
-        public Command<object> DeleteCommand { get; set; }
-        public Command<object> OpenCommand { get; set; }
-        public Command<object> ExtractCommand { get; set; }
-        public Command<object> PreviewCommand { get; set; }
 
         private bool _isAllChecked;
         public bool IsAllChecked
@@ -52,38 +50,16 @@ namespace RhythmVerseClient.ViewModels
             {
                 _selectedFile = value;
                 OnPropertyChanged();
-                ExtractCommand.CanExecute(value);
             }
         }
-
-        public enum MenuCommand
-        {
-            Delete,
-            Open,
-            Extract,
-            Preview
-        }
-        public MenuCommand[] MenuCommandsDeleteOpenExtract { get; } =
-        new[] { MenuCommand.Delete, MenuCommand.Open, MenuCommand.Extract };
 
         public DownloadViewModel()
         {
             DataItems = new ObservableCollection<FileData>();
             SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
-            DeleteCommand = new Command<object>(ExecuteDelete);
-            OpenCommand = new Command<object>(ExecuteOpen);
-            ExtractCommand = new Command<object>(ExecuteExtract, CanExecuteExtract);
-            PreviewCommand = new Command<object>(ExecutePreview);
+           
         }
-
-        private void ExecuteDelete(object parameter) { /* Handle Delete */ }
-        private void ExecuteOpen(object parameter) { /* Handle Open */ }
-        private void ExecuteExtract(object parameter) { /* Handle Extract */ }
-        private bool CanExecuteExtract(object parameter) =>
-            parameter is FileData fileData &&
-            (fileData.FileType == WatcherFileType.Rar || fileData.FileType == WatcherFileType.Zip || fileData.FileType == WatcherFileType.SevenZip);
-        private void ExecutePreview(object parameter) { /* Handle Preview */ }
 
         private void CheckAllItemsCommand()
         {
