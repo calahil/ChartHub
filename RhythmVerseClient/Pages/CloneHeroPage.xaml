@@ -4,15 +4,14 @@
              xmlns:services="clr-namespace:RhythmVerseClient.Services"
              xmlns:models="clr-namespace:RhythmVerseClient.ViewModels"
              xmlns:control="clr-namespace:RhythmVerseClient.Controls"
-             x:Class="RhythmVerseClient.Pages.DownloadPage"
-             x:DataType="models:DownloadViewModel"
-             Title="Downloads">
+             x:Class="RhythmVerseClient.Pages.CloneHeroPage"
+             x:DataType="models:CloneHeroViewModel"
+             Title="Clone Hero Songs">
 
-    <Grid >
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Header Grid -->
@@ -48,7 +47,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
-                        <CheckBox IsChecked="{Binding Checked}" Grid.Column="0" CheckedChanged="OnCheckBoxCheckedChanged" HorizontalOptions="Center" VerticalOptions="Center" />
+                        <CheckBox IsChecked="{Binding Checked}" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />
                         <control:FancyName Grid.Column="1" />
                         <Label Text="{Binding FileType}" Grid.Column="2" HorizontalOptions="Center" />
                         <Label Text="{Binding FileSize}" Grid.Column="3" HorizontalOptions="Center" />
@@ -56,6 +55,5 @@
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
-        <Button Grid.Row="2" IsVisible="{Binding IsAnyChecked}" Command="{Binding InstallSongs}"/>
     </Grid>
 </ContentPage>

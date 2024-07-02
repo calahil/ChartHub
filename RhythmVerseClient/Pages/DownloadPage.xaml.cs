@@ -19,4 +19,9 @@ public partial class DownloadPage : ContentPage
         //throw new NotImplementedException();
 
     }
+
+    private void OnCheckBoxCheckedChanged(object sender, CheckedChangedEventArgs e)
+    {
+        viewModel.IsAnyChecked = viewModel.AnyItemChecked();
+    }
 }

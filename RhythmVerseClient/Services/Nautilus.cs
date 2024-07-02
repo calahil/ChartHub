@@ -1,43 +1,26 @@
-﻿using SharpCompress.Archives;
+﻿using RhythmVerseClient.Utilities;
+using SharpCompress.Archives;
 using SharpCompress.Common;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace RhythmVerseClient.Services
 {
-    public partial class Nautilus(IKeystrokeSender keystrokeSender)
+    public partial class Nautilus
     {
         public ProcessStartInfo? CmdArgs { get; set; }
         public Process? Program { get; set; }
         public nint Hwnd { get; set; }
 
-        //private string nautilisEXE;
 
-        private readonly IKeystrokeSender _keystrokeSender = keystrokeSender;
+        private readonly IKeystrokeSender _keystrokeSender;
 
-        public static void Initialize()
+        public Nautilus(IKeystrokeSender keystrokeSender, string nautilusPath)
         {
-            /*if (!File.Exists(Constants.ZipFilePath) && !File.Exists(nautilisEXE))
-            {
-                await DownloadFileAsync();
-            }
-
-            if (File.Exists(Constants.ZipFilePath) && !File.Exists(nautilisEXE))
-            {
-                ExtractZipFile();
-            }
-
-            if (File.Exists(Constants.ZipFilePath) && File.Exists(nautilisEXE))
-            {
-                File.Delete(Constants.ZipFilePath);
-            }*/
-
-            //if (Constants.NAUTILUS_ARGS != null && nautilisEXE != null)
-            //{
-            //    CmdArgs = new(nautilisEXE, Constants.NAUTILUS_ARGS);
-            //}
+            _keystrokeSender = keystrokeSender;
+            CmdArgs = new(Toolbox.ConstructPath(nautilusPath, "Nautilus.exe"), Constants.NAUTILUS_ARGS);
         }
-        
+
         public void Run()
         {
             if (CmdArgs == null)
@@ -96,9 +79,6 @@ namespace RhythmVerseClient.Services
     public static class Constants
     {
         public const string NAUTILUS_ARGS = "-clonehero";
-        /*public const string ZIP_FILE_URL = "https://calahil.github.io/nautilus.zip";
-        public static readonly string NautilusDirectoryPath = Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "rhythmverse"), "nautilus");
-        public static readonly string ZipFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nautilus.zip");*/
     }
 
     public static partial class User32

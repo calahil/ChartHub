@@ -7,28 +7,16 @@ namespace RhythmVerseClient
 {
     public partial class MainPage : TabbedPage
     {
-        public ResourceWatcher CloneHeroSongsWatcher { get; set; }
 
-        public MainPage(MainViewModel mainView, DownloadViewModel downView)
+        public MainPage(MainViewModel mainView, DownloadViewModel downView, CloneHeroViewModel cloneView)
         {
             InitializeComponent();
             BindingContext = mainView;
 
             var DownloadsPage = new DownloadPage(downView);
             Children.Add(DownloadsPage);
-
-            //ContextMenuFlyOut.BindingContext = downloadViewModel;
-        /*    
-            FileManager = fileSystemManager;
-            FileManager.Initialize();
-
-            CloneHeroSongsWatcher = FileManager.GetCloneHeroSongWatcher();
-            CloneHeroSongsWatcher.LoadItems();*/
-           // ContextMenuFlyOut.GenerateContextMenuItems();
-           //DownloadPage.BindingContext = mainView.DownloadWatcher;
-            //CloneHeroPage.BindingContext = mainView.CloneHeroSongsWatcher;
-            //DownloadList.ItemsSource = mainView.DownloadWatcher.Data;
-            //CloneHeroList.ItemsSource = mainView.CloneHeroSongsWatcher.Data;
+            var CloneHeroPage = new CloneHeroPage(cloneView);
+            Children.Add(CloneHeroPage);
         }
 
         private void OnButtonClicked(object sender, EventArgs e)

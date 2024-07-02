@@ -3,10 +3,14 @@ using System.ComponentModel;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Windows.Input;
 using Microsoft.UI.Xaml.Controls;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Utilities;
+using SharpCompress.Archives;
+using SharpCompress.Common;
+using Windows.Devices.Midi;
 
 namespace RhythmVerseClient.ViewModels
 {
@@ -30,7 +34,21 @@ namespace RhythmVerseClient.ViewModels
         private bool _isAscending = true;
         public ICommand SortCommand { get; }
         public ICommand CheckAllCommand { get; }
+        public ICommand InstallSongs { get; }
 
+        private bool _isAnyChecked;
+        public bool IsAnyChecked
+        {
+            get => _isAnyChecked;
+            set
+            {
+                if (_isAnyChecked != value)
+                {
+                    _isAnyChecked = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
         private bool _isAllChecked;
         public bool IsAllChecked
         {
@@ -57,14 +75,18 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        public DownloadViewModel(AppGlobalSettings settings)
+        private IKeystrokeSender _keystrokeSender;
+
+        public DownloadViewModel(AppGlobalSettings settings, IKeystrokeSender keystrokeSender)
         {
             globalSettings = settings;
             DownloadWatcher = new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
             DataItems = DownloadWatcher.Data;
             SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
+            InstallSongs = new Command(InstallSongsCommand);
             DownloadWatcher.LoadItems();
+            _keystrokeSender = keystrokeSender;
         }
 
         private void CheckAllItemsCommand()
@@ -72,6 +94,37 @@ namespace RhythmVerseClient.ViewModels
             IsAllChecked = !IsAllChecked;
         }
 
+        private void InstallSongsCommand()
+        {
+            List<string> songs = new List<string>();
+            foreach (FileData file in DownloadWatcher.Data)
+            {
+                if (file.Checked)
+                {
+                    songs.Add(file.FilePath);
+                    var extension = Path.GetExtension(file.FilePath).ToLower();
+
+                    if (extension == ".zip" || extension == ".rar" || extension == ".7z")
+                    {
+                        using var archive = Toolbox.OpenArchive(file.FilePath);
+                        foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
+                        {
+                            entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
+                            {
+                                ExtractFullPath = true,
+                                Overwrite = true
+                            });
+                        }
+                        File.Delete(file.FilePath);
+                    }
+                    File.Move(file.FilePath, Toolbox.ConstructPath(globalSettings.PhaseshiftDir, file.DisplayName));
+                }
+            }
+
+            // TODO figure out why the resourcewatchers dont see the change
+            var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
+            nautilus.Run();
+        }
         public void SortData(string columnName)
         {
             if (_isAscending)
@@ -108,11 +161,53 @@ namespace RhythmVerseClient.ViewModels
             OnPropertyChanged(nameof(DataItems)); // Notify the UI to update
         }
 
+        public bool AnyItemChecked()
+        {
+            return DataItems.Any(item => item.Checked);
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        
+
+        public async Task ProcessZipsAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                var files = Directory.EnumerateFiles(globalSettings.PhaseshiftDir);
+                foreach (var file in files)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var extension = Path.GetExtension(file).ToLower();
+
+                    if (extension == ".zip" || extension == ".rar" || extension == ".7z")
+                    {
+                        using var archive = Toolbox.OpenArchive(file);
+                        foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
+                        {
+                            entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
+                            {
+                                ExtractFullPath = true,
+                                Overwrite = true
+                            });
+                        }
+                    }
+                }
+                await Task.Delay(500, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                await Shell.Current.DisplayAlert("Info", "Operation was cancelled.", "OK");
+            }
+            catch (Exception ex)
+            {
+                await Shell.Current.DisplayAlert("Error", $"An error occurred: {ex.Message}", "OK");
+            }
         }
     }
 }

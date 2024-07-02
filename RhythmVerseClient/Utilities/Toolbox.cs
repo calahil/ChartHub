@@ -1,5 +1,8 @@
 ﻿using SettingsManager;
 using SharpCompress.Archives;
+using SharpCompress.Archives.Rar;
+using SharpCompress.Archives.SevenZip;
+using SharpCompress.Archives.Zip;
 using SharpCompress.Common;
 using System;
 using System.Collections.Generic;
@@ -44,6 +47,17 @@ namespace RhythmVerseClient.Utilities
             }
         }
 
+        public static IArchive OpenArchive(string filePath)
+        {
+            var extension = Path.GetExtension(filePath).ToLower();
+            return extension switch
+            {
+                ".zip" => ZipArchive.Open(filePath),
+                ".rar" => RarArchive.Open(filePath),
+                ".7z" => SevenZipArchive.Open(filePath),
+                _ => throw new NotSupportedException($"File type {extension} is not supported.")
+            };
+        }
         /* public void MoveDirectory(string source, string destination)
          {
              // Create the destination directory if it doesn't exist
