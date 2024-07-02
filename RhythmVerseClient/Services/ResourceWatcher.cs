@@ -43,17 +43,13 @@ namespace RhythmVerseClient.Services
         public event EventHandler<string>? DirectoryNotFound;
         public event EventHandler<string>? ErrorOccurred;
 
-        public ResourceWatcher()
-        {
-            Data = [];
-            fileSystemWatcher = new FileSystemWatcher();
-            existingEntries = [];
-        }
-
-        public void Initialize(string path, WatcherType watcherType)
+        public ResourceWatcher(string path, WatcherType watcherType)
         {
             DirectoryPath = path;
             _watcherType = watcherType;
+            Data = [];
+            fileSystemWatcher = new FileSystemWatcher();
+            existingEntries = [];
 
             fileSystemWatcher.Path = DirectoryPath;
             fileSystemWatcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName;
@@ -63,8 +59,6 @@ namespace RhythmVerseClient.Services
             fileSystemWatcher.Deleted += OnDeleted;
             fileSystemWatcher.Renamed += OnRenamed;
             fileSystemWatcher.EnableRaisingEvents = true;
-
-            //RefreshItems();
         }
 
         public async void LoadItems()

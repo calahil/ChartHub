@@ -1,26 +1,29 @@
 ﻿using Microsoft.Maui.Controls;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.ViewModels;
+using RhythmVerseClient.Pages;
 
 namespace RhythmVerseClient
 {
     public partial class MainPage : TabbedPage
     {
-        public IFileSystemManager FileManager { get; }
         public ResourceWatcher CloneHeroSongsWatcher { get; set; }
 
-        public MainPage(IFileSystemManager fileSystemManager, MainViewModel mainView)
+        public MainPage(MainViewModel mainView, DownloadViewModel downView)
         {
             InitializeComponent();
             BindingContext = mainView;
 
+            var DownloadsPage = new DownloadPage(downView);
+            Children.Add(DownloadsPage);
+
             //ContextMenuFlyOut.BindingContext = downloadViewModel;
-            
+        /*    
             FileManager = fileSystemManager;
             FileManager.Initialize();
 
             CloneHeroSongsWatcher = FileManager.GetCloneHeroSongWatcher();
-            CloneHeroSongsWatcher.LoadItems();
+            CloneHeroSongsWatcher.LoadItems();*/
            // ContextMenuFlyOut.GenerateContextMenuItems();
            //DownloadPage.BindingContext = mainView.DownloadWatcher;
             //CloneHeroPage.BindingContext = mainView.CloneHeroSongsWatcher;

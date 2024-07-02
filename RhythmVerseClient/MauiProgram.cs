@@ -5,6 +5,7 @@ using SettingsManager;
 using System.Text.Json;
 using CommunityToolkit.Maui;
 using RhythmVerseClient.Pages;
+using RhythmVerseClient.Utilities;
 
 namespace RhythmVerseClient
 {
@@ -51,7 +52,7 @@ namespace RhythmVerseClient
                 return new SettingsManager<AppSettings>(settingsFilePath, appSettings);
             });
             builder.Services.AddSingleton<IKeystrokeSender, WindowsKeystrokeSender>();
-            builder.Services.AddSingleton<IFileSystemManager, FileSystemManager>();
+            builder.Services.AddSingleton<AppGlobalSettings>();
             builder.Services.AddSingleton<MainViewModel>();
             builder.Services.AddSingleton<DownloadViewModel>();
             builder.Services.AddTransient<MainPage>();

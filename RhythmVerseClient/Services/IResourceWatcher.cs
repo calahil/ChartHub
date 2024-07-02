@@ -6,7 +6,7 @@ namespace RhythmVerseClient.Services
     {
         string DirectoryPath { get; }
         ObservableCollection<FileData> Data { get; }
-        void Initialize(string path, WatcherType watcherType);
+        void LoadItems();
         event EventHandler<string> DirectoryNotFound;
         event EventHandler<string> ErrorOccurred;
     }

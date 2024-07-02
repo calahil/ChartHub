@@ -1,15 +1,19 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Microsoft.UI.Xaml.Controls;
 using RhythmVerseClient.Services;
+using RhythmVerseClient.Utilities;
 
 namespace RhythmVerseClient.ViewModels
 {
     public class DownloadViewModel : INotifyPropertyChanged
     {
+        private readonly AppGlobalSettings globalSettings;
+       
         private ObservableCollection<FileData>? _dataItems;
         public ObservableCollection<FileData> DataItems
         {
@@ -21,6 +25,7 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        public IResourceWatcher DownloadWatcher { get; set; }
 
         private bool _isAscending = true;
         public ICommand SortCommand { get; }
@@ -52,12 +57,14 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        public DownloadViewModel(FileSystemManager fileSystem)
+        public DownloadViewModel(AppGlobalSettings settings)
         {
-            DataItems = fileSystem.GetDownloadWatcher().Data;
+            globalSettings = settings;
+            DownloadWatcher = new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
+            DataItems = DownloadWatcher.Data;
             SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
-           
+            DownloadWatcher.LoadItems();
         }
 
         private void CheckAllItemsCommand()

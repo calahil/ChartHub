@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace RhythmVerseClient.Services
 {
-    public partial class Nautilus(IFileSystemManager fileSystem, IKeystrokeSender keystrokeSender)
+    public partial class Nautilus(IKeystrokeSender keystrokeSender)
     {
         public ProcessStartInfo? CmdArgs { get; set; }
         public Process? Program { get; set; }
@@ -13,7 +13,6 @@ namespace RhythmVerseClient.Services
 
         //private string nautilisEXE;
 
-        private readonly IFileSystemManager _fileSystem = fileSystem;
         private readonly IKeystrokeSender _keystrokeSender = keystrokeSender;
 
         public static void Initialize()

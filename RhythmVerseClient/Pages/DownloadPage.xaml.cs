@@ -5,16 +5,13 @@ namespace RhythmVerseClient.Pages;
 
 public partial class DownloadPage : ContentPage
 {
+    private DownloadViewModel viewModel;
 
-    public ResourceWatcher DownloadWatcher { get; set; }
-
-    public DownloadPage()
+    public DownloadPage(DownloadViewModel downloadView)
 	{
+        viewModel = downloadView;
 		InitializeComponent();
-		BindingContext = new DownloadViewModel(fileSystem);
-        DownloadWatcher = fileSystem.GetDownloadWatcher();
-        DownloadWatcher.LoadItems();
-        DownloadList.SelectionChanged += DownloadList_SelectionChanged;
+		BindingContext = downloadView;
     }
 
     private void DownloadList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
