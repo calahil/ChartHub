@@ -6,6 +6,7 @@ using System.Text.Json;
 using CommunityToolkit.Maui;
 using RhythmVerseClient.Pages;
 using RhythmVerseClient.Utilities;
+using RhythmVerseClient.Platforms.Windows;
 
 namespace RhythmVerseClient
 {
@@ -51,14 +52,21 @@ namespace RhythmVerseClient
                 var appSettings = serviceProvider.GetRequiredService<AppSettings>();
                 return new SettingsManager<AppSettings>(settingsFilePath, appSettings);
             });
+
+#if WINDOWS
+            builder.Services.AddSingleton<IWindowSizeService, WindowSizeService>();
+#endif
+
             builder.Services.AddSingleton<IKeystrokeSender, WindowsKeystrokeSender>();
             builder.Services.AddSingleton<AppGlobalSettings>();
             builder.Services.AddSingleton<MainViewModel>();
             builder.Services.AddSingleton<DownloadViewModel>();
             builder.Services.AddSingleton<CloneHeroViewModel>();
+            builder.Services.AddSingleton<InstallSongViewModel>();
             builder.Services.AddTransient<MainPage>();
             builder.Services.AddTransient<DownloadPage>();
             builder.Services.AddTransient<CloneHeroPage>();
+            builder.Services.AddTransient<InstallSongPage>();
 
 
             return builder.Build();

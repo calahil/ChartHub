@@ -21,59 +21,64 @@ namespace RhythmVerseClient.Services
             CmdArgs = new(Toolbox.ConstructPath(nautilusPath, "Nautilus.exe"), Constants.NAUTILUS_ARGS);
         }
 
-        public void Run()
+        public async Task RunAsync()
         {
             if (CmdArgs == null)
                 return;
 
-            Program = Process.Start(CmdArgs);
-
-            if (Program == null)
-                return;
-
-            Program.WaitForInputIdle();
-            Hwnd = Program.MainWindowHandle;
-
-            User32.ShowWindow(Hwnd, 2);
-
-            Thread.Sleep(1000);
-
-            _keystrokeSender.SendSpecialKey("tab");
-            _keystrokeSender.SendSpecialKey("tab");
-            _keystrokeSender.SendSpecialKey("tab");
-            _keystrokeSender.SendSpecialKey("enter");
-
-            Thread.Sleep(1000);
-
-            int counter = 0;
-            var test = true;
-            while (test)
+            await Task.Run(() =>
             {
-                TimeSpan prevCpuTime = Program.TotalProcessorTime;
-                Thread.Sleep(5000); // Wait for 1 second
-                TimeSpan currCpuTime = Program.TotalProcessorTime;
+                Program = Process.Start(CmdArgs);
 
-                if (currCpuTime - prevCpuTime > TimeSpan.FromMilliseconds(100))
+                if (Program == null)
+                    return;
+
+                Program.WaitForInputIdle();
+                Hwnd = Program.MainWindowHandle;
+
+                User32.ShowWindow(Hwnd, 2);
+
+                Thread.Sleep(1000);
+
+                _keystrokeSender.SendSpecialKey("tab");
+                _keystrokeSender.SendSpecialKey("tab");
+                _keystrokeSender.SendSpecialKey("tab");
+                _keystrokeSender.SendSpecialKey("enter");
+
+                Thread.Sleep(1000);
+
+                int counter = 0;
+                var test = true;
+                while (test)
                 {
-                    counter = 0;
-                }
-                else
-                {
-                    if (counter < 2)
+                    TimeSpan prevCpuTime = Program.TotalProcessorTime;
+                    Thread.Sleep(5000); // Wait for 5 seconds
+                    TimeSpan currCpuTime = Program.TotalProcessorTime;
+
+                    if (currCpuTime - prevCpuTime > TimeSpan.FromMilliseconds(100))
                     {
-                        counter++;
+                        counter = 0;
                     }
                     else
                     {
-                        test = false;
+                        if (counter < 2)
+                        {
+                            counter++;
+                        }
+                        else
+                        {
+                            test = false;
+                        }
                     }
                 }
-            }
 
-            Program.Kill();
-            Program.WaitForExit();
+                Program.Kill();
+                Program.WaitForExit();
+            });
+
             //_fileSystem.ResourceWatchers[0]?.RefreshItems();
         }
+
     }
 
     public static class Constants

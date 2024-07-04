@@ -4,36 +4,48 @@
              xmlns:services="clr-namespace:RhythmVerseClient.Services"
              xmlns:models="clr-namespace:RhythmVerseClient.ViewModels"
              xmlns:control="clr-namespace:RhythmVerseClient.Controls"
+             xmlns:util="clr-namespace:RhythmVerseClient.Utilities"
              x:Class="RhythmVerseClient.Pages.CloneHeroPage"
              x:DataType="models:CloneHeroViewModel"
-             Title="Clone Hero Songs">
+             Title="Clone Hero Song Library">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <util:ColumnWidthConverter x:Key="ColumnWidthConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Header Grid -->
-        <Grid Grid.Row="0" ColumnSpacing="5" Padding="5">
+        <Grid  Grid.Row="0" ColumnSpacing="5" Padding="5">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="48" />
+                <ColumnDefinition x:Name="HeaderCloneColumn" Width="*" />
+                <ColumnDefinition Width="128" />
+                <ColumnDefinition Width="128" />
             </Grid.ColumnDefinitions>
 
             <Grid Grid.Column="0" HorizontalOptions="Fill" VerticalOptions="Center">
-                <Button Command="{Binding CheckAllCommand}" HorizontalOptions="Fill" />
-                <CheckBox IsChecked="{Binding IsAllChecked}" VerticalOptions="Center" HorizontalOptions="Center" Opacity="100" Color="#000000" IsEnabled="True"/>
+                <Grid>
+                    <Button WidthRequest="48" Command="{Binding CheckAllCommand}" HorizontalOptions="Fill" />
+                    <CheckBox Margin="8,0,0,0" IsChecked="{Binding IsAllChecked}" VerticalOptions="Center" HorizontalOptions="Center" IsEnabled="True"/>
+                </Grid>
             </Grid>
-           
-            <Button Text="Display Name" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
+
+            <Button Text="Display Name" Grid.Column="1" FontAttributes="Bold" 
+                    HorizontalOptions="FillAndExpand" Command="{Binding SortCommand}" 
+                    CommandParameter="DisplayName" />
             <Button Text="File Type" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileType" />
             <Button Text="File Size" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />
         </Grid>
         <CollectionView ItemsSource="{Binding DataItems}" SelectionMode="Single"
-                     x:Name="DownloadList" Grid.Row="1">
+                     x:Name="CloneHeroList" Grid.Row="1">
             <CollectionView.ItemsLayout>
                 <GridItemsLayout Orientation="Vertical" Span="1" />
             </CollectionView.ItemsLayout>
@@ -41,13 +53,13 @@
                 <DataTemplate x:DataType="services:FileData">
                     <Grid ColumnSpacing="5" Padding="5">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="48" />
+                            <ColumnDefinition Width="{Binding Source={x:Reference HeaderCloneColumn}, Path=Width, Converter={StaticResource ColumnWidthConverter}}" />
+                            <ColumnDefinition Width="128" />
+                            <ColumnDefinition Width="128" />
                         </Grid.ColumnDefinitions>
 
-                        <CheckBox IsChecked="{Binding Checked}" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />
+                        <CheckBox Margin="8,0,0,0" IsChecked="{Binding Checked}" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />
                         <control:FancyName Grid.Column="1" />
                         <Label Text="{Binding FileType}" Grid.Column="2" HorizontalOptions="Center" />
                         <Label Text="{Binding FileSize}" Grid.Column="3" HorizontalOptions="Center" />

@@ -1,16 +1,13 @@
-﻿using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Data;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Windows.Input;
-using Microsoft.UI.Xaml.Controls;
+﻿using CommunityToolkit.Mvvm.Input;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Utilities;
 using SharpCompress.Archives;
 using SharpCompress.Common;
-using Windows.Devices.Midi;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Data;
+using System.Runtime.CompilerServices;
+using System.Windows.Input;
 
 namespace RhythmVerseClient.ViewModels
 {
@@ -34,7 +31,7 @@ namespace RhythmVerseClient.ViewModels
         private bool _isAscending = true;
         public ICommand SortCommand { get; }
         public ICommand CheckAllCommand { get; }
-        public ICommand InstallSongs { get; }
+        public IAsyncRelayCommand InstallSongs { get; }
 
         private bool _isAnyChecked;
         public bool IsAnyChecked
@@ -84,7 +81,7 @@ namespace RhythmVerseClient.ViewModels
             DataItems = DownloadWatcher.Data;
             SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
-            InstallSongs = new Command(InstallSongsCommand);
+            InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
             DownloadWatcher.LoadItems();
             _keystrokeSender = keystrokeSender;
         }
@@ -94,7 +91,7 @@ namespace RhythmVerseClient.ViewModels
             IsAllChecked = !IsAllChecked;
         }
 
-        private void InstallSongsCommand()
+        private async Task InstallSongsCommand()
         {
             List<string> songs = new List<string>();
             foreach (FileData file in DownloadWatcher.Data)
@@ -117,14 +114,20 @@ namespace RhythmVerseClient.ViewModels
                         }
                         File.Delete(file.FilePath);
                     }
-                    File.Move(file.FilePath, Toolbox.ConstructPath(globalSettings.PhaseshiftDir, file.DisplayName));
+                    else
+                    {
+                        File.Move(file.FilePath, Toolbox.ConstructPath(globalSettings.PhaseshiftDir, file.DisplayName));
+                    }
+                    // attempt to throttle the system events firing
+                    await Task.Delay(500);
                 }
             }
 
             // TODO figure out why the resourcewatchers dont see the change
             var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
-            nautilus.Run();
+            await nautilus.RunAsync();
         }
+
         public void SortData(string columnName)
         {
             if (_isAscending)

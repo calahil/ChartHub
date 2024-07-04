@@ -15,9 +15,13 @@ namespace RhythmVerseClient
         public App(IServiceProvider serviceProvider, AppGlobalSettings settings)
         {
             InitializeComponent();
+
+            Current.UserAppTheme = AppTheme.Dark;
             _globalSettings = settings;
             MainPage = serviceProvider.GetRequiredService<MainPage>();
+
         }
+
         protected async override void OnStart()
         {
             base.OnStart();
@@ -57,7 +61,6 @@ namespace RhythmVerseClient
                 Toolbox.CreateDirectoryIfNotExists(_globalSettings.DownloadDir);
             }
         }
-
 
     }
 }

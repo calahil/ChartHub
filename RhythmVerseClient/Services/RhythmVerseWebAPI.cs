@@ -21,9 +21,9 @@ namespace RhythmVerseClient.Services
             collection.Add(new("records", "25"));
             var content = new FormUrlEncodedContent(collection);
             request.Content = content;
-            var response = await client.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-            Console.WriteLine(await response.Content.ReadAsStringAsync());
+            //var response = await client.SendAsync(request);
+            //response.EnsureSuccessStatusCode();
+            //Console.WriteLine(await response.Content.ReadAsStringAsync());
 
         }
     }

@@ -1,20 +1,21 @@
-﻿using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Data;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
-using System.Windows.Input;
-using Microsoft.UI.Xaml.Controls;
+﻿using CommunityToolkit.Mvvm.Input;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Utilities;
+using SharpCompress.Archives;
+using SharpCompress.Common;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Data;
+using System.Runtime.CompilerServices;
+using System.Windows.Input;
 
 namespace RhythmVerseClient.ViewModels
 {
     public class CloneHeroViewModel : INotifyPropertyChanged
     {
         private readonly AppGlobalSettings globalSettings;
-       
-        private ObservableCollection<FileData>? _dataItems;
+
+        private ObservableCollection<FileData> _dataItems;
         public ObservableCollection<FileData> DataItems
         {
             get => _dataItems;
@@ -31,6 +32,19 @@ namespace RhythmVerseClient.ViewModels
         public ICommand SortCommand { get; }
         public ICommand CheckAllCommand { get; }
 
+        private bool _isAnyChecked;
+        public bool IsAnyChecked
+        {
+            get => _isAnyChecked;
+            set
+            {
+                if (_isAnyChecked != value)
+                {
+                    _isAnyChecked = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
         private bool _isAllChecked;
         public bool IsAllChecked
         {
@@ -47,7 +61,7 @@ namespace RhythmVerseClient.ViewModels
         }
 
         private FileData? _selectedFile;
-        public FileData SelectedFile
+        public FileData? SelectedFile
         {
             get => _selectedFile;
             set
@@ -61,7 +75,7 @@ namespace RhythmVerseClient.ViewModels
         {
             globalSettings = settings;
             CloneHeroWatcher = new ResourceWatcher(globalSettings.CloneHeroSongsDir, WatcherType.Directory);
-            DataItems = CloneHeroWatcher.Data;
+            _dataItems = CloneHeroWatcher.Data;
             SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
             CloneHeroWatcher.LoadItems();
@@ -106,6 +120,11 @@ namespace RhythmVerseClient.ViewModels
                 item.Checked = isChecked;
             }
             OnPropertyChanged(nameof(DataItems)); // Notify the UI to update
+        }
+
+        public bool AnyItemChecked()
+        {
+            return DataItems.Any(item => item.Checked);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

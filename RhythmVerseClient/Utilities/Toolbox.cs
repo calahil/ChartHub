@@ -6,6 +6,7 @@ using SharpCompress.Archives.Zip;
 using SharpCompress.Common;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -124,6 +125,8 @@ namespace RhythmVerseClient.Utilities
             set { _appSettings.CloneHeroSongLocation = value; _settingsManager.Save(); }
         }
 
+        public int WindowHeigtht;
+
         public AppGlobalSettings(ISettingsManager<AppSettings> settingsManager)
         {
             _settingsManager = settingsManager;
@@ -180,6 +183,19 @@ namespace RhythmVerseClient.Utilities
                 }
                 Directory.Delete(directory);
             }
+        }
+    }
+
+    public class ColumnWidthConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
         }
     }
 }

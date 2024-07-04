@@ -69,6 +69,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="CommunityToolkit.Maui" Version="9.0.1" />
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="8.0.61" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.61" />
@@ -83,6 +84,9 @@
 	<ItemGroup>
 	  <Compile Update="Pages\CloneHeroPage.xaml.cs">
 	    <DependentUpon>CloneHeroPage.xaml</DependentUpon>
+	  </Compile>
+	  <Compile Update="Pages\InstallSongPage.xaml.cs">
+	    <DependentUpon>InstallSongPage.xaml</DependentUpon>
 	  </Compile>
 	</ItemGroup>
 
@@ -100,6 +104,9 @@
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	  <MauiXaml Update="Pages\DownloadPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
+	  <MauiXaml Update="Pages\InstallSongPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
 	</ItemGroup>
