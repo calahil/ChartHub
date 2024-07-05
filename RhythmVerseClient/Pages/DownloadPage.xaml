@@ -7,7 +7,7 @@
              xmlns:util="clr-namespace:RhythmVerseClient.Utilities"
              x:Class="RhythmVerseClient.Pages.DownloadPage"
              x:DataType="models:DownloadViewModel"
-             Title="Downloads">
+             Title="{Binding PageStrings.Title}">
 
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -37,10 +37,10 @@
                     <CheckBox Margin="8,0,0,0" IsChecked="{Binding IsAllChecked}" VerticalOptions="Center" HorizontalOptions="Center" IsEnabled="True"/>
                 </Grid>
             </Grid>
-           
-            <Button Text="Display Name" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
-            <Button Text="File Type" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileType" />
-            <Button Text="File Size" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />
+
+            <Button Text="{Binding PageStrings.DisplayName}" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
+            <Button Text="{Binding PageStrings.FileType}" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileType" />
+            <Button Text="{Binding PageStrings.FileSize}" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />
         </Grid>
         <CollectionView ItemsSource="{Binding DataItems}" SelectionMode="Single"
                      x:Name="DownloadList" Grid.Row="1">

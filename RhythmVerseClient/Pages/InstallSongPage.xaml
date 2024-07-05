@@ -5,7 +5,7 @@
              xmlns:util="clr-namespace:RhythmVerseClient.Utilities"
              x:Class="RhythmVerseClient.Pages.InstallSongPage"
              x:DataType="models:InstallSongViewModel"
-             Title="Install Songs Page">
+             Title="{Binding PageString.Title}">
 
     <Grid x:Name="MyGrid" Padding="10" RowSpacing="10">
         <Grid.RowDefinitions>
@@ -34,7 +34,7 @@
 
         <!-- Button to Show/Hide Details -->
         <Button Grid.Row="1" Grid.Column="0"
-                Text="Start Progress"
+                Text="{Binding PageString.StartButton}"
                 HeightRequest="32"
                 MinimumHeightRequest="32"
                 Command="{Binding StartBarCommand}" />

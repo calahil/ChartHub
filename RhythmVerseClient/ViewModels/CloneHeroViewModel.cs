@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using RhythmVerseClient.Services;
+using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
 using SharpCompress.Archives;
 using SharpCompress.Common;
@@ -71,6 +72,8 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        public CloneHeroPageStrings PageStrings { get; }
+
         public CloneHeroViewModel(AppGlobalSettings settings)
         {
             globalSettings = settings;
@@ -79,6 +82,7 @@ namespace RhythmVerseClient.ViewModels
             SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
             CloneHeroWatcher.LoadItems();
+            PageStrings = new CloneHeroPageStrings();
         }
 
         private void CheckAllItemsCommand()

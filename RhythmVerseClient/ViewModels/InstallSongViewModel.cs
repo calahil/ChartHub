@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using RhythmVerseClient.Platforms.Windows;
+using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -46,6 +47,8 @@ namespace RhythmVerseClient.ViewModels
 
         private readonly IWindowSizeService _windowSizeService;
 
+        public InstallPageStrings PageString { get; }
+
         public InstallSongViewModel(AppGlobalSettings settings, IWindowSizeService windowSizeService)
         {
             _progressValue = 0;
@@ -56,6 +59,7 @@ namespace RhythmVerseClient.ViewModels
             _windowSizeService.PropertyChanged += _windowSizeService_PropertyChanged;
 
             _consoleHeight = windowSizeService.GetWindowSize().Height;
+            PageString = new InstallPageStrings();
         }
 
         private void _windowSizeService_PropertyChanged(object? sender, PropertyChangedEventArgs e)

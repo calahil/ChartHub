@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using RhythmVerseClient.Services;
+using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
 using SharpCompress.Archives;
 using SharpCompress.Common;
@@ -74,6 +75,8 @@ namespace RhythmVerseClient.ViewModels
 
         private IKeystrokeSender _keystrokeSender;
 
+        public DownloadPageStrings PageStrings { get; set; }
+
         public DownloadViewModel(AppGlobalSettings settings, IKeystrokeSender keystrokeSender)
         {
             globalSettings = settings;
@@ -84,6 +87,7 @@ namespace RhythmVerseClient.ViewModels
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
             DownloadWatcher.LoadItems();
             _keystrokeSender = keystrokeSender;
+            PageStrings = new DownloadPageStrings();
         }
 
         private void CheckAllItemsCommand()
