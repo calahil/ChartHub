@@ -16,6 +16,12 @@ namespace RhythmVerseClient.Pages
             viewModel.InstallItems = installSongView.InstallSongs = [];
         }
 
+        protected override void OnAppearing()
+        {
+            base.OnAppearing();
+            viewModel.DownloadWatcher.LoadItems();
+        }
+
         private void DownloadList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
             //throw new NotImplementedException();

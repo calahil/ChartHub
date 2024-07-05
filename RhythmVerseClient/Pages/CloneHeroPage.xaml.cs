@@ -14,5 +14,10 @@ namespace RhythmVerseClient.Pages
             BindingContext = cloneHeroView;
         }
 
+        protected override void OnAppearing()
+        {
+            base.OnAppearing();
+            viewModel.CloneHeroWatcher.LoadItems();
+        }
     }
 }

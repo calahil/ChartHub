@@ -6,10 +6,5 @@
     xmlns:local="clr-namespace:RhythmVerseClient"
     Shell.FlyoutBehavior="Disabled"
     Title="RhythmVerseClient">
-
-    <ShellContent
-        Title="Home"
-        ContentTemplate="{DataTemplate local:MainPage}"
-        Route="MainPage" />
-
+    
 </Shell>

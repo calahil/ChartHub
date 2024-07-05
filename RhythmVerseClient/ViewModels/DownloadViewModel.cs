@@ -96,7 +96,7 @@ namespace RhythmVerseClient.ViewModels
             SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
-            DownloadWatcher.LoadItems();
+            //DownloadWatcher.LoadItems();
             _keystrokeSender = keystrokeSender;
             PageStrings = new DownloadPageStrings();
         }
@@ -140,7 +140,7 @@ namespace RhythmVerseClient.ViewModels
             // TODO figure out why the resourcewatchers dont see the change
             //var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
             //await nautilus.RunAsync();
-            await Shell.Current.GoToAsync("//installsong");
+            await Shell.Current.GoToAsync("//InstallSong");
 
         }
 

@@ -21,7 +21,9 @@ namespace RhythmVerseClient
             _globalSettings = settings;
             MainPage = new LoadingPage();
             _serviceProvider = serviceProvider;
+
             InitializeAsync(initializer);
+
         }
 
         private async void InitializeAsync(Initializer initializer)
@@ -29,6 +31,5 @@ namespace RhythmVerseClient
             await initializer.InitializeAsync();
             MainPage = _serviceProvider.GetRequiredService<MainPage>();
         }
-
     }
 }

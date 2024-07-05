@@ -81,7 +81,7 @@ namespace RhythmVerseClient.ViewModels
             _dataItems = CloneHeroWatcher.Data;
             SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
-            CloneHeroWatcher.LoadItems();
+            //CloneHeroWatcher.LoadItems();
             PageStrings = new CloneHeroPageStrings();
         }
 
