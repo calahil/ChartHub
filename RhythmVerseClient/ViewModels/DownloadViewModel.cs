@@ -140,7 +140,7 @@ namespace RhythmVerseClient.ViewModels
             // TODO figure out why the resourcewatchers dont see the change
             //var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
             //await nautilus.RunAsync();
-            await Shell.Current.GoToAsync("//InstallSong");
+            await Shell.Current.GoToAsync("installsong");
 
         }
 
