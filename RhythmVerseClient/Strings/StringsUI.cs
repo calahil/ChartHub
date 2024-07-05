@@ -1,15 +1,16 @@
 ﻿namespace RhythmVerseClient.Strings
 {
-    public class StringsUI
+    public static class StringExtensions
     {
-        public string FormatString(string template, Dictionary<string, string> values)
+        public static string FormatString(this string str, string newText)
         {
-            foreach (var placeholder in values)
-            {
-                template = template.Replace($"%{placeholder.Key}%", placeholder.Value);
-            }
-            return template;
+            return str.Replace("%filename%", newText);
         }
+    }
+
+    public class StringsUI
+    {      
+
     }
 
     public class InstallPageStrings : StringsUI
@@ -34,7 +35,8 @@
         public string DisplayName { get; } = "Display Name";
         public string FileType { get; } = "File Type";
         public string FileSize { get; } = "File Size";
-       
+        public string InstallSongs { get; } = "Install Songs";
+
     }
 
     public class CloneHeroPageStrings : StringsUI

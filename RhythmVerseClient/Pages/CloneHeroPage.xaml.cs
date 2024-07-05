@@ -1,22 +1,18 @@
 using RhythmVerseClient.Services;
 using RhythmVerseClient.ViewModels;
 
-namespace RhythmVerseClient.Pages;
-
-public partial class CloneHeroPage : ContentPage
+namespace RhythmVerseClient.Pages
 {
-    private CloneHeroViewModel viewModel;
-
-    public CloneHeroPage(CloneHeroViewModel cloneHeroView)
-	{
-        viewModel = cloneHeroView;
-		InitializeComponent();
-		BindingContext = cloneHeroView;
-    }
-
-    private void DownloadList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    public partial class CloneHeroPage : ContentPage
     {
-        //throw new NotImplementedException();
+        private CloneHeroViewModel viewModel;
+
+        public CloneHeroPage(CloneHeroViewModel cloneHeroView)
+        {
+            viewModel = cloneHeroView;
+            InitializeComponent();
+            BindingContext = cloneHeroView;
+        }
 
     }
 }

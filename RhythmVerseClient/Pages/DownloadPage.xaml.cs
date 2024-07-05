@@ -1,27 +1,30 @@
 using RhythmVerseClient.Services;
 using RhythmVerseClient.ViewModels;
 
-namespace RhythmVerseClient.Pages;
-
-public partial class DownloadPage : ContentPage
+namespace RhythmVerseClient.Pages
 {
-    private DownloadViewModel viewModel;
 
-    public DownloadPage(DownloadViewModel downloadView)
-	{
-        viewModel = downloadView;
-		InitializeComponent();
-		BindingContext = downloadView;
-    }
-
-    private void DownloadList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    public partial class DownloadPage : ContentPage
     {
-        //throw new NotImplementedException();
+        private DownloadViewModel viewModel;
 
-    }
+        public DownloadPage(DownloadViewModel downloadView, InstallSongViewModel installSongView)
+        {
+            viewModel = downloadView;
+            InitializeComponent();
+            BindingContext = downloadView;
+            viewModel.InstallItems = installSongView.InstallSongs = [];
+        }
 
-    private void OnCheckBoxCheckedChanged(object sender, CheckedChangedEventArgs e)
-    {
-        viewModel.IsAnyChecked = viewModel.AnyItemChecked();
+        private void DownloadList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            //throw new NotImplementedException();
+
+        }
+
+        private void CheckBox_CheckedChanged(object sender, CheckedChangedEventArgs e)
+        {
+            viewModel.IsAnyChecked = viewModel.AnyItemChecked();
+        }
     }
 }

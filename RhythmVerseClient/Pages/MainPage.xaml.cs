@@ -4,7 +4,7 @@ using RhythmVerseClient.ViewModels;
 using RhythmVerseClient.Pages;
 using RhythmVerseClient.Platforms.Windows;
 
-namespace RhythmVerseClient
+namespace RhythmVerseClient.Pages
 {
     public partial class MainPage : TabbedPage
     {
@@ -16,7 +16,7 @@ namespace RhythmVerseClient
             InitializeComponent();
             BindingContext = mainView;
 
-            var DownloadsPage = new DownloadPage(downView);
+            var DownloadsPage = new DownloadPage(downView, installView);
             Children.Add(DownloadsPage);
             var CloneHeroPage = new CloneHeroPage(cloneView);
             Children.Add(CloneHeroPage);

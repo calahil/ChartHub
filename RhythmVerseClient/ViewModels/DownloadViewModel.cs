@@ -27,6 +27,17 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        private ObservableCollection<FileData>? _installItems;
+        public ObservableCollection<FileData> InstallItems
+        {
+            get => _installItems;
+            set
+            {
+                _installItems = value;
+                OnPropertyChanged();
+            }
+        }
+
         public IResourceWatcher DownloadWatcher { get; set; }
 
         private bool _isAscending = true;
@@ -47,7 +58,7 @@ namespace RhythmVerseClient.ViewModels
                 }
             }
         }
-        private bool _isAllChecked;
+       private bool _isAllChecked;
         public bool IsAllChecked
         {
             get => _isAllChecked;
@@ -97,39 +108,40 @@ namespace RhythmVerseClient.ViewModels
 
         private async Task InstallSongsCommand()
         {
-            List<string> songs = new List<string>();
             foreach (FileData file in DownloadWatcher.Data)
             {
                 if (file.Checked)
                 {
-                    songs.Add(file.FilePath);
-                    var extension = Path.GetExtension(file.FilePath).ToLower();
+                    InstallItems.Add(file);
+                    //var extension = Path.GetExtension(file.FilePath).ToLower();
 
-                    if (extension == ".zip" || extension == ".rar" || extension == ".7z")
-                    {
-                        using var archive = Toolbox.OpenArchive(file.FilePath);
-                        foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
-                        {
-                            entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
-                            {
-                                ExtractFullPath = true,
-                                Overwrite = true
-                            });
-                        }
-                        File.Delete(file.FilePath);
-                    }
-                    else
-                    {
-                        File.Move(file.FilePath, Toolbox.ConstructPath(globalSettings.PhaseshiftDir, file.DisplayName));
-                    }
+                    //if (extension == ".zip" || extension == ".rar" || extension == ".7z")
+                    //{
+                    //    using var archive = Toolbox.OpenArchive(file.FilePath);
+                    //    foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
+                    //    {
+                    //        entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
+                    //        {
+                    //            ExtractFullPath = true,
+                    //            Overwrite = true
+                    //        });
+                    //    }
+                    //    File.Delete(file.FilePath);
+                    //}
+                    //else
+                    //{
+                    //    File.Move(file.FilePath, Toolbox.ConstructPath(globalSettings.PhaseshiftDir, file.DisplayName));
+                    //}
                     // attempt to throttle the system events firing
                     await Task.Delay(500);
                 }
             }
 
             // TODO figure out why the resourcewatchers dont see the change
-            var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
-            await nautilus.RunAsync();
+            //var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
+            //await nautilus.RunAsync();
+            await Shell.Current.GoToAsync("//installsong");
+
         }
 
         public void SortData(string columnName)

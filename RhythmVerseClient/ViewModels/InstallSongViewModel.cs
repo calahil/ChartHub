@@ -1,7 +1,9 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using RhythmVerseClient.Platforms.Windows;
+using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -10,6 +12,17 @@ namespace RhythmVerseClient.ViewModels
 {
     public class InstallSongViewModel : INotifyPropertyChanged
     {
+        private ObservableCollection<FileData> _installSongs;
+        public ObservableCollection<FileData> InstallSongs
+        {
+            get => _installSongs;
+            set
+            {
+                _installSongs = value;
+                OnPropertyChanged();
+            }
+        }
+
         private double _progressValue;
         public double ProgressValue
         {
@@ -60,6 +73,7 @@ namespace RhythmVerseClient.ViewModels
 
             _consoleHeight = windowSizeService.GetWindowSize().Height;
             PageString = new InstallPageStrings();
+         
         }
 
         private void _windowSizeService_PropertyChanged(object? sender, PropertyChangedEventArgs e)

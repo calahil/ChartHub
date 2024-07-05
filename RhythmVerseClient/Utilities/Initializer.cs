@@ -17,7 +17,7 @@ namespace RhythmVerseClient.Utilities
 
         public Initializer() { }
 
-        private async void Initialize()
+        public async Task InitializeAsync()
         {
             var NautilusDirectoryPath = Toolbox.ConstructPath(ApplicationData.Current.LocalFolder.Path, "nautilus");
             var nautilisEXE = Path.Combine(NautilusDirectoryPath, "Nautilus.exe");
@@ -52,7 +52,9 @@ namespace RhythmVerseClient.Utilities
                 }
 
 
-                var PhaseshiftDir =Toolbox.ConstructPath(NautilusDirectoryPath)
+                var PhaseshiftDir = Toolbox.ConstructPath(NautilusDirectoryPath, "phaseshift");
+                var PhaseshiftMusicDir = Toolbox.ConstructPath(PhaseshiftDir, "Music");
+                var DownloadDir = Toolbox.ConstructPath(PhaseshiftDir, "downloads");
                 Toolbox.CreateDirectoryIfNotExists(PhaseshiftDir);
                 Toolbox.CreateDirectoryIfNotExists(PhaseshiftMusicDir);
                 Toolbox.CreateDirectoryIfNotExists(DownloadDir);

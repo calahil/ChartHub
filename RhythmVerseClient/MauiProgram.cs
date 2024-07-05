@@ -68,6 +68,7 @@ namespace RhythmVerseClient
             builder.Services.AddTransient<CloneHeroPage>();
             builder.Services.AddTransient<InstallSongPage>();
 
+            builder.Services.AddSingleton<Initializer>();
 
             return builder.Build();
         }

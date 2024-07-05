@@ -20,6 +20,7 @@ namespace RhythmVerseClient.Pages
         {
             base.OnSizeAllocated(width, height);
             _windowSizeService.Refresh();
+            
         }
     }
 }
