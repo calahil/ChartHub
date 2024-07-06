@@ -62,7 +62,9 @@ namespace RhythmVerseClient.ViewModels
 
         public InstallPageStrings PageString { get; }
 
-        public InstallSongViewModel(AppGlobalSettings settings, IWindowSizeService windowSizeService)
+        private IKeystrokeSender _keystrokeSender;
+
+        public InstallSongViewModel(AppGlobalSettings settings, IWindowSizeService windowSizeService, IKeystrokeSender keystrokeSender)
         {
             _progressValue = 0;
             _details = String.Empty;
@@ -71,6 +73,8 @@ namespace RhythmVerseClient.ViewModels
             _windowSizeService = windowSizeService;
             _windowSizeService.PropertyChanged += _windowSizeService_PropertyChanged;
 
+            _keystrokeSender = keystrokeSender;
+            _installSongs = [];
             _consoleHeight = windowSizeService.GetWindowSize().Height;
             PageString = new InstallPageStrings();
          

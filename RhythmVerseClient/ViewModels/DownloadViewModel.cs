@@ -85,11 +85,9 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        private IKeystrokeSender _keystrokeSender;
-
         public DownloadPageStrings PageStrings { get; set; }
 
-        public DownloadViewModel(AppGlobalSettings settings, IKeystrokeSender keystrokeSender)
+        public DownloadViewModel(AppGlobalSettings settings)
         {
             globalSettings = settings;
             DownloadWatcher = new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
@@ -98,7 +96,6 @@ namespace RhythmVerseClient.ViewModels
             CheckAllCommand = new Command(CheckAllItemsCommand);
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
             //DownloadWatcher.LoadItems();
-            _keystrokeSender = keystrokeSender;
             PageStrings = new DownloadPageStrings();
         }
 
