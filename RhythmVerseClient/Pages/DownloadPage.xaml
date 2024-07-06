@@ -25,22 +25,22 @@
         <!-- Header Grid -->
         <Grid Grid.Row="0" ColumnSpacing="5" Padding="5">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="48" />
-                <ColumnDefinition x:Name="HeaderDownloadColumn" Width="*" />
-                <ColumnDefinition Width="128" />
-                <ColumnDefinition Width="128" />
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="86*" />
+                <ColumnDefinition Width="6*" />
+                <ColumnDefinition Width="6*" />
             </Grid.ColumnDefinitions>
 
             <Grid Grid.Column="0" HorizontalOptions="Fill" VerticalOptions="Center">
                 <Grid>
-                    <Button WidthRequest="48" Command="{Binding CheckAllCommand}" HorizontalOptions="Fill" Clicked="Button_Clicked"/>
+                    <Button Command="{Binding CheckAllCommand}" HorizontalOptions="Fill" Clicked="Button_Clicked"/>
                     <CheckBox Margin="8,0,0,0" IsChecked="{Binding IsAllChecked}" VerticalOptions="Center" HorizontalOptions="Center" IsEnabled="True"/>
                 </Grid>
             </Grid>
 
-            <Button Text="{Binding PageStrings.DisplayName}" HeightRequest="44" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
-            <Button Text="{Binding PageStrings.FileType}" HeightRequest="44" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileType" />
-            <Button Text="{Binding PageStrings.FileSize}" HeightRequest="44" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />
+            <Button Text="{Binding PageStrings.DisplayName}" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
+            <Button Text="{Binding PageStrings.FileType}" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileType" />
+            <Button Text="{Binding PageStrings.FileSize}" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />
         </Grid>
         <CollectionView ItemsSource="{Binding DataItems}" SelectionMode="Single"
                      x:Name="DownloadList" Grid.Row="1">
@@ -51,10 +51,10 @@
                 <DataTemplate x:DataType="services:FileData">
                     <Grid ColumnSpacing="5" Padding="5">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="48" />
-                            <ColumnDefinition Width="{Binding Source={x:Reference HeaderDownloadColumn}, Path=Width, Converter={StaticResource ColumnWidthConverter}}" />
-                            <ColumnDefinition Width="128" />
-                            <ColumnDefinition Width="128" />
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="86*" />
+                            <ColumnDefinition Width="6*" />
+                            <ColumnDefinition Width="6*" />
                         </Grid.ColumnDefinitions>
 
                         <CheckBox Margin="8,0,0,0" IsChecked="{Binding Checked}" CheckedChanged="CheckBox_CheckedChanged" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />
