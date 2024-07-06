@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.Input;
+using RhythmVerseClient.Pages;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
@@ -113,25 +114,25 @@ namespace RhythmVerseClient.ViewModels
                 if (file.Checked)
                 {
                     InstallItems.Add(file);
-                    //var extension = Path.GetExtension(file.FilePath).ToLower();
+                    var extension = Path.GetExtension(file.FilePath).ToLower();
 
-                    //if (extension == ".zip" || extension == ".rar" || extension == ".7z")
-                    //{
-                    //    using var archive = Toolbox.OpenArchive(file.FilePath);
-                    //    foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
-                    //    {
-                    //        entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
-                    //        {
-                    //            ExtractFullPath = true,
-                    //            Overwrite = true
-                    //        });
-                    //    }
-                    //    File.Delete(file.FilePath);
-                    //}
-                    //else
-                    //{
-                    //    File.Move(file.FilePath, Toolbox.ConstructPath(globalSettings.PhaseshiftDir, file.DisplayName));
-                    //}
+                    if (extension == ".zip" || extension == ".rar" || extension == ".7z")
+                    {
+                        using var archive = Toolbox.OpenArchive(file.FilePath);
+                        foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
+                        {
+                            entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
+                            {
+                                ExtractFullPath = true,
+                                Overwrite = true
+                            });
+                        }
+                        //File.Delete(file.FilePath);
+                    }
+                    else
+                    {
+                        File.Move(file.FilePath, Toolbox.ConstructPath(globalSettings.PhaseshiftDir, file.DisplayName));
+                    }
                     // attempt to throttle the system events firing
                     await Task.Delay(500);
                 }
@@ -140,7 +141,8 @@ namespace RhythmVerseClient.ViewModels
             // TODO figure out why the resourcewatchers dont see the change
             //var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
             //await nautilus.RunAsync();
-            await Shell.Current.GoToAsync("installsong");
+            var mainPage = Application.Current?.MainPage as MainPage;
+            mainPage?.FocusOnTab(2);
 
         }
 

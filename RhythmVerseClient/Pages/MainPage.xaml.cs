@@ -22,6 +22,16 @@ namespace RhythmVerseClient.Pages
             Children.Add(CloneHeroPage);
             var InstallSongPage = new InstallSongPage(installView, windowSizeService);
             Children.Add(InstallSongPage);
+
+            CurrentPage = Children[0];
+        }
+
+        public void FocusOnTab(int tabIndex)
+        {
+            if (tabIndex >= 0 && tabIndex < Children.Count)
+            {
+                CurrentPage = Children[tabIndex];
+            }
         }
 
         protected override void OnSizeAllocated(double width, double height)
