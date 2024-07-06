@@ -17,23 +17,23 @@
     
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="1*" />
             <RowDefinition Height="10*" />
-            <RowDefinition Height="80*" />
-            <RowDefinition Height="10*" />
+            <RowDefinition Height="1*" />
         </Grid.RowDefinitions>
 
         <!-- Header Grid -->
         <Grid Grid.Row="0" ColumnSpacing="5" Padding="5">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" />
-                <ColumnDefinition Width="86*" />
-                <ColumnDefinition Width="6*" />
-                <ColumnDefinition Width="6*" />
+                <ColumnDefinition Width="1*" />
+                <ColumnDefinition Width="20*" />
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="3*" />
             </Grid.ColumnDefinitions>
 
             <Grid Grid.Column="0" HorizontalOptions="Fill" VerticalOptions="Center">
                 <Grid>
-                    <Button Command="{Binding CheckAllCommand}" HorizontalOptions="Fill" Clicked="Button_Clicked"/>
+                    <Button HorizontalOptions="Fill" Clicked="Button_Clicked"/>
                     <CheckBox Margin="8,0,0,0" IsChecked="{Binding IsAllChecked}" VerticalOptions="Center" HorizontalOptions="Center" IsEnabled="True"/>
                 </Grid>
             </Grid>
@@ -51,10 +51,10 @@
                 <DataTemplate x:DataType="services:FileData">
                     <Grid ColumnSpacing="5" Padding="5">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="86*" />
-                            <ColumnDefinition Width="6*" />
-                            <ColumnDefinition Width="6*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="20*" />
+                            <ColumnDefinition Width="3*" />
+                            <ColumnDefinition Width="3*" />
                         </Grid.ColumnDefinitions>
 
                         <CheckBox Margin="8,0,0,0" IsChecked="{Binding Checked}" CheckedChanged="CheckBox_CheckedChanged" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />
@@ -65,6 +65,6 @@
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
-        <Button Grid.Row="2" VerticalOptions="End" Text="{Binding PageStrings.InstallSongs}"  IsVisible="{Binding IsAnyChecked}" Command="{Binding InstallSongs}"/>
+        <Button Grid.Row="2" VerticalOptions="End" Text="{Binding PageStrings.InstallSongs}"  IsEnabled="{Binding IsAnyChecked}" Command="{Binding InstallSongs}"/>
     </Grid>
 </ContentPage>

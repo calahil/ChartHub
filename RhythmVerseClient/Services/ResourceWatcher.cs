@@ -15,8 +15,7 @@ namespace RhythmVerseClient.Services
     }
 
     public enum WatcherFileType
-    {
-       
+    {       
         Con,
         CloneHero,
         Directory,
@@ -113,6 +112,7 @@ namespace RhythmVerseClient.Services
             });
         }
 
+        // Look at this about not removing items from collection when the app is moving them.
         private void OnDeleted(object sender, FileSystemEventArgs e)
         {
             MainThread.BeginInvokeOnMainThread(() =>
