@@ -59,6 +59,26 @@ namespace RhythmVerseClient.Utilities
                 _ => throw new NotSupportedException($"File type {extension} is not supported.")
             };
         }
+
+        public static void DebugResetSongProcessor(string phaseshiftDir, string downloadDir, string phaseshiftMusicDir)
+        {
+            foreach (var file in Directory.GetFiles(phaseshiftDir))
+            {
+                string destFile = Path.Combine(downloadDir, Path.GetFileName(file));
+                File.Copy(file, destFile, true); // true to overwrite
+                File.Delete(file); // Delete the original file
+            }
+
+            foreach (string directory in Directory.GetDirectories(phaseshiftMusicDir))
+            {
+                foreach (string file in Directory.GetFiles(directory))
+                {
+                    File.Delete(file); // Delete the original file
+                }
+                Directory.Delete(directory);
+            }
+        }
+
         /* public void MoveDirectory(string source, string destination)
          {
              // Create the destination directory if it doesn't exist
@@ -166,24 +186,7 @@ namespace RhythmVerseClient.Utilities
             }
         }
 
-        public void DebugResetSongProcessor()
-        {
-            foreach (var file in Directory.GetFiles(PhaseshiftDir))
-            {
-                string destFile = Path.Combine(DownloadDir, Path.GetFileName(file));
-                File.Copy(file, destFile, true); // true to overwrite
-                File.Delete(file); // Delete the original file
-            }
-
-            foreach (string directory in Directory.GetDirectories(PhaseshiftMusicDir))
-            {
-                foreach (string file in Directory.GetFiles(directory))
-                {
-                    File.Delete(file); // Delete the original file
-                }
-                Directory.Delete(directory);
-            }
-        }
+        
     }
 
     public class ColumnWidthConverter : IValueConverter

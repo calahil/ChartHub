@@ -17,16 +17,17 @@
     {
         public string Title { get; } = "Install Songs Page";
         public string StartButton { get; } = "Start Progress";
-        public string StartProcess { get; } = "Song install has begun...";
-        public string Done { get; } = "Done";
-        public string UnzipFile { get; } = "Begin unziping %filename% into staging directory...";
-        public string ExtractFile { get; } = "Begin extracting %filename% into staging directory...";
-        public string UnRarFile { get; } = "Begin unraring %filename% into staging directory...";
-        public string RBConFile { get; } = "Moving %filename% into Nautilus directory...";
-        public string StartNautilus { get; } = "Starting Nautilus...";
-        public string NautilusConversion { get; } = "RB3 CON file conversion started...";
-        public string StopNautilus { get; } = "Stopping Nautilus...";
-        public string InstallSongs { get; } = "Installing songs to your Clone Hero song directory...";
+        public string GoBack { get; } = "Go Back";
+        public string StartProcess { get; } = "Song install has begun...\n";
+        public string Done { get; } = "Done\n";
+        public string UnzipFile { get; } = "Begin unziping '%filename%' into staging directory...";
+        public string ExtractFile { get; } = "Begin extracting '%filename%' into staging directory...";
+        public string UnRarFile { get; } = "Begin unraring '%filename%' into staging directory...";
+        public string RBConFile { get; } = "Moving '%filename%' into Nautilus directory...";
+        public string StartNautilus { get; } = "Starting Nautilus...\n";
+        public string NautilusConversion { get; } = "RB3 CON file conversion started...\n";
+        public string StopNautilus { get; } = "Stopping Nautilus...\n";
+        public string InstallSongs { get; } = "Installing songs to your Clone Hero song directory...\n";
     }
 
     public class DownloadPageStrings : StringsUI

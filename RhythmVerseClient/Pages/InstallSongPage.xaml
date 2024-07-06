@@ -38,7 +38,11 @@
                 HeightRequest="32"
                 MinimumHeightRequest="32"
                 Command="{Binding StartBarCommand}" />
-
+        <Button Grid.Row="1" Grid.Column="1"
+        Text="{Binding PageString.GoBack}"
+        HeightRequest="32"
+        MinimumHeightRequest="32"
+        Command="{Binding GoBackCommand}" />
         <Label Grid.Row="1" Grid.Column="3" VerticalOptions="FillAndExpand"
             HorizontalOptions="Center"
             Text="{Binding InstallSongs.Count, StringFormat='{0} %'}"

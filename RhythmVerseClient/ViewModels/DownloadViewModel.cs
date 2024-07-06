@@ -106,38 +106,23 @@ namespace RhythmVerseClient.ViewModels
 
         private async Task InstallSongsCommand()
         {
+            InstallItems.Clear();
             foreach (FileData file in DownloadWatcher.Data)
             {
                 if (file.Checked)
                 {
-                    InstallItems.Add(file);
-                    var extension = Path.GetExtension(file.FilePath).ToLower();
+                    var newFilePath = Toolbox.ConstructPath(globalSettings.PhaseshiftDir, file.DisplayName);
 
-                    if (extension == ".zip" || extension == ".rar" || extension == ".7z")
-                    {
-                        using var archive = Toolbox.OpenArchive(file.FilePath);
-                        foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
-                        {
-                            entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
-                            {
-                                ExtractFullPath = true,
-                                Overwrite = true
-                            });
-                        }
-                        //File.Delete(file.FilePath);
-                    }
-                    else
-                    {
-                        File.Move(file.FilePath, Toolbox.ConstructPath(globalSettings.PhaseshiftDir, file.DisplayName));
-                    }
+                    File.Move(file.FilePath, newFilePath);
+                    file.FilePath = newFilePath;
+                    InstallItems.Add(file);
                     // attempt to throttle the system events firing
                     await Task.Delay(500);
                 }
             }
 
             // TODO figure out why the resourcewatchers dont see the change
-            //var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
-            //await nautilus.RunAsync();
+           
             var mainPage = Application.Current?.MainPage as MainPage;
             mainPage?.FocusOnTab(2);
 
@@ -193,39 +178,39 @@ namespace RhythmVerseClient.ViewModels
 
         
 
-        public async Task ProcessZipsAsync(CancellationToken cancellationToken)
-        {
-            try
-            {
-                var files = Directory.EnumerateFiles(globalSettings.PhaseshiftDir);
-                foreach (var file in files)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var extension = Path.GetExtension(file).ToLower();
+        //public async Task ProcessZipsAsync(CancellationToken cancellationToken)
+        //{
+        //    try
+        //    {
+        //        var files = Directory.EnumerateFiles(globalSettings.PhaseshiftDir);
+        //        foreach (var file in files)
+        //        {
+        //            cancellationToken.ThrowIfCancellationRequested();
+        //            var extension = Path.GetExtension(file).ToLower();
 
-                    if (extension == ".zip" || extension == ".rar" || extension == ".7z")
-                    {
-                        using var archive = Toolbox.OpenArchive(file);
-                        foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
-                        {
-                            entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
-                            {
-                                ExtractFullPath = true,
-                                Overwrite = true
-                            });
-                        }
-                    }
-                }
-                await Task.Delay(500, cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                await Shell.Current.DisplayAlert("Info", "Operation was cancelled.", "OK");
-            }
-            catch (Exception ex)
-            {
-                await Shell.Current.DisplayAlert("Error", $"An error occurred: {ex.Message}", "OK");
-            }
-        }
+        //            if (extension == ".zip" || extension == ".rar" || extension == ".7z")
+        //            {
+        //                using var archive = Toolbox.OpenArchive(file);
+        //                foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
+        //                {
+        //                    entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
+        //                    {
+        //                        ExtractFullPath = true,
+        //                        Overwrite = true
+        //                    });
+        //                }
+        //            }
+        //        }
+        //        await Task.Delay(500, cancellationToken);
+        //    }
+        //    catch (OperationCanceledException)
+        //    {
+        //        await Shell.Current.DisplayAlert("Info", "Operation was cancelled.", "OK");
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        await Shell.Current.DisplayAlert("Error", $"An error occurred: {ex.Message}", "OK");
+        //    }
+        //}
     }
 }

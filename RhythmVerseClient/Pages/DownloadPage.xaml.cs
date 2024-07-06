@@ -21,16 +21,16 @@ namespace RhythmVerseClient.Pages
             base.OnAppearing();
             viewModel.DownloadWatcher.LoadItems();
         }
-
-        private void DownloadList_SelectionChanged(object? sender, SelectionChangedEventArgs e)
-        {
-            //throw new NotImplementedException();
-
-        }
+      
 
         private void CheckBox_CheckedChanged(object sender, CheckedChangedEventArgs e)
         {
             viewModel.IsAnyChecked = viewModel.AnyItemChecked();
+        }
+
+        private async void Button_Clicked(object sender, EventArgs e)
+        {
+            await Task.Delay(1000);
         }
     }
 }

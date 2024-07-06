@@ -1,8 +1,11 @@
 ﻿using CommunityToolkit.Mvvm.Input;
+using RhythmVerseClient.Pages;
 using RhythmVerseClient.Platforms.Windows;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
+using SharpCompress.Archives;
+using SharpCompress.Common;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -57,6 +60,7 @@ namespace RhythmVerseClient.ViewModels
         }
 
         public IAsyncRelayCommand StartBarCommand { get; }
+        public ICommand GoBackCommand {  get; }
 
         private readonly IWindowSizeService _windowSizeService;
 
@@ -64,12 +68,14 @@ namespace RhythmVerseClient.ViewModels
 
         private IKeystrokeSender _keystrokeSender;
 
+        private readonly AppGlobalSettings globalSettings;
+
         public InstallSongViewModel(AppGlobalSettings settings, IWindowSizeService windowSizeService, IKeystrokeSender keystrokeSender)
         {
             _progressValue = 0;
             _details = String.Empty;
             StartBarCommand = new AsyncRelayCommand(StartBar);
-
+            GoBackCommand = new Command(GoBack);
             _windowSizeService = windowSizeService;
             _windowSizeService.PropertyChanged += _windowSizeService_PropertyChanged;
 
@@ -77,7 +83,14 @@ namespace RhythmVerseClient.ViewModels
             _installSongs = [];
             _consoleHeight = windowSizeService.GetWindowSize().Height;
             PageString = new InstallPageStrings();
-         
+            globalSettings = settings;
+        }
+
+        private void GoBack()
+        {
+            Toolbox.DebugResetSongProcessor(globalSettings.PhaseshiftDir, globalSettings.DownloadDir, globalSettings.PhaseshiftMusicDir);
+            var mainPage = Application.Current?.MainPage as MainPage;
+            mainPage?.FocusOnTab(0);
         }
 
         private void _windowSizeService_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -95,14 +108,63 @@ namespace RhythmVerseClient.ViewModels
 
         private async Task StartBar()
         {
+            Details = String.Empty;
             ProgressValue = 0;
-            while (ProgressValue < 1)
+            Details += PageString.StartProcess;
+
+            await Task.Delay(100);
+            foreach (var song in InstallSongs)
             {
-                ProgressValue += 0.01;
-                Details += ProgressValue.ToString() + "%" + Environment.NewLine;
-                await Task.Delay(100);
+                var extension = Path.GetExtension(song.FilePath).ToLower();
+
+                if (extension == ".zip" || extension == ".rar" || extension == ".7z")
+                {
+                    switch (extension)
+                    {
+                        case ".zip":
+                            Details += PageString.UnzipFile.FormatString(song.DisplayName);
+                            break;
+                        case ".rar":
+                            Details += PageString.UnRarFile.FormatString(song.DisplayName);
+                            break;
+                        case ".7z":
+                            Details += PageString.ExtractFile.FormatString(song.DisplayName);
+                            break;
+                        default:
+                            Details += PageString.ExtractFile.FormatString(song.DisplayName);
+                            break;
+
+                    }
+                    await Task.Delay(100);
+                    using var archive = Toolbox.OpenArchive(song.FilePath);
+                    foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
+                    {
+                        entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
+                        {
+                            ExtractFullPath = true,
+                            Overwrite = true
+                        });
+                    }
+                    Details += PageString.Done;
+                    await Task.Delay(100);
+                }
             }
 
+            Details += PageString.StartNautilus;
+
+            await Task.Delay(100);
+            //while (ProgressValue < 1)
+            //{
+            //    ProgressValue += 0.01;
+            //    Details += ProgressValue.ToString() + "%" + Environment.NewLine;
+            //    await Task.Delay(100);
+            //}
+            var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
+            Details += PageString.NautilusConversion;
+            await Task.Delay(100);
+            await nautilus.RunAsync();
+            Details += PageString.StopNautilus;
+            await Task.Delay(100);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

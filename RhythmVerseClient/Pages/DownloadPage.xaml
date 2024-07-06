@@ -17,9 +17,9 @@
     
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="10*" />
+            <RowDefinition Height="80*" />
+            <RowDefinition Height="10*" />
         </Grid.RowDefinitions>
 
         <!-- Header Grid -->
@@ -33,14 +33,14 @@
 
             <Grid Grid.Column="0" HorizontalOptions="Fill" VerticalOptions="Center">
                 <Grid>
-                    <Button WidthRequest="48" Command="{Binding CheckAllCommand}" HorizontalOptions="Fill" />
+                    <Button WidthRequest="48" Command="{Binding CheckAllCommand}" HorizontalOptions="Fill" Clicked="Button_Clicked"/>
                     <CheckBox Margin="8,0,0,0" IsChecked="{Binding IsAllChecked}" VerticalOptions="Center" HorizontalOptions="Center" IsEnabled="True"/>
                 </Grid>
             </Grid>
 
-            <Button Text="{Binding PageStrings.DisplayName}" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
-            <Button Text="{Binding PageStrings.FileType}" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileType" />
-            <Button Text="{Binding PageStrings.FileSize}" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />
+            <Button Text="{Binding PageStrings.DisplayName}" HeightRequest="44" Grid.Column="1" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="DisplayName" />
+            <Button Text="{Binding PageStrings.FileType}" HeightRequest="44" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileType" />
+            <Button Text="{Binding PageStrings.FileSize}" HeightRequest="44" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />
         </Grid>
         <CollectionView ItemsSource="{Binding DataItems}" SelectionMode="Single"
                      x:Name="DownloadList" Grid.Row="1">
