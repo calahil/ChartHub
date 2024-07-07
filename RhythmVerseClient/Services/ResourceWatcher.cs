@@ -113,7 +113,7 @@ namespace RhythmVerseClient.Services
         }
 
         // Look at this about not removing items from collection when the app is moving them.
-        private void OnDeleted(object sender, FileSystemEventArgs e)
+        private async void OnDeleted(object sender, FileSystemEventArgs e)
         {
             MainThread.BeginInvokeOnMainThread(() =>
             {
@@ -155,7 +155,7 @@ namespace RhythmVerseClient.Services
             });*/
         }
 
-        public static async Task<WatcherFileType> GetFileTypeAsync(string filePath)
+        private static async Task<WatcherFileType> GetFileTypeAsync(string filePath)
         {
             byte[] fileSignature = new byte[6];
 
@@ -204,7 +204,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        public static string GetIconForFileType(WatcherFileType fileType)
+        private static string GetIconForFileType(WatcherFileType fileType)
         {
             return fileType switch
             {
@@ -217,7 +217,7 @@ namespace RhythmVerseClient.Services
             };
         }
 
-        public int GetItemCount()
+        private int GetItemCount()
         {
             if (Directory.Exists(DirectoryPath))
             {
@@ -235,7 +235,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        public void OpenLocation(int index)
+        private void OpenLocation(int index)
         {
             var selectedItem = Data[index];
             string? directoryPath = _watcherType == WatcherType.Directory ? selectedItem.FilePath : Path.GetDirectoryName(selectedItem.FilePath);
@@ -253,7 +253,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        public void DeleteFile(int index)
+        private void DeleteFile(int index)
         {
             var selectedItem = Data[index];
 
@@ -292,45 +292,51 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        public async Task AddItem(string itemName, string itemPath)
+        private async Task AddItem(string itemName, string itemPath)
         {
-            var fileType = await GetFileTypeAsync(itemPath);
-            var imageFile = GetIconForFileType(fileType);
-            long sizeBytes;
+            existingEntries.TryGetValue(itemPath, out var entry);
 
-            switch (_watcherType)
-                {
-                case WatcherType.File:
-                    var info = new FileInfo(itemPath);
-                    sizeBytes = info.Length;
-                    break;
-                case WatcherType.Directory:
-                    sizeBytes = Toolbox.GetDirectorySize(itemPath);
-                    break;
-                default:
-                    sizeBytes = 0;
-                    break;
-            }            
-            Data.Add(new FileData(itemName, itemPath, fileType, imageFile, sizeBytes));
-            existingEntries.Add(itemPath);
-        }
-
-        public async Task DeleteItem(string itemName, string itemPath)
-        {
-            var fileType = await GetFileTypeAsync(itemPath);
-            var imageFile = GetIconForFileType(fileType);
-            var info = new FileInfo(itemPath);
-            var itemToDelete = new FileData(itemName, itemPath, fileType, imageFile, info.Length);
-            var index = Data.IndexOf(itemToDelete);
-
-            if (index != -1)
+            if (entry == null)
             {
-                Data.RemoveAt(index);
+                var fileType = await GetFileTypeAsync(itemPath);
+                var imageFile = GetIconForFileType(fileType);
+                long sizeBytes;
+
+                switch (_watcherType)
+                {
+                    case WatcherType.File:
+                        var info = new FileInfo(itemPath);
+                        sizeBytes = info.Length;
+                        break;
+                    case WatcherType.Directory:
+                        sizeBytes = Toolbox.GetDirectorySize(itemPath);
+                        break;
+                    default:
+                        sizeBytes = 0;
+                        break;
+                }
+                Data.Add(new FileData(itemName, itemPath, fileType, imageFile, sizeBytes));
+                existingEntries.Add(itemPath);
             }
-            existingEntries.Remove(itemPath);
         }
 
-        public async Task UpdateItem(string itemName, string itemPath, string oldItemPath)
+        private void DeleteItem(string itemName, string itemPath)
+        {          
+            var itemToRemove = Data.FirstOrDefault(file => file.DisplayName == itemName);
+
+            if (itemToRemove != null)
+            {
+                Data.Remove(itemToRemove);
+            }
+            existingEntries.TryGetValue(itemPath, out var entry);
+
+            if (entry != null)
+            {
+                existingEntries.Remove(itemPath);
+            }
+        }
+
+        private async Task UpdateItem(string itemName, string itemPath, string oldItemPath)
         {
             var itemToEdit = Data.FirstOrDefault(item => item.FilePath == oldItemPath);
 
@@ -341,6 +347,13 @@ namespace RhythmVerseClient.Services
                 itemToEdit.FilePath = itemPath;
                 itemToEdit.DisplayName = itemName;
             }
+            existingEntries.TryGetValue(oldItemPath, out var entry);
+
+            if (entry != null)
+            {
+                existingEntries.Remove(oldItemPath);
+            }
+            existingEntries.Add(itemPath);
         }
     }
 

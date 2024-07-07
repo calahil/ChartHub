@@ -17,24 +17,24 @@
     
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="1*" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="10*" />
-            <RowDefinition Height="1*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Header Grid -->
         <Grid Grid.Row="0" ColumnSpacing="5" Padding="5">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1*" />
-                <ColumnDefinition Width="20*" />
-                <ColumnDefinition Width="3*" />
-                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width=".02*" />
+                <ColumnDefinition Width=".25*" />
+                <ColumnDefinition Width=".04*" />
+                <ColumnDefinition Width=".04*" />
             </Grid.ColumnDefinitions>
 
             <Grid Grid.Column="0" HorizontalOptions="Fill" VerticalOptions="Center">
                 <Grid>
                     <Button HorizontalOptions="Fill" Clicked="Button_Clicked"/>
-                    <CheckBox Margin="8,0,0,0" IsChecked="{Binding IsAllChecked}" VerticalOptions="Center" HorizontalOptions="Center" IsEnabled="True"/>
+                    <CheckBox IsChecked="{Binding IsAllChecked}" VerticalOptions="Center" HorizontalOptions="Center" IsEnabled="True"/>
                 </Grid>
             </Grid>
 
@@ -51,13 +51,13 @@
                 <DataTemplate x:DataType="services:FileData">
                     <Grid ColumnSpacing="5" Padding="5">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1*" />
-                            <ColumnDefinition Width="20*" />
-                            <ColumnDefinition Width="3*" />
-                            <ColumnDefinition Width="3*" />
+                            <ColumnDefinition Width=".02*" />
+                            <ColumnDefinition Width=".25*" />
+                            <ColumnDefinition Width=".04*" />
+                            <ColumnDefinition Width=".04*" />
                         </Grid.ColumnDefinitions>
 
-                        <CheckBox Margin="8,0,0,0" IsChecked="{Binding Checked}" CheckedChanged="CheckBox_CheckedChanged" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />
+                        <CheckBox IsChecked="{Binding Checked}" CheckedChanged="CheckBox_CheckedChanged" Grid.Column="0" HorizontalOptions="Center" VerticalOptions="Center" />
                         <control:FancyName Grid.Column="1" />
                         <Label Text="{Binding FileType}" Grid.Column="2" HorizontalOptions="Center" />
                         <Label Text="{Binding FileSize}" Grid.Column="3" HorizontalOptions="Center" />
