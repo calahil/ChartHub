@@ -14,18 +14,7 @@ using System.Windows.Input;
 namespace RhythmVerseClient.ViewModels
 {
     public class InstallSongViewModel : INotifyPropertyChanged
-    {
-        private ObservableCollection<FileData> _installSongs;
-        public ObservableCollection<FileData> InstallSongs
-        {
-            get => _installSongs;
-            set
-            {
-                _installSongs = value;
-                OnPropertyChanged();
-            }
-        }
-
+    {       
         private double _progressValue;
         public double ProgressValue
         {
@@ -68,6 +57,8 @@ namespace RhythmVerseClient.ViewModels
 
         private IKeystrokeSender _keystrokeSender;
 
+        public IResourceWatcher PhaseshiftWatcher { get; set; }
+
         private readonly AppGlobalSettings globalSettings;
 
         public InstallSongViewModel(AppGlobalSettings settings, IWindowSizeService windowSizeService, IKeystrokeSender keystrokeSender)
@@ -80,10 +71,11 @@ namespace RhythmVerseClient.ViewModels
             _windowSizeService.PropertyChanged += _windowSizeService_PropertyChanged;
 
             _keystrokeSender = keystrokeSender;
-            _installSongs = [];
             _consoleHeight = windowSizeService.GetWindowSize().Height;
             PageString = new InstallPageStrings();
             globalSettings = settings;
+
+            PhaseshiftWatcher = new ResourceWatcher(globalSettings.PhaseshiftDir, WatcherType.File);
         }
 
         private void GoBack()
@@ -113,7 +105,7 @@ namespace RhythmVerseClient.ViewModels
             Details += PageString.StartProcess;
 
             await Task.Delay(100);
-            foreach (var song in InstallSongs)
+            foreach (var song in PhaseshiftWatcher.Data)
             {
                 var extension = Path.GetExtension(song.FilePath).ToLower();
 

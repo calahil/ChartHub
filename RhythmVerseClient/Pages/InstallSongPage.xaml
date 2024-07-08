@@ -45,7 +45,7 @@
         Command="{Binding GoBackCommand}" />
         <Label Grid.Row="1" Grid.Column="3" VerticalOptions="FillAndExpand"
             HorizontalOptions="Center"
-            Text="{Binding InstallSongs.Count, StringFormat='{0} %'}"
+            Text="{Binding PhaseshiftWatcher.Data.Count, StringFormat='{0} %'}"
             MinimumHeightRequest="32" />
         <!-- ListView to Show Details -->
         <ScrollView x:Name="ScrollConsole" HeightRequest="{Binding ConsoleHeight}" VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand" Grid.Row="2" Grid.ColumnSpan="3" Padding="4" >

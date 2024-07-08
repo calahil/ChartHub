@@ -16,11 +16,10 @@ namespace RhythmVerseClient.Pages
             _windowSizeService = windowSizeService;
         }
 
-        protected override void OnSizeAllocated(double width, double height)
+        protected override void OnAppearing()
         {
-            base.OnSizeAllocated(width, height);
-            _windowSizeService.Refresh();
-            
+            base.OnAppearing();
+            viewModel.PhaseshiftWatcher.LoadItems();
         }
     }
 }

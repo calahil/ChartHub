@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace RhythmVerseClient.Services
 {
@@ -25,10 +26,30 @@ namespace RhythmVerseClient.Services
         Zip
     }
 
-    public class ResourceWatcher : IResourceWatcher
+    public class ResourceWatcher : IResourceWatcher, INotifyPropertyChanged
     {
-        public ObservableCollection<FileData> Data { get; set; }
-        public string DirectoryPath { get; private set; } = string.Empty;
+        private ObservableCollection<FileData> _data;
+        public ObservableCollection<FileData> Data
+        {
+            get => _data;
+            set
+            {
+                _data = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _directoryPath;
+        public string DirectoryPath
+        {
+            get => _directoryPath;
+            set
+            {
+                _directoryPath = value;
+                OnPropertyChanged();
+            }
+        }
+
         private readonly FileSystemWatcher fileSystemWatcher;
         private HashSet<string> existingEntries;
         private WatcherType _watcherType;
@@ -44,9 +65,9 @@ namespace RhythmVerseClient.Services
 
         public ResourceWatcher(string path, WatcherType watcherType)
         {
-            DirectoryPath = path;
+            _directoryPath = path;
             _watcherType = watcherType;
-            Data = [];
+            _data = [];
             fileSystemWatcher = new FileSystemWatcher();
             existingEntries = [];
 
@@ -117,12 +138,19 @@ namespace RhythmVerseClient.Services
         {
             MainThread.BeginInvokeOnMainThread(() =>
             {
-                string itemName = String.Empty;
-                if (e.Name == null)
+                try
                 {
-                    itemName = Path.GetFileName(e.FullPath);
+                    string itemName = String.Empty;
+                    if (e.Name == null)
+                    {
+                        itemName = Path.GetFileName(e.FullPath);
+                    }
+                    DeleteItem(e.Name ?? itemName, e.FullPath);
                 }
-                DeleteItem(e.Name ?? itemName, e.FullPath);
+                catch(Exception ex)
+                {
+                    Logger.LogError(ex);
+                }
             });
         }
 
@@ -354,6 +382,12 @@ namespace RhythmVerseClient.Services
                 existingEntries.Remove(oldItemPath);
             }
             existingEntries.Add(itemPath);
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 

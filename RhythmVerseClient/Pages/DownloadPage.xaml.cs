@@ -8,12 +8,11 @@ namespace RhythmVerseClient.Pages
     {
         private DownloadViewModel viewModel;
 
-        public DownloadPage(DownloadViewModel downloadView, InstallSongViewModel installSongView)
+        public DownloadPage(DownloadViewModel downloadView)
         {
             viewModel = downloadView;
             InitializeComponent();
             BindingContext = downloadView;
-            viewModel.InstallItems = installSongView.InstallSongs = [];
         }
 
         protected override void OnAppearing()
@@ -22,6 +21,10 @@ namespace RhythmVerseClient.Pages
             viewModel.DownloadWatcher.LoadItems();
         }
       
+        public void InvalidateMe()
+        {
+            this.InvalidateMeasure();
+        }
 
         private void CheckBox_CheckedChanged(object sender, CheckedChangedEventArgs e)
         {

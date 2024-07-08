@@ -16,28 +16,6 @@ namespace RhythmVerseClient.ViewModels
     public class DownloadViewModel : INotifyPropertyChanged
     {
         private readonly AppGlobalSettings globalSettings;
-       
-        private ObservableCollection<FileData>? _dataItems;
-        public ObservableCollection<FileData> DataItems
-        {
-            get => _dataItems;
-            set
-            {
-                _dataItems = value;
-                OnPropertyChanged();
-            }
-        }
-
-        private ObservableCollection<FileData>? _installItems;
-        public ObservableCollection<FileData> InstallItems
-        {
-            get => _installItems;
-            set
-            {
-                _installItems = value;
-                OnPropertyChanged();
-            }
-        }
 
         public IResourceWatcher DownloadWatcher { get; set; }
 
@@ -59,7 +37,7 @@ namespace RhythmVerseClient.ViewModels
                 }
             }
         }
-       private bool _isAllChecked;
+        private bool _isAllChecked;
         public bool IsAllChecked
         {
             get => _isAllChecked;
@@ -91,7 +69,6 @@ namespace RhythmVerseClient.ViewModels
         {
             globalSettings = settings;
             DownloadWatcher = new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
-            DataItems = DownloadWatcher.Data;
             SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
@@ -106,23 +83,31 @@ namespace RhythmVerseClient.ViewModels
 
         private async Task InstallSongsCommand()
         {
-            InstallItems.Clear();
+            List<string> items = new List<string>();
+
             foreach (FileData file in DownloadWatcher.Data)
             {
                 if (file.Checked)
                 {
-                    var newFilePath = Toolbox.ConstructPath(globalSettings.PhaseshiftDir, file.DisplayName);
-
-                    File.Move(file.FilePath, newFilePath);
-                    file.FilePath = newFilePath;
-                    InstallItems.Add(file);
-                    // attempt to throttle the system events firing
-                    await Task.Delay(500);
+                    items.Add(file.FilePath);
                 }
+
+                // attempt to throttle the system events firing
+                await Task.Delay(100);
+            }
+            foreach (string file in items)
+            {
+                var displayName = Path.GetFileName(file);
+                var newFilePath = Toolbox.ConstructPath(globalSettings.PhaseshiftDir, displayName);
+
+                File.Move(file, newFilePath);
+
+                await Task.Delay(100);
             }
 
+            
             // TODO figure out why the resourcewatchers dont see the change
-           
+
             var mainPage = Application.Current?.MainPage as MainPage;
             mainPage?.FocusOnTab(2);
 
@@ -132,11 +117,11 @@ namespace RhythmVerseClient.ViewModels
         {
             if (_isAscending)
             {
-                DataItems = new ObservableCollection<FileData>(DataItems.OrderBy(x => GetSortablePropertyValue(x, columnName)));
+                DownloadWatcher.Data = new ObservableCollection<FileData>(DownloadWatcher.Data.OrderBy(x => GetSortablePropertyValue(x, columnName)));
             }
             else
             {
-                DataItems = new ObservableCollection<FileData>(DataItems.OrderByDescending(x => GetSortablePropertyValue(x, columnName)));
+                DownloadWatcher.Data = new ObservableCollection<FileData>(DownloadWatcher.Data.OrderByDescending(x => GetSortablePropertyValue(x, columnName)));
             }
 
             _isAscending = !_isAscending;
@@ -157,16 +142,16 @@ namespace RhythmVerseClient.ViewModels
 
         public void CheckAllItems(bool isChecked)
         {
-            foreach (var item in DataItems)
+            foreach (var item in DownloadWatcher.Data)
             {
                 item.Checked = isChecked;
             }
-            OnPropertyChanged(nameof(DataItems)); // Notify the UI to update
+            OnPropertyChanged(nameof(DownloadWatcher.Data)); // Notify the UI to update
         }
 
         public bool AnyItemChecked()
         {
-            return DataItems.Any(item => item.Checked);
+            return DownloadWatcher.Data.Any(item => item.Checked);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -176,7 +161,7 @@ namespace RhythmVerseClient.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        
+
 
         //public async Task ProcessZipsAsync(CancellationToken cancellationToken)
         //{
