@@ -14,21 +14,21 @@
             <util:ColumnWidthConverter x:Key="ColumnWidthConverter" />
         </ResourceDictionary>
     </ContentPage.Resources>
-    
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="10*" />
+            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- Header Grid -->
         <Grid Grid.Row="0" ColumnSpacing="5" Padding="5">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1*" />
-                <ColumnDefinition Width="25*" />
-                <ColumnDefinition Width="2*" />
-                <ColumnDefinition Width="2*" />
+                <ColumnDefinition x:Name="Col0" Width="1*" />
+                <ColumnDefinition x:Name="Col1" Width="25*" />
+                <ColumnDefinition x:Name="Col2" Width="2*" />
+                <ColumnDefinition x:Name="Col3" Width="2*" />
             </Grid.ColumnDefinitions>
 
             <Grid Grid.Column="0" HorizontalOptions="Fill" >
@@ -42,6 +42,8 @@
             <Button Text="{Binding PageStrings.FileType}" Grid.Column="2" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileType" />
             <Button Text="{Binding PageStrings.FileSize}" Grid.Column="3" FontAttributes="Bold" HorizontalOptions="Fill" Command="{Binding SortCommand}" CommandParameter="FileSize" />
         </Grid>
+
+        <!-- CollectionView for List Items -->
         <CollectionView ItemsSource="{Binding DownloadWatcher.Data}" SelectionMode="Single"
                      x:Name="DownloadList" Grid.Row="1">
             <CollectionView.ItemsLayout>
@@ -51,27 +53,21 @@
                 <DataTemplate x:DataType="services:FileData">
                     <Grid ColumnSpacing="5" Padding="5" HeightRequest="32">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1*" />
-                            <ColumnDefinition Width="25*" />
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="{Binding Source={x:Reference Col0}, Path=Width}" />
+                            <ColumnDefinition Width="{Binding Source={x:Reference Col1}, Path=Width}" />
+                            <ColumnDefinition Width="{Binding Source={x:Reference Col2}, Path=Width}" />
+                            <ColumnDefinition Width="{Binding Source={x:Reference Col3}, Path=Width}" />
                         </Grid.ColumnDefinitions>
 
                         <CheckBox IsChecked="{Binding Checked}" CheckedChanged="CheckBox_CheckedChanged" Grid.Column="0" HorizontalOptions="Fill" />
-                        <Grid Grid.Column="1" HorizontalOptions="Fill" ColumnSpacing="5">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="1*" />
-                                <ColumnDefinition Width="60*" />
-                            </Grid.ColumnDefinitions>
-                            <Image Source="{Binding ImageFile}" Grid.Column="0"  HorizontalOptions="Fill"/>
-                            <Label Text="{Binding DisplayName}" Grid.Column="1" HorizontalOptions="Fill" />
-                        </Grid>
+                        <Label Text="{Binding DisplayName}" Grid.Column="1" HorizontalOptions="Fill" />
                         <Label Text="{Binding FileType}" Grid.Column="2" HorizontalOptions="Fill" />
                         <Label Text="{Binding FileSize}" Grid.Column="3" HorizontalOptions="Fill" />
                     </Grid>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
+
         <Button Grid.Row="2" VerticalOptions="End" Text="{Binding PageStrings.InstallSongs}"  IsEnabled="{Binding IsAnyChecked}" Command="{Binding InstallSongs}"/>
     </Grid>
 </ContentPage>

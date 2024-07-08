@@ -49,7 +49,7 @@ namespace RhythmVerseClient.Pages
 
                 if (downloadPage != null)
                 {
-                    downloadPage.InvalidateMe();
+                    downloadPage.ForceLayout();
                 }
             }
         }
