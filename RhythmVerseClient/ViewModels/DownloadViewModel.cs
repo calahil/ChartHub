@@ -161,41 +161,5 @@ namespace RhythmVerseClient.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-
-
-        //public async Task ProcessZipsAsync(CancellationToken cancellationToken)
-        //{
-        //    try
-        //    {
-        //        var files = Directory.EnumerateFiles(globalSettings.PhaseshiftDir);
-        //        foreach (var file in files)
-        //        {
-        //            cancellationToken.ThrowIfCancellationRequested();
-        //            var extension = Path.GetExtension(file).ToLower();
-
-        //            if (extension == ".zip" || extension == ".rar" || extension == ".7z")
-        //            {
-        //                using var archive = Toolbox.OpenArchive(file);
-        //                foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
-        //                {
-        //                    entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
-        //                    {
-        //                        ExtractFullPath = true,
-        //                        Overwrite = true
-        //                    });
-        //                }
-        //            }
-        //        }
-        //        await Task.Delay(500, cancellationToken);
-        //    }
-        //    catch (OperationCanceledException)
-        //    {
-        //        await Shell.Current.DisplayAlert("Info", "Operation was cancelled.", "OK");
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        await Shell.Current.DisplayAlert("Error", $"An error occurred: {ex.Message}", "OK");
-        //    }
-        //}
     }
 }
