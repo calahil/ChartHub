@@ -21,11 +21,6 @@ namespace RhythmVerseClient.Pages
             viewModel.DownloadWatcher.LoadItems();
         }
       
-        public void InvalidateMe()
-        {
-            this.InvalidateMeasure();
-        }
-
         private void CheckBox_CheckedChanged(object sender, CheckedChangedEventArgs e)
         {
             viewModel.IsAnyChecked = viewModel.AnyItemChecked();

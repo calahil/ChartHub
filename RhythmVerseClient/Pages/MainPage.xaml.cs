@@ -17,8 +17,6 @@ namespace RhythmVerseClient.Pages
             _windowSizeService = windowSizeService;
             InitializeComponent();
             BindingContext = mainView;
-            _previousWidth = 0;
-            _previousHeight = 0;
             var DownloadsPage = new DownloadPage(downView);
             Children.Add(DownloadsPage);
             var CloneHeroPage = new CloneHeroPage(cloneView);
@@ -34,23 +32,6 @@ namespace RhythmVerseClient.Pages
             if (tabIndex >= 0 && tabIndex < Children.Count)
             {
                 CurrentPage = Children[tabIndex];
-            }
-        }
-
-        protected override void OnSizeAllocated(double width, double height)
-        {
-            base.OnSizeAllocated(width, height);
-            if (width != _previousWidth || height != _previousHeight)
-            {
-                _previousWidth = width;
-                _previousHeight = height;
-                _windowSizeService.Refresh();
-                DownloadPage? downloadPage = Children[0] as DownloadPage;
-
-                if (downloadPage != null)
-                {
-                    downloadPage.ForceLayout();
-                }
             }
         }
 

@@ -63,6 +63,17 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        private ObservableCollection<FileData> _downloadFiles;
+        public ObservableCollection<FileData> DownloadFiles
+        {
+            get => _downloadFiles;
+            set
+            {
+                _downloadFiles = value;
+                OnPropertyChanged();
+            }
+        }
+
         public DownloadPageStrings PageStrings { get; set; }
 
         public DownloadViewModel(AppGlobalSettings settings)
@@ -72,7 +83,7 @@ namespace RhythmVerseClient.ViewModels
             SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
-            //DownloadWatcher.LoadItems();
+            _downloadFiles = DownloadWatcher.Data;
             PageStrings = new DownloadPageStrings();
         }
 
@@ -85,7 +96,7 @@ namespace RhythmVerseClient.ViewModels
         {
             List<string> items = new List<string>();
 
-            foreach (FileData file in DownloadWatcher.Data)
+            foreach (FileData file in DownloadFiles)
             {
                 if (file.Checked)
                 {
@@ -117,11 +128,11 @@ namespace RhythmVerseClient.ViewModels
         {
             if (_isAscending)
             {
-                DownloadWatcher.Data = new ObservableCollection<FileData>(DownloadWatcher.Data.OrderBy(x => GetSortablePropertyValue(x, columnName)));
+                DownloadFiles = new ObservableCollection<FileData>(DownloadFiles.OrderBy(x => GetSortablePropertyValue(x, columnName)));
             }
             else
             {
-                DownloadWatcher.Data = new ObservableCollection<FileData>(DownloadWatcher.Data.OrderByDescending(x => GetSortablePropertyValue(x, columnName)));
+                DownloadFiles = new ObservableCollection<FileData>(DownloadFiles.OrderByDescending(x => GetSortablePropertyValue(x, columnName)));
             }
 
             _isAscending = !_isAscending;
@@ -142,16 +153,16 @@ namespace RhythmVerseClient.ViewModels
 
         public void CheckAllItems(bool isChecked)
         {
-            foreach (var item in DownloadWatcher.Data)
+            foreach (var item in DownloadFiles)
             {
                 item.Checked = isChecked;
             }
-            OnPropertyChanged(nameof(DownloadWatcher.Data)); // Notify the UI to update
+            OnPropertyChanged(nameof(DownloadFiles)); // Notify the UI to update
         }
 
         public bool AnyItemChecked()
         {
-            return DownloadWatcher.Data.Any(item => item.Checked);
+            return DownloadFiles.Any(item => item.Checked);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

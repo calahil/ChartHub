@@ -37,6 +37,7 @@
         public string FileType { get; } = "File Type";
         public string FileSize { get; } = "File Size";
         public string InstallSongs { get; } = "Install Songs";
+        public string Install { get; } = "Install";
 
     }
 

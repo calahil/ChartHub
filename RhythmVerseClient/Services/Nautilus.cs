@@ -75,10 +75,7 @@ namespace RhythmVerseClient.Services
                 Program.Kill();
                 Program.WaitForExit();
             });
-
-            //_fileSystem.ResourceWatchers[0]?.RefreshItems();
         }
-
     }
 
     public static class Constants
