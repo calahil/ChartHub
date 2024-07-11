@@ -3,12 +3,9 @@ using RhythmVerseClient.Pages;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
-using SharpCompress.Archives;
-using SharpCompress.Common;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;
-using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
 namespace RhythmVerseClient.ViewModels
@@ -19,8 +16,6 @@ namespace RhythmVerseClient.ViewModels
 
         public IResourceWatcher DownloadWatcher { get; set; }
 
-        private bool _isAscending = true;
-        public ICommand SortCommand { get; }
         public ICommand CheckAllCommand { get; }
         public IAsyncRelayCommand InstallSongs { get; }
 
@@ -33,7 +28,7 @@ namespace RhythmVerseClient.ViewModels
                 if (_isAnyChecked != value)
                 {
                     _isAnyChecked = value;
-                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsAnyChecked));
                 }
             }
         }
@@ -46,45 +41,46 @@ namespace RhythmVerseClient.ViewModels
                 if (_isAllChecked != value)
                 {
                     _isAllChecked = value;
-                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsAllChecked));
                     CheckAllItems(value);
                 }
             }
         }
 
         private FileData? _selectedFile;
-        public FileData SelectedFile
+        public FileData? SelectedFile
         {
             get => _selectedFile;
             set
             {
                 _selectedFile = value;
-                OnPropertyChanged();
+                OnPropertyChanged(nameof(SelectedFile));
             }
         }
 
-        private ObservableCollection<FileData> _downloadFiles;
-        public ObservableCollection<FileData> DownloadFiles
+        public ObservableCollection<FileData> DownloadFiles { get; set; }
+
+        private DownloadPageStrings _pageStrings;
+        public DownloadPageStrings PageStrings
         {
-            get => _downloadFiles;
+            get { return _pageStrings; }
             set
             {
-                _downloadFiles = value;
-                OnPropertyChanged();
+                if (_pageStrings != value)
+                {
+                    _pageStrings = value;
+                    OnPropertyChanged(nameof(PageStrings));
+                }
             }
         }
-
-        public DownloadPageStrings PageStrings { get; set; }
-
         public DownloadViewModel(AppGlobalSettings settings)
         {
             globalSettings = settings;
             DownloadWatcher = new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
-            SortCommand = new Command<string>(SortData);
             CheckAllCommand = new Command(CheckAllItemsCommand);
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
-            _downloadFiles = DownloadWatcher.Data;
-            PageStrings = new DownloadPageStrings();
+            DownloadFiles = DownloadWatcher.Data;
+            _pageStrings = new DownloadPageStrings();
         }
 
         private void CheckAllItemsCommand()
@@ -124,33 +120,6 @@ namespace RhythmVerseClient.ViewModels
 
         }
 
-        public void SortData(string columnName)
-        {
-            if (_isAscending)
-            {
-                DownloadFiles = new ObservableCollection<FileData>(DownloadFiles.OrderBy(x => GetSortablePropertyValue(x, columnName)));
-            }
-            else
-            {
-                DownloadFiles = new ObservableCollection<FileData>(DownloadFiles.OrderByDescending(x => GetSortablePropertyValue(x, columnName)));
-            }
-
-            _isAscending = !_isAscending;
-        }
-
-        private object? GetSortablePropertyValue(FileData item, string propertyName)
-        {
-            switch (propertyName)
-            {
-                case nameof(FileData.FileSize):
-                    return item.SizeBytes;
-                case nameof(FileData.FileType):
-                    return item.FileType;
-                default:
-                    return item.GetType().GetProperty(propertyName)?.GetValue(item, null);
-            }
-        }
-
         public void CheckAllItems(bool isChecked)
         {
             foreach (var item in DownloadFiles)
@@ -167,7 +136,7 @@ namespace RhythmVerseClient.ViewModels
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        protected void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

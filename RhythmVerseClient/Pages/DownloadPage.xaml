@@ -5,7 +5,7 @@
              xmlns:models="clr-namespace:RhythmVerseClient.ViewModels"
              xmlns:control="clr-namespace:RhythmVerseClient.Controls"
              xmlns:util="clr-namespace:RhythmVerseClient.Utilities"
-             xmlns:dg="clr-namespace:Maui.DataGrid;assembly=Maui.DataGrid"
+             xmlns:sf="http://schemas.syncfusion.com/maui"
              x:Class="RhythmVerseClient.Pages.DownloadPage"
              x:DataType="models:DownloadViewModel"
              Title="{Binding PageStrings.Title}">
@@ -15,43 +15,21 @@
             <Button Text="{Binding PageStrings.InstallSongs}" WidthRequest="140" IsEnabled="{Binding IsAnyChecked}" Command="{Binding InstallSongs}" />
         </HorizontalStackLayout>
         <!-- DataGrid for List Items -->
-        <ScrollView Grid.Row="1" >
-            <dg:DataGrid ItemsSource="{Binding DownloadFiles}" RowHeight="50" HeaderHeight="50">
-                <dg:DataGrid.Columns>
-                    <dg:DataGridColumn Title="{Binding PageStrings.Install}" PropertyName="Checked" Width="2*" >
-                        <dg:DataGridColumn.CellTemplate>
-                            <DataTemplate x:DataType="services:FileData">
-                                <CheckBox IsChecked="{Binding Checked}" CheckedChanged="CheckBox_CheckedChanged" HorizontalOptions="Center" />
-                            </DataTemplate>
-                        </dg:DataGridColumn.CellTemplate>
-                    </dg:DataGridColumn>
-
-                    <dg:DataGridColumn Title="{Binding PageStrings.DisplayName}" Width="25*" SortingEnabled="True" >
-                        <dg:DataGridColumn.CellTemplate>
-                            <DataTemplate x:DataType="services:FileData">
-                                <Label Text="{Binding DisplayName}" Margin="10,0,0,0" HorizontalOptions="Fill" VerticalOptions="CenterAndExpand" />
-                            </DataTemplate>
-                        </dg:DataGridColumn.CellTemplate>
-                    </dg:DataGridColumn>
-
-                    <dg:DataGridColumn Title="{Binding PageStrings.FileType}" Width="3*" SortingEnabled="True" >
-                        <dg:DataGridColumn.CellTemplate>
-                            <DataTemplate x:DataType="services:FileData">
-                                <Label Text="{Binding FileType}" HorizontalOptions="CenterAndExpand" VerticalOptions="CenterAndExpand" />
-                            </DataTemplate>
-                        </dg:DataGridColumn.CellTemplate>
-                    </dg:DataGridColumn>
-
-                    <dg:DataGridColumn Title="{Binding PageStrings.FileSize}" Width="3*" SortingEnabled="True" >
-                        <dg:DataGridColumn.CellTemplate>
-                            <DataTemplate x:DataType="services:FileData">
-                                <Label Text="{Binding FileSize}" HorizontalOptions="CenterAndExpand" VerticalOptions="CenterAndExpand" />
-                            </DataTemplate>
-                        </dg:DataGridColumn.CellTemplate>
-                    </dg:DataGridColumn>
-                </dg:DataGrid.Columns>
-            
-        </dg:DataGrid>
+        <ScrollView Grid.Row="1" HorizontalOptions="Fill">
+            <sf:SfDataGrid x:Name="DownloadList" ItemsSource="{Binding DownloadFiles}" SelectedRow="{Binding SelectedFile}" SelectionMode="Single"
+                           ColumnWidthMode="Fill" AutoGenerateColumnsMode="None" SortingMode="Single" AllowTriStateSorting="True">
+                <sf:SfDataGrid.SortColumnDescriptions>
+                    <sf:SortColumnDescription ColumnName="DisplayName"  />
+                    <sf:SortColumnDescription ColumnName="FileType" />
+                    <sf:SortColumnDescription ColumnName="FileSize" />
+                </sf:SfDataGrid.SortColumnDescriptions>
+                <sf:SfDataGrid.Columns>
+                    <sf:DataGridCheckBoxColumn MappingName="Checked" Width="80" />
+                    <sf:DataGridTextColumn MappingName="DisplayName" />
+                    <sf:DataGridImageColumn MappingName="ImageFile" Width="120" />
+                    <sf:DataGridTextColumn MappingName="FileSize" Width="120" CellTextAlignment="Center" />
+                </sf:SfDataGrid.Columns>
+            </sf:SfDataGrid>
         </ScrollView>
     </Grid>
 </ContentPage>

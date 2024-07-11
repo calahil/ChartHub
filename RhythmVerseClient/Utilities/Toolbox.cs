@@ -1,4 +1,5 @@
-﻿using SettingsManager;
+﻿using RhythmVerseClient.Services;
+using SettingsManager;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Rar;
 using SharpCompress.Archives.SevenZip;
@@ -64,6 +65,34 @@ namespace RhythmVerseClient.Utilities
             int order = (int)Math.Log(sizeBytes, 1024);
             double adjustedSize = sizeBytes / Math.Pow(1024, order);
             return $"{Math.Round(adjustedSize, 2)} {sizeSuffixes[order]}";
+        }
+
+        public class FileTypeComparer : IComparer<object>
+        {
+            public int Compare(object? x, object? y)
+            {
+                var fileDataX = x as FileData;
+                var fileDataY = y as FileData;
+
+                if (fileDataX == null || fileDataY == null)
+                    return 0;
+
+                return fileDataX.FileType.CompareTo(fileDataY.FileType);
+            }
+        }
+
+        public class FileSizeComparer : IComparer<object>
+        {
+            public int Compare(object? x, object? y)
+            {
+                var fileDataX = x as FileData;
+                var fileDataY = y as FileData;
+
+                if (fileDataX == null || fileDataY == null)
+                    return 0;
+
+                return fileDataX.SizeBytes.CompareTo(fileDataY.SizeBytes);
+            }
         }
 
         public static long GetDirectorySize(string folderPath)

@@ -7,6 +7,7 @@ using CommunityToolkit.Maui;
 using RhythmVerseClient.Pages;
 using RhythmVerseClient.Utilities;
 using RhythmVerseClient.Platforms.Windows;
+using Syncfusion.Maui.Core.Hosting;
 
 namespace RhythmVerseClient
 {
@@ -69,6 +70,8 @@ namespace RhythmVerseClient
             builder.Services.AddSingleton<MainPage>();
 
             builder.Services.AddSingleton<Initializer>();
+
+            builder.ConfigureSyncfusionCore();
 
             return builder.Build();
         }
