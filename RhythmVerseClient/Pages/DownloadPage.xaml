@@ -16,10 +16,10 @@
         </HorizontalStackLayout>
         <!-- DataGrid for List Items -->
         <ScrollView Grid.Row="1" HorizontalOptions="Fill">
-            <sf:SfDataGrid x:Name="DownloadList" ItemsSource="{Binding DownloadFiles}" SelectedRow="{Binding SelectedFile}" SelectionMode="Single"
+            <sf:SfDataGrid x:Name="DownloadList" ItemsSource="{Binding DownloadFiles}" SelectedRow="{Binding SelectedFile}" SelectionMode="SingleDeselect"
                            ColumnWidthMode="Fill" AutoGenerateColumnsMode="None" SortingMode="Single" AllowTriStateSorting="True">
                 <sf:SfDataGrid.SortColumnDescriptions>
-                    <sf:SortColumnDescription ColumnName="DisplayName"  />
+                    <sf:SortColumnDescription ColumnName="DisplayName" />
                     <sf:SortColumnDescription ColumnName="FileType" />
                     <sf:SortColumnDescription ColumnName="FileSize" />
                 </sf:SfDataGrid.SortColumnDescriptions>

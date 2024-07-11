@@ -81,6 +81,23 @@ namespace RhythmVerseClient.ViewModels
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
             DownloadFiles = DownloadWatcher.Data;
             _pageStrings = new DownloadPageStrings();
+
+            DownloadFiles.CollectionChanged += DownloadFiles_CollectionChanged;
+        }
+
+        private void DownloadFiles_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            foreach (FileData file in DownloadFiles)
+            {
+                file.PropertyChanged += ItemPropertyChanged;
+            }
+        }
+
+        private void ItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(FileData.Checked)) {
+                IsAnyChecked = AnyItemChecked();
+            }
         }
 
         private void CheckAllItemsCommand()
