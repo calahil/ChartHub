@@ -6,14 +6,12 @@ namespace RhythmVerseClient.Pages
     public partial class InstallSongPage : ContentPage
     {
         private InstallSongViewModel viewModel;
-        private IWindowSizeService _windowSizeService;
 
-        public InstallSongPage(InstallSongViewModel installSongView, IWindowSizeService windowSizeService)
+        public InstallSongPage(InstallSongViewModel installSongView)
         {
             InitializeComponent();
             viewModel = installSongView;
             BindingContext = viewModel;
-            _windowSizeService = windowSizeService;
         }
 
         protected override void OnAppearing()

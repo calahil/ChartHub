@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Xaml.Controls;
 using RhythmVerseClient.Pages;
 using RhythmVerseClient.Platforms.Windows;
 using RhythmVerseClient.Services;
@@ -68,7 +69,7 @@ namespace RhythmVerseClient.ViewModels
             StartBarCommand = new AsyncRelayCommand(StartBar);
             GoBackCommand = new Command(GoBack);
             _windowSizeService = windowSizeService;
-            _windowSizeService.PropertyChanged += _windowSizeService_PropertyChanged;
+            _windowSizeService.PropertyChanged += WindowSizeService_PropertyChanged;
 
             _keystrokeSender = keystrokeSender;
             _consoleHeight = windowSizeService.GetWindowSize().Height;
@@ -85,12 +86,12 @@ namespace RhythmVerseClient.ViewModels
             mainPage?.FocusOnTab(0);
         }
 
-        private void _windowSizeService_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        private void WindowSizeService_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             var temp = _windowSizeService.Height - ((128 * 2) + 88);
             if (temp < 0)
             {
-                temp = temp * -1;
+                temp *= -1;
             }
             if (ConsoleHeight != temp)
             {
@@ -103,30 +104,22 @@ namespace RhythmVerseClient.ViewModels
             Details = String.Empty;
             ProgressValue = 0;
             Details += PageString.StartProcess;
+            var processedFiles = new List<string>();
 
             await Task.Delay(100);
             foreach (var song in PhaseshiftWatcher.Data)
             {
                 var extension = Path.GetExtension(song.FilePath).ToLower();
-
+                processedFiles.Add(song.FilePath);
                 if (extension == ".zip" || extension == ".rar" || extension == ".7z")
                 {
-                    switch (extension)
+                    Details += extension switch
                     {
-                        case ".zip":
-                            Details += PageString.UnzipFile.FormatString(song.DisplayName);
-                            break;
-                        case ".rar":
-                            Details += PageString.UnRarFile.FormatString(song.DisplayName);
-                            break;
-                        case ".7z":
-                            Details += PageString.ExtractFile.FormatString(song.DisplayName);
-                            break;
-                        default:
-                            Details += PageString.ExtractFile.FormatString(song.DisplayName);
-                            break;
-
-                    }
+                        ".zip" => PageString.UnzipFile.FormatString(song.DisplayName),
+                        ".rar" => PageString.UnRarFile.FormatString(song.DisplayName),
+                        ".7z" => PageString.ExtractFile.FormatString(song.DisplayName),
+                        _ => PageString.ExtractFile.FormatString(song.DisplayName),
+                    };
                     await Task.Delay(100);
                     using var archive = Toolbox.OpenArchive(song.FilePath);
                     foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
@@ -157,10 +150,27 @@ namespace RhythmVerseClient.ViewModels
             await nautilus.RunAsync();
             Details += PageString.StopNautilus;
             await Task.Delay(100);
+            Details += PageString.InstallSongs;
+            Toolbox.MoveDirectory(globalSettings.PhaseshiftMusicDir, globalSettings.CloneHeroSongsDir);
+
+            foreach (string song in processedFiles)
+            {
+                try
+                {
+                    File.Delete(song);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex);
+                }
+            }
+
+            Details += PageString.Finished;         
+
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

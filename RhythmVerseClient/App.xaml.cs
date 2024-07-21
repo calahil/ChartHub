@@ -16,8 +16,10 @@ namespace RhythmVerseClient
         public App(IServiceProvider serviceProvider, AppGlobalSettings settings, Initializer initializer)
         {
             InitializeComponent();
-
-            Current.UserAppTheme = AppTheme.Dark;
+            if (Current != null) 
+            {
+                Current.UserAppTheme = AppTheme.Dark;
+            }
             _globalSettings = settings;
             MainPage = new LoadingPage();
             _serviceProvider = serviceProvider;

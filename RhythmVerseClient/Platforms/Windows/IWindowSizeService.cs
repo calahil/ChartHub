@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using RhythmVerseClient.Utilities;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace RhythmVerseClient.Platforms.Windows
@@ -53,7 +54,7 @@ namespace RhythmVerseClient.Platforms.Windows
         {
             try
             {
-                var window = (Microsoft.UI.Xaml.Window)App.Current.Windows[0].Handler.PlatformView;
+                var window = App.Current.Windows[0].Handler.PlatformView as Microsoft.UI.Xaml.Window;
                 var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(window);
                 var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(windowHandle);
                 var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
@@ -64,7 +65,7 @@ namespace RhythmVerseClient.Platforms.Windows
             }
             catch (Exception ex)
             {
-
+                Logger.LogError(ex);
                 Width = 0;
                 Height = 0;
             }
@@ -74,7 +75,7 @@ namespace RhythmVerseClient.Platforms.Windows
         {
             try
             {
-                var window = (Microsoft.UI.Xaml.Window)App.Current.Windows[0].Handler.PlatformView;
+                var window = App.Current.Windows[0].Handler.PlatformView as Microsoft.UI.Xaml.Window;
                 var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(window);
                 var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(windowHandle);
                 var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
@@ -83,6 +84,7 @@ namespace RhythmVerseClient.Platforms.Windows
             }
             catch(Exception ex)
             {
+                Logger.LogError(ex);
                 return (0, 0);
             }
         }

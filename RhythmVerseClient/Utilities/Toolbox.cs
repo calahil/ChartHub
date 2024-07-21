@@ -23,12 +23,10 @@ namespace RhythmVerseClient.Utilities
         {
             try
             {
-                using (StreamWriter writer = new StreamWriter(LogFilePath, true))
-                {
-                    writer.WriteLine($"[{DateTime.Now}] {ex.GetType()}: {ex.Message}");
-                    writer.WriteLine(ex.StackTrace);
-                    writer.WriteLine();
-                }
+                using StreamWriter writer = new(LogFilePath, true);
+                writer.WriteLine($"[{DateTime.Now}] {ex.GetType()}: {ex.Message}");
+                writer.WriteLine(ex.StackTrace);
+                writer.WriteLine();
             }
             catch
             {
@@ -40,10 +38,8 @@ namespace RhythmVerseClient.Utilities
         {
             try
             {
-                using (StreamWriter writer = new StreamWriter(LogFilePath, true))
-                {
-                    writer.WriteLine($"[{DateTime.Now}] {message}");
-                }
+                using StreamWriter writer = new(LogFilePath, true);
+                writer.WriteLine($"[{DateTime.Now}] {message}");
             }
             catch
             {
@@ -56,7 +52,7 @@ namespace RhythmVerseClient.Utilities
     {
         public static string ConvertFileSize(long sizeBytes)
         {
-            string[] sizeSuffixes = { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
+            string[] sizeSuffixes = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
             if (sizeBytes == 0)
             {
                 return "0B";
@@ -71,10 +67,7 @@ namespace RhythmVerseClient.Utilities
         {
             public int Compare(object? x, object? y)
             {
-                var fileDataX = x as FileData;
-                var fileDataY = y as FileData;
-
-                if (fileDataX == null || fileDataY == null)
+                if (x is not FileData fileDataX || y is not FileData fileDataY)
                     return 0;
 
                 return fileDataX.FileType.CompareTo(fileDataY.FileType);
@@ -85,10 +78,7 @@ namespace RhythmVerseClient.Utilities
         {
             public int Compare(object? x, object? y)
             {
-                var fileDataX = x as FileData;
-                var fileDataY = y as FileData;
-
-                if (fileDataX == null || fileDataY == null)
+                if (x is not FileData fileDataX || y is not FileData fileDataY)
                     return 0;
 
                 return fileDataX.SizeBytes.CompareTo(fileDataY.SizeBytes);
@@ -97,7 +87,7 @@ namespace RhythmVerseClient.Utilities
 
         public static long GetDirectorySize(string folderPath)
         {
-            DirectoryInfo di = new DirectoryInfo(folderPath);
+            DirectoryInfo di = new(folderPath);
             return di.EnumerateFiles("*", SearchOption.AllDirectories).Sum(fi => fi.Length);
         }
 
@@ -145,7 +135,7 @@ namespace RhythmVerseClient.Utilities
             }
         }
 
-        /* public void MoveDirectory(string source, string destination)
+        public static void MoveDirectory(string source, string destination)
          {
              // Create the destination directory if it doesn't exist
              Directory.CreateDirectory(destination);
@@ -167,7 +157,7 @@ namespace RhythmVerseClient.Utilities
 
              // Delete the source directory now that it's empty
              Directory.Delete(source);
-         }*/
+         }
     }
 
     public class AppGlobalSettings
@@ -257,12 +247,18 @@ namespace RhythmVerseClient.Utilities
 
     public class ColumnWidthConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            return value;
+            if (value == null)
+            {
+                return 0;
+            }
+            else
+            {
+                return value;
+            }
         }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }

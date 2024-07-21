@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace RhythmVerseClient.DTO
-{
+{/*
 
     public class Rootobject
     {
@@ -276,5 +276,5 @@ namespace RhythmVerseClient.DTO
         public int x { get; set; }
         public int all { get; set; }
     }
-
+*/
 }

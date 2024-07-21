@@ -107,7 +107,7 @@ namespace RhythmVerseClient.ViewModels
 
         private async Task InstallSongsCommand()
         {
-            List<string> items = new List<string>();
+            List<string> items = [];
 
             foreach (FileData file in DownloadFiles)
             {

@@ -52,7 +52,7 @@ namespace RhythmVerseClient.Services
 
         private readonly FileSystemWatcher fileSystemWatcher;
         private HashSet<string> existingEntries;
-        private WatcherType _watcherType;
+        private readonly WatcherType _watcherType;
 
 
         private static readonly byte[] ZipSignature = [0x50, 0x4B, 0x03, 0x04];
@@ -133,8 +133,7 @@ namespace RhythmVerseClient.Services
             });
         }
 
-        // Look at this about not removing items from collection when the app is moving them.
-        private async void OnDeleted(object sender, FileSystemEventArgs e)
+        private void OnDeleted(object sender, FileSystemEventArgs e)
         {
             MainThread.BeginInvokeOnMainThread(() =>
             {
@@ -156,7 +155,7 @@ namespace RhythmVerseClient.Services
 
         private void OnCreated(object sender, FileSystemEventArgs e)
         {
-            MainThread.BeginInvokeOnMainThread(() =>
+            MainThread.BeginInvokeOnMainThread(async () =>
             {
                 string itemName = String.Empty;
                 if (e.Name == null)
@@ -164,7 +163,7 @@ namespace RhythmVerseClient.Services
                     itemName = Path.GetFileName(e.FullPath);
                 }
 
-                AddItem(e.Name ?? itemName, e.FullPath);
+                await AddItem(e.Name ?? itemName, e.FullPath);
             });
 
         }
@@ -190,7 +189,7 @@ namespace RhythmVerseClient.Services
             try
             {
                 using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
-                await fs.ReadAsync(fileSignature, 0, fileSignature.Length);
+                await fs.ReadAsync(fileSignature);
             }
             catch (Exception ex)
             {
@@ -202,15 +201,15 @@ namespace RhythmVerseClient.Services
                 return WatcherFileType.Unknown;
             }
 
-            if (fileSignature.Length >= ZipSignature.Length && fileSignature.AsSpan().Slice(0, ZipSignature.Length).SequenceEqual(ZipSignature))
+            if (fileSignature.Length >= ZipSignature.Length && fileSignature.AsSpan()[..ZipSignature.Length].SequenceEqual(ZipSignature))
             {
                 return WatcherFileType.Zip;
             }
-            else if (fileSignature.Length >= RarSignature.Length && fileSignature.AsSpan().Slice(0, RarSignature.Length).SequenceEqual(RarSignature))
+            else if (fileSignature.Length >= RarSignature.Length && fileSignature.AsSpan()[..RarSignature.Length].SequenceEqual(RarSignature))
             {
                 return WatcherFileType.Rar;
             }
-            else if (fileSignature.Length >= Rb3ConSignature.Length && fileSignature.AsSpan().Slice(0, Rb3ConSignature.Length).SequenceEqual(Rb3ConSignature))
+            else if (fileSignature.Length >= Rb3ConSignature.Length && fileSignature.AsSpan()[..Rb3ConSignature.Length].SequenceEqual(Rb3ConSignature))
             {
                 return WatcherFileType.Con;
             }
@@ -218,7 +217,7 @@ namespace RhythmVerseClient.Services
             {
                 return WatcherFileType.CloneHero;
             }
-            else if (fileSignature.AsSpan().Slice(0, SevenZipSignature.Length).SequenceEqual(SevenZipSignature))
+            else if (fileSignature.AsSpan()[..SevenZipSignature.Length].SequenceEqual(SevenZipSignature))
             {
                 return WatcherFileType.SevenZip;
             }
@@ -245,7 +244,7 @@ namespace RhythmVerseClient.Services
             };
         }
 
-        private int GetItemCount()
+        /*private int GetItemCount()
         {
             if (Directory.Exists(DirectoryPath))
             {
@@ -318,7 +317,7 @@ namespace RhythmVerseClient.Services
             {
                 DirectoryNotFound?.Invoke(this, DirectoryPath);
             }
-        }
+        }*/
 
         private async Task AddItem(string itemName, string itemPath)
         {
@@ -385,7 +384,7 @@ namespace RhythmVerseClient.Services
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }

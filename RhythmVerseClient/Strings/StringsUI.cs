@@ -30,6 +30,7 @@ namespace RhythmVerseClient.Strings
         public string NautilusConversion { get; } = "RB3 CON file conversion started...\n";
         public string StopNautilus { get; } = "Stopping Nautilus...\n";
         public string InstallSongs { get; } = "Installing songs to your Clone Hero song directory...\n";
+        public string Finished { get; } = "Finished\n";
     }
 
     public class DownloadPageStrings : StringsUI
