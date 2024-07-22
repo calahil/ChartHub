@@ -6,12 +6,14 @@ namespace RhythmVerseClient.Pages
 {
     public partial class MainPage : TabbedPage
     {
-        RhythmVerseApiClient _client;
+        
 
-        public MainPage(MainViewModel mainView, DownloadViewModel downView, CloneHeroViewModel cloneView, InstallSongViewModel installView)
+        public MainPage(MainViewModel mainView, DownloadViewModel downView, CloneHeroViewModel cloneView, InstallSongViewModel installView, RhythmVerseModel verseModel)
         {
             InitializeComponent();
             BindingContext = mainView;
+            var RhythmVersePage = new RhythmVersePage(verseModel);
+            Children.Add(RhythmVersePage);
             var DownloadsPage = new DownloadPage(downView);
             Children.Add(DownloadsPage);
             var CloneHeroPage = new CloneHeroPage(cloneView);
@@ -20,14 +22,6 @@ namespace RhythmVerseClient.Pages
             Children.Add(InstallSongPage);
 
             CurrentPage = Children[0];
-
-            _client = new RhythmVerseApiClient();
-            LoadRVSongs();
-        }
-
-        private async void LoadRVSongs()
-        {
-            var response = await _client.GetSongFilesAsync(1, 50);
         }
 
         public void FocusOnTab(int tabIndex)

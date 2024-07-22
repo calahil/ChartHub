@@ -63,9 +63,11 @@ namespace RhythmVerseClient
             builder.Services.AddSingleton<DownloadViewModel>();
             builder.Services.AddSingleton<CloneHeroViewModel>();
             builder.Services.AddSingleton<InstallSongViewModel>();
+            builder.Services.AddSingleton<RhythmVerseModel>();
             builder.Services.AddSingleton<DownloadPage>();
             builder.Services.AddSingleton<CloneHeroPage>();
             builder.Services.AddSingleton<InstallSongPage>();
+            builder.Services.AddSingleton<RhythmVersePage>();
 
             builder.Services.AddSingleton<MainPage>();
 

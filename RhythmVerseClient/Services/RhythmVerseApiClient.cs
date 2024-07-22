@@ -12,14 +12,14 @@ namespace RhythmVerseClient.Services
         public RhythmVerseApiClient()
         {
             _httpClient = new HttpClient();
-            _httpClient.BaseAddress = new Uri("https://rhythmverse.co/api/chm/");
+            _httpClient.BaseAddress = new Uri("https://rhythmverse.co/");
         }
 
         public async Task<RootResponse> GetSongFilesAsync(int page, int recordsPerPage)
         {
             try
             {
-                var endpoint = "songfiles/list";
+                var endpoint = "api/chm/songfiles/list";
                 var payload = $"instrument=drums&sort%5B0%5D%5Bsort_by%5D=update_date&sort%5B0%5D%5Bsort_order%5D=DESC&data_type=full&page={page}&records={recordsPerPage}";
 
                 try

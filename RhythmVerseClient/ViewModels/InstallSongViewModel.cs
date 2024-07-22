@@ -81,7 +81,7 @@ namespace RhythmVerseClient.ViewModels
         {
             Toolbox.DebugResetSongProcessor(globalSettings.PhaseshiftDir, globalSettings.DownloadDir, globalSettings.PhaseshiftMusicDir);
             var mainPage = Application.Current?.MainPage as MainPage;
-            mainPage?.FocusOnTab(0);
+            mainPage?.FocusOnTab(1);
         }
 
         private void WindowSizeService_PropertyChanged(object? sender, PropertyChangedEventArgs e)

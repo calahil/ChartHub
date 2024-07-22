@@ -1,0 +1,91 @@
+﻿using RhythmVerseClient.Api;
+using RhythmVerseClient.Services;
+using RhythmVerseClient.Strings;
+using RhythmVerseClient.Utilities;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
+namespace RhythmVerseClient.ViewModels
+{
+    public class RhythmVerseModel : INotifyPropertyChanged
+    {
+        private readonly AppGlobalSettings globalSettings;
+        private RhythmVerseApiClient apiClient;
+        private int _currentPage = 1;
+        private const int RecordsPerPage = 50;
+        private bool _isLoading = false;
+        private bool _hasMoreRecords = true;
+
+        private ObservableCollection<Song>? _dataItems;
+        public ObservableCollection<Song>? DataItems
+        {
+            get => _dataItems;
+            set
+            {
+                _dataItems = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private Song? _selectedFile;
+        public Song? SelectedFile
+        {
+            get => _selectedFile;
+            set
+            {
+                _selectedFile = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public RhythmVersePageStrings PageStrings { get; }
+
+        public RhythmVerseModel(AppGlobalSettings settings)
+        {
+            globalSettings = settings;
+            PageStrings = new RhythmVersePageStrings();
+            apiClient = new RhythmVerseApiClient();
+            _dataItems = [];
+        }
+
+        public async Task LoadDataAsync()
+        {
+            if (_isLoading) return;
+
+            _isLoading = true;
+
+            if (!_hasMoreRecords) return;
+
+            var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage);
+
+            if (response.Data.Songs != null && response.Data.Songs.Length != 0)
+            {
+                if (DataItems == null)
+                    DataItems = [];
+
+                foreach (var song in response.Data.Songs)
+                {
+                    if (!DataItems.Contains(song))
+                    {
+                        DataItems.Add(song);
+                    }
+                }
+                _currentPage++;
+            }
+            else
+            {
+                _hasMoreRecords = false;
+            }
+
+            _isLoading = false;
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+}

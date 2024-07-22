@@ -18,6 +18,8 @@ namespace RhythmVerseClient.Api
     using System.Text.Json;
     using System.Text.Json.Serialization;
     using System.Globalization;
+    using System.ComponentModel;
+    using System.Runtime.CompilerServices;
 
     public partial class RootResponse
     {
@@ -292,6 +294,7 @@ namespace RhythmVerseClient.Api
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("record_id")]
         public string RecordId { get; set; }
+
     }
 
     public partial class Tiers
@@ -887,7 +890,8 @@ namespace RhythmVerseClient.Api
                 UpdateDateConverter.Singleton,
                 new DateOnlyConverter(),
                 new TimeOnlyConverter(),
-                IsoDateTimeOffsetConverter.Singleton
+                IsoDateTimeOffsetConverter.Singleton,
+                new SongDataConverter()
             },
         };
     }
@@ -1079,6 +1083,40 @@ namespace RhythmVerseClient.Api
 
         public static readonly IsoDateTimeOffsetConverter Singleton = new IsoDateTimeOffsetConverter();
     }
+
+    public class SongDataConverter : JsonConverter<SongData>
+    {
+        private const string BaseUrl = "https://rhythmverse.co/";
+
+        public override SongData Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            // Deserialize the RootResponse object
+            var rootResponse = JsonSerializer.Deserialize<SongData>(ref reader, options);
+
+            // Check if rootResponse is not null and navigate to the AlbumArt property
+            if (rootResponse != null)
+            {
+
+                if (rootResponse.AlbumArt != null)
+                {
+                    var albumArt = rootResponse.AlbumArt;
+                    if (!albumArt.StartsWith(BaseUrl))
+                    {
+                        rootResponse.AlbumArt = BaseUrl + albumArt;
+                    }
+                }
+
+            }
+
+            return rootResponse;
+        }
+
+        public override void Write(Utf8JsonWriter writer, SongData value, JsonSerializerOptions options)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
 }
 #pragma warning restore CS8618
 #pragma warning restore CS8601

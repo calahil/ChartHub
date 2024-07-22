@@ -50,4 +50,9 @@
         public string FileSize { get; } = "File Size";
 
     }
+
+    public class RhythmVersePageStrings : StringsUI
+    {
+        public string Title { get; } = "RhythmVerse";
+    }
 }

@@ -133,7 +133,7 @@ namespace RhythmVerseClient.ViewModels
             // TODO figure out why the resourcewatchers dont see the change
 
             var mainPage = Application.Current?.MainPage as MainPage;
-            mainPage?.FocusOnTab(2);
+            mainPage?.FocusOnTab(3);
 
         }
 

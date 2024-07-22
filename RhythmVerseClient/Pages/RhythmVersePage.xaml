@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:services="clr-namespace:RhythmVerseClient.Services"
+             xmlns:models="clr-namespace:RhythmVerseClient.ViewModels"
+             xmlns:util="clr-namespace:RhythmVerseClient.Utilities"
+             xmlns:api="clr-namespace:RhythmVerseClient.Api"
+             x:Class="RhythmVerseClient.Pages.RhythmVersePage"
+             x:DataType="models:RhythmVerseModel"
+             Title="{Binding PageStrings.Title}">
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- DataGrid for List Items -->
+        <ScrollView Grid.Row="1" HorizontalOptions="Fill">
+            <CollectionView x:Name="SongList" ItemsSource="{Binding DataItems }" RemainingItemsThreshold="1" 
+                            RemainingItemsThresholdReached="SongList_RemainingItemsThresholdReached"
+                            SelectionMode="Single">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="api:Song">
+                        <Grid RowDefinitions="*, *, *, *"
+                              ColumnDefinitions="*, *, *, *">
+                            <Image Source="https://rhythmverse.co/{Binding Data.AlbumArt}" Grid.Row="0" Grid.Column="0" />
+                            <Label Text="{Binding Data.Artist}" Grid.Row="0" Grid.Column="1"/>
+                            <Label Text="{Binding Data.Title}" Grid.Row="1" Grid.RowSpan="3" Grid.Column="1"/>
+                            <Label Text="{Binding File.AuthorId}" Grid.Row="1" Grid.Column="3"/>
+                            <Label Text="{Binding File.Author.Releases}" Grid.Row="2" Grid.Column="3"/>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+        </ScrollView>
+    </Grid>
+</ContentPage>
