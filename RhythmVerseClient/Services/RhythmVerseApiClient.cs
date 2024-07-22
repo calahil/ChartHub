@@ -19,9 +19,8 @@ namespace RhythmVerseClient.Services
         {
             try
             {
-                var endpoint = "api/chm/songfiles/list";
-                var payload = $"instrument=drums&sort%5B0%5D%5Bsort_by%5D=update_date&sort%5B0%5D%5Bsort_order%5D=DESC&data_type=full&page={page}&records={recordsPerPage}";
-
+                var endpoint = "/api/all/songfiles/search/live";
+                var payload = $"sort%5B0%5D%5Bsort_by%5D=update_date&sort%5B0%5D%5Bsort_order%5D=DESC&data_type=full&text=modest+mouse&page={page}&records={recordsPerPage}";
                 try
                 {
                     var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");

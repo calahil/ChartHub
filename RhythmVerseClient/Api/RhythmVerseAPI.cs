@@ -814,11 +814,11 @@ namespace RhythmVerseClient.Api
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("bassghl")]
-        public Bassghl Bassghl { get; set; }
+        public dynamic Bassghl { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("guitarghl")]
-        public Bassghl Guitarghl { get; set; }
+        public dynamic Guitarghl { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("rhythm")]
@@ -891,7 +891,7 @@ namespace RhythmVerseClient.Api
                 new DateOnlyConverter(),
                 new TimeOnlyConverter(),
                 IsoDateTimeOffsetConverter.Singleton,
-                new SongDataConverter()
+                new SongConverter()
             },
         };
     }
@@ -1084,34 +1084,52 @@ namespace RhythmVerseClient.Api
         public static readonly IsoDateTimeOffsetConverter Singleton = new IsoDateTimeOffsetConverter();
     }
 
-    public class SongDataConverter : JsonConverter<SongData>
+    public class SongConverter : JsonConverter<Song>
     {
-        private const string BaseUrl = "https://rhythmverse.co/";
+        private const string BaseUrl = "https://rhythmverse.co";
 
-        public override SongData Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override Song Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            // Deserialize the RootResponse object
-            var rootResponse = JsonSerializer.Deserialize<SongData>(ref reader, options);
+            // Create a copy of the default options without this converter
+            var newOptions = new JsonSerializerOptions(options);
+            newOptions.Converters.Remove(this);
 
-            // Check if rootResponse is not null and navigate to the AlbumArt property
-            if (rootResponse != null)
+            // Deserialize the Song object using the modified options
+            var song = JsonSerializer.Deserialize<Song>(ref reader, newOptions);
+
+            // Check if the song is not null and navigate to the AlbumArt property
+            if (song != null)
             {
-
-                if (rootResponse.AlbumArt != null)
+                if (song.File.Author.AvatarPath != null)
                 {
-                    var albumArt = rootResponse.AlbumArt;
-                    if (!albumArt.StartsWith(BaseUrl))
+                    var avatarArt = song.File.Author.AvatarPath;
+                    if (!avatarArt.StartsWith("http"))
                     {
-                        rootResponse.AlbumArt = BaseUrl + albumArt;
+                        song.File.Author.AvatarPath = BaseUrl + avatarArt;
                     }
                 }
+                else
+                {
+                    song.File.Author.AvatarPath = "blankprofile.png";
+                }
 
+                if (song.Data?.AlbumArt != null)
+                {
+                    var albumArt = song.Data.AlbumArt;
+                    if (!albumArt.StartsWith(BaseUrl))
+                    {
+                        song.Data.AlbumArt = BaseUrl + albumArt;
+                    }
+                }
+                else
+                {
+                    song.Data.AlbumArt = "noalbumart.png";
+                }
             }
-
-            return rootResponse;
+            return song;
         }
 
-        public override void Write(Utf8JsonWriter writer, SongData value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, Song value, JsonSerializerOptions options)
         {
             throw new NotImplementedException();
         }

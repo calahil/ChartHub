@@ -13,7 +13,7 @@ namespace RhythmVerseClient.ViewModels
         private readonly AppGlobalSettings globalSettings;
         private RhythmVerseApiClient apiClient;
         private int _currentPage = 1;
-        private const int RecordsPerPage = 50;
+        private const int RecordsPerPage = 25;
         private bool _isLoading = false;
         private bool _hasMoreRecords = true;
 

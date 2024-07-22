@@ -59,8 +59,10 @@
 
 	<ItemGroup>
 	  <None Remove="Resources\Images\blank.png" />
+	  <None Remove="Resources\Images\blankprofile.png" />
 	  <None Remove="Resources\Images\clonehero.png" />
 	  <None Remove="Resources\Images\folder.png" />
+	  <None Remove="Resources\Images\noalbumart.png" />
 	  <None Remove="Resources\Images\rar.png" />
 	  <None Remove="Resources\Images\rb.png" />
 	  <None Remove="Resources\Images\sevenzip.png" />

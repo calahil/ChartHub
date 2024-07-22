@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:services="clr-namespace:RhythmVerseClient.Services"
              xmlns:models="clr-namespace:RhythmVerseClient.ViewModels"
+             xmlns:control="clr-namespace:RhythmVerseClient.Control"
              xmlns:util="clr-namespace:RhythmVerseClient.Utilities"
              xmlns:api="clr-namespace:RhythmVerseClient.Api"
              x:Class="RhythmVerseClient.Pages.RhythmVersePage"
@@ -12,23 +13,32 @@
     <Grid RowDefinitions="Auto,*">
         <!-- DataGrid for List Items -->
         <ScrollView Grid.Row="1" HorizontalOptions="Fill">
-            <CollectionView x:Name="SongList" ItemsSource="{Binding DataItems }" RemainingItemsThreshold="1" 
+            <CollectionView x:Name="SongList" ItemsSource="{Binding DataItems }" RemainingItemsThreshold="2" 
                             RemainingItemsThresholdReached="SongList_RemainingItemsThresholdReached"
                             SelectionMode="Single">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="api:Song">
-                        <Grid RowDefinitions="*, *, *, *"
-                              ColumnDefinitions="*, *, *, *">
-                            <Image Source="https://rhythmverse.co/{Binding Data.AlbumArt}" Grid.Row="0" Grid.Column="0" />
-                            <Label Text="{Binding Data.Artist}" Grid.Row="0" Grid.Column="1"/>
-                            <Label Text="{Binding Data.Title}" Grid.Row="1" Grid.RowSpan="3" Grid.Column="1"/>
-                            <Label Text="{Binding File.AuthorId}" Grid.Row="1" Grid.Column="3"/>
-                            <Label Text="{Binding File.Author.Releases}" Grid.Row="2" Grid.Column="3"/>
+                        <Grid RowDefinitions="32, 32, 32, 32"
+                              ColumnDefinitions="128, *, *, *"
+                              Padding="5">
+                            <control:BindableImage ImageUrl="{Binding Data.AlbumArt}" Grid.Row="0" Grid.Column="0" Grid.RowSpan="4"
+                                                 VerticalOptions="Fill" HorizontalOptions="Fill"/>
+                            <Image Source="{Binding Data.AlbumArt}" Grid.Row="0" Grid.Column="0" Grid.RowSpan="4" 
+                                   VerticalOptions="Fill" HorizontalOptions="Fill"/>
+                            <Label Margin="10,0,0,0" Text="{Binding Data.Artist}" Grid.Row="0" Grid.Column="1" FontSize="16"/>
+                            <Label Margin="10,0,0,0" Text="{Binding Data.Title}" Grid.Row="1" Grid.RowSpan="3" Grid.Column="1" FontSize="16"/>
+                            <Grid Grid.Row="1" Grid.Column="3" ColumnDefinitions="Auto,Auto" ColumnSpacing="5">
+                                <Image Source="{Binding File.Author.AvatarPath}" Grid.Column="0"/>
+                                <Label Text="{Binding File.AuthorId}" Grid.Column="1"/>
+                            </Grid>
+                            <Grid Grid.Row="2" Grid.Column="3" ColumnDefinitions="Auto,Auto" ColumnSpacing="5">
+                                <Label Text="Downloads:" Grid.Column="0"/>
+                                <Label Text="{Binding File.Downloads}" Grid.Column="1"/>
+                            </Grid>
                         </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
-
         </ScrollView>
     </Grid>
 </ContentPage>
