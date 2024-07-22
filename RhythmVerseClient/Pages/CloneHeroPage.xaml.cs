@@ -1,4 +1,3 @@
-using RhythmVerseClient.Services;
 using RhythmVerseClient.ViewModels;
 
 namespace RhythmVerseClient.Pages

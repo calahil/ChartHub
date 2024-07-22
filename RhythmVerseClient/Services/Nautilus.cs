@@ -1,6 +1,4 @@
 ﻿using RhythmVerseClient.Utilities;
-using SharpCompress.Archives;
-using SharpCompress.Common;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 

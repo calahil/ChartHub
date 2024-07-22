@@ -1,13 +1,13 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using CommunityToolkit.Maui;
+using Microsoft.Extensions.Logging;
+using RhythmVerseClient.Pages;
+using RhythmVerseClient.Platforms.Windows;
 using RhythmVerseClient.Services;
+using RhythmVerseClient.Utilities;
 using RhythmVerseClient.ViewModels;
 using SettingsManager;
-using System.Text.Json;
-using CommunityToolkit.Maui;
-using RhythmVerseClient.Pages;
-using RhythmVerseClient.Utilities;
-using RhythmVerseClient.Platforms.Windows;
 using Syncfusion.Maui.Core.Hosting;
+using System.Text.Json;
 
 namespace RhythmVerseClient
 {
@@ -25,9 +25,9 @@ namespace RhythmVerseClient
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 #if DEBUG
-    		builder.Logging.AddDebug();
+            builder.Logging.AddDebug();
 #endif
-            
+
 
             var settingsFileName = "appsettings.json";
             var sourceFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, settingsFileName);
@@ -39,9 +39,9 @@ namespace RhythmVerseClient
             }
 
             string json = File.ReadAllText(destinationFilePath);
-       
-        AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json, JsonCerealOptions.Instance)
-                ?? throw new JsonException("Failed to deserialize settings.");
+
+            AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json, JsonCerealOptions.Instance)
+                    ?? throw new JsonException("Failed to deserialize settings.");
 
 
             builder.Services.AddSingleton(settings);

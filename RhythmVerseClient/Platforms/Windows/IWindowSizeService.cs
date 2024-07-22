@@ -82,7 +82,7 @@ namespace RhythmVerseClient.Platforms.Windows
 
                 return (appWindow.Size.Width, appWindow.Size.Height);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Logger.LogError(ex);
                 return (0, 0);

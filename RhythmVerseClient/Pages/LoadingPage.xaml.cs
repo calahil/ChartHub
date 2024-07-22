@@ -32,7 +32,7 @@ public partial class LoadingPage : ContentPage
             }
         };
 
-            Grid.SetRow(new Label { Text = "Initializing..." }, 0);
-            Grid.SetRow(new ActivityIndicator { IsRunning = true }, 1);
-        }
+        Grid.SetRow(new Label { Text = "Initializing..." }, 0);
+        Grid.SetRow(new ActivityIndicator { IsRunning = true }, 1);
+    }
 }

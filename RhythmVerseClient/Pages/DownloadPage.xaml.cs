@@ -1,5 +1,5 @@
-using RhythmVerseClient.ViewModels;
 using RhythmVerseClient.Utilities;
+using RhythmVerseClient.ViewModels;
 using Syncfusion.Maui.Data;
 
 namespace RhythmVerseClient.Pages
@@ -38,7 +38,7 @@ namespace RhythmVerseClient.Pages
             base.OnAppearing();
             viewModel.DownloadWatcher.LoadItems();
         }
-      
+
         private void CheckBox_CheckedChanged(object sender, CheckedChangedEventArgs e)
         {
             viewModel.IsAnyChecked = viewModel.AnyItemChecked();

@@ -1,10 +1,6 @@
-﻿using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.CustomAttributes;
-using RhythmVerseClient.Utilities;
+﻿using RhythmVerseClient.Utilities;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
-using System.IO;
 using System.Runtime.CompilerServices;
 
 namespace RhythmVerseClient.Services
@@ -16,7 +12,7 @@ namespace RhythmVerseClient.Services
     }
 
     public enum WatcherFileType
-    {       
+    {
         Con,
         CloneHero,
         Directory,
@@ -146,7 +142,7 @@ namespace RhythmVerseClient.Services
                     }
                     DeleteItem(e.Name ?? itemName, e.FullPath);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Logger.LogError(ex);
                 }
@@ -348,7 +344,7 @@ namespace RhythmVerseClient.Services
         }
 
         private void DeleteItem(string itemName, string itemPath)
-        {          
+        {
             var itemToRemove = Data.FirstOrDefault(file => file.DisplayName == itemName);
 
             if (itemToRemove != null)

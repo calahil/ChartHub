@@ -4,13 +4,7 @@ using SharpCompress.Archives;
 using SharpCompress.Archives.Rar;
 using SharpCompress.Archives.SevenZip;
 using SharpCompress.Archives.Zip;
-using SharpCompress.Common;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Windows.Storage;
 
 namespace RhythmVerseClient.Utilities
@@ -136,28 +130,28 @@ namespace RhythmVerseClient.Utilities
         }
 
         public static void MoveDirectory(string source, string destination)
-         {
-             // Create the destination directory if it doesn't exist
-             Directory.CreateDirectory(destination);
+        {
+            // Create the destination directory if it doesn't exist
+            Directory.CreateDirectory(destination);
 
-             // Move each file and overwrite if the file already exists
-             foreach (var file in Directory.GetFiles(source))
-             {
-                 string destFile = Path.Combine(destination, Path.GetFileName(file));
-                 File.Copy(file, destFile, true); // true to overwrite
-                 File.Delete(file); // Delete the original file
-             }
+            // Move each file and overwrite if the file already exists
+            foreach (var file in Directory.GetFiles(source))
+            {
+                string destFile = Path.Combine(destination, Path.GetFileName(file));
+                File.Copy(file, destFile, true); // true to overwrite
+                File.Delete(file); // Delete the original file
+            }
 
-             // Recursively move subdirectories
-             foreach (var directory in Directory.GetDirectories(source))
-             {
-                 string destDir = Path.Combine(destination, Path.GetFileName(directory));
-                 MoveDirectory(directory, destDir); // Recursive call
-             }
+            // Recursively move subdirectories
+            foreach (var directory in Directory.GetDirectories(source))
+            {
+                string destDir = Path.Combine(destination, Path.GetFileName(directory));
+                MoveDirectory(directory, destDir); // Recursive call
+            }
 
-             // Delete the source directory now that it's empty
-             Directory.Delete(source);
-         }
+            // Delete the source directory now that it's empty
+            Directory.Delete(source);
+        }
     }
 
     public class AppGlobalSettings
@@ -242,7 +236,7 @@ namespace RhythmVerseClient.Utilities
             }
         }
 
-        
+
     }
 
     public class ColumnWidthConverter : IValueConverter

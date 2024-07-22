@@ -5,7 +5,6 @@ using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Data;
 using System.Windows.Input;
 
 namespace RhythmVerseClient.ViewModels
@@ -95,7 +94,8 @@ namespace RhythmVerseClient.ViewModels
 
         private void ItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(FileData.Checked)) {
+            if (e.PropertyName == nameof(FileData.Checked))
+            {
                 IsAnyChecked = AnyItemChecked();
             }
         }
@@ -129,7 +129,7 @@ namespace RhythmVerseClient.ViewModels
                 await Task.Delay(100);
             }
 
-            
+
             // TODO figure out why the resourcewatchers dont see the change
 
             var mainPage = Application.Current?.MainPage as MainPage;

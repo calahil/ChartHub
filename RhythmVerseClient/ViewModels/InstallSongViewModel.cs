@@ -1,5 +1,4 @@
 ﻿using CommunityToolkit.Mvvm.Input;
-using Microsoft.UI.Xaml.Controls;
 using RhythmVerseClient.Pages;
 using RhythmVerseClient.Platforms.Windows;
 using RhythmVerseClient.Services;
@@ -7,7 +6,6 @@ using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
 using SharpCompress.Archives;
 using SharpCompress.Common;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -15,7 +13,7 @@ using System.Windows.Input;
 namespace RhythmVerseClient.ViewModels
 {
     public class InstallSongViewModel : INotifyPropertyChanged
-    {       
+    {
         private double _progressValue;
         public double ProgressValue
         {
@@ -50,7 +48,7 @@ namespace RhythmVerseClient.ViewModels
         }
 
         public IAsyncRelayCommand StartBarCommand { get; }
-        public ICommand GoBackCommand {  get; }
+        public ICommand GoBackCommand { get; }
 
         private readonly IWindowSizeService _windowSizeService;
 
@@ -165,7 +163,7 @@ namespace RhythmVerseClient.ViewModels
                 }
             }
 
-            Details += PageString.Finished;         
+            Details += PageString.Finished;
 
         }
 

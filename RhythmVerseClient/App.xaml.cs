@@ -1,10 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using RhythmVerseClient.Services;
+﻿using RhythmVerseClient.Pages;
 using RhythmVerseClient.Utilities;
-using RhythmVerseClient.Pages;
-using SharpCompress.Archives;
-using SharpCompress.Common;
-using System;
 
 namespace RhythmVerseClient
 {
@@ -16,7 +11,7 @@ namespace RhythmVerseClient
         public App(IServiceProvider serviceProvider, AppGlobalSettings settings, Initializer initializer)
         {
             InitializeComponent();
-            if (Current != null) 
+            if (Current != null)
             {
                 Current.UserAppTheme = AppTheme.Dark;
             }

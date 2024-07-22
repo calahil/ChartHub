@@ -1,6 +1,4 @@
-﻿using System.ComponentModel;
-
-namespace RhythmVerseClient.Strings
+﻿namespace RhythmVerseClient.Strings
 {
     public static class StringExtensions
     {
@@ -12,7 +10,7 @@ namespace RhythmVerseClient.Strings
 
     public class StringsUI
     {
-       
+
     }
 
     public class InstallPageStrings : StringsUI

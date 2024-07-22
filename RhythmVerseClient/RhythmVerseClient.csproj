@@ -98,9 +98,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <MauiXaml Update="Controls\FancyName.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
 	  <MauiXaml Update="Pages\CloneHeroPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </MauiXaml>
