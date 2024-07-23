@@ -28,12 +28,12 @@ namespace RhythmVerseClient.Services
 
                 if (search != string.Empty)
                 {
-                    endpoint = "/api/all/songfiles/search/live";
+                    endpoint = "/api/ch/songfiles/search/live";
                     payload = $"sort%5B0%5D%5Bsort_by%5D=title&sort%5B0%5D%5Bsort_order%5D=ASC&data_type=full&text={search}&page={page}&records={recordsPerPage}";
                 }
                 else
                 {
-                    endpoint = "/api/all/songfiles/list";
+                    endpoint = "/api/ch/songfiles/list";
                     payload = $"sort%5B0%5D%5Bsort_by%5D=title&sort%5B0%5D%5Bsort_order%5D=ASC&data_type=full&page={page}&records={recordsPerPage}";
                 }
 
