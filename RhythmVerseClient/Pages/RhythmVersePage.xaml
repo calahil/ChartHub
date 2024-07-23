@@ -10,6 +10,12 @@
              x:DataType="models:RhythmVerseModel"
              Title="{Binding PageStrings.Title}">
 
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <util:DataUnionToSongDataConverter x:Key="DataUnionToSongDataConverter"/>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
     <Grid RowDefinitions="Auto,*">
         <!-- DataGrid for List Items -->
         <Grid Grid.Row="0" 
@@ -26,12 +32,12 @@
                         <Grid RowDefinitions="32, 32, 32, 32"
                               ColumnDefinitions="128, *, *, *"
                               Padding="5">
-                            <control:BindableImage ImageUrl="{Binding Data.AlbumArt}" Grid.Row="0" Grid.Column="0" Grid.RowSpan="4"
+                            <control:BindableImage ImageUrl="{Binding File.AlbumArt}" Grid.Row="0" Grid.Column="0" Grid.RowSpan="4"
                                                  VerticalOptions="Fill" HorizontalOptions="Fill"/>
-                            <Image Source="{Binding Data.AlbumArt}" Grid.Row="0" Grid.Column="0" Grid.RowSpan="4" 
+                            <Image Source="{Binding File.AlbumArt}" Grid.Row="0" Grid.Column="0" Grid.RowSpan="4" 
                                    VerticalOptions="Fill" HorizontalOptions="Fill"/>
-                            <Label Margin="10,0,0,0" Text="{Binding Data.Artist}" Grid.Row="0" Grid.Column="1" FontSize="16"/>
-                            <Label Margin="10,0,0,0" Text="{Binding Data.Title}" Grid.Row="1" Grid.RowSpan="3" Grid.Column="1" FontSize="16"/>
+                            <Label Margin="10,0,0,0" Text="{Binding Data, Converter={StaticResource DataUnionToSongDataConverter}, ConverterParameter=Artist }" Grid.Row="0" Grid.Column="1" FontSize="16"/>
+                            <Label Margin="10,0,0,0" Text="{Binding Data, Converter={StaticResource DataUnionToSongDataConverter}, ConverterParameter=Title }" Grid.Row="1" Grid.RowSpan="3" Grid.Column="1" FontSize="16"/>
                             <Grid Grid.Row="1" Grid.Column="3" ColumnDefinitions="Auto,Auto" ColumnSpacing="5">
                                 <Image Source="{Binding File.Author.AvatarPath}" Grid.Column="0"/>
                                 <Label Text="{Binding File.AuthorId}" Grid.Column="1"/>

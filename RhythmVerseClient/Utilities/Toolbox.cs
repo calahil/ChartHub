@@ -1,4 +1,6 @@
-﻿using RhythmVerseClient.Services;
+﻿
+using RhythmVerseClient.Api;
+using RhythmVerseClient.Services;
 using SettingsManager;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Rar;
@@ -9,6 +11,29 @@ using Windows.Storage;
 
 namespace RhythmVerseClient.Utilities
 {
+    public class DataUnionToSongDataConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is DataUnion dataUnion)
+            {
+                switch(parameter)
+                {
+                    case "Artist":
+                        return dataUnion.DataData.Artist;
+                    case "Title":
+                        return dataUnion.DataData.Title;
+                }
+            }
+            return null;
+        }
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
     public static class Logger
     {
         private static readonly string LogFilePath = Toolbox.ConstructPath(ApplicationData.Current.LocalFolder.Path, "errorlog.txt");
@@ -115,15 +140,15 @@ namespace RhythmVerseClient.Utilities
             foreach (var file in Directory.GetFiles(phaseshiftDir))
             {
                 string destFile = Path.Combine(downloadDir, Path.GetFileName(file));
-                File.Copy(file, destFile, true); // true to overwrite
-                File.Delete(file); // Delete the original file
+                System.IO.File.Copy(file, destFile, true); // true to overwrite
+                System.IO.File.Delete(file); // Delete the original file
             }
 
             foreach (string directory in Directory.GetDirectories(phaseshiftMusicDir))
             {
                 foreach (string file in Directory.GetFiles(directory))
                 {
-                    File.Delete(file); // Delete the original file
+                    System.IO.File.Delete(file); // Delete the original file
                 }
                 Directory.Delete(directory);
             }
@@ -138,8 +163,8 @@ namespace RhythmVerseClient.Utilities
             foreach (var file in Directory.GetFiles(source))
             {
                 string destFile = Path.Combine(destination, Path.GetFileName(file));
-                File.Copy(file, destFile, true); // true to overwrite
-                File.Delete(file); // Delete the original file
+                System.IO.File.Copy(file, destFile, true); // true to overwrite
+                System.IO.File.Delete(file); // Delete the original file
             }
 
             // Recursively move subdirectories
@@ -147,10 +172,8 @@ namespace RhythmVerseClient.Utilities
             {
                 string destDir = Path.Combine(destination, Path.GetFileName(directory));
                 MoveDirectory(directory, destDir); // Recursive call
+                Directory.Delete(directory);
             }
-
-            // Delete the source directory now that it's empty
-            Directory.Delete(source);
         }
     }
 
@@ -237,24 +260,5 @@ namespace RhythmVerseClient.Utilities
         }
 
 
-    }
-
-    public class ColumnWidthConverter : IValueConverter
-    {
-        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        {
-            if (value == null)
-            {
-                return 0;
-            }
-            else
-            {
-                return value;
-            }
-        }
-        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-        {
-            throw new NotImplementedException();
-        }
     }
 }

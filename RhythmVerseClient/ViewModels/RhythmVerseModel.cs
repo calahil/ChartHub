@@ -5,6 +5,7 @@ using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace RhythmVerseClient.ViewModels
@@ -107,4 +108,7 @@ namespace RhythmVerseClient.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
+
+
+    
 }

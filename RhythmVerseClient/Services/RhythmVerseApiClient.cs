@@ -9,6 +9,10 @@ namespace RhythmVerseClient.Services
     {
         private readonly HttpClient _httpClient;
 
+        public string ResponseBody { get; private set; } = string.Empty;
+
+        public RootResponse? DecodedResponse { get; private set; }
+
         public RhythmVerseApiClient()
         {
             _httpClient = new HttpClient();
@@ -43,9 +47,13 @@ namespace RhythmVerseClient.Services
 
                     string responseBody = await response.Content.ReadAsStringAsync();
 
-                    var decodedResponse = RootResponse.FromJson(responseBody);
+                    ResponseBody = responseBody;
+
+                    DecodedResponse = RootResponse.FromJson(responseBody);
+
+
                     Task.Delay(100);
-                    return decodedResponse;
+                    return DecodedResponse;
                 }
                 catch (HttpRequestException e)
                 {
