@@ -1,4 +1,5 @@
-﻿using RhythmVerseClient.Api;
+﻿using CommunityToolkit.Mvvm.Input;
+using RhythmVerseClient.Api;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
@@ -39,6 +40,9 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        public string SearchText { get; set; } = string.Empty;
+        public IAsyncRelayCommand SearchButtonCommand { get; }
+
         public RhythmVersePageStrings PageStrings { get; }
 
         public RhythmVerseModel(AppGlobalSettings settings)
@@ -47,8 +51,13 @@ namespace RhythmVerseClient.ViewModels
             PageStrings = new RhythmVersePageStrings();
             apiClient = new RhythmVerseApiClient();
             _dataItems = [];
+            SearchButtonCommand = new AsyncRelayCommand(SearchButton);
         }
 
+        public async Task SearchButton()
+        {
+
+        }
         public async Task LoadDataAsync()
         {
             if (_isLoading) return;
@@ -57,7 +66,7 @@ namespace RhythmVerseClient.ViewModels
 
             if (!_hasMoreRecords) return;
 
-            var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage);
+            var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage, ConvertSpacesToPlus(SearchText));
 
             if (response.Data.Songs != null && response.Data.Songs.Length != 0)
             {
@@ -79,6 +88,16 @@ namespace RhythmVerseClient.ViewModels
             }
 
             _isLoading = false;
+        }
+
+        private string ConvertSpacesToPlus(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return input;
+            }
+
+            return input.Replace(" ", "+").ToLower();
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

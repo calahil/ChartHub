@@ -12,10 +12,15 @@
 
     <Grid RowDefinitions="Auto,*">
         <!-- DataGrid for List Items -->
+        <Grid Grid.Row="0" 
+              ColumnDefinitions="*, *, *, *">            
+            <Entry Placeholder="search text..." Text="{Binding SearchText }" Grid.Column="0"/>
+            <Button Text="Search" Grid.Column="1" Command="{Binding SearchButtonCommand}" />
+        </Grid>
         <ScrollView Grid.Row="1" HorizontalOptions="Fill">
             <CollectionView x:Name="SongList" ItemsSource="{Binding DataItems }" RemainingItemsThreshold="2" 
                             RemainingItemsThresholdReached="SongList_RemainingItemsThresholdReached"
-                            SelectionMode="Single">
+                            SelectionMode="Single" SelectionChanged="SongList_SelectionChanged" SelectedItem="{Binding SelectedFile}">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="api:Song">
                         <Grid RowDefinitions="32, 32, 32, 32"

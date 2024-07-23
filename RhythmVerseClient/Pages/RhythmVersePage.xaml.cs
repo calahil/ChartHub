@@ -23,4 +23,9 @@ public partial class RhythmVersePage : ContentPage
     {
 		await viewModel.LoadDataAsync();
     }
+
+    private void SongList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var temp = e.CurrentSelection;
+    }
 }

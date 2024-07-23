@@ -15,12 +15,24 @@ namespace RhythmVerseClient.Services
             _httpClient.BaseAddress = new Uri("https://rhythmverse.co/");
         }
 
-        public async Task<RootResponse> GetSongFilesAsync(int page, int recordsPerPage)
+        public async Task<RootResponse> GetSongFilesAsync(int page, int recordsPerPage, string search)
         {
             try
             {
-                var endpoint = "/api/all/songfiles/search/live";
-                var payload = $"sort%5B0%5D%5Bsort_by%5D=update_date&sort%5B0%5D%5Bsort_order%5D=DESC&data_type=full&text=modest+mouse&page={page}&records={recordsPerPage}";
+                string endpoint;
+                string payload;
+
+                if (search != string.Empty)
+                {
+                    endpoint = "/api/all/songfiles/search/live";
+                    payload = $"sort%5B0%5D%5Bsort_by%5D=title&sort%5B0%5D%5Bsort_order%5D=ASC&data_type=full&text={search}&page={page}&records={recordsPerPage}";
+                }
+                else
+                {
+                    endpoint = "/api/all/songfiles/list";
+                    payload = $"sort%5B0%5D%5Bsort_by%5D=title&sort%5B0%5D%5Bsort_order%5D=ASC&data_type=full&page={page}&records={recordsPerPage}";
+                }
+
                 try
                 {
                     var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded");
@@ -32,7 +44,7 @@ namespace RhythmVerseClient.Services
                     string responseBody = await response.Content.ReadAsStringAsync();
 
                     var decodedResponse = RootResponse.FromJson(responseBody);
-
+                    Task.Delay(100);
                     return decodedResponse;
                 }
                 catch (HttpRequestException e)

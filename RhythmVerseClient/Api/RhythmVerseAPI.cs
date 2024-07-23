@@ -1094,39 +1094,57 @@ namespace RhythmVerseClient.Api
             var newOptions = new JsonSerializerOptions(options);
             newOptions.Converters.Remove(this);
 
-            // Deserialize the Song object using the modified options
-            var song = JsonSerializer.Deserialize<Song>(ref reader, newOptions);
-
-            // Check if the song is not null and navigate to the AlbumArt property
-            if (song != null)
+            // Read the JSON document
+            using (JsonDocument document = JsonDocument.ParseValue(ref reader))
             {
-                if (song.File.Author.AvatarPath != null)
-                {
-                    var avatarArt = song.File.Author.AvatarPath;
-                    if (!avatarArt.StartsWith("http"))
-                    {
-                        song.File.Author.AvatarPath = BaseUrl + avatarArt;
-                    }
-                }
-                else
-                {
-                    song.File.Author.AvatarPath = "blankprofile.png";
-                }
+                // Extract the root element
+                JsonElement root = document.RootElement;
 
-                if (song.Data?.AlbumArt != null)
+                // Deserialize the Song object using the modified options
+                var song = JsonSerializer.Deserialize<Song>(root.GetRawText(), newOptions);
+
+                // Check if the song is not null and navigate to the AlbumArt property
+                if (song != null)
                 {
-                    var albumArt = song.Data.AlbumArt;
-                    if (!albumArt.StartsWith(BaseUrl))
+                    // Handle AvatarPath
+                    if (song.File?.Author?.AvatarPath != null)
                     {
-                        song.Data.AlbumArt = BaseUrl + albumArt;
+                        var avatarArt = song.File.Author.AvatarPath;
+                        if (!avatarArt.StartsWith("http"))
+                        {
+                            song.File.Author.AvatarPath = BaseUrl + avatarArt;
+                        }
+                    }
+                    else if (song.File?.Author != null)
+                    {
+                        song.File.Author.AvatarPath = "blankprofile.png";
+                    }
+
+                    // Handle AlbumArt
+                    if (root.TryGetProperty("data", out JsonElement dataElement) &&
+                        dataElement.TryGetProperty("album_art", out JsonElement albumArtElement))
+                    {
+                        if (albumArtElement.ValueKind == JsonValueKind.String)
+                        {
+                            var albumArt = albumArtElement.GetString();
+                            if (!albumArt.StartsWith(BaseUrl))
+                            {
+                                song.Data.AlbumArt = BaseUrl + albumArt;
+                            }
+                        }
+                        else if (albumArtElement.ValueKind == JsonValueKind.True ||
+                                 albumArtElement.ValueKind == JsonValueKind.False)
+                        {
+                            song.Data.AlbumArt = albumArtElement.GetBoolean() ? "true" : "false";
+                        }
+                    }
+                    else
+                    {
+                        song.Data.AlbumArt = "noalbumart.png";
                     }
                 }
-                else
-                {
-                    song.Data.AlbumArt = "noalbumart.png";
-                }
+                return song;
             }
-            return song;
         }
 
         public override void Write(Utf8JsonWriter writer, Song value, JsonSerializerOptions options)
