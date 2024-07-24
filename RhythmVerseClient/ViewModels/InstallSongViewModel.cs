@@ -1,6 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using RhythmVerseClient.Pages;
-using RhythmVerseClient.Platforms.Windows;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
@@ -36,21 +35,8 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        private double _consoleHeight;
-        public double ConsoleHeight
-        {
-            get => _consoleHeight;
-            set
-            {
-                _consoleHeight = value;
-                OnPropertyChanged();
-            }
-        }
-
         public IAsyncRelayCommand StartBarCommand { get; }
         public ICommand GoBackCommand { get; }
-
-        private readonly IWindowSizeService _windowSizeService;
 
         public InstallPageStrings PageString { get; }
 
@@ -60,17 +46,14 @@ namespace RhythmVerseClient.ViewModels
 
         private readonly AppGlobalSettings globalSettings;
 
-        public InstallSongViewModel(AppGlobalSettings settings, IWindowSizeService windowSizeService, IKeystrokeSender keystrokeSender)
+        public InstallSongViewModel(AppGlobalSettings settings, IKeystrokeSender keystrokeSender)
         {
             _progressValue = 0;
             _details = String.Empty;
             StartBarCommand = new AsyncRelayCommand(StartBar);
             GoBackCommand = new Command(GoBack);
-            _windowSizeService = windowSizeService;
-            _windowSizeService.PropertyChanged += WindowSizeService_PropertyChanged;
 
             _keystrokeSender = keystrokeSender;
-            _consoleHeight = windowSizeService.GetWindowSize().Height;
             PageString = new InstallPageStrings();
             globalSettings = settings;
 
@@ -84,20 +67,7 @@ namespace RhythmVerseClient.ViewModels
             mainPage?.FocusOnTab(1);
         }
 
-        private void WindowSizeService_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            var temp = _windowSizeService.Height - ((128 * 2) + 88);
-            if (temp < 0)
-            {
-                temp *= -1;
-            }
-            if (ConsoleHeight != temp)
-            {
-                ConsoleHeight = temp;
-            }
-        }
-
-        private async Task StartBar()
+       private async Task StartBar()
         {
             Details = String.Empty;
             ProgressValue = 0;
@@ -159,7 +129,7 @@ namespace RhythmVerseClient.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex);
+                    Logger.LogMessage($"An error occurred: {ex.Message}");
                 }
             }
 

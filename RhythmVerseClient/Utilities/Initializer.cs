@@ -50,9 +50,11 @@ namespace RhythmVerseClient.Utilities
                 var PhaseshiftDir = Toolbox.ConstructPath(NautilusDirectoryPath, "phaseshift");
                 var PhaseshiftMusicDir = Toolbox.ConstructPath(PhaseshiftDir, "Music");
                 var DownloadDir = Toolbox.ConstructPath(PhaseshiftDir, "downloads");
+                var DownloadStaging = Toolbox.ConstructPath(PhaseshiftDir, "staging");
                 Toolbox.CreateDirectoryIfNotExists(PhaseshiftDir);
                 Toolbox.CreateDirectoryIfNotExists(PhaseshiftMusicDir);
                 Toolbox.CreateDirectoryIfNotExists(DownloadDir);
+                Toolbox.CreateDirectoryIfNotExists(DownloadStaging);
             }
         }
 

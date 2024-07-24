@@ -144,7 +144,7 @@ namespace RhythmVerseClient.Services
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex);
+                    Logger.LogMessage($"An error occurred: {ex.Message}");
                 }
             });
         }

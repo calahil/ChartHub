@@ -1,3 +1,4 @@
+using RhythmVerseClient.Api;
 using RhythmVerseClient.ViewModels;
 
 namespace RhythmVerseClient.Pages;
@@ -21,11 +22,6 @@ public partial class RhythmVersePage : ContentPage
 
     private async void SongList_RemainingItemsThresholdReached(object sender, EventArgs e)
     {
-		await viewModel.LoadDataAsync();
-    }
-
-    private void SongList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        var temp = e.CurrentSelection;
+		
     }
 }

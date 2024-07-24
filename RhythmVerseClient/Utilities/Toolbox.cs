@@ -7,30 +7,38 @@ using SharpCompress.Archives.Rar;
 using SharpCompress.Archives.SevenZip;
 using SharpCompress.Archives.Zip;
 using System.Globalization;
+using Windows.Media.Protection.PlayReady;
 using Windows.Storage;
 
 namespace RhythmVerseClient.Utilities
 {
-    public class DataUnionToSongDataConverter : IValueConverter
+    public class FileDownloadService
     {
-        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        private readonly HttpClient _httpClient;
+
+        public FileDownloadService()
         {
-            if (value is DataUnion dataUnion)
-            {
-                switch(parameter)
-                {
-                    case "Artist":
-                        return dataUnion.DataData.Artist;
-                    case "Title":
-                        return dataUnion.DataData.Title;
-                }
-            }
-            return null;
+            _httpClient = new HttpClient();
         }
 
-        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        public async Task DownloadFileAsync(string fileUrl, string destinationPath)
         {
-            throw new NotImplementedException();
+            try
+            {
+                byte[] data = await _httpClient.GetByteArrayAsync(fileUrl);
+                await System.IO.File.WriteAllBytesAsync(ZipFilePath, data);
+
+                /*using var response = await _httpClient.GetAsync(fileUrl);
+                response.EnsureSuccessStatusCode();
+
+                await using var contentStream = await response.Content.ReadAsStreamAsync();
+                await using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.Read);
+                await contentStream.CopyToAsync(fileStream);*/
+            }
+            catch (Exception ex)
+            {
+                Logger.LogMessage($"An error occurred: {ex.Message}");
+            }
         }
     }
 
@@ -212,6 +220,12 @@ namespace RhythmVerseClient.Utilities
             set { _appSettings.DownloadLocation = value; _settingsManager.Save(); }
         }
 
+        public string StagingDir
+        {
+            get => _appSettings.DownloadStaging ?? String.Empty;
+            set { _appSettings.DownloadStaging = value; _settingsManager.Save(); }
+        }
+
         public string CloneHeroSongsDir
         {
             get => _appSettings.CloneHeroSongLocation ?? String.Empty;
@@ -256,6 +270,11 @@ namespace RhythmVerseClient.Utilities
             {
                 var cloneHeroDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Clone Hero");
                 CloneHeroSongsDir = Toolbox.ConstructPath(cloneHeroDataDir, "Songs");
+            }
+
+            if (StagingDir == "first_install")
+            {
+                StagingDir = Toolbox.ConstructPath(PhaseshiftDir, "staging"); ;
             }
         }
 

@@ -3,6 +3,7 @@ using RhythmVerseClient.Api;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
+using Syncfusion.Maui.Core.Carousel;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -14,6 +15,7 @@ namespace RhythmVerseClient.ViewModels
     {
         private readonly AppGlobalSettings globalSettings;
         private RhythmVerseApiClient apiClient;
+        private FileDownloadService fileDownloadService;
         private int _currentPage = 1;
         private const int RecordsPerPage = 25;
         private bool _isLoading = false;
@@ -43,7 +45,8 @@ namespace RhythmVerseClient.ViewModels
 
         public string SearchText { get; set; } = string.Empty;
         public IAsyncRelayCommand SearchButtonCommand { get; }
-
+        public IAsyncRelayCommand DownloadFileCommand { get; }
+        public IAsyncRelayCommand ThresholdReachedCommand { get; }
         public RhythmVersePageStrings PageStrings { get; }
 
         public RhythmVerseModel(AppGlobalSettings settings)
@@ -53,12 +56,34 @@ namespace RhythmVerseClient.ViewModels
             apiClient = new RhythmVerseApiClient();
             _dataItems = [];
             SearchButtonCommand = new AsyncRelayCommand(SearchButton);
+            DownloadFileCommand = new AsyncRelayCommand(DownloadFile);
+            ThresholdReachedCommand = new AsyncRelayCommand(ThresholdReached);
+            fileDownloadService = new FileDownloadService();
         }
 
         public async Task SearchButton()
         {
-
+            if (DataItems != null)
+            {
+                DataItems.Clear();
+            }
+            _currentPage = 1;
+            await LoadDataAsync();
         }
+
+        public async Task DownloadFile()
+        {
+            if (SelectedFile == null)
+                return;
+
+            await fileDownloadService.DownloadFileAsync(SelectedFile.File.FileUrlFull.OriginalString, globalSettings.StagingDir);
+        }
+
+        public async Task ThresholdReached()
+        {
+            await LoadDataAsync();
+        }
+
         public async Task LoadDataAsync()
         {
             if (_isLoading) return;
@@ -69,7 +94,8 @@ namespace RhythmVerseClient.ViewModels
 
             var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage, ConvertSpacesToPlus(SearchText));
 
-            if (response.Data.Songs != null && response.Data.Songs.Length != 0)
+           
+            if (response != null && response.Data.Songs != null)
             {
                 if (DataItems == null)
                     DataItems = [];
@@ -98,7 +124,7 @@ namespace RhythmVerseClient.ViewModels
                 return input;
             }
 
-            return input.Replace(" ", "+").ToLower();
+            return input.ToLower();
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

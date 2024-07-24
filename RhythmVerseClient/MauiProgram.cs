@@ -1,7 +1,6 @@
 ﻿using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
 using RhythmVerseClient.Pages;
-using RhythmVerseClient.Platforms.Windows;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Utilities;
 using RhythmVerseClient.ViewModels;
@@ -52,10 +51,6 @@ namespace RhythmVerseClient
                 var appSettings = serviceProvider.GetRequiredService<AppSettings>();
                 return new SettingsManager<AppSettings>(settingsFilePath, appSettings);
             });
-
-#if WINDOWS
-            builder.Services.AddSingleton<IWindowSizeService, WindowSizeService>();
-#endif
 
             builder.Services.AddSingleton<IKeystrokeSender, WindowsKeystrokeSender>();
             builder.Services.AddSingleton<AppGlobalSettings>();
