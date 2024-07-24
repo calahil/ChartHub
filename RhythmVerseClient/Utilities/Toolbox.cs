@@ -21,12 +21,12 @@ namespace RhythmVerseClient.Utilities
             _httpClient = new HttpClient();
         }
 
-        public async Task DownloadFileAsync(string fileUrl, string destinationPath)
+        public async Task DownloadFileAsync(Song song, string destinationPath)
         {
             try
             {
-                byte[] data = await _httpClient.GetByteArrayAsync(fileUrl);
-                await System.IO.File.WriteAllBytesAsync(ZipFilePath, data);
+                byte[] data = await _httpClient.GetByteArrayAsync(song.File.FileUrlFull.OriginalString);
+                await System.IO.File.WriteAllBytesAsync(Toolbox.ConstructPath(destinationPath, song.File.FileName), data);
 
                 /*using var response = await _httpClient.GetAsync(fileUrl);
                 response.EnsureSuccessStatusCode();

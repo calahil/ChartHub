@@ -76,7 +76,7 @@ namespace RhythmVerseClient.ViewModels
             if (SelectedFile == null)
                 return;
 
-            await fileDownloadService.DownloadFileAsync(SelectedFile.File.FileUrlFull.OriginalString, globalSettings.StagingDir);
+            await fileDownloadService.DownloadFileAsync(SelectedFile, globalSettings.StagingDir);
         }
 
         public async Task ThresholdReached()
