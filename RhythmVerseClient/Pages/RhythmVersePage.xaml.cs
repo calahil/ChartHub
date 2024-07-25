@@ -21,12 +21,4 @@ public partial class RhythmVersePage : ContentPage
         await viewModel.LoadDataAsync();
     }
 
-    private void SongList_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (viewModel.SelectedFile == null)
-            return;
-        var popup = new DownloadPopup(viewModel.SelectedFile.File.DownloadPageUrlFull.OriginalString);
-        this.ShowPopup(popup);
-        //await fileDownloadService.DownloadFileAsync(SelectedFile, globalSettings.StagingDir);
-    }
 }
