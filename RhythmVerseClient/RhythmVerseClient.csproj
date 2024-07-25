@@ -76,8 +76,12 @@
 		<PackageReference Include="Microsoft.Maui.Controls" Version="8.0.70" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.70" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2592.51" />
+		<PackageReference Include="Selenium.WebDriver" Version="4.23.0" />
+		<PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="127.0.6533.7200" />
 		<PackageReference Include="SharpCompress" Version="0.37.2" />
-		<PackageReference Include="Syncfusion.Maui.DataGrid" Version="26.1.41" />
+		<PackageReference Include="Syncfusion.Maui.DataGrid" Version="26.2.4" />
+		<PackageReference Include="System.Text.Json" Version="8.0.4" />
 	</ItemGroup>
 
 	<ItemGroup>

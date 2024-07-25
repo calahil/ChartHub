@@ -1,12 +1,12 @@
-﻿using CommunityToolkit.Mvvm.Input;
+﻿using CommunityToolkit.Maui.Views;
+using CommunityToolkit.Mvvm.Input;
 using RhythmVerseClient.Api;
+using RhythmVerseClient.Pages;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
-using Syncfusion.Maui.Core.Carousel;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace RhythmVerseClient.ViewModels
@@ -94,7 +94,7 @@ namespace RhythmVerseClient.ViewModels
 
             var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage, ConvertSpacesToPlus(SearchText));
 
-           
+
             if (response != null && response.Data.Songs != null)
             {
                 if (DataItems == null)
@@ -136,5 +136,5 @@ namespace RhythmVerseClient.ViewModels
     }
 
 
-    
+
 }

@@ -20,7 +20,6 @@ namespace RhythmVerseClient.Pages
             Children.Add(CloneHeroPage);
             var InstallSongPage = new InstallSongPage(installView);
             Children.Add(InstallSongPage);
-
             CurrentPage = Children[0];
         }
 
