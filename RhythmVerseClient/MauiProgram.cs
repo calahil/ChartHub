@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Maui;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using RhythmVerseClient.Pages;
 using RhythmVerseClient.Services;
@@ -26,8 +27,8 @@ namespace RhythmVerseClient
 #if DEBUG
             builder.Logging.AddDebug();
 #endif
-
-
+            builder.Configuration.AddUserSecrets<App>();
+            
             var settingsFileName = "appsettings.json";
             var sourceFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, settingsFileName);
             var destinationFilePath = Path.Combine(FileSystem.AppDataDirectory, settingsFileName);
@@ -63,7 +64,10 @@ namespace RhythmVerseClient
             builder.Services.AddSingleton<CloneHeroPage>();
             builder.Services.AddSingleton<InstallSongPage>();
             builder.Services.AddSingleton<RhythmVersePage>();
-
+            builder.Services.AddScoped<IProgress<double>>(provider => new Progress<double>(value =>
+            {
+                // handle progress value, e.g., update a property or state
+            }));
             builder.Services.AddSingleton<MainPage>();
 
             builder.Services.AddSingleton<Initializer>();

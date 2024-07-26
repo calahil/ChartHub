@@ -10,7 +10,8 @@
              x:DataType="models:RhythmVerseModel"
              Title="{Binding PageStrings.Title}">
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid RowDefinitions="48,*"
+          ColumnDefinitions="3*, *">
         <!-- DataGrid for List Items -->
         <Grid Grid.Row="0" 
               ColumnDefinitions="*, *, *, *">            
@@ -20,9 +21,10 @@
                    ReturnCommand="{Binding SearchButtonCommand}"/>
             <Button Text="Search" 
                     Grid.Column="1" 
-                    Command="{Binding SearchButtonCommand}" />
+                    Command="{Binding SearchButtonCommand}" 
+                    HeightRequest="42" />
         </Grid>
-            <CollectionView x:Name="SongList" Grid.Row="1" 
+            <CollectionView x:Name="SongList" Grid.Row="1" Grid.Column="0"
                             ItemsSource="{Binding DataItems }" 
                             RemainingItemsThreshold="1" 
                             RemainingItemsThresholdReachedCommand="{Binding ThresholdReachedCommand}"
@@ -51,5 +53,25 @@
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
+        <Grid Grid.Row="1" Grid.Column="1"
+              RowDefinitions="48, *"
+              ColumnDefinitions="*,*"
+              Padding="5">
+            <Label Grid.Row="0" Grid.Column="0" Text="Downloads" VerticalOptions="Center" FontAttributes="Bold" FontSize="16"/>
+            <Button Grid.Row="0" Grid.Column="1" Text="Process Files" HeightRequest="42"/>
+            <CollectionView x:Name="Downloads" Grid.Row="1" Grid.ColumnSpan="2" ItemsSource="{Binding Downloads}">
+                <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="services:DownloadFile">
+                    <Grid Padding="10" RowDefinitions="20, 20"
+                          ColumnDefinitions="*, 20">
+
+                        <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="0" VerticalOptions="Center" />
+                            <Image Source="checkmark.png" Grid.Row="0" Grid.Column="1" IsVisible="{Binding Finished}" />
+                            <ProgressBar Progress="{Binding DownloadProgress}" Grid.Row="1" Grid.ColumnSpan="2" VerticalOptions="Center" />
+                    </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
     </Grid>
 </ContentPage>

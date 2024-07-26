@@ -38,6 +38,7 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
 		<UserSecretsId>b0e751a2-ccc2-493f-96d7-3a78ffe23a8b</UserSecretsId>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<PackageIcon>logo.png</PackageIcon>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -72,13 +73,11 @@
 	<ItemGroup>
 		<PackageReference Include="CommunityToolkit.Maui" Version="9.0.2" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+		<PackageReference Include="Google.Apis.Drive.v3" Version="1.68.0.3466" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="8.0.70" />
 		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="8.0.70" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2592.51" />
-		<PackageReference Include="Selenium.WebDriver" Version="4.23.0" />
-		<PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="127.0.6533.7200" />
 		<PackageReference Include="SharpCompress" Version="0.37.2" />
 		<PackageReference Include="Syncfusion.Maui.DataGrid" Version="26.2.4" />
 		<PackageReference Include="System.Text.Json" Version="8.0.4" />
@@ -100,6 +99,10 @@
 	<ItemGroup>
 	  <None Update="appsettings.json">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
+	  <None Update="Resources\Images\logo.png">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
 	  </None>
 	</ItemGroup>
 

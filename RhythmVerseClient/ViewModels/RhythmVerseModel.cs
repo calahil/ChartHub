@@ -1,13 +1,18 @@
-﻿using CommunityToolkit.Maui.Views;
-using CommunityToolkit.Mvvm.Input;
+﻿using CommunityToolkit.Mvvm.Input;
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.Download;
+using Google.Apis.Drive.v3;
+using Google.Apis.Services;
+using Google.Apis.Util.Store;
+using Microsoft.Extensions.Configuration;
 using RhythmVerseClient.Api;
-using RhythmVerseClient.Pages;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 
 namespace RhythmVerseClient.ViewModels
 {
@@ -15,11 +20,12 @@ namespace RhythmVerseClient.ViewModels
     {
         private readonly AppGlobalSettings globalSettings;
         private RhythmVerseApiClient apiClient;
-        private FileDownloadService fileDownloadService;
+        private DownloadService downloadService;
         private int _currentPage = 1;
         private const int RecordsPerPage = 25;
         private bool _isLoading = false;
         private bool _hasMoreRecords = true;
+        private Progress<double> _progress;
 
         private ObservableCollection<Song>? _dataItems;
         public ObservableCollection<Song>? DataItems
@@ -28,6 +34,17 @@ namespace RhythmVerseClient.ViewModels
             set
             {
                 _dataItems = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private ObservableCollection<DownloadFile> _downloads;
+        public ObservableCollection<DownloadFile> Downloads
+        {
+            get => _downloads;
+            set
+            {
+                _downloads = value;
                 OnPropertyChanged();
             }
         }
@@ -49,16 +66,24 @@ namespace RhythmVerseClient.ViewModels
         public IAsyncRelayCommand ThresholdReachedCommand { get; }
         public RhythmVersePageStrings PageStrings { get; }
 
-        public RhythmVerseModel(AppGlobalSettings settings)
+        public RhythmVerseModel(AppGlobalSettings settings, IConfiguration configuration, IProgress<double> progress)
         {
             globalSettings = settings;
             PageStrings = new RhythmVersePageStrings();
-            apiClient = new RhythmVerseApiClient();
+            apiClient = new RhythmVerseApiClient(configuration);
             _dataItems = [];
+            _downloads = [];
+            _progress = new Progress<double>(HandleProgressChanged);
             SearchButtonCommand = new AsyncRelayCommand(SearchButton);
             DownloadFileCommand = new AsyncRelayCommand(DownloadFile);
             ThresholdReachedCommand = new AsyncRelayCommand(ThresholdReached);
-            fileDownloadService = new FileDownloadService();
+
+            downloadService = new DownloadService(configuration, progress);
+        }
+
+        private void HandleProgressChanged(double progress)
+        {
+            throw new NotImplementedException();
         }
 
         public async Task SearchButton()
@@ -68,6 +93,7 @@ namespace RhythmVerseClient.ViewModels
                 DataItems.Clear();
             }
             _currentPage = 1;
+            _isLoading = false;
             await LoadDataAsync();
         }
 
@@ -75,8 +101,21 @@ namespace RhythmVerseClient.ViewModels
         {
             if (SelectedFile == null)
                 return;
+            
+            string downloadString;
 
-            await fileDownloadService.DownloadFileAsync(SelectedFile, globalSettings.StagingDir);
+            if (!SelectedFile.File.DownloadUrl.StartsWith("http"))
+            {
+                downloadString = "https://rhythmverse.co" + SelectedFile.File.DownloadUrl;
+            }
+            else
+            {
+                downloadString = SelectedFile.File.DownloadUrl;
+            }
+
+            var downloadFile = new DownloadFile(SelectedFile.File.FileName, globalSettings.StagingDir, downloadString);
+            Downloads.Add(downloadFile);
+            await downloadService.DownloadFileAsync(downloadFile);
         }
 
         public async Task ThresholdReached()
@@ -135,6 +174,10 @@ namespace RhythmVerseClient.ViewModels
         }
     }
 
+    public class FileDownloadService
+    {
+        
+    }
 
-
+    
 }

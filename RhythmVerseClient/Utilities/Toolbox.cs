@@ -1,91 +1,13 @@
-﻿
-using OpenQA.Selenium.Chrome;
-using OpenQA.Selenium;
-using RhythmVerseClient.Api;
-using RhythmVerseClient.Services;
+﻿using RhythmVerseClient.Services;
 using SettingsManager;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Rar;
 using SharpCompress.Archives.SevenZip;
 using SharpCompress.Archives.Zip;
-using System.Globalization;
-using Windows.Media.Protection.PlayReady;
 using Windows.Storage;
-using static System.Net.WebRequestMethods;
 
 namespace RhythmVerseClient.Utilities
 {
-    public class FileDownloadService
-    {
-        private readonly HttpClient _httpClient;
-
-        public FileDownloadService()
-        {
-            _httpClient = new HttpClient();
-        }
-
-        public async Task DownloadFileAsync(Song song, string destinationPath)
-        {
-            try
-            {
-                string downloadString;
-
-                if (!song.File.DownloadUrl.StartsWith("http"))
-                {
-                    downloadString = "https://rhythmverse.co" + song.File.DownloadUrl;
-                }
-                else
-                {
-                    downloadString = song.File.DownloadUrl;
-                }
-
-
-                if (song.File.DownloadUrl.StartsWith("https://drive.google.com/drive"))
-                {
-                    var options = new ChromeOptions();
-
-                    options.AddUserProfilePreference("download.default_directory", destinationPath);
-                    options.AddUserProfilePreference("download.prompt_for_download", false);
-                    options.AddUserProfilePreference("disable-popup-blocking", "true");
-
-                    // Set up ChromeDriver
-                    using (var driver = new ChromeDriver(options))
-                    {
-                        driver.Navigate().GoToUrl(downloadString);
-
-                        // Wait for the page to load
-                        Thread.Sleep(5000);
-
-                        IWebElement downloadButton = driver.FindElement(By.XPath("//div[contains(@class, 'h-sb-Ic') and text()='Download all']"));
-
-                        // Interact with the element (e.g., click it)
-                        downloadButton.Click();
-
-                        // Wait for the download to complete
-                        Thread.Sleep(5000); // Adjust the wait time as needed
-
-                        //driver.Quit();
-                    }
-                }
-                else
-                {
-                    byte[] data = await _httpClient.GetByteArrayAsync(downloadString);
-                    await System.IO.File.WriteAllBytesAsync(Toolbox.ConstructPath(destinationPath, song.File.FileName), data);
-                }
-                /*using var response = await _httpClient.GetAsync(fileUrl);
-                response.EnsureSuccessStatusCode();
-
-                await using var contentStream = await response.Content.ReadAsStreamAsync();
-                await using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.Read);
-                await contentStream.CopyToAsync(fileStream);*/
-            }
-            catch (Exception ex)
-            {
-                Logger.LogMessage($"An error occurred: {ex.Message}");
-            }
-        }
-    }
-
     public static class Logger
     {
         private static readonly string LogFilePath = Toolbox.ConstructPath(ApplicationData.Current.LocalFolder.Path, "errorlog.txt");

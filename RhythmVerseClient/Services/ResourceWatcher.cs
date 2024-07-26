@@ -395,6 +395,7 @@ namespace RhythmVerseClient.Services
         private WatcherFileType _fileType = watcherFileType;
         private string _fileSize = Toolbox.ConvertFileSize(sizeBytes);
         private long _sizeBytes = sizeBytes;
+        private double _downloadProgress = 0;
 
         public bool Checked
         {
@@ -481,6 +482,16 @@ namespace RhythmVerseClient.Services
             {
                 _sizeBytes = value;
                 OnPropertyChanged(nameof(SizeBytes));
+            }
+        }
+
+        public double DownloadProgress
+        {
+            get => _downloadProgress;
+            set
+            {
+                _downloadProgress = value;
+                OnPropertyChanged(nameof(DownloadProgress));
             }
         }
 
