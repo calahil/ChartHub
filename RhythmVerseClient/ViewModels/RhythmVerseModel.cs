@@ -25,7 +25,6 @@ namespace RhythmVerseClient.ViewModels
         private const int RecordsPerPage = 25;
         private bool _isLoading = false;
         private bool _hasMoreRecords = true;
-        private Progress<double> _progress;
 
         private ObservableCollection<Song>? _dataItems;
         public ObservableCollection<Song>? DataItems
@@ -66,24 +65,18 @@ namespace RhythmVerseClient.ViewModels
         public IAsyncRelayCommand ThresholdReachedCommand { get; }
         public RhythmVersePageStrings PageStrings { get; }
 
-        public RhythmVerseModel(AppGlobalSettings settings, IConfiguration configuration, IProgress<double> progress)
+        public RhythmVerseModel(AppGlobalSettings settings, IConfiguration configuration)
         {
             globalSettings = settings;
             PageStrings = new RhythmVersePageStrings();
             apiClient = new RhythmVerseApiClient(configuration);
             _dataItems = [];
             _downloads = [];
-            _progress = new Progress<double>(HandleProgressChanged);
             SearchButtonCommand = new AsyncRelayCommand(SearchButton);
             DownloadFileCommand = new AsyncRelayCommand(DownloadFile);
             ThresholdReachedCommand = new AsyncRelayCommand(ThresholdReached);
 
-            downloadService = new DownloadService(configuration, progress);
-        }
-
-        private void HandleProgressChanged(double progress)
-        {
-            throw new NotImplementedException();
+            downloadService = new DownloadService(configuration);
         }
 
         public async Task SearchButton()
@@ -113,7 +106,7 @@ namespace RhythmVerseClient.ViewModels
                 downloadString = SelectedFile.File.DownloadUrl;
             }
 
-            var downloadFile = new DownloadFile(SelectedFile.File.FileName, globalSettings.StagingDir, downloadString);
+            var downloadFile = new DownloadFile(SelectedFile.File.FileName, globalSettings.StagingDir, downloadString, SelectedFile.File.Size);
             Downloads.Add(downloadFile);
             await downloadService.DownloadFileAsync(downloadFile);
         }
@@ -173,11 +166,4 @@ namespace RhythmVerseClient.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
-
-    public class FileDownloadService
-    {
-        
-    }
-
-    
 }

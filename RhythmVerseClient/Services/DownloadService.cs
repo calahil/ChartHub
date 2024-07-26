@@ -4,6 +4,7 @@ using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
 using Microsoft.Extensions.Configuration;
+using RhythmVerseClient.Api;
 using RhythmVerseClient.Utilities;
 using RhythmVerseClient.ViewModels;
 using System;
@@ -13,6 +14,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Windows.UI.StartScreen;
 
 namespace RhythmVerseClient.Services
 {
@@ -23,12 +25,12 @@ namespace RhythmVerseClient.Services
         private readonly GoogleDriveService _googleDriveService;
         private IProgress<double> _progress;
 
-        public DownloadService(IConfiguration configuration, IProgress<double> progress)
+        public DownloadService(IConfiguration configuration)
         {
             _httpClient = new HttpClient();
             _urlHelper = new UrlHelper();
             _googleDriveService = new GoogleDriveService(configuration);
-            _progress = progress;
+            _progress = new Progress<double>();
         }
 
         public async Task DownloadFileAsync(DownloadFile song)
@@ -36,7 +38,7 @@ namespace RhythmVerseClient.Services
             try
             {
                 string finalUrl = await _urlHelper.GetFinalRedirectUrlAsync(song.Url);
-
+                song.Url = finalUrl;
                 if (finalUrl.StartsWith("https://drive.google.com/drive"))
                 {
 
@@ -44,7 +46,7 @@ namespace RhythmVerseClient.Services
                 else if (finalUrl.StartsWith("https://drive.google.com/file"))
                 {
                     var fileId = UrlExtractor.ExtractIdFromUrl(finalUrl);
-                    await _googleDriveService.DownloadFileAsync(fileId, Toolbox.ConstructPath(song.FilePath, song.DisplayName), _progress);                    
+                    await _googleDriveService.DownloadFileAsync(song, _progress, fileId);                    
                 }
                 else
                 {
@@ -139,33 +141,39 @@ namespace RhythmVerseClient.Services
             });
         }
 
-        public async Task DownloadFileAsync(string fileId, string savePath, IProgress<double> progressReporter)
+        public async Task DownloadFileAsync(DownloadFile downloadFile, IProgress<double> progress, string fileId, CancellationToken cancellationToken = default)
         {
             var service = await GetServiceAsync();
             var request = service.Files.Get(fileId);
+            var savePath = Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName);
 
-            // Get the file to determine total size for progress calculation
-            var file = await service.Files.Get(fileId).ExecuteAsync();
-            long? totalSize = file.Size;  // Total size of the file.
+            
 
             using (var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                // Create a progress stream that reports the download progress.
-                var progressStream = new ProgressStream(fileStream, progressReporter, totalSize.Value);
-                request.MediaDownloader.ProgressChanged += (IDownloadProgress prog) =>
+                var file = await request.DownloadAsync(fileStream);
+                downloadFile.FileSize = file.BytesDownloaded; // Update file size
+                var mediaDownloader = new MediaDownloader(service)
                 {
-                    if (prog.Status == DownloadStatus.Downloading)
+                    ChunkSize = 256 * 1024  // Adjust the chunk size if needed
+                };
+
+                mediaDownloader.ProgressChanged += progressEvent =>
+                {
+                    if (progressEvent.Status == DownloadStatus.Downloading)
                     {
-                        progressStream.Report(prog.BytesDownloaded);
+                        double progressPercentage = (double)progressEvent.BytesDownloaded / downloadFile.FileSize * 100;
+                        progress?.Report(progressPercentage); // Correctly reporting progress
+                        downloadFile.DownloadProgress = progressPercentage;
                     }
-                    else if (prog.Status == DownloadStatus.Completed)
+                    else if (progressEvent.Status == DownloadStatus.Completed)
                     {
-                        progressReporter.Report(100);  // Ensure that progress is reported as 100% at the end
+                        downloadFile.Finished = true;
+                        downloadFile.DownloadProgress = 100;
                     }
                 };
 
-                // Download directly into the file stream.
-                await request.DownloadAsync(progressStream);
+                await mediaDownloader.DownloadAsync(downloadFile.Url, fileStream, cancellationToken);
             }
         }
 
@@ -269,13 +277,14 @@ namespace RhythmVerseClient.Services
         }
     }
 
-    public class DownloadFile(string displayName, string filePath, string urlString) : INotifyPropertyChanged
+    public class DownloadFile(string displayName, string filePath, string urlString, long fileSize) : INotifyPropertyChanged
     {
         private string _displayName = displayName;
         private string _filePath = filePath;
         private string _url = urlString;
         private double _downloadProgress = 0;
         private bool _finished = false;
+        private long _fileSize = fileSize;
 
         public string DisplayName
         {
@@ -336,6 +345,18 @@ namespace RhythmVerseClient.Services
             }
         }
 
+        public long FileSize
+        {
+            get => _fileSize;
+            set
+            {
+                if (_fileSize != value)
+                {
+                    _fileSize = value;
+                    OnPropertyChanged(nameof(FileSize));
+                }
+            }
+        }
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -352,50 +373,5 @@ namespace RhythmVerseClient.Services
         {
             return HashCode.Combine(DisplayName, FilePath);
         }
-    }
-
-    class ProgressStream : Stream
-    {
-        private readonly Stream _baseStream;
-        private readonly IProgress<double> _progressReporter;
-        private readonly long _totalSize;
-        private long _totalRead;
-
-        public ProgressStream(Stream baseStream, IProgress<double> progressReporter, long totalSize)
-        {
-            _baseStream = baseStream;
-            _progressReporter = progressReporter;
-            _totalSize = totalSize;
-        }
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            _baseStream.Write(buffer, offset, count);
-            _totalRead += count;
-            Report(_totalRead);
-        }
-
-        public void Report(long bytesDownloaded)
-        {
-            _progressReporter.Report((double)bytesDownloaded / _totalSize * 100);
-        }
-
-        // Implement all other abstract methods and pass-through calls to _baseStream
-
-        public override bool CanRead => _baseStream.CanRead;
-        public override bool CanSeek => _baseStream.CanSeek;
-        public override bool CanWrite => _baseStream.CanWrite;
-        public override long Length => _baseStream.Length;
-
-        public override long Position
-        {
-            get => _baseStream.Position;
-            set => _baseStream.Position = value;
-        }
-
-        public override void Flush() => _baseStream.Flush();
-        public override int Read(byte[] buffer, int offset, int count) => _baseStream.Read(buffer, offset, count);
-        public override long Seek(long offset, SeekOrigin origin) => _baseStream.Seek(offset, origin);
-        public override void SetLength(long value) => _baseStream.SetLength(value);
-    }
+    }   
 }

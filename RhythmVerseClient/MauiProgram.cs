@@ -64,10 +64,6 @@ namespace RhythmVerseClient
             builder.Services.AddSingleton<CloneHeroPage>();
             builder.Services.AddSingleton<InstallSongPage>();
             builder.Services.AddSingleton<RhythmVersePage>();
-            builder.Services.AddScoped<IProgress<double>>(provider => new Progress<double>(value =>
-            {
-                // handle progress value, e.g., update a property or state
-            }));
             builder.Services.AddSingleton<MainPage>();
 
             builder.Services.AddSingleton<Initializer>();

@@ -234,9 +234,9 @@ namespace RhythmVerseClient.Api
         [JsonPropertyName("downloads")]
         public long? Downloads { get; set; }
 
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
         [JsonPropertyName("size")]
-        public long? Size { get; set; }
+        public long Size { get; set; }
 /*
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("audio_type")]
