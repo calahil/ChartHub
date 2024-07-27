@@ -7,6 +7,9 @@ using Microsoft.Extensions.Configuration;
 using RhythmVerseClient.Api;
 using RhythmVerseClient.Utilities;
 using RhythmVerseClient.ViewModels;
+using SharpCompress.Archives;
+using SharpCompress.Archives.Zip;
+using SharpCompress.Common;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -176,18 +179,79 @@ namespace RhythmVerseClient.Services
                 await mediaDownloader.DownloadAsync(downloadFile.Url, fileStream, cancellationToken);
             }
         }
+        public async Task DownloadFolderAsync(string folderId, string destinationZipFilePath)
+        {
+            string folderPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(folderPath);
 
-        public async Task<List<Google.Apis.Drive.v3.Data.File>> ListFilesInFolder(string folderId)
+            await DownloadFilesInFolder(folderId, folderPath);
+
+            CreateZip(folderPath, destinationZipFilePath);
+
+            Directory.Delete(folderPath, true); // Cleanup the temporary folder
+        }
+
+        private async Task DownloadFilesInFolder(string folderId, string parentFolderPath)
         {
             var service = await GetServiceAsync();
             var request = service.Files.List();
             request.Q = $"'{folderId}' in parents";
-            request.Fields = "nextPageToken, files(id, name)";
+            request.Fields = "files(id, name, mimeType)";
 
             var result = await request.ExecuteAsync();
-            return result.Files.ToList();
+
+            foreach (var file in result.Files)
+            {
+                if (file.MimeType == "application/vnd.google-apps.folder")
+                {
+                    string subFolderPath = Path.Combine(parentFolderPath, file.Name);
+                    Directory.CreateDirectory(subFolderPath);
+                    await DownloadFilesInFolder(file.Id, subFolderPath);
+                }
+                else
+                {
+                    var stream = new MemoryStream();
+                    await service.Files.Get(file.Id).DownloadAsync(stream);
+                    stream.Seek(0, SeekOrigin.Begin);
+
+                    string filePath = Path.Combine(parentFolderPath, file.Name);
+                    using (var fileStream = System.IO.File.Create(filePath))
+                    {
+                        stream.CopyTo(fileStream);
+                    }
+                }
+            }
+        }
+        private void CreateZip(string folderPath, string destinationZipFilePath)
+        {
+            using (var archive = ZipArchive.Create())
+            {
+                // Recursively add files to the archive
+                AddFilesToArchive(archive, folderPath, folderPath);
+
+                // Save the archive to a file
+                using (var stream = System.IO.File.OpenWrite(destinationZipFilePath))
+                {
+                    archive.SaveTo(stream, CompressionType.Deflate);
+                }
+            }
         }
 
+        private void AddFilesToArchive(ZipArchive archive, string rootPath, string currentPath)
+        {
+            // Add files from the current directory to the archive
+            foreach (var filePath in Directory.GetFiles(currentPath))
+            {
+                string relativePath = Path.GetRelativePath(rootPath, filePath);
+                archive.AddEntry(relativePath, filePath);
+            }
+
+            // Recursively add files from subdirectories
+            foreach (var subDirPath in Directory.GetDirectories(currentPath))
+            {
+                AddFilesToArchive(archive, rootPath, subDirPath);
+            }
+        }
         /*public async Task DownloadFolderAsZip(string folderId, string savePath)
         {
             var files = await ListFilesInFolder(folderId);
