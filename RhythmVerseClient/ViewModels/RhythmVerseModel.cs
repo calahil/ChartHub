@@ -298,6 +298,7 @@ namespace RhythmVerseClient.ViewModels
                     var songView = new ViewSong();
                     songView.Artist = song.Data.Artist ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
                     songView.Title = song.Data.Title ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
+                    var image = song.Data.AlbumArt ?? song.File.AlbumArt ?? "noalbumart.png";
                     songView.Downloads = song.Data.Downloads ?? song.File.Downloads ?? 0;
                     songView.FileName = song.File.FileName ?? song.File.Filename ?? null;
                     songView.SongLength = song.Data.SongLength ?? song.File.FileSongLength ?? 0;
