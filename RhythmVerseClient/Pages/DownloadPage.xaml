@@ -27,13 +27,6 @@
                     <sf:DataGridTextColumn MappingName="DisplayName" />
                     <sf:DataGridImageColumn MappingName="ImageFile" Width="120" />
                     <sf:DataGridTextColumn MappingName="FileSize" Width="120" CellTextAlignment="Center" />
-                    <sf:DataGridTemplateColumn HeaderText="Downloaded" >
-                        <sf:DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate x:DataType="services:FileData">
-                                <ProgressBar Progress="{Binding DownloadProgress}" HeightRequest="20" />
-                            </DataTemplate>
-                        </sf:DataGridTemplateColumn.CellTemplate>
-                    </sf:DataGridTemplateColumn>
                 </sf:SfDataGrid.Columns>
             </sf:SfDataGrid>
         </ScrollView>

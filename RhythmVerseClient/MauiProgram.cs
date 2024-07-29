@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Maui;
+using Google.Apis.Drive.v3;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using RhythmVerseClient.Pages;
@@ -65,7 +66,7 @@ namespace RhythmVerseClient
             builder.Services.AddSingleton<InstallSongPage>();
             builder.Services.AddSingleton<RhythmVersePage>();
             builder.Services.AddSingleton<MainPage>();
-
+            builder.Services.AddSingleton<DriveService>();
             builder.Services.AddSingleton<Initializer>();
 
             builder.ConfigureSyncfusionCore();

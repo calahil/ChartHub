@@ -12,7 +12,7 @@
     <Grid RowDefinitions="Auto,*">
         <!-- DataGrid for List Items -->
         <ScrollView Grid.Row="1" HorizontalOptions="Fill">
-            <sf:SfDataGrid x:Name="DownloadList" ItemsSource="{Binding DataItems }" SelectedRow="{Binding SelectedFile}" SelectionMode="SingleDeselect"
+            <sf:SfDataGrid x:Name="CloneHeroList" ItemsSource="{Binding DataItems }" SelectedRow="{Binding SelectedFile}" SelectionMode="SingleDeselect"
                            ColumnWidthMode="Fill" AutoGenerateColumnsMode="None" SortingMode="Single" AllowTriStateSorting="True">
                 <sf:SfDataGrid.SortColumnDescriptions>
                     <sf:SortColumnDescription ColumnName="DisplayName" />

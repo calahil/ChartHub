@@ -45,6 +45,7 @@
     public class CloneHeroPageStrings : StringsUI
     {
         public string Title { get; } = "Clone Hero Song Library";
+        public string Select { get; } = "Select";
         public string DisplayName { get; } = "Display Name";
         public string FileType { get; } = "File Type";
         public string FileSize { get; } = "File Size";

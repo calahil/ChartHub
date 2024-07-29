@@ -21,4 +21,8 @@ public partial class RhythmVersePage : ContentPage
         await viewModel.LoadDataAsync();
     }
 
+    private void Picker_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        viewModel.SortDataItems();
+    }
 }
