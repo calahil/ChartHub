@@ -14,7 +14,6 @@ public partial class RhythmVersePage : ContentPage
         viewModel = verseModel;
         BindingContext = viewModel;
 
-        SortPicker.ItemDisplayBinding
         SortPicker.SelectedIndexChanged += SortPicker_SelectedIndexChanged;
         OrderPicker.SelectedIndexChanged += OrderPicker_SelectedIndexChanged;
     }
