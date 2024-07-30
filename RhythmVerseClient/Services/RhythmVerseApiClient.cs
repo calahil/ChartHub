@@ -12,9 +12,9 @@ namespace RhythmVerseClient.Services
     {
         private readonly HttpClient _httpClient;
 
-        public string ResponseBody { get; private set; } = string.Empty;
+        //public string ResponseBody { get; private set; } = string.Empty;
 
-        public RootResponse? DecodedResponse { get; private set; }
+        //public RootResponse? DecodedResponse { get; private set; }
 
         public RhythmVerseApiClient(IConfiguration configuration)
         {
@@ -59,9 +59,7 @@ namespace RhythmVerseClient.Services
 
                     string responseBody = await response.Content.ReadAsStringAsync();
 
-                    ResponseBody = responseBody;
-
-                    DecodedResponse = RootResponse.FromJson(responseBody);
+                    var DecodedResponse = RootResponse.FromJson(responseBody);
 
                     return DecodedResponse;
                 }

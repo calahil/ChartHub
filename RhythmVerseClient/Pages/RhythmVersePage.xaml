@@ -5,6 +5,7 @@
              xmlns:models="clr-namespace:RhythmVerseClient.ViewModels"
              xmlns:control="clr-namespace:RhythmVerseClient.Control"
              xmlns:util="clr-namespace:RhythmVerseClient.Utilities"
+             xmlns:ffimage="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
              xmlns:api="clr-namespace:RhythmVerseClient.Api"
              x:Class="RhythmVerseClient.Pages.RhythmVersePage"
              x:DataType="models:RhythmVerseModel"
@@ -14,7 +15,7 @@
           ColumnDefinitions="3*, *">
         <!-- DataGrid for List Items -->
         <Grid Grid.Row="0" 
-              ColumnDefinitions="*, *, *, *">            
+              ColumnDefinitions="*, *, *, *">
             <Entry Placeholder="search text..." 
                    Text="{Binding SearchText }" 
                    Grid.Column="0" 
@@ -25,7 +26,7 @@
                     HeightRequest="42" />
             <Picker Grid.Column="3" ItemsSource="{Binding SortFilters}" SelectedItem="{Binding SelectedFilter}" SelectedIndexChanged="Picker_SelectedIndexChanged" />
         </Grid>
-            <CollectionView x:Name="SongList" Grid.Row="1" Grid.Column="0"
+        <CollectionView x:Name="SongList" Grid.Row="1" Grid.Column="0"
                             ItemsSource="{Binding DataItems }" 
                             RemainingItemsThreshold="1" 
                             RemainingItemsThresholdReachedCommand="{Binding ThresholdReachedCommand}"
@@ -33,42 +34,60 @@
                             SelectionMode="Single" 
                             ItemsUpdatingScrollMode="KeepScrollOffset"
                             SelectedItem="{Binding SelectedFile}">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="models:ViewSong">
-                        <Grid RowDefinitions="32, 32, 32, 32"
-                              ColumnDefinitions="128, *, *, *"
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:ViewSong">
+                    <Grid RowDefinitions="32, 32, 32, 32"
+                              ColumnDefinitions="128, Auto, *, *, *"
                               Padding="5">
-                            <control:BindableImage ImageUrl="{Binding AlbumArt}" Grid.Row="0" Grid.Column="0" Grid.RowSpan="4"
-                                                 VerticalOptions="Fill" HorizontalOptions="Fill"/>
-                            <Label Margin="10,0,0,0" Text="{Binding Artist }" Grid.Row="0" Grid.Column="1" FontSize="16"/>
-                            <Label Margin="10,0,0,0" Text="{Binding Title }" Grid.Row="1" Grid.RowSpan="3" Grid.Column="1" FontSize="16"/>
-                            <Grid Grid.Row="1" Grid.Column="3" ColumnDefinitions="Auto,Auto" ColumnSpacing="5">
-                                <Image Source="{Binding Avatar}" Grid.Column="0"/>
-                                <Label Text="{Binding Author}" Grid.Column="1"/>
-                            </Grid>
-                            <Grid Grid.Row="2" Grid.Column="3" ColumnDefinitions="Auto,Auto" ColumnSpacing="5">
-                                <Label Text="Downloads:" Grid.Column="0"/>
-                                <Label Text="{Binding Downloads}" Grid.Column="1"/>
-                            </Grid>
+                        <ffimage:CachedImage Source="{Binding AlbumArt}"
+                            LoadingPlaceholder="albumloading.png"
+                            ErrorPlaceholder="noalbumart.png"
+                            FadeAnimationForCachedImages="true"
+                            FadeAnimationDuration="5" 
+                            Grid.Row="0" Grid.Column="0" Grid.RowSpan="4"
+                            VerticalOptions="Fill" HorizontalOptions="Fill" />
+
+                        <Label Margin="10,0,0,0" Text="Artist: " Grid.Row="0" Grid.Column="1" FontSize="12"/>
+                        <Label Margin="10,0,0,0" Text="{Binding Artist }" Grid.Row="0" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14"/>
+                        <Label Margin="10,0,0,0" Text="Title: " Grid.Row="1" Grid.Column="1" FontSize="12"/>
+                        <Label Margin="10,0,0,0" Text="{Binding Title }" Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14"/>
+                        <Label Margin="10,0,0,0" Text="Album: " Grid.Row="2" Grid.Column="1" FontSize="12" />
+                        <Label Margin="10,0,0,0" Text="{Binding Album }" Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14" />
+                        <Label Margin="10,0,0,0" Text="Time: " Grid.Row="3" Grid.Column="1" FontSize="12" />
+                        <Label Margin="10,0,0,0" Text="{Binding FormattedTme }" Grid.Row="3" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14" />
+
+                        <Grid Grid.Row="1" Grid.Column="4" ColumnDefinitions="Auto,Auto" ColumnSpacing="5">
+                            <ffimage:CachedImage Source="{Binding Avatar}"
+                                 LoadingPlaceholder="profileloading.png"
+                                 ErrorPlaceholder="blankprofile.png"
+                                 FadeAnimationForCachedImages="true"
+                                 FadeAnimationDuration="5" 
+                                 Grid.Column="0" />         
+                            <Label Text="{Binding Author}" Grid.Column="1"/>
                         </Grid>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
+                        <Grid Grid.Row="2" Grid.Column="4" ColumnDefinitions="Auto,Auto" ColumnSpacing="5">
+                            <Label Text="Downloads:" Grid.Column="0" FontSize="12" />
+                            <Label Text="{Binding Downloads}" Grid.Column="1" FontSize="12" />
+                        </Grid>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
         <Grid Grid.Row="1" Grid.Column="1"
               RowDefinitions="48, *"
               ColumnDefinitions="*,*"
               Padding="5">
-            <Label Grid.Row="0" Grid.Column="0" Text="Downloads" VerticalOptions="Center" FontAttributes="Bold" FontSize="16"/>
+            <Label Grid.Row="0" Grid.Column="0" Text="Downloads" VerticalOptions="Center" FontAttributes="Bold" FontSize="14"/>
             <CollectionView x:Name="Downloads" Grid.Row="1" Grid.ColumnSpan="2" ItemsSource="{Binding Downloads}">
                 <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="services:DownloadFile">
-                    <Grid Padding="10" RowDefinitions="20, 20"
+                    <DataTemplate x:DataType="services:DownloadFile">
+                        <Grid Padding="10" RowDefinitions="20, 20"
                           ColumnDefinitions="*, 20">
 
-                        <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="0" VerticalOptions="Center" />
+                            <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="0" VerticalOptions="Center" />
                             <Image Source="checkmark.png" Grid.Row="0" Grid.Column="1" IsVisible="{Binding Finished}" />
                             <ProgressBar Progress="{Binding DownloadProgress}" Grid.Row="1" Grid.ColumnSpan="2" VerticalOptions="Center" />
-                    </Grid>
+                        </Grid>
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>

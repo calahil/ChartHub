@@ -9,6 +9,7 @@ using RhythmVerseClient.ViewModels;
 using SettingsManager;
 using Syncfusion.Maui.Core.Hosting;
 using System.Text.Json;
+using FFImageLoading.Maui;
 
 namespace RhythmVerseClient
 {
@@ -19,6 +20,7 @@ namespace RhythmVerseClient
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
+                .UseFFImageLoading()
                 .UseMauiCommunityToolkit()
                 .ConfigureFonts(fonts =>
                 {

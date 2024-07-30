@@ -64,6 +64,7 @@
 	  <None Remove="Resources\Images\clonehero.png" />
 	  <None Remove="Resources\Images\folder.png" />
 	  <None Remove="Resources\Images\noalbumart.png" />
+	  <None Remove="Resources\Images\profileloading.png" />
 	  <None Remove="Resources\Images\rar.png" />
 	  <None Remove="Resources\Images\rb.png" />
 	  <None Remove="Resources\Images\sevenzip.png" />
@@ -73,6 +74,7 @@
 	<ItemGroup>
 		<PackageReference Include="CommunityToolkit.Maui" Version="9.0.2" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+		<PackageReference Include="FFImageLoading.Maui" Version="1.2.6" />
 		<PackageReference Include="Google.Apis.Drive.v3" Version="1.68.0.3466" />
 		<PackageReference Include="HtmlAgilityPack" Version="1.11.61" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0" />

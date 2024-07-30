@@ -5,6 +5,7 @@ using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Maui.Controls;
 using RhythmVerseClient.Api;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
@@ -22,12 +23,14 @@ namespace RhythmVerseClient.ViewModels
         private string title;
         private long? downloads;
         private string author;
-        private ImageSource avatar;
-        private ImageSource albumArt;
+        private string? avatar;
+        private string? albumArt;
         private long? songLength;
         private string downloadLink;
         private string fileName;
         private long fileSize;
+        private string album;
+        private string? formattedTme;
 
         public string Artist
         {
@@ -45,6 +48,16 @@ namespace RhythmVerseClient.ViewModels
             set
             {
                 title = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string Album
+        {
+            get => album;
+            set
+            {
+                album = value;
                 OnPropertyChanged();
             }
         }
@@ -69,7 +82,7 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        public ImageSource Avatar
+        public string? Avatar
         {
             get => avatar;
             set
@@ -79,7 +92,7 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        public ImageSource AlbumArt
+        public string? AlbumArt
         {
             get => albumArt;
             set
@@ -129,6 +142,15 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        public string? FormattedTme
+        {
+            get => formattedTme;
+            set
+            {
+                formattedTme = value;
+                OnPropertyChanged();
+            }
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -296,55 +318,38 @@ namespace RhythmVerseClient.ViewModels
                 foreach (var song in response.Data.Songs)
                 {
                     var songView = new ViewSong();
-                    songView.Artist = song.Data.Artist ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
-                    songView.Title = song.Data.Title ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
-                    var image = song.Data.AlbumArt ?? song.File.AlbumArt ?? "noalbumart.png";
-                    songView.Downloads = song.Data.Downloads ?? song.File.Downloads ?? 0;
-                    songView.FileName = song.File.FileName ?? song.File.Filename ?? null;
-                    songView.SongLength = song.Data.SongLength ?? song.File.FileSongLength ?? 0;
-                    songView.FileSize = song.File.Size;
+                    songView.Artist = song.File.FileArtist ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
+                    songView.Title = song.File.FileTitle ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
+                    songView.Album = song.File.FileAlbum ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
+                    var image = song.File.AlbumArt ?? song.Data.AlbumArt;
+                    if (image != null)
+                    {
+                        if (!image.StartsWith(BaseUrl))
+                        {
+                            image = BaseUrl + image;
+                        }
+                        songView.AlbumArt = image;
+                    }                    
 
+                    songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : song.Data.Downloads;
+                    songView.FileName = song.File.FileName ?? song.File.Filename ?? "missing";
+                    songView.SongLength = (song.File.FileSongLength ?? 0) != 0 ? song.File.FileSongLength.Value : song.Data.SongLength ?? 0;
+                    songView.FileSize = song.File.Size;
+                    songView.FormattedTme = ConvertSecondstoText(songView.SongLength);
                     Author author = song.File.Author ?? new Author();
                     songView.Author = author.Name;
 
-                    if (author.AvatarPath != null)
+                    var avatarPath = author.AvatarPath;
+                    if (avatarPath != null)
                     {
-                        var avatarPath = author.AvatarPath;
                         if (!avatarPath.StartsWith("http"))
                         {
-                            author.AvatarPath = BaseUrl + avatarPath;
+                            avatarPath = BaseUrl + avatarPath;
                         }
 
-                        songView.Avatar = ImageSource.FromUri(new Uri(author.AvatarPath));
-                    }
-                    else
-                    {
-                        songView.Avatar = ImageSource.FromFile("blankprofile.png");
-                    }
-
-                    if (song.Data.AlbumArt != string.Empty && song.Data.AlbumArt != null)
-                    {
-                        var albumArt = song.Data.AlbumArt;
-                        if (!albumArt.StartsWith(BaseUrl))
-                        {
-                            albumArt = BaseUrl + albumArt;
-                        }
-                        songView.AlbumArt = ImageSource.FromUri(new Uri(albumArt));
-                    }
-                    else if(song.File.AlbumArt != string.Empty && song.File.AlbumArt != null)
-                    {
-                        var albumArt = song.File.AlbumArt;
-                        if (!albumArt.StartsWith(BaseUrl))
-                        {
-                            albumArt = BaseUrl + albumArt;
-                        }
-                        songView.AlbumArt = ImageSource.FromUri(new Uri(albumArt));
-                    }
-                    else
-                    {
-                        songView.AlbumArt = ImageSource.FromFile("noalbumart.png");
-                    }
-
+                        songView.Avatar = avatarPath;
+                    }                  
+                   
                     if (!song.File.DownloadUrl.StartsWith("http"))
                     {
                         songView.DownloadLink = BaseUrl + song.File.DownloadUrl;
@@ -377,6 +382,22 @@ namespace RhythmVerseClient.ViewModels
             }
 
             return input.ToLower();
+        }
+
+        private string ConvertSecondstoText(long? input)
+        {
+            if (input != null)
+            {
+                long? minutes = input / 60;
+                int seconds = (int)input % 60;
+
+
+                return $"{minutes}:{seconds:D2}";
+            }
+            else
+            {
+                return "00:00";
+            }
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

@@ -206,23 +206,11 @@ namespace RhythmVerseClient.Api
         */
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("album_art")]
-        public dynamic AlbumArt { get; set; }
+        public string? AlbumArt { get; set; }
     }
 
     public partial class Files
     {
-        /*       [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-               [JsonPropertyName("diff_guitar")]
-               public long? DiffGuitar { get; set; }
-
-               [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-               [JsonPropertyName("file_id")]
-               public string FileId { get; set; }
-
-               [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-               [JsonPropertyName("db_id")]
-               public long? DbId { get; set; }
-       */
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("file_name")]
         public string FileName { get; set; }
@@ -238,15 +226,19 @@ namespace RhythmVerseClient.Api
         [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
         [JsonPropertyName("size")]
         public long Size { get; set; }
-        /*
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("audio_type")]
-                public string AudioType { get; set; }
 
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("encoding")]
-                public string Encoding { get; set; }
-        */
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("file_artist")]
+        public string? FileArtist { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("file_album")]
+        public string? FileAlbum { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("file_title")]
+        public string? FileTitle { get; set; }
+
         [JsonPropertyName("external_url")]
         public Uri ExternalUrl { get; set; }
         /*
@@ -260,13 +252,13 @@ namespace RhythmVerseClient.Api
                 [JsonPropertyName("wip")]
                 public object Wip { get; set; }
 */
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("file_song_length")]
-                public long? FileSongLength { get; set; }
-/*
-                [JsonPropertyName("file_album_track_number")]
-                public long? FileAlbumTrackNumber { get; set; }
-        */
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("file_song_length")]
+        public long? FileSongLength { get; set; }
+        /*
+                        [JsonPropertyName("file_album_track_number")]
+                        public long? FileAlbumTrackNumber { get; set; }
+                */
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("filename")]
         public string Filename { get; set; }
@@ -518,7 +510,7 @@ namespace RhythmVerseClient.Api
                             case "album_art":
                                 if (reader.TokenType == JsonTokenType.False || reader.TokenType == JsonTokenType.Null)
                                 {
-                                    songData.AlbumArt = string.Empty;
+                                    songData.AlbumArt = null;
                                 }
                                 else
                                 {
