@@ -23,7 +23,7 @@ namespace RhythmVerseClient.Services
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
         }
 
-        public async Task<RootResponse> GetSongFilesAsync(int page, int recordsPerPage, string search, string sort)
+        public async Task<RootResponse> GetSongFilesAsync(int page, int recordsPerPage, string search, string sort, string order)
         {
             try
             {
@@ -42,8 +42,8 @@ namespace RhythmVerseClient.Services
                 try
                 {
                     var collection = new List<KeyValuePair<string, string>>();
-                    collection.Add(new("sort[0][sort_by]", "artist"));
-                    collection.Add(new("sort[0][sort_order]", "ASC"));
+                    collection.Add(new("sort[0][sort_by]", $"{sort}"));
+                    collection.Add(new("sort[0][sort_order]", $"{order}"));
                     collection.Add(new("data_type", "full"));
                     if (!string.IsNullOrEmpty(search))
                     {

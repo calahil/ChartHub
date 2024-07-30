@@ -13,16 +13,33 @@ public partial class RhythmVersePage : ContentPage
         InitializeComponent();
         viewModel = verseModel;
         BindingContext = viewModel;
+
+        SortPicker.ItemDisplayBinding
+        SortPicker.SelectedIndexChanged += SortPicker_SelectedIndexChanged;
+        OrderPicker.SelectedIndexChanged += OrderPicker_SelectedIndexChanged;
+    }
+
+    private void OrderPicker_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        var picker = sender as Picker;
+        if (picker != null)
+        {
+            viewModel.Filters.SelectedOrder = viewModel.Filters.SelectedFilter.Orders[picker.SelectedIndex].ToString();
+        }
+    }
+
+    private void SortPicker_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        var picker = sender as Picker;
+        if (picker != null)
+        {
+            viewModel.Filters.SelectedFilter = viewModel.Filters.Filters[picker.SelectedIndex];
+        }
     }
 
     protected async override void OnAppearing()
     {
         base.OnAppearing();
         await viewModel.LoadDataAsync();
-    }
-
-    private void Picker_SelectedIndexChanged(object sender, EventArgs e)
-    {
-        viewModel.SortDataItems();
     }
 }

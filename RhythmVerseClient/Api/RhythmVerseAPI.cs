@@ -214,11 +214,11 @@ namespace RhythmVerseClient.Api
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("file_name")]
         public string FileName { get; set; }
-        /*
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("gameformat")]
-                public string Gameformat { get; set; }
-        */
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("gameformat")]
+        public string Gameformat { get; set; }
+
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("downloads")]
         public long? Downloads { get; set; }

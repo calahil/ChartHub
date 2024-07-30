@@ -31,6 +31,7 @@ namespace RhythmVerseClient.ViewModels
         private long fileSize;
         private string album;
         private string? formattedTme;
+        private string? gameformat;
 
         public string Artist
         {
@@ -152,6 +153,142 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        public string? Gameformat
+        {
+            get => gameformat;
+            set
+            {
+                gameformat = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public class Orders(string name, string order) : INotifyPropertyChanged
+    {
+        private string order = order;
+        private string name = name;
+
+        public string Name
+        {
+            get => name;
+            set
+            {
+                name = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string Order
+        {
+            get => order;
+            set
+            {
+                order = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public class Filters : INotifyPropertyChanged
+    {
+        private ObservableCollection<Orders> orders = new ObservableCollection<Orders>();
+        private string filter;
+
+        public string Filter
+        {
+            get => filter;
+            set
+            {
+                filter = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<Orders> Orders
+        {
+            get => orders;
+            set
+            {
+                orders = value;
+                OnPropertyChanged();
+            }
+        }
+        public Filters(string filters, ObservableCollection<Orders> order)
+        {
+            filter = filters;
+            orders = order;
+        }
+
+        public override string? ToString()
+        {
+            return Filter;
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    public class FilterPicker : INotifyPropertyChanged
+    {
+        private Filters? selectedFilter;
+        private string? selectedOrder;
+        private ObservableCollection<Filters> filters = new ObservableCollection<Filters>();
+
+        public Filters? SelectedFilter
+        {
+            get => selectedFilter;
+            set
+            {
+                selectedFilter = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string? SelectedOrder 
+        { 
+            get => selectedOrder;
+            set
+            {
+                selectedOrder = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public ObservableCollection<Filters> Filters
+        {
+            get => filters;
+            set
+            {
+                filters = value;
+                OnPropertyChanged();
+            }
+        }
+        public FilterPicker(ObservableCollection<Filters> filters)
+        {
+            Filters = filters;
+            SelectedFilter = Filters.FirstOrDefault() ?? new Filters("Artist", new ObservableCollection<Orders>(){ new Orders("A-Z", "ASC"), new Orders("Z-A", "DESC") });
+            SelectedOrder = SelectedFilter.Orders[0].Order;
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -170,6 +307,9 @@ namespace RhythmVerseClient.ViewModels
         private bool _isLoading = false;
         private bool _hasMoreRecords = true;
         private const string BaseUrl = "https://rhythmverse.co";
+        private Dictionary<string, List<string>> dictionary;
+
+        public FilterPicker Filters { get; set; }
 
         private ObservableCollection<ViewSong>? _dataItems;
         public ObservableCollection<ViewSong>? DataItems
@@ -203,8 +343,7 @@ namespace RhythmVerseClient.ViewModels
                 OnPropertyChanged();
             }
         }
-        public List<string> SortFilters { get; set; } = ["Artist", "Title", "Downloads", "Song Length"];
-        public string SelectedFilter { get; set; } = "Artist";
+
         public string SearchText { get; set; } = string.Empty;
         public IAsyncRelayCommand SearchButtonCommand { get; }
         public IAsyncRelayCommand DownloadFileCommand { get; }
@@ -222,52 +361,66 @@ namespace RhythmVerseClient.ViewModels
             DownloadFileCommand = new AsyncRelayCommand(DownloadFile);
             ThresholdReachedCommand = new AsyncRelayCommand(ThresholdReached);
             downloadService = new DownloadService(configuration);
+
+            dictionary = new Dictionary<string, List<string>>
+            {
+                { "rb3", ["Rock Band 3", "rb3.png"] },
+                { "rv", ["RhythmVerse", "rv.png"] },
+                { "rb3xbox", ["Rock Band 3 Xbox 360", "rb3xbox.png"] },
+                { "rb3wii", ["Rock Band 3 Wii", "rb3wii.png"] },
+                { "rb3ps3", ["Rock Band 3 PS3", "rb3ps3.png"] },
+                { "wtde", ["Guitar Hero World Tour: Definitive Edition", "wtde.png"] },
+                { "tbrbxbox", ["The Beatles: Rock Band XBox 360", "tbrb.png"] },
+                { "tbrbps3", ["The Beatles: Rock Band PS3", "tbrb.png"] },
+                { "tbrb", ["The Beatles: Rock Band", "tbrb.png"] },
+                { "yarg", ["YARG", "yarg.png"] },
+                { "rb2xbox", ["Rock Band 2 Xbox 360", "rb2.png"] },
+                { "ps", ["Phase Shift", "ps.png"] },
+                { "chm", ["Clone Hero", "ch.png"] },
+                { "ch", ["Clone Hero", "ch.png"] },
+                { "gh3pc", ["Guitar Hero World Tour PC", "gh.png"] }
+            };
+
+            var filter = new ObservableCollection<Filters>();
+            filter.Add(new Filters("Artist", new ObservableCollection<Orders>() { new Orders("A-Z", "ASC"), new Orders("Z-A", "DESC") }));
+            filter.Add(new Filters("Title", new ObservableCollection<Orders>() { new Orders("A-Z", "ASC"), new Orders("Z-A", "DESC") }));
+            filter.Add(new Filters("Downloads", new ObservableCollection<Orders>() { new Orders("9-0", "DESC"), new Orders("0-9", "ASC") }));
+            filter.Add(new Filters("Song Length", new ObservableCollection<Orders>() { new Orders("9-0", "DESC"), new Orders("0-9", "ASC") }));
+
+            Filters = new FilterPicker(filter);
         }
 
-        public void SortDataItems()
+        /*public void SortDataItems()
         {
             if (DataItems == null || DataItems.Count == 0) return;
 
-            IOrderedEnumerable<ViewSong> sortedData;
+            IEnumerable<ViewSong> sortedData;
 
-            switch (SelectedFilter.ToLower())
+            switch (SelectedFilter.Filter.ToLower())
             {
                 case "artist":
-                    sortedData = true
-                        ? DataItems.OrderBy(s => s.Artist)
-                        : DataItems.OrderByDescending(s => s.Artist);
+                    sortedData = DataItems.OrderBy(s => s.Artist).ToList(); // Force execution here
                     break;
-
                 case "title":
-                    sortedData = true
-                        ? DataItems.OrderBy(s => s.Title)
-                        : DataItems.OrderByDescending(s => s.Title);
+                    sortedData = DataItems.OrderBy(s => s.Title).ToList(); // Force execution here
                     break;
-
                 case "downloads":
-                    sortedData = true
-                        ? DataItems.OrderBy(s => s.Downloads ?? 0)
-                        : DataItems.OrderByDescending(s => s.Downloads ?? 0);
+                    sortedData = DataItems.OrderBy(s => s.Downloads ?? 0).ToList(); // Force execution here
                     break;
-
                 case "songlength":
-                    sortedData = true
-                        ? DataItems.OrderBy(s => s.SongLength ?? 0)
-                        : DataItems.OrderByDescending(s => s.SongLength ?? 0);
+                    sortedData = DataItems.OrderBy(s => s.SongLength ?? 0).ToList(); // Force execution here
                     break;
-
                 default:
-                    sortedData = DataItems.OrderBy(s => s.Title); // Default sort
+                    sortedData = DataItems.OrderBy(s => s.Title).ToList(); // Default sort and force execution
                     break;
             }
 
-            // Clear and repopulate the collection with the sorted data
             DataItems.Clear();
             foreach (var song in sortedData)
             {
                 DataItems.Add(song);
             }
-        }
+        }*/
 
         public async Task SearchButton()
         {
@@ -296,7 +449,7 @@ namespace RhythmVerseClient.ViewModels
 
         public async Task ThresholdReached()
         {
-            await LoadDataAsync();
+            //await LoadDataAsync();
         }
 
         public async Task LoadDataAsync()
@@ -307,13 +460,15 @@ namespace RhythmVerseClient.ViewModels
 
             if (!_hasMoreRecords) return;
 
-            var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage, ConvertSpacesToPlus(SearchText), SelectedFilter.ToLower());
+            var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage, SearchText.ToLower(), ConvertSpacesToEmpty(Filters.SelectedFilter.Filter), Filters.SelectedOrder);
 
 
             if (response != null && response.Data != null)
             {
                 if (DataItems == null)
                     DataItems = [];
+                else
+                    DataItems.Clear();
 
                 foreach (var song in response.Data.Songs)
                 {
@@ -329,7 +484,7 @@ namespace RhythmVerseClient.ViewModels
                             image = BaseUrl + image;
                         }
                         songView.AlbumArt = image;
-                    }                    
+                    }
 
                     songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : song.Data.Downloads;
                     songView.FileName = song.File.FileName ?? song.File.Filename ?? "missing";
@@ -348,8 +503,8 @@ namespace RhythmVerseClient.ViewModels
                         }
 
                         songView.Avatar = avatarPath;
-                    }                  
-                   
+                    }
+
                     if (!song.File.DownloadUrl.StartsWith("http"))
                     {
                         songView.DownloadLink = BaseUrl + song.File.DownloadUrl;
@@ -357,6 +512,11 @@ namespace RhythmVerseClient.ViewModels
                     else
                     {
                         songView.DownloadLink = song.File.DownloadUrl;
+                    }
+
+                    if (dictionary.TryGetValue(song.File.Gameformat, out List<string> value))
+                    {
+                        songView.Gameformat = value[1];
                     }
 
                     if (!DataItems.Contains(songView))
@@ -374,14 +534,13 @@ namespace RhythmVerseClient.ViewModels
             _isLoading = false;
         }
 
-        private string ConvertSpacesToPlus(string input)
+        private string ConvertSpacesToEmpty(string input)
         {
             if (string.IsNullOrEmpty(input))
             {
                 return input;
             }
-
-            return input.ToLower();
+            return input.Replace(" ", "").ToLower();
         }
 
         private string ConvertSecondstoText(long? input)
