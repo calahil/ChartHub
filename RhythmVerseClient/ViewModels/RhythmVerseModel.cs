@@ -170,146 +170,111 @@ namespace RhythmVerseClient.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
-
-    public class Orders(string name, string order) : INotifyPropertyChanged
-    {
-        private string order = order;
-        private string name = name;
-
-        public string Name
-        {
-            get => name;
-            set
-            {
-                name = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string Order
-        {
-            get => order;
-            set
-            {
-                order = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-    }
-
-    public class Filters : INotifyPropertyChanged
-    {
-        private ObservableCollection<Orders> orders = new ObservableCollection<Orders>();
-        private string filter;
-
-        public string Filter
-        {
-            get => filter;
-            set
-            {
-                filter = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public ObservableCollection<Orders> Orders
-        {
-            get => orders;
-            set
-            {
-                orders = value;
-                OnPropertyChanged();
-            }
-        }
-        public Filters(string filters, ObservableCollection<Orders> order)
-        {
-            filter = filters;
-            orders = order;
-        }
-
-        public override string? ToString()
-        {
-            return Filter;
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-    }
-
-    public class FilterPicker : INotifyPropertyChanged
-    {
-        private Filters? selectedFilter;
-        private string? selectedOrder;
-        private ObservableCollection<Filters> filters = new ObservableCollection<Filters>();
-
-        public Filters? SelectedFilter
-        {
-            get => selectedFilter;
-            set
-            {
-                selectedFilter = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public string? SelectedOrder 
-        { 
-            get => selectedOrder;
-            set
-            {
-                selectedOrder = value;
-                OnPropertyChanged();
-            }
-        }
-
-        public ObservableCollection<Filters> Filters
-        {
-            get => filters;
-            set
-            {
-                filters = value;
-                OnPropertyChanged();
-            }
-        }
-        public FilterPicker(ObservableCollection<Filters> filters)
-        {
-            Filters = filters;
-            SelectedFilter = Filters.FirstOrDefault() ?? new Filters("Artist", new ObservableCollection<Orders>(){ new Orders("A-Z", "ASC"), new Orders("Z-A", "DESC") });
-            SelectedOrder = SelectedFilter.Orders[0].Order;
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-    }
-
+     
     public class RhythmVerseModel : INotifyPropertyChanged
     {
         private readonly AppGlobalSettings globalSettings;
         private RhythmVerseApiClient apiClient;
         private DownloadService downloadService;
-        private int _currentPage = 1;
-        private const int RecordsPerPage = 25;
-        private bool _isLoading = false;
+        private long? RecordsPerPage = 25;
         private bool _hasMoreRecords = true;
         private const string BaseUrl = "https://rhythmverse.co";
         private Dictionary<string, List<string>> dictionary;
 
-        public FilterPicker Filters { get; set; }
+        public List<string> Filters { get; } = new List<string> { "Artist", "Downloads", "Song Length", "Title" };
+        public List<string> Orders { get; } = new List<string> { "Ascending", "Descending" };
+
+        private long? _totalPages;
+        public long? TotalPages
+        {
+            get => _totalPages;
+            set
+            {
+                _totalPages = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private long? _totalResults;
+        public long? TotalResults
+        {
+            get => _totalResults;
+            set
+            {
+                _totalResults = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private long? _currentPage;
+        public long? CurrentPage
+        {
+            get => _currentPage;
+            set
+            {
+                _currentPage = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private long? _startRecord;
+        public long? StartRecord
+        {
+            get => _startRecord;
+            set
+            {
+                _startRecord = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private long? _endRecord;
+        public long? EndRecord
+        {
+            get => _endRecord;
+            set
+            {
+                _endRecord = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public bool IsPlaceholder
+        {
+            get => isPlaceholder;
+            set
+            {
+                isPlaceholder = value;
+                OnPropertyChanged();
+            }
+        }
+        private string _selectedFilter;
+        public string SelectedFilter
+        {
+            get => _selectedFilter;
+            set
+            {
+                if (_selectedFilter != value)
+                {
+                    _selectedFilter = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private string _selectedOrder;
+        public string SelectedOrder
+        {
+            get => _selectedOrder;
+            set
+            {
+                if (_selectedOrder != value)
+                {
+                    _selectedOrder = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
 
         private ObservableCollection<ViewSong>? _dataItems;
         public ObservableCollection<ViewSong>? DataItems
@@ -344,6 +309,19 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        private bool _isLoading = false;
+        private bool isPlaceholder;
+
+        public bool IsLoading
+        {
+            get => _isLoading;
+            set
+            {
+                _isLoading = value;
+                OnPropertyChanged();
+            }
+        }
+
         public string SearchText { get; set; } = string.Empty;
         public IAsyncRelayCommand SearchButtonCommand { get; }
         public IAsyncRelayCommand DownloadFileCommand { get; }
@@ -357,6 +335,10 @@ namespace RhythmVerseClient.ViewModels
             apiClient = new RhythmVerseApiClient(configuration);
             _dataItems = [];
             _downloads = [];
+            _selectedFilter = "Artist";
+            _selectedOrder = "Ascending";
+            _currentPage = 1;
+            IsPlaceholder = true;
             SearchButtonCommand = new AsyncRelayCommand(SearchButton);
             DownloadFileCommand = new AsyncRelayCommand(DownloadFile);
             ThresholdReachedCommand = new AsyncRelayCommand(ThresholdReached);
@@ -380,14 +362,6 @@ namespace RhythmVerseClient.ViewModels
                 { "ch", ["Clone Hero", "ch.png"] },
                 { "gh3pc", ["Guitar Hero World Tour PC", "gh.png"] }
             };
-
-            var filter = new ObservableCollection<Filters>();
-            filter.Add(new Filters("Artist", new ObservableCollection<Orders>() { new Orders("A-Z", "ASC"), new Orders("Z-A", "DESC") }));
-            filter.Add(new Filters("Title", new ObservableCollection<Orders>() { new Orders("A-Z", "ASC"), new Orders("Z-A", "DESC") }));
-            filter.Add(new Filters("Downloads", new ObservableCollection<Orders>() { new Orders("9-0", "DESC"), new Orders("0-9", "ASC") }));
-            filter.Add(new Filters("Song Length", new ObservableCollection<Orders>() { new Orders("9-0", "DESC"), new Orders("0-9", "ASC") }));
-
-            Filters = new FilterPicker(filter);
         }
 
         /*public void SortDataItems()
@@ -429,7 +403,8 @@ namespace RhythmVerseClient.ViewModels
                 DataItems.Clear();
             }
             _currentPage = 1;
-            _isLoading = false;
+            IsLoading = false;
+            IsPlaceholder = true;
             _hasMoreRecords = true;
             await LoadDataAsync();
         }
@@ -444,7 +419,7 @@ namespace RhythmVerseClient.ViewModels
             Downloads.Add(downloadFile);
             await downloadService.DownloadFileAsync(downloadFile);
 
-            System.IO.File.Move(Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName), Toolbox.ConstructPath(globalSettings.DownloadDir, downloadFile.DisplayName));
+            File.Move(Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName), Toolbox.ConstructPath(globalSettings.DownloadDir, downloadFile.DisplayName));
         }
 
         public async Task ThresholdReached()
@@ -454,22 +429,45 @@ namespace RhythmVerseClient.ViewModels
 
         public async Task LoadDataAsync()
         {
-            if (_isLoading) return;
+            if (IsLoading) return;
 
-            _isLoading = true;
+            IsLoading = true;
 
             if (!_hasMoreRecords) return;
 
-            var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage, SearchText.ToLower(), ConvertSpacesToEmpty(Filters.SelectedFilter.Filter), Filters.SelectedOrder);
+
+            if (string.IsNullOrEmpty(SelectedFilter) || string.IsNullOrEmpty(SelectedOrder))
+            {
+                SelectedFilter = "Artist";
+                SelectedOrder = "Ascending";
+            }
+            var filter = ConvertFilter(SelectedFilter);
+            var order = GetSortOrder(filter, SelectedOrder);
+
+            var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage, SearchText.ToLower(), filter, order);
 
 
             if (response != null && response.Data != null)
             {
+                if (response.Data.Records.TotalFiltered != null)
+                {
+
+                    TotalResults = response.Data.Records.TotalFiltered;
+                    TotalPages = TotalResults / RecordsPerPage;
+                    if ((TotalResults % RecordsPerPage) > 0)
+                        TotalPages++;
+                }
+
+                if (response.Data.Pagination.Start + 1 > 0)
+                {
+                    StartRecord = response.Data.Pagination.Start + 1;
+                    EndRecord = StartRecord + RecordsPerPage - 1;
+                }
+
                 if (DataItems == null)
                     DataItems = [];
                 else
                     DataItems.Clear();
-
                 foreach (var song in response.Data.Songs)
                 {
                     var songView = new ViewSong();
@@ -524,23 +522,23 @@ namespace RhythmVerseClient.ViewModels
                         DataItems.Add(songView);
                     }
                 }
-                _currentPage++;
             }
             else
             {
                 _hasMoreRecords = false;
             }
 
-            _isLoading = false;
+            IsLoading = false;
+            IsPlaceholder = false;
         }
 
-        private string ConvertSpacesToEmpty(string input)
+        private string ConvertFilter(string input)
         {
             if (string.IsNullOrEmpty(input))
             {
                 return input;
             }
-            return input.Replace(" ", "").ToLower();
+            return input.Replace("Song ", "").ToLower();
         }
 
         private string ConvertSecondstoText(long? input)
@@ -556,6 +554,22 @@ namespace RhythmVerseClient.ViewModels
             else
             {
                 return "00:00";
+            }
+        }
+
+        private string GetSortOrder(string filter, string order)
+        {             
+            bool isStringField = filter.Equals("Artist", StringComparison.OrdinalIgnoreCase) ||
+                                 filter.Equals("Title", StringComparison.OrdinalIgnoreCase);
+
+            // Adjust order based on the type of data
+            if (isStringField)
+            {
+                return order == "Ascending" ? "ASC" : "DESC";
+            }
+            else // Assume numerical data for other fields
+            {
+                return order == "Ascending" ? "DESC" : "ASC";
             }
         }
 

@@ -11,30 +11,50 @@
              x:DataType="models:RhythmVerseModel"
              Title="{Binding PageStrings.Title}">
 
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <util:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+    
     <Grid RowDefinitions="48,*"
           ColumnDefinitions="3*, *">
         <!-- DataGrid for List Items -->
         <Grid Grid.Row="0" 
-              ColumnDefinitions="*, *, *, *"
+              ColumnDefinitions="*,64,56,42,8,42,128,*,*,42,8,42"
               ColumnSpacing="5">
             <SearchBar Grid.Column="0" Placeholder="search text..." Text="{Binding SearchText}" SearchCommand="{Binding SearchButtonCommand}"/>
-            
-            <Stepper Minimum="0" Maximum="10" Increment="1" Grid.Column="3"/>
+
+            <Stepper Minimum="1" Maximum="{Binding TotalPages}" Increment="1" Grid.Column="1" ValueChanged="Stepper_ValueChanged" Value="{Binding CurrentPage}"/>
+
+            <Label Grid.Column="2" Text="| Pages:" HorizontalOptions="End" />
+            <Label Grid.Column="3" Text="{Binding CurrentPage}" HorizontalOptions="End" />
+            <Label Grid.Column="4" Text="/" HorizontalOptions="Center"/>
+            <Label Grid.Column="5" Text="{Binding TotalPages}" HorizontalOptions="Start" />
+            <Label Grid.Column="6" Text="| Total Results:" HorizontalOptions="End" />
+            <Label Grid.Column="7" Text="{Binding TotalResults}" HorizontalOptions="Start" />
+            <Label Grid.Column="8" Text="| Results:" HorizontalOptions="End" />
+            <Label Grid.Column="9" Text="{Binding StartRecord}" HorizontalOptions="End" />
+            <Label Grid.Column="10" Text="-" HorizontalOptions="Center"/>
+            <Label Grid.Column="11" Text="{Binding EndRecord}" HorizontalOptions="Start" />
         </Grid>
-        <CollectionView x:Name="SongList" Grid.Row="1" Grid.Column="0"
+        <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="*, *, *, *" >
+
+            <CollectionView x:Name="SongList" Grid.RowSpan="4"
                             ItemsSource="{Binding DataItems }" 
                             RemainingItemsThreshold="1" 
                             RemainingItemsThresholdReachedCommand="{Binding ThresholdReachedCommand}"
                             SelectionChangedCommand="{Binding DownloadFileCommand}"
                             SelectionMode="Single" 
                             ItemsUpdatingScrollMode="KeepScrollOffset"
-                            SelectedItem="{Binding SelectedFile}" Visual="">
-            <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="models:ViewSong">
-                    <Grid RowDefinitions="32, 32, 32, 32"
+                            SelectedItem="{Binding SelectedFile}"
+                            IsVisible="{Binding IsPlaceholder, Converter={StaticResource InverseBooleanConverter}}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:ViewSong">
+                        <Grid RowDefinitions="32, 32, 32, 32"
                               ColumnDefinitions="128, Auto, *, *, *"
                               Padding="5">
-                        <ffimage:CachedImage Source="{Binding AlbumArt}"
+                            <ffimage:CachedImage Source="{Binding AlbumArt}"
                             LoadingPlaceholder="albumloading.png"
                             ErrorPlaceholder="noalbumart.png"
                             FadeAnimationForCachedImages="true"
@@ -42,43 +62,52 @@
                             Grid.Row="0" Grid.Column="0" Grid.RowSpan="4"
                             VerticalOptions="Fill" HorizontalOptions="Fill" />
 
-                        <Label Margin="10,0,0,0" Text="Artist: " Grid.Row="0" Grid.Column="1" FontSize="12"/>
-                        <Label Margin="10,0,0,0" Text="{Binding Artist }" Grid.Row="0" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14"/>
-                        <Label Margin="10,0,0,0" Text="Title: " Grid.Row="1" Grid.Column="1" FontSize="12"/>
-                        <Label Margin="10,0,0,0" Text="{Binding Title }" Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14"/>
-                        <Label Margin="10,0,0,0" Text="Album: " Grid.Row="2" Grid.Column="1" FontSize="12" />
-                        <Label Margin="10,0,0,0" Text="{Binding Album }" Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14" />
-                        <Label Margin="10,0,0,0" Text="Time: " Grid.Row="3" Grid.Column="1" FontSize="12" />
-                        <Label Margin="10,0,0,0" Text="{Binding FormattedTme }" Grid.Row="3" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14" />
+                            <Label Margin="10,0,0,0" Text="Artist: " Grid.Row="0" Grid.Column="1" FontSize="12"/>
+                            <Label Margin="10,0,0,0" Text="{Binding Artist }" Grid.Row="0" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14"/>
+                            <Label Margin="10,0,0,0" Text="Title: " Grid.Row="1" Grid.Column="1" FontSize="12"/>
+                            <Label Margin="10,0,0,0" Text="{Binding Title }" Grid.Row="1" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14"/>
+                            <Label Margin="10,0,0,0" Text="Album: " Grid.Row="2" Grid.Column="1" FontSize="12" />
+                            <Label Margin="10,0,0,0" Text="{Binding Album }" Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14" />
+                            <Label Margin="10,0,0,0" Text="Time: " Grid.Row="3" Grid.Column="1" FontSize="12" />
+                            <Label Margin="10,0,0,0" Text="{Binding FormattedTme }" Grid.Row="3" Grid.ColumnSpan="2" Grid.Column="2" FontSize="14" />
 
-                        <Grid Grid.Row="0" Grid.Column="4" Grid.RowSpan="4" ColumnDefinitions="32,32,32,32" 
+                            <Grid Grid.Row="0" Grid.Column="4" Grid.RowSpan="4" ColumnDefinitions="32,32,32,32" 
                               RowDefinitions="32, 32, 50, 14" ColumnSpacing="5" >
-                            <ffimage:CachedImage Source="{Binding Avatar}"
+                                <ffimage:CachedImage Source="{Binding Avatar}"
                                                 LoadingPlaceholder="profileloading.png"
                                                 ErrorPlaceholder="blankprofile.png"
                                                 FadeAnimationForCachedImages="true"
                                                 FadeAnimationDuration="5" 
                                                 Grid.Column="0" 
                                                 Grid.Row="0" />
-                            <Label Text="{Binding Author}" Grid.Column="1" Grid.Row="0" Grid.ColumnSpan="3" />
+                                <Label Text="{Binding Author}" Grid.Column="1" Grid.Row="0" Grid.ColumnSpan="3" />
 
-                            <Label Text="Downloads:" Grid.Column="0" Grid.Row="1" FontSize="12" Grid.ColumnSpan="2" />
-                            <Label Text="{Binding Downloads}" Grid.Column="2" Grid.Row="1" FontSize="12" Grid.ColumnSpan="2" />
-                            <ImageButton Source="{Binding Gameformat}" Grid.Row="2" Grid.ColumnSpan="4" Grid.RowSpan="1" Aspect="Center" />
+                                <Label Text="Downloads:" Grid.Column="0" Grid.Row="1" FontSize="12" Grid.ColumnSpan="2" />
+                                <Label Text="{Binding Downloads}" Grid.Column="2" Grid.Row="1" FontSize="12" Grid.ColumnSpan="2" />
+                                <ImageButton Source="{Binding Gameformat}" Grid.Row="2" Grid.ColumnSpan="4" Grid.RowSpan="1" Aspect="Center" />
+                            </Grid>
                         </Grid>
-                    </Grid>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+            <Grid Grid.RowSpan="4"
+                  RowDefinitions="*,*,*,*"  
+                  IsVisible="{Binding IsPlaceholder}">
+                <ActivityIndicator Grid.Row="1" IsRunning="true" VerticalOptions="End" HorizontalOptions="Center" />
+                <Label  Grid.Row="2" Grid.ColumnSpan="2" Text="Loading..." VerticalOptions="Start" HorizontalOptions="Center"/>
+            </Grid>
+        </Grid>
         <Grid Grid.Row="1" Grid.Column="1"
               RowDefinitions="64, 64, 48, *"
               ColumnDefinitions="*,*"
               Padding="5">
 
-            <Picker Grid.Row="0" Grid.Column="0" ItemsSource="{Binding Filters.Filters }"  ItemDisplayBinding="{Binding Filters.Filters}"
-                                    x:Name="SortPicker" Title="Sort By" />
-            <Picker Grid.Row="1" Grid.Column="0" ItemsSource="{Binding Filters.SelectedFilter.Orders}" SelectedItem="{Binding Filters.SelectedOrder}"  
+            <Picker Grid.Row="0" Grid.Column="0" ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" 
+                        x:Name="SortPicker" Title="Sort By" />
+            <Picker Grid.Row="1" Grid.Column="0" ItemsSource="{Binding Orders}" SelectedItem="{Binding SelectedOrder}"  
                          x:Name="OrderPicker" Title="Order By" />
+            <Button Grid.Row="1" Grid.Column="1" HeightRequest="32" VerticalOptions="Start" Text="Apply Filter"
+                    Command="{Binding SearchButtonCommand}"/>
             <Label Grid.Row="2" Grid.Column="0" Text="Downloads" VerticalOptions="Center" FontAttributes="Bold" FontSize="14"/>
             <CollectionView x:Name="Downloads" Grid.Row="3" Grid.ColumnSpan="2" ItemsSource="{Binding Downloads}">
                 <CollectionView.ItemTemplate>

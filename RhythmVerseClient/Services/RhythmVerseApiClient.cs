@@ -23,7 +23,7 @@ namespace RhythmVerseClient.Services
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
         }
 
-        public async Task<RootResponse> GetSongFilesAsync(int page, int recordsPerPage, string search, string sort, string order)
+        public async Task<RootResponse> GetSongFilesAsync(long? page, long? recordsPerPage, string search, string sort, string order)
         {
             try
             {

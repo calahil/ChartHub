@@ -4,6 +4,7 @@ using SharpCompress.Archives;
 using SharpCompress.Archives.Rar;
 using SharpCompress.Archives.SevenZip;
 using SharpCompress.Archives.Zip;
+using System.Globalization;
 using Windows.Storage;
 
 namespace RhythmVerseClient.Utilities
@@ -41,8 +42,30 @@ namespace RhythmVerseClient.Utilities
         }
     }
 
+    public class InverseBooleanConverter : IValueConverter
+    {
+        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool booleanValue)
+            {
+                return !booleanValue;
+            }
+            return false;
+        }
+
+        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        {
+            if (value is bool booleanValue)
+            {
+                return !booleanValue;
+            }
+            return false;
+        }
+    }
+
     public static class Toolbox
     {
+
         public static string ConvertFileSize(long sizeBytes)
         {
             string[] sizeSuffixes = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
