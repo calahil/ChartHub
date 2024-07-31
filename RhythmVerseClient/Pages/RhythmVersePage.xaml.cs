@@ -26,4 +26,13 @@ public partial class RhythmVersePage : ContentPage
         viewModel.IsPlaceholder = true;
         await viewModel.LoadDataAsync();
     }
+
+    private async void ImageButton_Clicked(object sender, EventArgs e)
+    {
+        var button = (Button)sender;
+        var parent = button.Parent;
+        viewModel.SelectedFile = button.Parent.BindingContext as ViewSong;
+
+        await viewModel.DownloadFile();
+    }
 }

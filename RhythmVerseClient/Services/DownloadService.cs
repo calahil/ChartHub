@@ -37,17 +37,17 @@ namespace RhythmVerseClient.Services
             {
                 string finalUrl = await _urlHelper.GetFinalRedirectUrlAsync(song.Url);
                 song.Url = finalUrl;
-                if (finalUrl.StartsWith("https://drive.google.com/drive"))
+                if (song.Url.StartsWith("https://drive.google.com/drive"))
                 {
                     var fileId = UrlExtractor.ExtractIdFromUrl(song.Url);
                     await _googleDriveService.DownloadFolderAsync(song, _progress, fileId);
                 }
-                else if (finalUrl.StartsWith("https://drive.google.com/file"))
+                else if (song.Url.StartsWith("https://drive.google.com/file"))
                 {
                     var fileId = UrlExtractor.ExtractIdFromUrl(song.Url);
                     await _googleDriveService.DownloadFileAsync(song, _progress, fileId);
                 }
-                else if (finalUrl.StartsWith("https://www.mediafire.com"))
+                else if (song.Url.StartsWith("https://www.mediafire.com") || song.Url.StartsWith("http://www.mediafire.com"))
                 {
                     HttpResponseMessage response = await _httpClient.GetAsync(finalUrl);
                     response.EnsureSuccessStatusCode();
@@ -77,7 +77,10 @@ namespace RhythmVerseClient.Services
                 {
                     await DownloadAsync(song);
                 }
+                if (song.DownloadProgress != 100)
+                    song.DownloadProgress = 100;
                 song.Finished = true;
+                
             }
             catch (Exception ex)
             {
@@ -337,14 +340,26 @@ namespace RhythmVerseClient.Services
 
             do
             {
-                using (var response = await _httpClient.GetAsync(finalUrl))
+                using (var request = new HttpRequestMessage(HttpMethod.Head, finalUrl))
                 {
-                    isRedirect = (int)response.StatusCode >= 300 && (int)response.StatusCode < 400;
-                    if (isRedirect)
+                    using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
                     {
-                        finalUrl = response.Headers.Location.IsAbsoluteUri
-                            ? response.Headers.Location.AbsoluteUri
-                            : new Uri(new Uri(finalUrl), response.Headers.Location).AbsoluteUri;
+                        isRedirect = (int)response.StatusCode >= 300 && (int)response.StatusCode < 400;
+
+                        if (isRedirect)
+                        {
+                            finalUrl = response.Headers.Location.IsAbsoluteUri
+                                ? response.Headers.Location.AbsoluteUri
+                                : new Uri(new Uri(finalUrl), response.Headers.Location).AbsoluteUri;
+                        }
+                        else if ((int)response.StatusCode == 200)
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            throw new HttpRequestException($"Unexpected response status code: {response.StatusCode}");
+                        }
                     }
                 }
             } while (isRedirect);

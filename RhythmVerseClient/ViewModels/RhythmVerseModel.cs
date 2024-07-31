@@ -170,7 +170,15 @@ namespace RhythmVerseClient.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
-     
+
+    public class InstrumentItem
+    {
+        public string DisplayName { get; set; }
+        public string Value { get; set; }
+    }
+
+
+
     public class RhythmVerseModel : INotifyPropertyChanged
     {
         private readonly AppGlobalSettings globalSettings;
@@ -183,6 +191,19 @@ namespace RhythmVerseClient.ViewModels
 
         public List<string> Filters { get; } = new List<string> { "Artist", "Downloads", "Song Length", "Title" };
         public List<string> Orders { get; } = new List<string> { "Ascending", "Descending" };
+
+        public ObservableCollection<InstrumentItem> Instruments { get; set; }
+
+        private InstrumentItem _selectedInstrument;
+        public InstrumentItem SelectedInstrument
+        {
+            get => _selectedInstrument;
+            set
+            {
+                _selectedInstrument = value;
+                OnPropertyChanged();
+            }
+        }
 
         private long? _totalPages;
         public long? TotalPages
@@ -362,6 +383,25 @@ namespace RhythmVerseClient.ViewModels
                 { "ch", ["Clone Hero", "ch.png"] },
                 { "gh3pc", ["Guitar Hero World Tour PC", "gh.png"] }
             };
+            Instruments =
+            [
+                new InstrumentItem { DisplayName = "None", Value = string.Empty },
+                new InstrumentItem { DisplayName = "Bass", Value = "bass" },
+                new InstrumentItem { DisplayName = "Bass (GHL 6 Fret)", Value = "bassghl" },
+                new InstrumentItem { DisplayName = "Drums", Value = "drums" },
+                new InstrumentItem { DisplayName = "Guitar", Value = "guitar" },
+                new InstrumentItem { DisplayName = "Guitar (GHL 6 Fret)", Value = "guitarghl" },
+                new InstrumentItem { DisplayName = "Keys", Value = "keys" },
+                new InstrumentItem { DisplayName = "Pro Keys", Value = "prokeys" },
+                new InstrumentItem { DisplayName = "Vocals", Value = "vocals" },
+                new InstrumentItem { DisplayName = "Guitar Co-Op", Value = "guitar_coop" },
+                new InstrumentItem { DisplayName = "Co-op (Unspecified)", Value = "guitarcoop" },
+                new InstrumentItem { DisplayName = "Pro Bass", Value = "probass" },
+                new InstrumentItem { DisplayName = "Real Drums", Value = "prodrums" },
+                new InstrumentItem { DisplayName = "Pro Guitar", Value = "proguitar" },
+                new InstrumentItem { DisplayName = "Rhythm Guitar", Value = "rhythm" },
+            ];
+            SelectedInstrument = Instruments[0];
         }
 
         /*public void SortDataItems()
@@ -402,7 +442,7 @@ namespace RhythmVerseClient.ViewModels
             {
                 DataItems.Clear();
             }
-            _currentPage = 1;
+            CurrentPage = 1;
             IsLoading = false;
             IsPlaceholder = true;
             _hasMoreRecords = true;
@@ -419,7 +459,7 @@ namespace RhythmVerseClient.ViewModels
             Downloads.Add(downloadFile);
             await downloadService.DownloadFileAsync(downloadFile);
 
-            File.Move(Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName), Toolbox.ConstructPath(globalSettings.DownloadDir, downloadFile.DisplayName));
+            File.Move(Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName), Toolbox.ConstructPath(globalSettings.DownloadDir, downloadFile.DisplayName), true);
         }
 
         public async Task ThresholdReached()
@@ -443,8 +483,8 @@ namespace RhythmVerseClient.ViewModels
             }
             var filter = ConvertFilter(SelectedFilter);
             var order = GetSortOrder(filter, SelectedOrder);
-
-            var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage, SearchText.ToLower(), filter, order);
+            var instrument = SelectedInstrument.Value ?? string.Empty;
+            var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage, SearchText.ToLower(), filter, order, instrument);
 
 
             if (response != null && response.Data != null)
@@ -470,61 +510,69 @@ namespace RhythmVerseClient.ViewModels
                     DataItems.Clear();
                 foreach (var song in response.Data.Songs)
                 {
-                    var songView = new ViewSong();
-                    songView.Artist = song.File.FileArtist ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
-                    songView.Title = song.File.FileTitle ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
-                    songView.Album = song.File.FileAlbum ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
-                    var image = song.File.AlbumArt ?? song.Data.AlbumArt;
-                    if (image != null)
+                    if (!song.File.DownloadUrl.StartsWith("http://marketplace.xbox.com") && !song.File.DownloadUrl.StartsWith("none"))
                     {
-                        if (!image.StartsWith(BaseUrl))
+                        var songView = new ViewSong();
+                        songView.Artist = song.File.FileArtist ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
+                        songView.Title = song.File.FileTitle ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
+                        songView.Album = song.File.FileAlbum ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
+                        var image = song.File.AlbumArt ?? song.Data.AlbumArt;
+                        if (image != null)
                         {
-                            image = BaseUrl + image;
-                        }
-                        songView.AlbumArt = image;
-                    }
-
-                    songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : song.Data.Downloads;
-                    songView.FileName = song.File.FileName ?? song.File.Filename ?? "missing";
-                    songView.SongLength = (song.File.FileSongLength ?? 0) != 0 ? song.File.FileSongLength.Value : song.Data.SongLength ?? 0;
-                    songView.FileSize = song.File.Size;
-                    songView.FormattedTme = ConvertSecondstoText(songView.SongLength);
-                    Author author = song.File.Author ?? new Author();
-                    songView.Author = author.Name;
-
-                    var avatarPath = author.AvatarPath;
-                    if (avatarPath != null)
-                    {
-                        if (!avatarPath.StartsWith("http"))
-                        {
-                            avatarPath = BaseUrl + avatarPath;
+                            if (!image.StartsWith(BaseUrl))
+                            {
+                                image = BaseUrl + image;
+                            }
+                            songView.AlbumArt = image;
                         }
 
-                        songView.Avatar = avatarPath;
-                    }
+                        songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : song.Data.Downloads;
+                        songView.FileName = song.File.FileName ?? song.File.Filename ?? "missing";
+                        songView.SongLength = (song.File.FileSongLength ?? 0) != 0 ? song.File.FileSongLength.Value : song.Data.SongLength ?? 0;
+                        songView.FileSize = song.File.Size;
+                        songView.FormattedTme = ConvertSecondstoText(songView.SongLength);
+                        Author author = song.File.Author ?? new Author();
+                        songView.Author = author.Name;
 
-                    if (!song.File.DownloadUrl.StartsWith("http"))
-                    {
-                        songView.DownloadLink = BaseUrl + song.File.DownloadUrl;
-                    }
-                    else
-                    {
-                        songView.DownloadLink = song.File.DownloadUrl;
-                    }
+                        var avatarPath = author.AvatarPath;
+                        if (avatarPath != null)
+                        {
+                            if (!avatarPath.StartsWith("http"))
+                            {
+                                avatarPath = BaseUrl + avatarPath;
+                            }
 
-                    if (dictionary.TryGetValue(song.File.Gameformat, out List<string> value))
-                    {
-                        songView.Gameformat = value[1];
-                    }
+                            songView.Avatar = avatarPath;
+                        }
+                        else
+                        {
+                            songView.Avatar = "blankprofile.png";
+                        }
 
-                    if (!DataItems.Contains(songView))
-                    {
-                        DataItems.Add(songView);
+                        if (!song.File.DownloadUrl.StartsWith("http"))
+                        {
+                            songView.DownloadLink = BaseUrl + song.File.DownloadUrl;
+                        }
+                        else
+                        {
+                            songView.DownloadLink = song.File.DownloadUrl;
+                        }
+
+                        if (dictionary.TryGetValue(song.File.Gameformat, out List<string> value))
+                        {
+                            songView.Gameformat = value[1];
+                        }
+
+                        if (!DataItems.Contains(songView))
+                        {
+                            DataItems.Add(songView);
+                        }
                     }
                 }
             }
             else
             {
+
                 _hasMoreRecords = false;
             }
 
@@ -558,7 +606,7 @@ namespace RhythmVerseClient.ViewModels
         }
 
         private string GetSortOrder(string filter, string order)
-        {             
+        {
             bool isStringField = filter.Equals("Artist", StringComparison.OrdinalIgnoreCase) ||
                                  filter.Equals("Title", StringComparison.OrdinalIgnoreCase);
 
