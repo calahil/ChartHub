@@ -1,4 +1,5 @@
 using RhythmVerseClient.ViewModels;
+using WinRT;
 
 namespace RhythmVerseClient.Pages;
 
@@ -34,5 +35,31 @@ public partial class RhythmVersePage : ContentPage
         viewModel.SelectedFile = button.Parent.BindingContext as ViewSong;
 
         await viewModel.DownloadFile();
+    }
+
+    private void InstrumentPicker_SelectedIndexChanged(object sender, EventArgs e)
+    {
+        var picker = sender as Picker;
+        if (picker != null)
+        {
+            var instrument = picker.ItemsSource[picker.SelectedIndex];
+            var none = picker.ItemsSource[0];
+
+            if (instrument != null)
+            {
+                if (!viewModel.SelectedInstruments.Contains(instrument))
+                {
+                    viewModel.SelectedInstruments.Add(instrument as InstrumentItem);
+
+                    if (viewModel.SelectedInstruments.Contains(none))
+                        viewModel.SelectedInstruments.Remove(none as InstrumentItem);
+                }
+                else
+                {
+                    viewModel.SelectedInstruments.Remove(instrument as InstrumentItem);
+                }
+            }
+        }
+        
     }
 }

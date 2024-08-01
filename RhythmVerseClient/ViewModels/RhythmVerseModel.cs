@@ -1,19 +1,13 @@
 ﻿using CommunityToolkit.Mvvm.Input;
-using Google.Apis.Auth.OAuth2;
-using Google.Apis.Download;
-using Google.Apis.Drive.v3;
-using Google.Apis.Services;
-using Google.Apis.Util.Store;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Maui.Controls;
 using RhythmVerseClient.Api;
+using RhythmVerseClient.Control;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 
 namespace RhythmVerseClient.ViewModels
 {
@@ -173,11 +167,9 @@ namespace RhythmVerseClient.ViewModels
 
     public class InstrumentItem
     {
-        public string DisplayName { get; set; }
-        public string Value { get; set; }
+        public string DisplayName { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
     }
-
-
 
     public class RhythmVerseModel : INotifyPropertyChanged
     {
@@ -185,6 +177,17 @@ namespace RhythmVerseClient.ViewModels
         private RhythmVerseApiClient apiClient;
         private DownloadService downloadService;
         private long? RecordsPerPage = 25;
+
+        public bool NoResults
+        {
+            get => noResults;
+            set
+            {
+                noResults = value;
+                OnPropertyChanged();
+            }
+        }
+
         private bool _hasMoreRecords = true;
         private const string BaseUrl = "https://rhythmverse.co";
         private Dictionary<string, List<string>> dictionary;
@@ -193,17 +196,6 @@ namespace RhythmVerseClient.ViewModels
         public List<string> Orders { get; } = new List<string> { "Ascending", "Descending" };
 
         public ObservableCollection<InstrumentItem> Instruments { get; set; }
-
-        private InstrumentItem _selectedInstrument;
-        public InstrumentItem SelectedInstrument
-        {
-            get => _selectedInstrument;
-            set
-            {
-                _selectedInstrument = value;
-                OnPropertyChanged();
-            }
-        }
 
         private long? _totalPages;
         public long? TotalPages
@@ -307,6 +299,16 @@ namespace RhythmVerseClient.ViewModels
                 OnPropertyChanged();
             }
         }
+        private ObservableCollection<InstrumentItem> selectedInstruments;
+        public ObservableCollection<InstrumentItem> SelectedInstruments
+        {
+            get => selectedInstruments;
+            set
+            {
+                selectedInstruments = value;
+                OnPropertyChanged();
+            }
+        }
 
         private ObservableCollection<DownloadFile> _downloads;
         public ObservableCollection<DownloadFile> Downloads
@@ -332,6 +334,7 @@ namespace RhythmVerseClient.ViewModels
 
         private bool _isLoading = false;
         private bool isPlaceholder;
+        private bool noResults;
 
         public bool IsLoading
         {
@@ -360,6 +363,7 @@ namespace RhythmVerseClient.ViewModels
             _selectedOrder = "Ascending";
             _currentPage = 1;
             IsPlaceholder = true;
+            NoResults = false;
             SearchButtonCommand = new AsyncRelayCommand(SearchButton);
             DownloadFileCommand = new AsyncRelayCommand(DownloadFile);
             ThresholdReachedCommand = new AsyncRelayCommand(ThresholdReached);
@@ -401,7 +405,8 @@ namespace RhythmVerseClient.ViewModels
                 new InstrumentItem { DisplayName = "Pro Guitar", Value = "proguitar" },
                 new InstrumentItem { DisplayName = "Rhythm Guitar", Value = "rhythm" },
             ];
-            SelectedInstrument = Instruments[0];
+            selectedInstruments = [];
+            selectedInstruments.Add(Instruments[0]);
         }
 
         /*public void SortDataItems()
@@ -446,6 +451,7 @@ namespace RhythmVerseClient.ViewModels
             IsLoading = false;
             IsPlaceholder = true;
             _hasMoreRecords = true;
+            NoResults = false;
             await LoadDataAsync();
         }
 
@@ -483,7 +489,7 @@ namespace RhythmVerseClient.ViewModels
             }
             var filter = ConvertFilter(SelectedFilter);
             var order = GetSortOrder(filter, SelectedOrder);
-            var instrument = SelectedInstrument.Value ?? string.Empty;
+            var instrument = SelectedInstruments.ToList();
             var response = await apiClient.GetSongFilesAsync(_currentPage, RecordsPerPage, SearchText.ToLower(), filter, order, instrument);
 
 
@@ -572,7 +578,7 @@ namespace RhythmVerseClient.ViewModels
             }
             else
             {
-
+                NoResults = true;
                 _hasMoreRecords = false;
             }
 

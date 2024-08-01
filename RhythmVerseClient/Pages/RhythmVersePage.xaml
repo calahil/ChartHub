@@ -98,34 +98,66 @@
                 <ActivityIndicator Grid.Row="1" IsRunning="true" VerticalOptions="End" HorizontalOptions="Center" />
                 <Label  Grid.Row="2" Grid.ColumnSpan="2" Text="Loading..." VerticalOptions="Start" HorizontalOptions="Center"/>
             </Grid>
+            <Grid Grid.RowSpan="4"
+                 RowDefinitions="*,*,*,*"  
+                 IsVisible="{Binding NoResults}">
+                <Label  Grid.Row="1" Grid.ColumnSpan="2" Text="No Results...  So empty" VerticalOptions="End" HorizontalOptions="Center"/>
+            </Grid>
         </Grid>
         <Grid Grid.Row="1" Grid.Column="1"
-              RowDefinitions="64, 64, 64, 48,*"
+              RowDefinitions="64, 64, 64, 64, 48, *"
               ColumnDefinitions="*,*"
               Padding="5">
 
             <Picker Grid.Row="0" Grid.Column="0" ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" 
                         x:Name="SortPicker" Title="Sort By" />
+
             <Picker Grid.Row="1" Grid.Column="0" ItemsSource="{Binding Orders}" SelectedItem="{Binding SelectedOrder}"  
                          x:Name="OrderPicker" Title="Order By" />
-            <Picker Grid.Row="2" Grid.Column="0" x:Name="InstrumentPicker" Title="Select Instrument" ItemsSource="{Binding Instruments}"
-                    ItemDisplayBinding="{Binding DisplayName}"
-                    SelectedItem="{Binding SelectedInstrument, Mode=TwoWay}" />
-            <Button Grid.Row="1" Grid.Column="1" HeightRequest="32" VerticalOptions="End" Text="Apply Filter"
+           
+            <Grid RowDefinitions="*,*" Grid.Row="2" Grid.RowSpan="2" Grid.Column="0">
+                <CollectionView Grid.Row="0" x:Name="collectionControl" ItemsSource="{Binding SelectedInstruments}"
+                        HorizontalScrollBarVisibility="Never"
+                        VerticalOptions="Center"
+                        SelectionMode="None"
+                        BackgroundColor="Transparent">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Horizontal"/>
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="models:InstrumentItem">
+                            <Frame CornerRadius="15"
+                                           Padding="10"
+                                           Margin="5"
+                                           BackgroundColor="LightGray"
+                                           VerticalOptions="Center">
+                                <Label Text="{Binding DisplayName}" />
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+                <Picker Grid.Row="1" x:Name="pickerControl"
+                    ItemsSource="{Binding Instruments}"
+                    ItemDisplayBinding="{Binding DisplayName, Source={x:Type models:InstrumentItem}}"
+                    Title="Pick Instruments"
+                    SelectedIndexChanged="InstrumentPicker_SelectedIndexChanged"/>
+            </Grid>
+
+        <Button Grid.Row="1" Grid.Column="1" HeightRequest="32" VerticalOptions="End" Text="Apply Filter"
                     Command="{Binding SearchButtonCommand}"/>
-            <Label Grid.Row="3" Grid.Column="0" Text="Downloads" VerticalOptions="Center" FontAttributes="Bold" FontSize="14"/>
-            <CollectionView x:Name="Downloads" Grid.Row="4" Grid.ColumnSpan="2" ItemsSource="{Binding Downloads}">
-                <CollectionView.ItemTemplate>
-                    <DataTemplate x:DataType="services:DownloadFile">
-                        <Grid Padding="10" RowDefinitions="20, 20"
+        <Label Grid.Row="4" Grid.Column="0" Text="Downloads" VerticalOptions="Center" FontAttributes="Bold" FontSize="14"/>
+        <CollectionView x:Name="Downloads" Grid.Row="5" Grid.ColumnSpan="2" ItemsSource="{Binding Downloads}">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="services:DownloadFile">
+                    <Grid Padding="10" RowDefinitions="20, 20"
                           ColumnDefinitions="*, 20">
-                            <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="0" VerticalOptions="Center" />
-                            <Image Source="checkmark.png" Grid.Row="0" Grid.Column="1" IsVisible="{Binding Finished}" />
-                            <ProgressBar Progress="{Binding DownloadProgress}" Grid.Row="1" Grid.ColumnSpan="2" VerticalOptions="Center" />
-                        </Grid>
-                    </DataTemplate>
-                </CollectionView.ItemTemplate>
-            </CollectionView>
-        </Grid>
+                        <Label Text="{Binding DisplayName}" Grid.Row="0" Grid.Column="0" VerticalOptions="Center" />
+                        <Image Source="checkmark.png" Grid.Row="0" Grid.Column="1" IsVisible="{Binding Finished}" />
+                        <ProgressBar Progress="{Binding DownloadProgress}" Grid.Row="1" Grid.ColumnSpan="2" VerticalOptions="Center" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </Grid>
     </Grid>
 </ContentPage>

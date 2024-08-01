@@ -1,7 +1,9 @@
 ﻿
 using Microsoft.Extensions.Configuration;
 using RhythmVerseClient.Api;
+using RhythmVerseClient.Control;
 using RhythmVerseClient.Utilities;
+using RhythmVerseClient.ViewModels;
 using System.Diagnostics.Metrics;
 using System.Net.Http.Headers;
 using System.Text;
@@ -24,7 +26,7 @@ namespace RhythmVerseClient.Services
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
         }
 
-        public async Task<RootResponse> GetSongFilesAsync(long? page, long? recordsPerPage, string search, string sort, string order, string instrument)
+        public async Task<RootResponse> GetSongFilesAsync(long? page, long? recordsPerPage, string search, string sort, string order, List<InstrumentItem> instrument)
         {
             try
             {
@@ -43,9 +45,13 @@ namespace RhythmVerseClient.Services
                 try
                 {
                     var collection = new List<KeyValuePair<string, string>>();
-                    if (!string.IsNullOrEmpty(instrument))
+                    foreach (var item in instrument)
                     {
-                        collection.Add(new("instrument", $"{instrument}"));
+
+                        if (!string.IsNullOrEmpty(item.Value))
+                        {
+                            collection.Add(new("instrument", $"{item.Value}"));
+                        }
                     }
                     collection.Add(new("sort[0][sort_by]", $"{sort}"));
                     collection.Add(new("sort[0][sort_order]", $"{order}"));
