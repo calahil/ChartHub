@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.Input;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Configuration;
 using RhythmVerseClient.Api;
 using RhythmVerseClient.Control;
@@ -26,6 +27,10 @@ namespace RhythmVerseClient.ViewModels
         private string album;
         private string? formattedTme;
         private string? gameformat;
+        private string drumString;
+        private string guitarString;
+        private string bassString;
+        private string vocalString;
 
         public string Artist
         {
@@ -157,6 +162,47 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        public string DrumString
+        {
+            get => drumString;
+            set
+            {
+                drumString = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string GuitarString
+        {
+            get => guitarString;
+            set
+            {
+                guitarString = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string BassString
+        {
+            get => bassString;
+            set
+            {
+                bassString = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string VocalString
+        {
+            get => vocalString;
+            set
+            {
+                vocalString = value;
+                OnPropertyChanged();
+            }
+        }
+
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
@@ -165,10 +211,37 @@ namespace RhythmVerseClient.ViewModels
         }
     }
 
-    public class InstrumentItem
+    public class InstrumentItem : INotifyPropertyChanged
     {
-        public string DisplayName { get; set; } = string.Empty;
-        public string Value { get; set; } = string.Empty;
+        private string _displayName = string.Empty;
+        private string _value = string.Empty;
+
+        public string DisplayName 
+        { 
+            get => _displayName;
+            set
+            {
+                _displayName = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public string Value 
+        { 
+            get => _value;
+            set
+            {
+                _value = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 
     public class RhythmVerseModel : INotifyPropertyChanged
@@ -194,6 +267,8 @@ namespace RhythmVerseClient.ViewModels
 
         public List<string> Filters { get; } = new List<string> { "Artist", "Downloads", "Song Length", "Title" };
         public List<string> Orders { get; } = new List<string> { "Ascending", "Descending" };
+
+        public List<string> Ratings { get; }
 
         public ObservableCollection<InstrumentItem> Instruments { get; set; }
 
@@ -407,6 +482,15 @@ namespace RhythmVerseClient.ViewModels
             ];
             selectedInstruments = [];
             selectedInstruments.Add(Instruments[0]);
+
+            Ratings = [
+                "OOOOO",
+                "\u2B24" + "OOOO",
+                "\u2B24" + "\u2B24" + "OOO",
+                "\u2B24" + "\u2B24" +"\u2B24" + "OO",
+                "\u2B24" + "\u2B24" + "\u2B24" + "\u2B24" + "O",
+                "\u2B24" + "\u2B24" + "\u2B24" + "\u2B24" + "\u2B24"
+            ];
         }
 
         /*public void SortDataItems()
@@ -562,6 +646,42 @@ namespace RhythmVerseClient.ViewModels
                         else
                         {
                             songView.DownloadLink = song.File.DownloadUrl;
+                        }
+
+                        if (song.File.DiffDrums.HasValue && song.File.DiffDrums.Value >= 0 && song.File.DiffDrums.Value < Ratings.Count)
+                        {
+                            songView.DrumString = Ratings[(int)song.File.DiffDrums.Value];
+                        }
+                        else
+                        {
+                            songView.DrumString = Ratings[0];
+                        }
+
+                        if (song.File.DiffGuitar.HasValue && song.File.DiffGuitar.Value >= 0 && song.File.DiffGuitar.Value < Ratings.Count)
+                        {
+                            songView.GuitarString = Ratings[(int)song.File.DiffGuitar.Value];
+                        }
+                        else
+                        {
+                            songView.GuitarString = Ratings[0];
+                        }
+
+                        if (song.File.DiffBass.HasValue && song.File.DiffBass.Value >= 0 && song.File.DiffBass.Value < Ratings.Count)
+                        {
+                            songView.BassString = Ratings[(int)song.File.DiffBass.Value];
+                        }
+                        else
+                        {
+                            songView.BassString = Ratings[0];
+                        }
+
+                        if (song.File.DiffVocals.HasValue && song.File.DiffVocals.Value >= 0 && song.File.DiffVocals.Value < Ratings.Count)
+                        {
+                            songView.VocalString = Ratings[(int)song.File.DiffVocals.Value];
+                        }
+                        else
+                        {
+                            songView.VocalString = Ratings[0];
                         }
 
                         if (dictionary.TryGetValue(song.File.Gameformat, out List<string> value))

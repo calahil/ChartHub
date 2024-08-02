@@ -1,7 +1,11 @@
 ﻿using CommunityToolkit.Maui;
+using FFImageLoading.Maui;
 using Google.Apis.Drive.v3;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.LifecycleEvents;
+using Microsoft.Maui.Platform;
+using Microsoft.UI.Windowing;
 using RhythmVerseClient.Pages;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Utilities;
@@ -9,7 +13,7 @@ using RhythmVerseClient.ViewModels;
 using SettingsManager;
 using Syncfusion.Maui.Core.Hosting;
 using System.Text.Json;
-using FFImageLoading.Maui;
+using WinUIEx;
 
 namespace RhythmVerseClient
 {
@@ -26,7 +30,9 @@ namespace RhythmVerseClient
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+                    fonts.AddFont("fa-solid-900.tff", "FontAwesome");
                 });
+
 #if DEBUG
             builder.Logging.AddDebug();
 #endif
@@ -72,6 +78,19 @@ namespace RhythmVerseClient
             builder.Services.AddSingleton<Initializer>();
 
             builder.ConfigureSyncfusionCore();
+
+#if WINDOWS
+            builder.ConfigureLifecycleEvents(events =>
+            {
+                events.AddWindows(wndLifeCycleBuilder =>
+                {
+                    wndLifeCycleBuilder.OnWindowCreated(window =>
+                    {
+                        window.Maximize();
+                    });
+                });
+            });
+#endif
 
             return builder.Build();
         }

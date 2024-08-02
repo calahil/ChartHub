@@ -40,7 +40,7 @@ public partial class RhythmVersePage : ContentPage
     private void InstrumentPicker_SelectedIndexChanged(object sender, EventArgs e)
     {
         var picker = sender as Picker;
-        if (picker != null)
+        if (picker != null && picker.SelectedIndex != -1)
         {
             var instrument = picker.ItemsSource[picker.SelectedIndex];
             var none = picker.ItemsSource[0];
@@ -57,9 +57,15 @@ public partial class RhythmVersePage : ContentPage
                 else
                 {
                     viewModel.SelectedInstruments.Remove(instrument as InstrumentItem);
+                    if (!viewModel.SelectedInstruments.Any())
+                    {
+                        viewModel.SelectedInstruments.Add(none as InstrumentItem);
+                    }
                 }
             }
+
+            picker.SelectedItem = null;
+            picker.SelectedIndex = -1;
         }
-        
     }
 }

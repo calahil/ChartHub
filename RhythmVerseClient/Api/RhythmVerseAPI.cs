@@ -138,7 +138,7 @@ namespace RhythmVerseClient.Api
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("title")]
         public string Title { get; set; }
-        /*
+   
                 [JsonPropertyName("diff_drums")]
                 public string DiffDrums { get; set; }
 
@@ -150,7 +150,7 @@ namespace RhythmVerseClient.Api
 
                 [JsonPropertyName("diff_vocals")]
                 public object DiffVocals { get; set; }
-
+        /*
                 [JsonPropertyName("diff_keys")]
                 public string DiffKeys { get; set; }
 
@@ -211,6 +211,22 @@ namespace RhythmVerseClient.Api
 
     public partial class Files
     {
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("diff_drums")]
+        public long? DiffDrums { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("diff_guitar")]
+        public long? DiffGuitar { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("diff_bass")]
+        public long? DiffBass { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("diff_vocals")]
+        public long? DiffVocals { get; set; }
+
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("file_name")]
         public string FileName { get; set; }
