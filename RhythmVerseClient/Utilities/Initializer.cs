@@ -57,8 +57,6 @@ namespace RhythmVerseClient.Utilities
                 Toolbox.CreateDirectoryIfNotExists(PhaseshiftMusicDir);
                 Toolbox.CreateDirectoryIfNotExists(DownloadDir);
                 Toolbox.CreateDirectoryIfNotExists(DownloadStaging);
-                Toolbox.CreateDirectoryIfNotExists(CloneHeroDataDir);
-                Toolbox.CreateDirectoryIfNotExists(CloneHeroSongsDir);
             }
         }
 

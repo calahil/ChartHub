@@ -19,7 +19,7 @@
 
     <Grid RowDefinitions="48,*"
           ColumnDefinitions="3*, *">
-        <Button Grid.Row="0" Grid.Column="1" HeightRequest="32" VerticalOptions="End" Text="Apply Filters"
+        <Button Grid.Row="0" Grid.Column="1" HeightRequest="32" VerticalOptions="End" Text="{Binding PageStrings.ApplyFilter}"
              Command="{Binding SearchButtonCommand}"/>
         <Grid Grid.Row="0" 
               ColumnDefinitions="300,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
