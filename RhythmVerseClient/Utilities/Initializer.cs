@@ -55,6 +55,10 @@ namespace RhythmVerseClient.Utilities
                 Toolbox.CreateDirectoryIfNotExists(PhaseshiftMusicDir);
                 Toolbox.CreateDirectoryIfNotExists(DownloadDir);
                 Toolbox.CreateDirectoryIfNotExists(DownloadStaging);
+                var CloneHeroDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Clone Hero");
+                var CloneHeroSongsDir = Toolbox.ConstructPath(CloneHeroDataDir, "Songs");
+                Toolbox.CreateDirectoryIfNotExists(CloneHeroDataDir);
+                Toolbox.CreateDirectoryIfNotExists(CloneHeroSongsDir);
             }
         }
 
