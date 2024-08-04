@@ -250,7 +250,11 @@ namespace RhythmVerseClient.ViewModels
         private RhythmVerseApiClient apiClient;
         private DownloadService downloadService;
         private long? RecordsPerPage = 25;
+        private bool _hasMoreRecords = true;
+        private const string BaseUrl = "https://rhythmverse.co";
+        private Dictionary<string, List<string>> dictionary;
 
+        private bool noResults;
         public bool NoResults
         {
             get => noResults;
@@ -261,16 +265,27 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        private bool _hasMoreRecords = true;
-        private const string BaseUrl = "https://rhythmverse.co";
-        private Dictionary<string, List<string>> dictionary;
+        private bool _isLoading = false;
+        public bool IsLoading
+        {
+            get => _isLoading;
+            set
+            {
+                _isLoading = value;
+                OnPropertyChanged();
+            }
+        }
 
-        public List<string> Filters { get; } = new List<string> { "Artist", "Downloads", "Song Length", "Title" };
-        public List<string> Orders { get; } = new List<string> { "Ascending", "Descending" };
-
-        public List<string> Ratings { get; }
-
-        public ObservableCollection<InstrumentItem> Instruments { get; set; }
+        private bool isPlaceholder;
+        public bool IsPlaceholder
+        {
+            get => isPlaceholder;
+            set
+            {
+                isPlaceholder = value;
+                OnPropertyChanged();
+            }
+        }
 
         private long? _totalPages;
         public long? TotalPages
@@ -327,15 +342,6 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        public bool IsPlaceholder
-        {
-            get => isPlaceholder;
-            set
-            {
-                isPlaceholder = value;
-                OnPropertyChanged();
-            }
-        }
         private string _selectedFilter;
         public string SelectedFilter
         {
@@ -374,13 +380,14 @@ namespace RhythmVerseClient.ViewModels
                 OnPropertyChanged();
             }
         }
-        private ObservableCollection<InstrumentItem> selectedInstruments;
+
+        private ObservableCollection<InstrumentItem> _selectedInstruments;
         public ObservableCollection<InstrumentItem> SelectedInstruments
         {
-            get => selectedInstruments;
+            get => _selectedInstruments;
             set
             {
-                selectedInstruments = value;
+                _selectedInstruments = value;
                 OnPropertyChanged();
             }
         }
@@ -407,19 +414,12 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        private bool _isLoading = false;
-        private bool isPlaceholder;
-        private bool noResults;
+        public List<string> Filters { get; } = new List<string> { "Artist", "Downloads", "Song Length", "Title" };
+        public List<string> Orders { get; } = new List<string> { "Ascending", "Descending" };
 
-        public bool IsLoading
-        {
-            get => _isLoading;
-            set
-            {
-                _isLoading = value;
-                OnPropertyChanged();
-            }
-        }
+        public List<string> Ratings { get; }
+
+        public ObservableCollection<InstrumentItem> Instruments { get; set; }
 
         public string SearchText { get; set; } = string.Empty;
         public IAsyncRelayCommand SearchButtonCommand { get; }
@@ -480,8 +480,8 @@ namespace RhythmVerseClient.ViewModels
                 new InstrumentItem { DisplayName = "Pro Guitar", Value = "proguitar" },
                 new InstrumentItem { DisplayName = "Rhythm Guitar", Value = "rhythm" },
             ];
-            selectedInstruments = [];
-            selectedInstruments.Add(Instruments[0]);
+            _selectedInstruments = [];
+            _selectedInstruments.Add(Instruments[0]);
 
             Ratings = [
                 "OOOOO",

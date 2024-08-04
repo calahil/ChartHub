@@ -398,12 +398,6 @@ namespace RhythmVerseClient.Services
     public class DownloadFile(string displayName, string filePath, string urlString, long? fileSize) : INotifyPropertyChanged
     {
         private string _displayName = displayName;
-        private string _filePath = filePath;
-        private string _url = urlString;
-        private double _downloadProgress = 0;
-        private bool _finished = false;
-        private long? _fileSize = fileSize;
-
         public string DisplayName
         {
             get => _displayName;
@@ -417,6 +411,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
+        private string _filePath = filePath;
         public string FilePath
         {
             get => _filePath;
@@ -430,6 +425,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
+        private string _url = urlString;
         public string Url
         {
             get => _url;
@@ -443,6 +439,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
+        private double _downloadProgress = 0;
         public double DownloadProgress
         {
             get => _downloadProgress;
@@ -453,6 +450,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
+        private bool _finished = false;
         public bool Finished
         {
             get => _finished;
@@ -463,6 +461,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
+        private long? _fileSize = fileSize;
         public long? FileSize
         {
             get => _fileSize;
@@ -475,6 +474,7 @@ namespace RhythmVerseClient.Services
                 }
             }
         }
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)

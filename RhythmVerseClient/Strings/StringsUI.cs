@@ -55,5 +55,6 @@
     public class RhythmVersePageStrings : StringsUI
     {
         public string Title { get; } = "RhythmVerse";
+        public string ApplyFilter { get; } = "Apply Filters";
     }
 }
