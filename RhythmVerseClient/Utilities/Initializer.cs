@@ -14,7 +14,7 @@ namespace RhythmVerseClient.Utilities
 
         public async Task InitializeAsync()
         {
-            var NautilusDirectoryPath = Toolbox.ConstructPath(ApplicationData.Current.LocalFolder.Path, "nautilus");
+            var NautilusDirectoryPath = Toolbox.ConstructPath(FileSystem.Current.AppDataDirectory, "nautilus");
             var nautilisEXE = Path.Combine(NautilusDirectoryPath, "Nautilus.exe");
             if (!File.Exists(nautilisEXE))
             {
@@ -27,13 +27,13 @@ namespace RhythmVerseClient.Utilities
 
                     if (!Directory.Exists(NautilusDirectoryPath))
                     {
-                        Directory.CreateDirectory(ApplicationData.Current.LocalFolder.Path);
+                        Directory.CreateDirectory(FileSystem.Current.AppDataDirectory);
                     }
 
                     using var archive = ArchiveFactory.Open(ZipFilePath);
                     foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
                     {
-                        entry.WriteToDirectory(ApplicationData.Current.LocalFolder.Path, new ExtractionOptions
+                        entry.WriteToDirectory(FileSystem.Current.AppDataDirectory, new ExtractionOptions
                         {
                             ExtractFullPath = true,
                             Overwrite = true
@@ -51,10 +51,14 @@ namespace RhythmVerseClient.Utilities
                 var PhaseshiftMusicDir = Toolbox.ConstructPath(PhaseshiftDir, "Music");
                 var DownloadDir = Toolbox.ConstructPath(PhaseshiftDir, "downloads");
                 var DownloadStaging = Toolbox.ConstructPath(PhaseshiftDir, "staging");
+                var CloneHeroDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Clone Hero");
+                var CloneHeroSongsDir = Toolbox.ConstructPath(CloneHeroDataDir, "Songs");
                 Toolbox.CreateDirectoryIfNotExists(PhaseshiftDir);
                 Toolbox.CreateDirectoryIfNotExists(PhaseshiftMusicDir);
                 Toolbox.CreateDirectoryIfNotExists(DownloadDir);
                 Toolbox.CreateDirectoryIfNotExists(DownloadStaging);
+                Toolbox.CreateDirectoryIfNotExists(CloneHeroDataDir);
+                Toolbox.CreateDirectoryIfNotExists(CloneHeroSongsDir);
             }
         }
 

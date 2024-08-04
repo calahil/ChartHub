@@ -19,6 +19,9 @@
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<WindowsPackageType>None</WindowsPackageType>	
+		<WindowsAppSDKSelfContained Condition="'$(IsUnpackaged)' == 'true'">true</WindowsAppSDKSelfContained>
+		<SelfContained Condition="'$(IsUnpackaged)' == 'true'">true</SelfContained>
 
 		<!-- Display name -->
 		<ApplicationTitle>RhythmVerseClient</ApplicationTitle>
@@ -39,6 +42,8 @@
 		<UserSecretsId>b0e751a2-ccc2-493f-96d7-3a78ffe23a8b</UserSecretsId>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<PackageIcon>logo.png</PackageIcon>
+		<Company>Calahil Studios</Company>
+		<Authors>Calahil</Authors>
 	</PropertyGroup>
 
 	<ItemGroup>

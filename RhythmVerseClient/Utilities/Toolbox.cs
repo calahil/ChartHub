@@ -11,7 +11,7 @@ namespace RhythmVerseClient.Utilities
 {
     public static class Logger
     {
-        private static readonly string LogFilePath = Toolbox.ConstructPath(ApplicationData.Current.LocalFolder.Path, "errorlog.txt");
+        private static readonly string LogFilePath = Toolbox.ConstructPath(FileSystem.Current.AppDataDirectory, "errorlog.txt");
 
         public static void LogError(Exception ex)
         {
@@ -231,7 +231,7 @@ namespace RhythmVerseClient.Utilities
 
             if (RhythmverseAppPath == "first_install")
             {
-                RhythmverseAppPath = ApplicationData.Current.LocalFolder.Path;
+                RhythmverseAppPath =  FileSystem.Current.AppDataDirectory;
             }
 
             if (NautilusDirectoryPath == "first_install")
