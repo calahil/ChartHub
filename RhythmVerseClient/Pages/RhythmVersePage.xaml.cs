@@ -1,3 +1,4 @@
+using RhythmVerseClient.Models;
 using RhythmVerseClient.ViewModels;
 using WinRT;
 
@@ -19,13 +20,13 @@ public partial class RhythmVersePage : ContentPage
     {
         base.OnAppearing();
         viewModel.IsPlaceholder = true;
-        await viewModel.LoadDataAsync();
+        await viewModel.LoadDataAsync(false);
     }
 
     private async void Stepper_ValueChanged(object sender, ValueChangedEventArgs e)
     {
         viewModel.IsPlaceholder = true;
-        await viewModel.LoadDataAsync();
+        await viewModel.LoadDataAsync(true);
     }
 
     private async void ImageButton_Clicked(object sender, EventArgs e)

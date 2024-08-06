@@ -2,13 +2,14 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:services="clr-namespace:RhythmVerseClient.Services"
-             xmlns:models="clr-namespace:RhythmVerseClient.ViewModels"
+             xmlns:viewmodels="clr-namespace:RhythmVerseClient.ViewModels"
+             xmlns:models="clr-namespace:RhythmVerseClient.Models"
              xmlns:control="clr-namespace:RhythmVerseClient.Control"
              xmlns:util="clr-namespace:RhythmVerseClient.Utilities"
              xmlns:ffimage="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
              xmlns:api="clr-namespace:RhythmVerseClient.Api"
              x:Class="RhythmVerseClient.Pages.RhythmVersePage"
-             x:DataType="models:RhythmVerseModel"
+             x:DataType="viewmodels:RhythmVerseModel"
              Title="{Binding PageStrings.Title}">
 
     <ContentPage.Resources>

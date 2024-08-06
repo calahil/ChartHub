@@ -65,6 +65,46 @@ namespace RhythmVerseClient.Utilities
 
     public static class Toolbox
     {
+        public static string ConvertFilter(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                return input;
+            }
+            return input.Replace("Song ", "").ToLower();
+        }
+
+        public static string ConvertSecondstoText(long? input)
+        {
+            if (input != null)
+            {
+                long? minutes = input / 60;
+                int seconds = (int)input % 60;
+
+
+                return $"{minutes}:{seconds:D2}";
+            }
+            else
+            {
+                return "00:00";
+            }
+        }
+
+        public static string GetSortOrder(string filter, string order)
+        {
+            bool isStringField = filter.Equals("Artist", StringComparison.OrdinalIgnoreCase) ||
+                                 filter.Equals("Title", StringComparison.OrdinalIgnoreCase);
+
+            // Adjust order based on the type of data
+            if (isStringField)
+            {
+                return order == "Ascending" ? "ASC" : "DESC";
+            }
+            else // Assume numerical data for other fields
+            {
+                return order == "Ascending" ? "DESC" : "ASC";
+            }
+        }
 
         public static string ConvertFileSize(long sizeBytes)
         {
