@@ -194,7 +194,7 @@ namespace RhythmVerseClient.Services
 
                     var DecodedResponse = RootResponse.FromJson(responseBody);
 
-                    if (DecodedResponse != null && DecodedResponse.Data != null)
+                   if (DecodedResponse != null && DecodedResponse.Data != null)
                     {
                         if (DecodedResponse.Data.Records.TotalFiltered != null)
                         {
@@ -217,11 +217,11 @@ namespace RhythmVerseClient.Services
                             {
                                 var songView = new ViewSong
                                 {
-                                    Artist = song.File.FileArtist ?? song.File.FileName ?? song.File.Filename ?? "Unknown",
-                                    Title = song.File.FileTitle ?? song.File.FileName ?? song.File.Filename ?? "Unknown",
-                                    Album = song.File.FileAlbum ?? song.File.FileName ?? song.File.Filename ?? "Unknown"
+                                    //Artist = song.File.FileArtist ?? song.File.FileName ?? song.File.Filename ?? "Unknown",
+                                    //Title = song.File.FileTitle ?? song.File.FileName ?? song.File.Filename ?? "Unknown",
+                                    //Album = song.File.FileAlbum ?? song.File.FileName ?? song.File.Filename ?? "Unknown"
                                 };
-                                var image = song.File.AlbumArt ?? song.Data.AlbumArt;
+                                var image = song.File.AlbumArt;
                                 if (image != null)
                                 {
                                     if (!image.StartsWith(BaseUrl))
@@ -231,16 +231,16 @@ namespace RhythmVerseClient.Services
                                     songView.AlbumArt = image;
                                 }
 
-                                songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : song.Data.Downloads;
+                                songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : song.Data.DataData.Downloads;
                                 songView.FileName = song.File.FileName ?? song.File.Filename ?? "missing";
-                                if (song.File.FileSongLength is null)
+                                /*if (song.File.FileSongLength is null)
                                 {
                                     songView.SongLength = 0;
                                 }
                                 else
-                                {
-                                    songView.SongLength = song.File.FileSongLength;
-                                }
+                                {*/
+                                    songView.SongLength = song.File.FileSongLength as long?;
+                               // }
 
                                 songView.FileSize = song.File.Size;
                                 songView.FormattedTme = Toolbox.ConvertSecondstoText(songView.SongLength);
@@ -326,6 +326,7 @@ namespace RhythmVerseClient.Services
                     }
                     return DataItems;
                 }
+                
                 catch (HttpRequestException e)
                 {
                     Console.WriteLine($"Request error: {e.Message}");
