@@ -4,7 +4,6 @@
              xmlns:services="clr-namespace:RhythmVerseClient.Services"
              xmlns:viewmodels="clr-namespace:RhythmVerseClient.ViewModels"
              xmlns:models="clr-namespace:RhythmVerseClient.Models"
-             xmlns:control="clr-namespace:RhythmVerseClient.Control"
              xmlns:util="clr-namespace:RhythmVerseClient.Utilities"
              xmlns:ffimage="clr-namespace:FFImageLoading.Maui;assembly=FFImageLoading.Maui"
              xmlns:api="clr-namespace:RhythmVerseClient.Api"
@@ -43,8 +42,6 @@
         <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="*, *, *, *" >
             <CollectionView x:Name="SongList" Grid.RowSpan="4"
                             ItemsSource="{Binding DataItems }" 
-                            RemainingItemsThreshold="1" 
-                            RemainingItemsThresholdReachedCommand="{Binding ThresholdReachedCommand}"
                             SelectionMode="Single" 
                             ItemsUpdatingScrollMode="KeepScrollOffset"
                             SelectedItem="{Binding SelectedFile}"                            
@@ -167,7 +164,7 @@
                         BackgroundColor="Transparent"
                         ItemsLayout="HorizontalGrid, 3">
                     <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="models:InstrumentItem">
+                        <DataTemplate x:DataType="viewmodels:InstrumentItem">
                             <Frame BackgroundColor="LightGray" 
                                    HeightRequest="42"
                                    WidthRequest="93">

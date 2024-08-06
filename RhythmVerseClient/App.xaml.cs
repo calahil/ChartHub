@@ -25,7 +25,7 @@ namespace RhythmVerseClient
 
         private async void InitializeAsync(Initializer initializer)
         {
-            await initializer.InitializeAsync();
+            await Initializer.InitializeAsync();
             MainPage = _serviceProvider.GetRequiredService<MainPage>();
         }
     }

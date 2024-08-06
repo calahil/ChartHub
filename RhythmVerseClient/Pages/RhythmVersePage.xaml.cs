@@ -6,7 +6,7 @@ namespace RhythmVerseClient.Pages;
 
 public partial class RhythmVersePage : ContentPage
 {
-    private RhythmVerseModel viewModel;
+    private readonly RhythmVerseModel viewModel;
 
     public RhythmVersePage(RhythmVerseModel verseModel)
     {
@@ -32,7 +32,6 @@ public partial class RhythmVersePage : ContentPage
     private async void ImageButton_Clicked(object sender, EventArgs e)
     {
         var button = (Button)sender;
-        var parent = button.Parent;
         viewModel.SelectedFile = button.Parent.BindingContext as ViewSong;
 
         await viewModel.DownloadFile();
@@ -40,17 +39,14 @@ public partial class RhythmVersePage : ContentPage
 
     private void InstrumentPicker_SelectedIndexChanged(object sender, EventArgs e)
     {
-        var picker = sender as Picker;
-        if (picker != null && picker.SelectedIndex != -1)
+        if (sender is Picker picker && picker.SelectedIndex != -1)
         {
-            var instrument = picker.ItemsSource[picker.SelectedIndex];
-            var none = picker.ItemsSource[0];
-
-            if (instrument != null)
+            if (picker.ItemsSource[picker.SelectedIndex] is InstrumentItem instrument && picker.ItemsSource[0] is InstrumentItem none)
             {
+
                 if (!viewModel.SelectedInstruments.Contains(instrument))
                 {
-                    viewModel.SelectedInstruments.Add(instrument as InstrumentItem);
+                    viewModel.SelectedInstruments.Add(instrument);
 
                     if (viewModel.SelectedInstruments.Contains(none))
                         viewModel.SelectedInstruments.Remove(none as InstrumentItem);

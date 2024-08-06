@@ -12,7 +12,7 @@ namespace RhythmVerseClient.Utilities
 
         public Initializer() { }
 
-        public async Task InitializeAsync()
+        public static async Task InitializeAsync()
         {
             var NautilusDirectoryPath = Toolbox.ConstructPath(FileSystem.Current.AppDataDirectory, "nautilus");
             var nautilisEXE = Path.Combine(NautilusDirectoryPath, "Nautilus.exe");

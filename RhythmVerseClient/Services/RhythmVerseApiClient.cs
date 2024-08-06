@@ -1,18 +1,13 @@
 ﻿
 using Microsoft.Extensions.Configuration;
 using RhythmVerseClient.Api;
-using RhythmVerseClient.Control;
 using RhythmVerseClient.Models;
 using RhythmVerseClient.Utilities;
 using RhythmVerseClient.ViewModels;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics.Metrics;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
-using System.Text;
-using Windows.Media.Protection.PlayReady;
 
 namespace RhythmVerseClient.Services
 {
@@ -48,6 +43,7 @@ namespace RhythmVerseClient.Services
                 "\u2B24" + "\u2B24" + "\u2B24" + "\u2B24" + "O",
                 "\u2B24" + "\u2B24" + "\u2B24" + "\u2B24" + "\u2B24"
             ];
+
         private ObservableCollection<ViewSong>? _dataItems;
         public ObservableCollection<ViewSong>? DataItems
         {
@@ -130,8 +126,10 @@ namespace RhythmVerseClient.Services
 
         public RhythmVerseApiClient(IConfiguration configuration)
         {
-            _httpClient = new HttpClient();
-            _httpClient.BaseAddress = new Uri(BaseUrl);
+            _httpClient = new HttpClient
+            {
+                BaseAddress = new Uri(BaseUrl)
+            };
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
 
             _currentPage = 1;
@@ -217,10 +215,12 @@ namespace RhythmVerseClient.Services
                         {
                             if (!song.File.DownloadUrl.StartsWith("http://marketplace.xbox.com") && !song.File.DownloadUrl.StartsWith("none"))
                             {
-                                var songView = new ViewSong();
-                                songView.Artist = song.File.FileArtist ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
-                                songView.Title = song.File.FileTitle ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
-                                songView.Album = song.File.FileAlbum ?? song.File.FileName ?? song.File.Filename ?? "Unknown";
+                                var songView = new ViewSong
+                                {
+                                    Artist = song.File.FileArtist ?? song.File.FileName ?? song.File.Filename ?? "Unknown",
+                                    Title = song.File.FileTitle ?? song.File.FileName ?? song.File.Filename ?? "Unknown",
+                                    Album = song.File.FileAlbum ?? song.File.FileName ?? song.File.Filename ?? "Unknown"
+                                };
                                 var image = song.File.AlbumArt ?? song.Data.AlbumArt;
                                 if (image != null)
                                 {
@@ -233,7 +233,15 @@ namespace RhythmVerseClient.Services
 
                                 songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : song.Data.Downloads;
                                 songView.FileName = song.File.FileName ?? song.File.Filename ?? "missing";
-                                songView.SongLength = (song.File.FileSongLength ?? 0) != 0 ? song.File.FileSongLength.Value : song.Data.SongLength ?? 0;
+                                if (song.File.FileSongLength is null)
+                                {
+                                    songView.SongLength = 0;
+                                }
+                                else
+                                {
+                                    songView.SongLength = song.File.FileSongLength;
+                                }
+
                                 songView.FileSize = song.File.Size;
                                 songView.FormattedTme = Toolbox.ConvertSecondstoText(songView.SongLength);
                                 Author author = song.File.Author ?? new Author();
@@ -299,7 +307,7 @@ namespace RhythmVerseClient.Services
                                     songView.VocalString = Ratings[0];
                                 }
 
-                                if (dictionary.TryGetValue(song.File.Gameformat, out List<string> value))
+                                if (dictionary.TryGetValue(song.File.Gameformat, out List<string>? value))
                                 {
                                     songView.Gameformat = value[1];
                                 }
@@ -321,7 +329,7 @@ namespace RhythmVerseClient.Services
                 catch (HttpRequestException e)
                 {
                     Console.WriteLine($"Request error: {e.Message}");
-                    return new ObservableCollection<ViewSong>();
+                    return [];
                 }
             }
 
@@ -330,7 +338,7 @@ namespace RhythmVerseClient.Services
             {
                 // Handle exceptions
                 Logger.LogMessage($"An error occurred: {ex.Message}");
-                return new ObservableCollection<ViewSong>();
+                return [];
             }
         }
 

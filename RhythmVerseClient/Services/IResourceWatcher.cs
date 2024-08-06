@@ -8,7 +8,7 @@ namespace RhythmVerseClient.Services
         ObservableCollection<FileData> Data { get; set; }
         void LoadItems();
         event EventHandler<string> DirectoryNotFound;
-        event EventHandler<string> ErrorOccurred;
+        //event EventHandler<string> ErrorOccurred;
     }
 
 }

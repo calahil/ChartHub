@@ -16,20 +16,12 @@ using Windows.Media.Protection.PlayReady;
 
 namespace RhythmVerseClient.Services
 {
-    public class DownloadService
+    public class DownloadService(IConfiguration configuration)
     {
-        private readonly HttpClient _httpClient;
-        private readonly UrlHelper _urlHelper;
-        private readonly GoogleDriveService _googleDriveService;
-        private IProgress<double> _progress;
-
-        public DownloadService(IConfiguration configuration)
-        {
-            _httpClient = new HttpClient();
-            _urlHelper = new UrlHelper();
-            _googleDriveService = new GoogleDriveService(configuration);
-            _progress = new Progress<double>();
-        }
+        private readonly HttpClient _httpClient = new();
+        private readonly UrlHelper _urlHelper = new();
+        private readonly GoogleDriveService _googleDriveService = new(configuration);
+        private IProgress<double> _progress = new Progress<double>();
 
         public async Task DownloadFileAsync(DownloadFile song)
         {
@@ -40,7 +32,7 @@ namespace RhythmVerseClient.Services
                 if (song.Url.StartsWith("https://drive.google.com/drive"))
                 {
                     var fileId = UrlExtractor.ExtractIdFromUrl(song.Url);
-                    await _googleDriveService.DownloadFolderAsync(song, _progress, fileId);
+                    await _googleDriveService.DownloadFolderAsync(song, fileId);
                 }
                 else if (song.Url.StartsWith("https://drive.google.com/file"))
                 {
@@ -54,7 +46,7 @@ namespace RhythmVerseClient.Services
 
                     string content = await response.Content.ReadAsStringAsync();
 
-                    HtmlDocument doc = new HtmlDocument();
+                    HtmlDocument doc = new();
                     doc.LoadHtml(content);
 
                     var linkNode = doc.DocumentNode.SelectSingleNode("//a[@id='downloadButton']");
@@ -80,7 +72,7 @@ namespace RhythmVerseClient.Services
                 if (song.DownloadProgress != 100)
                     song.DownloadProgress = 100;
                 song.Finished = true;
-                
+
             }
             catch (Exception ex)
             {
@@ -96,50 +88,46 @@ namespace RhythmVerseClient.Services
             var totalBytes = response.Content.Headers.ContentLength ?? -1L;
             var canReportProgress = totalBytes != -1;
 
-            using (var contentStream = await response.Content.ReadAsStreamAsync())
+            using var contentStream = await response.Content.ReadAsStreamAsync();
+            var totalRead = 0L;
+            var buffer = new byte[8192];
+            var isMoreToRead = true;
+
+            using var fileStream = new FileStream(Path.Combine(song.FilePath, song.DisplayName), FileMode.Create, FileAccess.Write, FileShare.None, buffer.Length, true);
+            do
             {
-                var totalRead = 0L;
-                var buffer = new byte[8192];
-                var isMoreToRead = true;
-
-                using (var fileStream = new FileStream(Path.Combine(song.FilePath, song.DisplayName), FileMode.Create, FileAccess.Write, FileShare.None, buffer.Length, true))
+                var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+                if (read == 0)
                 {
-                    do
-                    {
-                        var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
-                        if (read == 0)
-                        {
-                            isMoreToRead = false;
-                            TriggerProgressChanged(song, totalBytes, totalRead);
-                            continue;
-                        }
+                    isMoreToRead = false;
+                    TriggerProgressChanged(song, totalBytes, totalRead);
+                    continue;
+                }
 
-                        await fileStream.WriteAsync(buffer.AsMemory(0, read));
+                await fileStream.WriteAsync(buffer.AsMemory(0, read));
 
-                        totalRead += read;
+                totalRead += read;
 
-                        if (canReportProgress)
-                        {
-                            TriggerProgressChanged(song, totalBytes, totalRead);
-                        }
-                    }
-                    while (isMoreToRead);
+                if (canReportProgress)
+                {
+                    TriggerProgressChanged(song, totalBytes, totalRead);
                 }
             }
+            while (isMoreToRead);
         }
 
-        private string ExtractMediaFireFileName(string url)
+        private static string ExtractMediaFireFileName(string url)
         {
-            Uri uri = new Uri(url);
+            Uri uri = new(url);
 
             // Get the absolute path of the URL
             string absolutePath = uri.AbsolutePath;
 
             // Extract the part after the last "/"
-           return absolutePath.Substring(absolutePath.LastIndexOf('/') + 1);
+            return absolutePath[(absolutePath.LastIndexOf('/') + 1)..];
         }
 
-        private void TriggerProgressChanged(DownloadFile song, long totalDownloadSize, long totalBytesRead)
+        private static void TriggerProgressChanged(DownloadFile song, long totalDownloadSize, long totalBytesRead)
         {
             if (totalDownloadSize != -1)
             {
@@ -148,17 +136,12 @@ namespace RhythmVerseClient.Services
         }
     }
 
-    public class GoogleDriveService
+    public class GoogleDriveService(IConfiguration configuration)
     {
-        private static readonly string[] Scopes = { DriveService.Scope.DriveReadonly };
+        private static readonly string[] Scopes = [DriveService.Scope.DriveReadonly];
         private static readonly string ApplicationName = "RhythmVerseClient";
-        private readonly IConfiguration _configuration;
+        private readonly IConfiguration _configuration = configuration;
         private DriveService? _driveService;
-
-        public GoogleDriveService(IConfiguration configuration)
-        {
-            _configuration = configuration;
-        }
 
         public async Task<DriveService> GetServiceAsync()
         {
@@ -185,43 +168,40 @@ namespace RhythmVerseClient.Services
 
         public async Task DownloadFileAsync(DownloadFile downloadFile, IProgress<double> progress, string fileId, CancellationToken cancellationToken = default)
         {
-            if (_driveService == null)
-                _driveService = await GetServiceAsync();
+            _driveService ??= await GetServiceAsync();
 
             var request = _driveService.Files.Get(fileId);
             var savePath = Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName);
 
 
 
-            using (var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None))
+            using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            var file = await request.DownloadAsync(fileStream, cancellationToken);
+            downloadFile.FileSize = file.BytesDownloaded; // Update file size
+            var mediaDownloader = new MediaDownloader(_driveService)
             {
-                var file = await request.DownloadAsync(fileStream);
-                downloadFile.FileSize = file.BytesDownloaded; // Update file size
-                var mediaDownloader = new MediaDownloader(_driveService)
-                {
-                    ChunkSize = 256 * 1024  // Adjust the chunk size if needed
-                };
+                ChunkSize = 256 * 1024  // Adjust the chunk size if needed
+            };
 
-                mediaDownloader.ProgressChanged += progressEvent =>
+            mediaDownloader.ProgressChanged += progressEvent =>
+            {
+                if (progressEvent.Status == DownloadStatus.Downloading)
                 {
-                    if (progressEvent.Status == DownloadStatus.Downloading)
-                    {
-                        double progressPercentage = (double)((double)progressEvent.BytesDownloaded / downloadFile.FileSize * 100);
-                        progress?.Report(progressPercentage); // Correctly reporting progress
-                        downloadFile.DownloadProgress = progressPercentage;
-                    }
-                    else if (progressEvent.Status == DownloadStatus.Completed)
-                    {
-                        downloadFile.Finished = true;
-                        downloadFile.DownloadProgress = 100;
-                    }
-                };
+                    double progressPercentage = (double)((double)progressEvent.BytesDownloaded / downloadFile.FileSize * 100);
+                    progress?.Report(progressPercentage); // Correctly reporting progress
+                    downloadFile.DownloadProgress = progressPercentage;
+                }
+                else if (progressEvent.Status == DownloadStatus.Completed)
+                {
+                    downloadFile.Finished = true;
+                    downloadFile.DownloadProgress = 100;
+                }
+            };
 
-                await mediaDownloader.DownloadAsync(downloadFile.Url, fileStream, cancellationToken);
-            }
+            await mediaDownloader.DownloadAsync(downloadFile.Url, fileStream, cancellationToken);
         }
 
-        public async Task DownloadFolderAsync(DownloadFile downloadFile, IProgress<double> progress, string fileId, CancellationToken cancellationToken = default)
+        public async Task DownloadFolderAsync(DownloadFile downloadFile, string fileId, CancellationToken cancellationToken = default)
         {
             string folderPath = Toolbox.ConstructPath(Path.GetTempPath(), Guid.NewGuid().ToString());
             Directory.CreateDirectory(folderPath);
@@ -230,23 +210,22 @@ namespace RhythmVerseClient.Services
             string finalPath = Toolbox.ConstructPath(folderPath, result);
 
             Directory.CreateDirectory(finalPath);
-            await DownloadFilesInFolder(fileId, finalPath);
+            await DownloadFilesInFolder(fileId, finalPath, cancellationToken);
             var zipFile = Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName);
             CreateZip(folderPath, zipFile);
 
             Directory.Delete(folderPath, true); // Cleanup the temporary folder
         }
 
-        private async Task DownloadFilesInFolder(string folderId, string parentFolderPath)
+        private async Task DownloadFilesInFolder(string folderId, string parentFolderPath, CancellationToken cancellationToken = default)
         {
-            if (_driveService == null)
-                _driveService = await GetServiceAsync();
+            _driveService ??= await GetServiceAsync();
 
             var request = _driveService.Files.List();
             request.Q = $"'{folderId}' in parents";
             request.Fields = "files(id, name, mimeType)";
 
-            var result = await request.ExecuteAsync();
+            var result = await request.ExecuteAsync(cancellationToken);
 
             foreach (var file in result.Files)
             {
@@ -254,27 +233,24 @@ namespace RhythmVerseClient.Services
                 {
                     string subFolderPath = Path.Combine(parentFolderPath, file.Name);
                     Directory.CreateDirectory(subFolderPath);
-                    await DownloadFilesInFolder(file.Id, subFolderPath);
+                    await DownloadFilesInFolder(file.Id, subFolderPath, cancellationToken);
                 }
                 else
                 {
                     var stream = new MemoryStream();
-                    await _driveService.Files.Get(file.Id).DownloadAsync(stream);
+                    await _driveService.Files.Get(file.Id).DownloadAsync(stream, cancellationToken);
                     stream.Seek(0, SeekOrigin.Begin);
 
                     string filePath = Path.Combine(parentFolderPath, file.Name);
-                    using (var fileStream = System.IO.File.Create(filePath))
-                    {
-                        stream.CopyTo(fileStream);
-                    }
+                    using var fileStream = System.IO.File.Create(filePath);
+                    stream.CopyTo(fileStream);
                 }
             }
         }
 
         public async Task<string> GetFolderNameAsync(string folderId)
         {
-            if (_driveService == null)
-                _driveService = await GetServiceAsync();
+            _driveService ??= await GetServiceAsync();
             try
             {
                 var request = _driveService.Files.Get(folderId);
@@ -286,27 +262,23 @@ namespace RhythmVerseClient.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"An error occurred: {ex.Message}");
-                return null;
+                return string.Empty;
             }
         }
 
 
-        private void CreateZip(string folderPath, string destinationZipFilePath)
+        private static void CreateZip(string folderPath, string destinationZipFilePath)
         {
-            using (var archive = ZipArchive.Create())
-            {
-                // Recursively add files to the archive
-                AddFilesToArchive(archive, folderPath, folderPath);
+            using var archive = ZipArchive.Create();
+            // Recursively add files to the archive
+            AddFilesToArchive(archive, folderPath, folderPath);
 
-                // Save the archive to a file
-                using (var stream = System.IO.File.OpenWrite(destinationZipFilePath))
-                {
-                    archive.SaveTo(stream, CompressionType.Deflate);
-                }
-            }
+            // Save the archive to a file
+            using var stream = System.IO.File.OpenWrite(destinationZipFilePath);
+            archive.SaveTo(stream, CompressionType.Deflate);
         }
 
-        private void AddFilesToArchive(ZipArchive archive, string rootPath, string currentPath)
+        private static void AddFilesToArchive(ZipArchive archive, string rootPath, string currentPath)
         {
             // Add files from the current directory to the archive
             foreach (var filePath in Directory.GetFiles(currentPath))
@@ -340,26 +312,28 @@ namespace RhythmVerseClient.Services
 
             do
             {
-                using (var request = new HttpRequestMessage(HttpMethod.Head, finalUrl))
-                {
-                    using (var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
-                    {
-                        isRedirect = (int)response.StatusCode >= 300 && (int)response.StatusCode < 400;
+                using var request = new HttpRequestMessage(HttpMethod.Head, finalUrl);
+                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
 
-                        if (isRedirect)
+                isRedirect = (int)response.StatusCode >= 300 && (int)response.StatusCode < 400;
+                if (response != null)
+                {
+                    if (isRedirect)
+                    {
+                        if (response.Headers.Location != null)
                         {
                             finalUrl = response.Headers.Location.IsAbsoluteUri
                                 ? response.Headers.Location.AbsoluteUri
                                 : new Uri(new Uri(finalUrl), response.Headers.Location).AbsoluteUri;
                         }
-                        else if ((int)response.StatusCode == 200)
-                        {
-                            break;
-                        }
-                        else
-                        {
-                            throw new HttpRequestException($"Unexpected response status code: {response.StatusCode}");
-                        }
+                    }
+                    else if ((int)response.StatusCode == 200)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        throw new HttpRequestException($"Unexpected response status code: {response.StatusCode}");
                     }
                 }
             } while (isRedirect);

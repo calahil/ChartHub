@@ -223,4 +223,8 @@
 	  </MauiXaml>
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Control\" />
+	</ItemGroup>
+
 </Project>

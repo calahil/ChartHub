@@ -57,7 +57,7 @@ namespace RhythmVerseClient.Services
         private static readonly byte[] SevenZipSignature = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
 
         public event EventHandler<string>? DirectoryNotFound;
-        public event EventHandler<string>? ErrorOccurred;
+        //public event EventHandler<string>? ErrorOccurred;
 
         public ResourceWatcher(string path, WatcherType watcherType)
         {

@@ -503,7 +503,7 @@ namespace RhythmVerseClient.Api
 
                     if (reader.TokenType == JsonTokenType.PropertyName)
                     {
-                        string propertyName = reader.GetString();
+                        string? propertyName = reader.GetString();
                         reader.Read();
 
                         switch (propertyName)

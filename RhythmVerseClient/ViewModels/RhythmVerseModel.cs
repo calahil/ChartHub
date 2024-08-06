@@ -48,6 +48,7 @@ namespace RhythmVerseClient.ViewModels
     public class RhythmVerseModel : INotifyPropertyChanged
     {
         private readonly AppGlobalSettings globalSettings;
+        private readonly DownloadService downloadService;
 
         private RhythmVerseApiClient _apiClient;
         public RhythmVerseApiClient ApiClient
@@ -58,6 +59,41 @@ namespace RhythmVerseClient.ViewModels
                 _apiClient = value;
                 OnPropertyChanged();
             }
+        }
+
+        public long? RecordsPerPage 
+        { 
+            get { return ApiClient.RecordsPerPage; }
+        }
+
+        public bool HasMoreRecords
+        {
+            get { return ApiClient.HasMoreRecords; }
+        }
+
+        public long? TotalPages
+        {
+            get { return ApiClient.TotalPages; }
+        }
+
+        public long? TotalResults
+        {
+            get { return ApiClient.TotalResults; }
+        }
+
+        public long? CurrentPage
+        {
+            get { return ApiClient.CurrentPage; }
+        }
+
+        public long? StartRecord
+        {
+            get { return ApiClient.StartRecord; }
+        }
+
+        public long? EndRecord
+        {
+            get { return ApiClient.EndRecord; }
         }
 
         private bool noResults;
@@ -92,9 +128,7 @@ namespace RhythmVerseClient.ViewModels
                 OnPropertyChanged();
             }
         }
-
-        
-
+                
         private string _selectedFilter;
         public string SelectedFilter
         {
@@ -167,22 +201,21 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        public List<string> Filters { get; } = new List<string> { "Artist", "Downloads", "Song Length", "Title" };
-        public List<string> Orders { get; } = new List<string> { "Ascending", "Descending" };
+        public List<string> Filters { get; } = ["Artist", "Downloads", "Song Length", "Title"];
+        public List<string> Orders { get; } = ["Ascending", "Descending"];
 
         public ObservableCollection<InstrumentItem> Instruments { get; set; }
 
         public string SearchText { get; set; } = string.Empty;
         public IAsyncRelayCommand SearchButtonCommand { get; }
         public IAsyncRelayCommand DownloadFileCommand { get; }
-        public IAsyncRelayCommand ThresholdReachedCommand { get; }
         public RhythmVersePageStrings PageStrings { get; }
 
         public RhythmVerseModel(AppGlobalSettings settings, IConfiguration configuration)
         {
             globalSettings = settings;
             PageStrings = new RhythmVersePageStrings();
-            apiClient = new RhythmVerseApiClient(configuration);
+            _apiClient = new RhythmVerseApiClient(configuration);
             _dataItems = [];
             _downloads = [];
             _selectedFilter = "Artist";
@@ -191,7 +224,6 @@ namespace RhythmVerseClient.ViewModels
             NoResults = false;
             SearchButtonCommand = new AsyncRelayCommand(SearchButton);
             DownloadFileCommand = new AsyncRelayCommand(DownloadFile);
-            ThresholdReachedCommand = new AsyncRelayCommand(ThresholdReached);
             downloadService = new DownloadService(configuration);
                      
             Instruments =
@@ -215,46 +247,24 @@ namespace RhythmVerseClient.ViewModels
             _selectedInstruments = [];
             _selectedInstruments.Add(Instruments[0]);
 
-            
+            _apiClient.PropertyChanged += ApiClient_PropertyChanged;
         }
 
-        /*public void SortDataItems()
+        private void ApiClient_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (DataItems == null || DataItems.Count == 0) return;
-
-            IEnumerable<ViewSong> sortedData;
-
-            switch (SelectedFilter.Filter.ToLower())
-            {
-                case "artist":
-                    sortedData = DataItems.OrderBy(s => s.Artist).ToList(); // Force execution here
-                    break;
-                case "title":
-                    sortedData = DataItems.OrderBy(s => s.Title).ToList(); // Force execution here
-                    break;
-                case "downloads":
-                    sortedData = DataItems.OrderBy(s => s.Downloads ?? 0).ToList(); // Force execution here
-                    break;
-                case "songlength":
-                    sortedData = DataItems.OrderBy(s => s.SongLength ?? 0).ToList(); // Force execution here
-                    break;
-                default:
-                    sortedData = DataItems.OrderBy(s => s.Title).ToList(); // Default sort and force execution
-                    break;
-            }
-
-            DataItems.Clear();
-            foreach (var song in sortedData)
-            {
-                DataItems.Add(song);
-            }
-        }*/
+            // Raise the PropertyChanged event for the corresponding property in the ViewModel
+            OnPropertyChanged(e.PropertyName);
+        }
 
         public async Task SearchButton()
         {
             if (DataItems != null)
             {
                 DataItems.Clear();
+            }
+            else
+            {
+                DataItems = [];
             }
             IsLoading = false;
             IsPlaceholder = true;
@@ -267,17 +277,11 @@ namespace RhythmVerseClient.ViewModels
             if (SelectedFile == null)
                 return;
 
-
-            var downloadFile = new DownloadFile(SelectedFile.FileName, globalSettings.StagingDir, SelectedFile.DownloadLink, SelectedFile.FileSize);
+            var downloadFile = new DownloadFile(SelectedFile.FileName ?? string.Empty, globalSettings.StagingDir, SelectedFile.DownloadLink ?? string.Empty, SelectedFile.FileSize);
             Downloads.Add(downloadFile);
             await downloadService.DownloadFileAsync(downloadFile);
 
             File.Move(Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName), Toolbox.ConstructPath(globalSettings.DownloadDir, downloadFile.DisplayName), true);
-        }
-
-        public async Task ThresholdReached()
-        {
-            //await LoadDataAsync();
         }
 
         public async Task LoadDataAsync(bool search)
@@ -286,7 +290,7 @@ namespace RhythmVerseClient.ViewModels
 
             IsLoading = true;
 
-            if (!apiClient.HasMoreRecords) return;
+            if (!ApiClient.HasMoreRecords) return;
 
 
             if (string.IsNullOrEmpty(SelectedFilter) || string.IsNullOrEmpty(SelectedOrder))
@@ -297,7 +301,7 @@ namespace RhythmVerseClient.ViewModels
             var filter = Toolbox.ConvertFilter(SelectedFilter);
             var order = Toolbox.GetSortOrder(filter, SelectedOrder);
             var instrument = SelectedInstruments.ToList();
-            DataItems = await apiClient.GetSongFilesAsync(search, SearchText.ToLower(), filter, order, instrument);
+            DataItems = await ApiClient.GetSongFilesAsync(search, SearchText.ToLower(), filter, order, instrument);
 
             if (DataItems.Count < 1)
             {
@@ -312,9 +316,7 @@ namespace RhythmVerseClient.ViewModels
             IsLoading = false;
             IsPlaceholder = false;
         }
-
-        
-
+    
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
