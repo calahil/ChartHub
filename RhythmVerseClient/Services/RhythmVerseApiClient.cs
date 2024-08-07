@@ -114,6 +114,8 @@ namespace RhythmVerseClient.Services
         }
 
         private long? _endRecord;
+        private string ResponseDebug;
+
         public long? EndRecord
         {
             get => _endRecord;
@@ -191,7 +193,7 @@ namespace RhythmVerseClient.Services
                     response.EnsureSuccessStatusCode();
 
                     string responseBody = await response.Content.ReadAsStringAsync();
-
+                    ResponseDebug = responseBody;
                     var DecodedResponse = RootResponse.FromJson(responseBody);
 
                     if (DecodedResponse != null && DecodedResponse.Data != null)

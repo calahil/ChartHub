@@ -852,53 +852,53 @@ namespace RhythmVerseClient.Api
     {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("drums")]
-        public DrumsClass Drums { get; set; }
+        public DrumsClass? Drums { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("guitar")]
-        public DrumsClass Guitar { get; set; }
+        public DrumsClass? Guitar { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("guitar_coop")]
-        public List<object> GuitarCoop { get; set; }
+        public List<object>? GuitarCoop { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("bass")]
-        public DrumsClass Bass { get; set; }
+        public DrumsClass? Bass { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("vocals")]
-        public DrumsClass Vocals { get; set; }
+        public DrumsClass? Vocals { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("keys")]
-        public DrumsClass Keys { get; set; }
+        public DrumsClass? Keys { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("prokeys")]
-        public DrumsClass Prokeys { get; set; }
+        public DrumsClass? Prokeys { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("guitarghl")]
-        public List<object> Guitarghl { get; set; }
+        public List<object>? Guitarghl { get; set; }
     }
 
     public partial class DrumsClass
     {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("e")]
-        public long? E { get; set; }
+        public long? Eeasy { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("m")]
-        public long? M { get; set; }
+        public long? Medium { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("h")]
-        public long? H { get; set; }
+        public long? Hard { get; set; }
 
         [JsonPropertyName("x")]
-        public long X { get; set; }
+        public long? Xtreme { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("all")]
@@ -1364,6 +1364,11 @@ namespace RhythmVerseClient.Api
 
         public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
+            if (reader.TokenType != JsonTokenType.String)
+            {
+                return default(DateTimeOffset);
+            }
+
             string? dateText = reader.GetString();
 
             if (string.IsNullOrEmpty(dateText) == false)
