@@ -852,57 +852,66 @@ namespace RhythmVerseClient.Api
     {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("drums")]
-        public DrumsClass? Drums { get; set; }
+        public DrumsClass? Drums { get; set; } = new DrumsClass();
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("guitar")]
-        public DrumsClass? Guitar { get; set; }
+        public DrumsClass? Guitar { get; set; } = new DrumsClass();
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("guitar_coop")]
-        public List<object>? GuitarCoop { get; set; }
+        public List<object>? GuitarCoop { get; set; } = [];
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("bass")]
-        public DrumsClass? Bass { get; set; }
+        public DrumsClass? Bass { get; set; } = new DrumsClass();
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("vocals")]
-        public DrumsClass? Vocals { get; set; }
+        public DrumsClass? Vocals { get; set; } = new DrumsClass();
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("keys")]
-        public DrumsClass? Keys { get; set; }
+        public DrumsClass? Keys { get; set; } = new DrumsClass();
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("prokeys")]
-        public DrumsClass? Prokeys { get; set; }
+        public DrumsClass? Prokeys { get; set; } = new DrumsClass();
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("guitarghl")]
-        public List<object>? Guitarghl { get; set; }
+        public List<object>? Guitarghl { get; set; } = [];
     }
 
     public partial class DrumsClass
     {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("e")]
-        public long? Eeasy { get; set; }
+        public long? E { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("m")]
-        public long? Medium { get; set; }
+        public long? M { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("h")]
-        public long? Hard { get; set; }
+        public long? H { get; set; }
 
         [JsonPropertyName("x")]
-        public long? Xtreme { get; set; }
+        public long? X { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("all")]
         public long? All { get; set; }
+
+        public DrumsClass()
+        {
+            E = 0;
+            M = 0;
+            H = 0;
+            X = 0;
+            All = 0;
+        }
     }
 
     public partial class Group
