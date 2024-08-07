@@ -65,4 +65,14 @@ public partial class RhythmVersePage : ContentPage
             picker.SelectedIndex = -1;
         }
     }
+
+    private void Button_Clicked(object sender, EventArgs e)
+    {
+        if (sender is Button button)
+        {
+            var song = (ViewSong)button.BindingContext;
+            viewModel.SearchAuthorText = song.Author.Name;
+        }
+        viewModel.RefreshButton();
+    }
 }

@@ -9,6 +9,7 @@ using RhythmVerseClient.Utilities;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows.Input;
 
 namespace RhythmVerseClient.ViewModels
 {
@@ -207,8 +208,11 @@ namespace RhythmVerseClient.ViewModels
         public ObservableCollection<InstrumentItem> Instruments { get; set; }
 
         public string SearchText { get; set; } = string.Empty;
-        public IAsyncRelayCommand SearchButtonCommand { get; }
+        public string SearchAuthorText {  get; set; } = string.Empty;
+
+        public IAsyncRelayCommand RefreshButtonCommand { get; }
         public IAsyncRelayCommand DownloadFileCommand { get; }
+
         public RhythmVersePageStrings PageStrings { get; }
 
         public RhythmVerseModel(AppGlobalSettings settings, IConfiguration configuration)
@@ -222,8 +226,9 @@ namespace RhythmVerseClient.ViewModels
             _selectedOrder = "Ascending";
             IsPlaceholder = true;
             NoResults = false;
-            SearchButtonCommand = new AsyncRelayCommand(SearchButton);
+            RefreshButtonCommand = new AsyncRelayCommand(RefreshButton);
             DownloadFileCommand = new AsyncRelayCommand(DownloadFile);
+
             downloadService = new DownloadService(configuration);
                      
             Instruments =
@@ -256,7 +261,7 @@ namespace RhythmVerseClient.ViewModels
             OnPropertyChanged(e.PropertyName);
         }
 
-        public async Task SearchButton()
+        public async Task RefreshButton()
         {
             if (DataItems != null)
             {
@@ -269,7 +274,7 @@ namespace RhythmVerseClient.ViewModels
             IsLoading = false;
             IsPlaceholder = true;
             NoResults = false;
-            await LoadDataAsync(true);
+            await LoadDataAsync(string.IsNullOrEmpty(SearchText) || string.IsNullOrEmpty(SearchAuthorText));
         }
 
         public async Task DownloadFile()
@@ -301,7 +306,7 @@ namespace RhythmVerseClient.ViewModels
             var filter = Toolbox.ConvertFilter(SelectedFilter);
             var order = Toolbox.GetSortOrder(filter, SelectedOrder);
             var instrument = SelectedInstruments.ToList();
-            DataItems = await ApiClient.GetSongFilesAsync(search, SearchText.ToLower(), filter, order, instrument);
+            DataItems = await ApiClient.GetSongFilesAsync(search, SearchText.ToLower(), filter, order, instrument, SearchAuthorText);
 
             if (DataItems.Count < 1)
             {

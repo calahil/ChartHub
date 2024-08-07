@@ -852,35 +852,41 @@ namespace RhythmVerseClient.Api
     {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("drums")]
-        public DrumsClass? Drums { get; set; } = new DrumsClass();
+        [JsonConverter(typeof(DrumsClassOrListConverter))]
+        public object? Drums { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("guitar")]
-        public DrumsClass? Guitar { get; set; } = new DrumsClass();
+        [JsonConverter(typeof(DrumsClassOrListConverter))]
+        public object? Guitar { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("guitar_coop")]
-        public List<object>? GuitarCoop { get; set; } = [];
+        public List<object>? GuitarCoop { get; set; } = new();
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("bass")]
-        public DrumsClass? Bass { get; set; } = new DrumsClass();
+        [JsonConverter(typeof(DrumsClassOrListConverter))]
+        public object? Bass { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("vocals")]
-        public DrumsClass? Vocals { get; set; } = new DrumsClass();
+        [JsonConverter(typeof(DrumsClassOrListConverter))]
+        public object? Vocals { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("keys")]
-        public DrumsClass? Keys { get; set; } = new DrumsClass();
+        [JsonConverter(typeof(DrumsClassOrListConverter))]
+        public object? Keys { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("prokeys")]
-        public DrumsClass? Prokeys { get; set; } = new DrumsClass();
+        [JsonConverter(typeof(DrumsClassOrListConverter))]
+        public object? Prokeys { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("guitarghl")]
-        public List<object>? Guitarghl { get; set; } = [];
+        public List<object>? Guitarghl { get; set; } = new();
     }
 
     public partial class DrumsClass
@@ -1071,6 +1077,38 @@ namespace RhythmVerseClient.Api
         };
     }
 
+    public class DrumsClassOrListConverter : JsonConverter<object>
+    {
+        public override object Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.StartObject)
+            {
+                return JsonSerializer.Deserialize<DrumsClass>(ref reader, options);
+            }
+            else if (reader.TokenType == JsonTokenType.StartArray)
+            {
+                return JsonSerializer.Deserialize<List<object>>(ref reader, options);
+            }
+            return new List<object>();
+        }
+
+        public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options)
+        {
+            if (value is DrumsClass drumsClass)
+            {
+                JsonSerializer.Serialize(writer, drumsClass, options);
+            }
+            else if (value is List<object> list)
+            {
+                JsonSerializer.Serialize(writer, list, options);
+            }
+            else
+            {
+                throw new JsonException("Unexpected value type");
+            }
+        }
+    }
+
     internal class ParseStringConverter : JsonConverter<long>
     {
         public override bool CanConvert(Type t) => t == typeof(long);
@@ -1083,7 +1121,8 @@ namespace RhythmVerseClient.Api
             {
                 return l;
             }
-            throw new Exception("Cannot unmarshal type long");
+            return default(long);
+            //throw new Exception("Cannot unmarshal type long");
         }
 
         public override void Write(Utf8JsonWriter writer, long value, JsonSerializerOptions options)
@@ -1111,7 +1150,7 @@ namespace RhythmVerseClient.Api
                     var objectValue = JsonSerializer.Deserialize<DataData>(ref reader, options);
                     return new DataUnion { DataData = objectValue };
             }
-            throw new Exception("Cannot unmarshal type DataUnion");
+            return new DataUnion { DataData = new DataData() };
         }
 
         public override void Write(Utf8JsonWriter writer, DataUnion value, JsonSerializerOptions options)
@@ -1148,7 +1187,7 @@ namespace RhythmVerseClient.Api
                     var stringValue = reader.GetString();
                     return new AlbumArt { String = stringValue };
             }
-            throw new Exception("Cannot unmarshal type AlbumArt");
+            return new AlbumArt { Bool = false };
         }
 
         public override void Write(Utf8JsonWriter writer, AlbumArt value, JsonSerializerOptions options)
@@ -1187,7 +1226,7 @@ namespace RhythmVerseClient.Api
                     var arrayValue = JsonSerializer.Deserialize<List<AltVersion>>(ref reader, options);
                     return new AltVersions { AltVersionArray = arrayValue };
             }
-            throw new Exception("Cannot unmarshal type AltVersions");
+            return new AltVersions { Bool = false };
         }
 
         public override void Write(Utf8JsonWriter writer, AltVersions value, JsonSerializerOptions options)
@@ -1229,7 +1268,7 @@ namespace RhythmVerseClient.Api
                     var boolValue = reader.GetBoolean();
                     return new Level { Bool = boolValue };
             }
-            throw new Exception("Cannot unmarshal type Level");
+            return new Level { Bool = false };
         }
 
         public override void Write(Utf8JsonWriter writer, Level value, JsonSerializerOptions options)
@@ -1265,7 +1304,7 @@ namespace RhythmVerseClient.Api
                     var arrayValue = JsonSerializer.Deserialize<List<object>>(ref reader, options);
                     return new CreditsUnion { AnythingArray = arrayValue };
             }
-            throw new Exception("Cannot unmarshal type CreditsUnion");
+            return new CreditsUnion { CreditsClass = new CreditsClass() };
         }
 
         public override void Write(Utf8JsonWriter writer, CreditsUnion value, JsonSerializerOptions options)
@@ -1400,620 +1439,6 @@ namespace RhythmVerseClient.Api
 
         public static readonly IsoDateTimeOffsetConverter Singleton = new IsoDateTimeOffsetConverter();
     }
-}
-
-namespace RhythmVerseClient.ApiVone
-{
-    using System;
-    using System.Collections.Generic;
-
-    using System.Text.Json;
-    using System.Text.Json.Serialization;
-    using System.Globalization;
-
-    public partial class RootResponse
-    {
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("status")]
-        public string Status { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("data")]
-        public RootResponseData Data { get; set; }
-    }
-
-    public partial class RootResponseData
-    {
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("records")]
-        public Records Records { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("pagination")]
-        public Pagination Pagination { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("songs")]
-        public List<Song> Songs { get; set; }
-    }
-
-    public partial class Pagination
-    {
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("start")]
-        public long? Start { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("records")]
-        public string Records { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("page")]
-        public string Page { get; set; }
-    }
-
-    public partial class Records
-    {
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("total_available")]
-        public long? TotalAvailable { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("total_filtered")]
-        public long? TotalFiltered { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("returned")]
-        public long? Returned { get; set; }
-    }
-
-    public partial class Song
-    {
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("data")]
-        [JsonConverter(typeof(SongDataConverter))]
-        public SongData Data { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("file")]
-        public Files File { get; set; }
-    }
-
-    public partial class SongData
-    {
-        /*[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("song_id")]
-        public long? SongId { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("member_id")]
-        public long? MemberId { get; set; }*/
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("song_length")]
-        public long? SongLength { get; set; }
-        
-        [JsonPropertyName("genre")]
-        public string Genre { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("year")]
-        public long? Year { get; set; }
-        /*
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("album")]
-                public string Album { get; set; }
-
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("album_s")]
-                public string AlbumS { get; set; }
-
-                [JsonPropertyName("album_track_number")]
-                public long? AlbumTrackNumber { get; set; }
-
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("decade")]
-                public long? Decade { get; set; }
-        */
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("artist")]
-        public string Artist { get; set; }
-        /*
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("artist_s")]
-                public string ArtistS { get; set; }
-
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("artist_id")]
-                public long? ArtistId { get; set; }
-        */
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("title")]
-        public string Title { get; set; }
-   
-        [JsonPropertyName("diff_drums")]
-        public string DiffDrums { get; set; }
-
-        [JsonPropertyName("diff_guitar")]
-        public string DiffGuitar { get; set; }
-
-        [JsonPropertyName("diff_bass")]
-        public string DiffBass { get; set; }
-
-        [JsonPropertyName("diff_vocals")]
-        public object DiffVocals { get; set; }
-        /*
-                [JsonPropertyName("diff_keys")]
-                public string DiffKeys { get; set; }
-
-                [JsonPropertyName("diff_prokeys")]
-                public object DiffProkeys { get; set; }
-
-                [JsonPropertyName("diff_proguitar")]
-                public object DiffProguitar { get; set; }
-
-                [JsonPropertyName("diff_probass")]
-                public object DiffProbass { get; set; }
-
-                [JsonPropertyName("diff_band")]
-                public object DiffBand { get; set; }
-
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("master")]
-                public long? Master { get; set; }
-
-                [JsonPropertyName("vocal_parts")]
-                public string VocalParts { get; set; }
-        */
-        [JsonPropertyName("rating")]
-        public string Rating { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("downloads")]
-        public long? Downloads { get; set; }
-        /*
-                [JsonPropertyName("diff_rhythm")]
-                public string DiffRhythm { get; set; }
-
-                [JsonPropertyName("diff_guitar_coop")]
-                public string DiffGuitarCoop { get; set; }
-
-                [JsonPropertyName("diff_drums_real_ps")]
-                public object DiffDrumsRealPs { get; set; }
-
-                [JsonPropertyName("diff_keys_real_ps")]
-                public object DiffKeysRealPs { get; set; }
-
-                [JsonPropertyName("diff_dance")]
-                public object DiffDance { get; set; }
-
-                [JsonPropertyName("diff_vocals_harm")]
-                public object DiffVocalsHarm { get; set; }
-
-                [JsonPropertyName("diff_guitarghl")]
-                public string DiffGuitarghl { get; set; }
-
-                [JsonPropertyName("diff_bassghl")]
-                public string DiffBassghl { get; set; }
-        */
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("album_art")]
-        public string? AlbumArt { get; set; }
-    }
-
-    public partial class Files
-    {
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("diff_drums")]
-        public long? DiffDrums { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("diff_guitar")]
-        public long? DiffGuitar { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("diff_bass")]
-        public long? DiffBass { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("diff_vocals")]
-        public long? DiffVocals { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("file_name")]
-        public string FileName { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("gameformat")]
-        public string Gameformat { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("downloads")]
-        public long? Downloads { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
-        [JsonPropertyName("size")]
-        public long Size { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("file_artist")]
-        public string? FileArtist { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("file_album")]
-        public string? FileAlbum { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("file_title")]
-        public string? FileTitle { get; set; }
-
-        [JsonPropertyName("external_url")]
-        public Uri ExternalUrl { get; set; }
-        /*
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("disc")]
-                public string Disc { get; set; }
-
-                [JsonPropertyName("completeness")]
-                public long? Completeness { get; set; }
-
-                [JsonPropertyName("wip")]
-                public object Wip { get; set; }
-*/
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("file_song_length")]
-        public long? FileSongLength { get; set; }
-        /*
-                        [JsonPropertyName("file_album_track_number")]
-                        public long? FileAlbumTrackNumber { get; set; }
-                */
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("filename")]
-        public string Filename { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("author")]
-        public Author Author { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("file_url")]
-        public string FileUrl { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("file_url_full")]
-        public Uri FileUrlFull { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("author_id")]
-        public string AuthorId { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("comments")]
-        public long? Comments { get; set; }
-
-        /* [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-         [JsonPropertyName("credits")]
-         public List<object> Credits { get; set; }*/
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("album_art")]
-        public string AlbumArt { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("thanks")]
-        public long? Thanks { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("download_url")]
-        public string DownloadUrl { get; set; }
-        /*
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("download_page_url")]
-                public string DownloadPageUrl { get; set; }
-
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("download_page_url_full")]
-                public Uri DownloadPageUrlFull { get; set; }
-
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("difficulties")]
-                public Difficulties Difficulties { get; set; }
-        */
-    }
-
-    public partial class Author
-    {
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("member_id")]
-        public long? MemberId { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("name")]
-        public string Name { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("account")]
-        public string Account { get; set; }
-        
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("releases")]
-        public long? Releases { get; set; }
-        /*
-                [JsonPropertyName("default_gameformat")]
-                public string DefaultGameformat { get; set; }
-
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("shortname")]
-                public string Shortname { get; set; }
-
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("role")]
-                public string Role { get; set; }
-
-                [JsonPropertyName("author_class")]
-                public string AuthorClass { get; set; }
-
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("level")]
-                public Level? Level { get; set; }
-
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("confirmed")]
-                public long? Confirmed { get; set; }
-
-                [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-                [JsonPropertyName("source")]
-                public long? Source { get; set; }
-        
-                [JsonPropertyName("id")]
-                public long? Id { get; set; }
-        */
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("dl_count")]
-        public long? DlCount { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("public_profile_page")]
-        public string PublicProfilePage { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("songlist_url")]
-        public string SonglistUrl { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("author_url")]
-        public string AuthorUrl { get; set; }
-
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        [JsonPropertyName("author_url_full")]
-        public Uri AuthorUrlFull { get; set; }
-  
-        [JsonPropertyName("avatar_path")]
-        public string AvatarPath { get; set; }
-    }
-    /*
-        public partial class Difficulties
-        {
-            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-            [JsonPropertyName("guitar")]
-            public DrumsUnion? Guitar { get; set; }
-
-            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-            [JsonPropertyName("drums")]
-            public DrumsUnion? Drums { get; set; }
-
-            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-            [JsonPropertyName("bass")]
-            public DrumsUnion? Bass { get; set; }
-
-            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-            [JsonPropertyName("vocals")]
-            public DrumsUnion? Vocals { get; set; }
-        }
-
-        public partial class DrumsClass
-        {
-            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-            [JsonPropertyName("x")]
-            public long? X { get; set; }
-
-            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-            [JsonPropertyName("h")]
-            public long? H { get; set; }
-
-            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-            [JsonPropertyName("e")]
-            public long? E { get; set; }
-
-            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-            [JsonPropertyName("m")]
-            public long? M { get; set; }
-
-            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-            [JsonPropertyName("all")]
-            public long? All { get; set; }
-        }
-
-        public partial struct Level
-        {
-            public bool? Bool;
-            public long? Integer;
-
-            public static implicit operator Level(bool Bool) => new Level { Bool = Bool };
-            public static implicit operator Level(long Integer) => new Level { Integer = Integer };
-        }
-
-        public partial struct DrumsUnion
-        {
-            public List<object> AnythingArray;
-            public DrumsClass DrumsClass;
-
-            public static implicit operator DrumsUnion(List<object> AnythingArray) => new DrumsUnion { AnythingArray = AnythingArray };
-            public static implicit operator DrumsUnion(DrumsClass DrumsClass) => new DrumsUnion { DrumsClass = DrumsClass };
-        }
-    */
-    public partial class RootResponse
-    {
-        public static RootResponse FromJson(string json) => JsonSerializer.Deserialize<RootResponse>(json, RhythmVerseClient.Api.Converter.Settings);
-    }
-
-    public static class Serialize
-    {
-        public static string ToJson(this RootResponse self) => JsonSerializer.Serialize(self, RhythmVerseClient.Api.Converter.Settings);
-    }
-
-    internal static class Converter
-    {
-        public static readonly JsonSerializerOptions Settings = new(JsonSerializerDefaults.General)
-        {
-            Converters =
-            {
-                //LevelConverter.Singleton,
-                //DrumsUnionConverter.Singleton,
-                new SongDataConverter()
-            },
-        };
-    }
-
-    public class SongDataConverter : JsonConverter<SongData>
-    {
-        public override SongData Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            if (reader.TokenType == JsonTokenType.True || reader.TokenType == JsonTokenType.False)
-            {
-                // If the data is a boolean, interpret it as indicating no data
-                return new SongData();
-            }
-            else if (reader.TokenType == JsonTokenType.StartObject)
-            {
-                var songData = new SongData();
-
-                while (reader.Read())
-                {
-                    if (reader.TokenType == JsonTokenType.EndObject)
-                        return songData;
-
-                    if (reader.TokenType == JsonTokenType.PropertyName)
-                    {
-                        string? propertyName = reader.GetString();
-                        reader.Read();
-
-                        switch (propertyName)
-                        {
-                            case "song_length":
-                                songData.SongLength = reader.TokenType == JsonTokenType.Null ? (long?)null : reader.GetInt64();
-                                break;
-                            case "artist":
-                                songData.Artist = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
-                                break;
-                            case "title":
-                                songData.Title = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
-                                break;
-                            case "rating":
-                                songData.Rating = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
-                                break;
-                            case "downloads":
-                                songData.Downloads = reader.TokenType == JsonTokenType.Null ? (long?)null : reader.GetInt64();
-                                break;
-                            case "album_art":
-                                if (reader.TokenType == JsonTokenType.False || reader.TokenType == JsonTokenType.Null)
-                                {
-                                    songData.AlbumArt = null;
-                                }
-                                else
-                                {
-                                    songData.AlbumArt = reader.GetString();
-                                }
-                                break;
-                            default:
-                                reader.Skip(); // Skip unknown properties
-                                break;
-                        }
-                    }
-                }
-            }
-
-            throw new JsonException("Unexpected token type when deserializing SongData.");
-        }
-
-        public override void Write(Utf8JsonWriter writer, SongData value, JsonSerializerOptions options)
-        {
-            JsonSerializer.Serialize(writer, value, options);
-        }
-    }
-    /*internal class LevelConverter : JsonConverter<Level>
-    {
-        public override bool CanConvert(Type t) => t == typeof(Level);
-
-        public override Level Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            switch (reader.TokenType)
-            {
-                case JsonTokenType.Number:
-                    var integerValue = reader.GetInt64();
-                    return new Level { Integer = integerValue };
-                case JsonTokenType.True:
-                case JsonTokenType.False:
-                    var boolValue = reader.GetBoolean();
-                    return new Level { Bool = boolValue };
-            }
-            throw new Exception("Cannot unmarshal type Level");
-        }
-
-        public override void Write(Utf8JsonWriter writer, Level value, JsonSerializerOptions options)
-        {
-            if (value.Integer != null)
-            {
-                JsonSerializer.Serialize(writer, value.Integer.Value, options);
-                return;
-            }
-            if (value.Bool != null)
-            {
-                JsonSerializer.Serialize(writer, value.Bool.Value, options);
-                return;
-            }
-            throw new Exception("Cannot marshal type Level");
-        }
-
-        public static readonly LevelConverter Singleton = new LevelConverter();
-    }
-
-    internal class DrumsUnionConverter : JsonConverter<DrumsUnion>
-    {
-        public override bool CanConvert(Type t) => t == typeof(DrumsUnion);
-
-        public override DrumsUnion Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            switch (reader.TokenType)
-            {
-                case JsonTokenType.StartObject:
-                    var objectValue = JsonSerializer.Deserialize<DrumsClass>(ref reader, options);
-                    return new DrumsUnion { DrumsClass = objectValue };
-                case JsonTokenType.StartArray:
-                    var arrayValue = JsonSerializer.Deserialize<List<object>>(ref reader, options);
-                    return new DrumsUnion { AnythingArray = arrayValue };
-            }
-            throw new Exception("Cannot unmarshal type DrumsUnion");
-        }
-
-        public override void Write(Utf8JsonWriter writer, DrumsUnion value, JsonSerializerOptions options)
-        {
-            if (value.AnythingArray != null)
-            {
-                JsonSerializer.Serialize(writer, value.AnythingArray, options);
-                return;
-            }
-            if (value.DrumsClass != null)
-            {
-                JsonSerializer.Serialize(writer, value.DrumsClass, options);
-                return;
-            }
-            throw new Exception("Cannot marshal type DrumsUnion");
-        }
-
-        public static readonly DrumsUnionConverter Singleton = new DrumsUnionConverter();
-    }
-*/
 }
 
 

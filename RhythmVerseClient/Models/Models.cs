@@ -1,4 +1,5 @@
-﻿using System;
+﻿using RhythmVerseClient.Api;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -44,6 +45,28 @@ namespace RhythmVerseClient.Models
             }
         }
 
+        private string? _year;
+        public string? Year
+        {
+            get => _year;
+            set
+            {
+                _year = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string? _genre;
+        public string? Genre
+        {
+            get => _genre;
+            set
+            {
+                _genre = value;
+                OnPropertyChanged();
+            }
+        }
+
         private long? _downloads;
         public long? Downloads
         {
@@ -55,8 +78,8 @@ namespace RhythmVerseClient.Models
             }
         }
 
-        private string? _author;
-        public string? Author
+        private Author? _author;
+        public Author? Author
         {
             get => _author;
             set
@@ -198,6 +221,16 @@ namespace RhythmVerseClient.Models
             }
         }
 
+        private string? _keysString;
+        public string? KeysString
+        {
+            get => _keysString;
+            set
+            {
+                _keysString = value;
+                OnPropertyChanged();
+            }
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 

@@ -114,7 +114,7 @@ namespace RhythmVerseClient.Services
         }
 
         private long? _endRecord;
-        private string ResponseDebug;
+        private string? ResponseDebug;
 
         public long? EndRecord
         {
@@ -138,7 +138,7 @@ namespace RhythmVerseClient.Services
 
         }
 
-        public async Task<ObservableCollection<ViewSong>> GetSongFilesAsync(bool search, string searchString, string sort, string order, List<InstrumentItem> instrument)
+        public async Task<ObservableCollection<ViewSong>> GetSongFilesAsync(bool search, string searchString, string sort, string order, List<InstrumentItem> instrument, string authorText)
         {
             if (search)
             {
@@ -150,7 +150,7 @@ namespace RhythmVerseClient.Services
                 string endpoint;
                 //string payload;
 
-                if (searchString != string.Empty)
+                if (!string.IsNullOrEmpty(searchString) || !string.IsNullOrEmpty(authorText))
                 {
                     endpoint = "api/all/songfiles/search/live";
                 }
@@ -176,6 +176,10 @@ namespace RhythmVerseClient.Services
                         {
                             collection.Add(new("instrument", $"{item.Value}"));
                         }
+                    }
+                    if (!string.IsNullOrEmpty(authorText))
+                    {
+                        collection.Add(new("author", $"{authorText}"));
                     }
                     collection.Add(new("sort[0][sort_by]", $"{sort}"));
                     collection.Add(new("sort[0][sort_order]", $"{order}"));
@@ -212,137 +216,106 @@ namespace RhythmVerseClient.Services
 
                         foreach (var song in DecodedResponse.Data.Songs)
                         {
-                            if (!song.File.DownloadUrl.StartsWith("http://marketplace.xbox.com") && !song.File.DownloadUrl.StartsWith("none"))
+                            if (song != null)
                             {
-                                var songView = new ViewSong();
-
-                                if (song.Data.DataData != null)
+                                if (!song.File.DownloadUrl.StartsWith("http://marketplace.xbox.com") && !song.File.DownloadUrl.StartsWith("none"))
                                 {
-                                    songView.Artist = song.File.FileArtist as string ?? song.Data.DataData.Artist ?? song.File.Filename ?? "Unknown";
-                                    songView.Title = song.File.FileTitle as string ?? song.Data.DataData.Title ?? song.File.Filename ?? "Unknown";
-                                    songView.Album = song.File.FileAlbum as string ?? song.Data.DataData.Album ?? song.File.Filename ?? "Unknown";
-                                    songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : song.Data.DataData.Downloads;
+                                    var songView = new ViewSong();
 
-                                    if (song.Data.DataData.SongLength > 0)
+                                    if (song.Data.DataData != null)
                                     {
-                                        songView.SongLength = song.Data.DataData.SongLength;
-                                    }
-                                    else if (song?.File.SongLength != null)
-                                    {
-                                        songView.SongLength = song.File.SongLength;
-                                    }
-                                    else
-                                    {
-                                        songView.SongLength = 0;
-                                    }
+                                        songView.Artist = song.File.FileArtist as string ?? song.Data.DataData.Artist ?? song.File.Filename ?? "Unknown";
+                                        songView.Title = song.File.FileTitle as string ?? song.Data.DataData.Title ?? song.File.Filename ?? "Unknown";
+                                        songView.Album = song.File.FileAlbum as string ?? song.Data.DataData.Album ?? song.File.Filename ?? "Unknown";
+                                        songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : song.Data.DataData.Downloads;
 
-                                }
-                                else
-                                {
-                                    songView.Artist = song.File.FileArtist as string ?? song.File.Filename ?? "Unknown";
-                                    songView.Title = song.File.FileTitle as string ?? song.File.Filename ?? "Unknown";
-                                    songView.Album = song.File.FileAlbum as string ?? song.File.Filename ?? "Unknown";
-                                    songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : 0;
-
-                                    if (song.File.SongLength != null)
-                                    {
-                                        songView.SongLength = song.File.SongLength;
-                                    }
-                                    else if (song.File.FileSongLength != null)
-                                    {
-                                        songView.SongLength = song.File.FileSongLength as long?;
+                                        if (song.Data.DataData.SongLength > 0)
+                                        {
+                                            songView.SongLength = song.Data.DataData.SongLength;
+                                        }
+                                        else
+                                        {
+                                            songView.SongLength = song.File.SongLength;
+                                        }
+                                        songView.Genre = song.Data.DataData.Genre ?? song.File.FileGenre ?? "Music";
+                                        songView.Year = song.Data.DataData.Year.ToString() ?? song.File.FileYear.ToString() ?? "1955";
                                     }
                                     else
                                     {
-                                        songView.SongLength = 0;
-                                    }
-                                }
-                                songView.FileName = song.File.FileName ?? song.File.Filename ?? "missing";
-                                songView.FileSize = song?.File.Size;
+                                        songView.Artist = song.File.FileArtist as string ?? song.File.Filename ?? "Unknown";
+                                        songView.Title = song.File.FileTitle as string ?? song.File.Filename ?? "Unknown";
+                                        songView.Album = song.File.FileAlbum as string ?? song.File.Filename ?? "Unknown";
+                                        songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : 0;
+                                        songView.Year = song.File.FileYear.ToString() ?? "1955";
+                                        songView.Genre = song.File.FileGenre ?? "Music";
 
-                                var image = song?.File.AlbumArt;
-                                if (image != null)
-                                {
-                                    if (!image.StartsWith(BaseUrl))
+                                        if (song.File.SongLength > 0)
+                                        {
+                                            songView.SongLength = song.File.SongLength;
+                                        }
+                                        else
+                                        {
+                                            songView.SongLength = song.File.FileSongLength as long?;
+                                        }
+                                    }
+                                    songView.FileName = song.File.FileName ?? song.File.Filename ?? "missing";
+                                    songView.FileSize = song.File.Size;
+
+                                    var image = song.File.AlbumArt;
+                                    if (image != null)
                                     {
-                                        image = BaseUrl + image;
+                                        if (!image.StartsWith(BaseUrl))
+                                        {
+                                            image = BaseUrl + image;
+                                        }
+                                        songView.AlbumArt = image;
                                     }
-                                    songView.AlbumArt = image;
-                                }
 
-                                songView.FormattedTme = Toolbox.ConvertSecondstoText(songView.SongLength);
+                                    songView.FormattedTme = Toolbox.ConvertSecondstoText(songView.SongLength);
 
-                                Author author = song?.File.Author ?? new Author();
-                                songView.Author = author.Name;
+                                    Author author = song.File.Author ?? new Author();
 
-                                var avatarPath = author.AvatarPath;
-                                if (avatarPath != null)
-                                {
-                                    if (!avatarPath.StartsWith("http"))
+                                    var avatarPath = author.AvatarPath;
+                                    if (avatarPath != null)
                                     {
-                                        avatarPath = BaseUrl + avatarPath;
+                                        if (!avatarPath.StartsWith("http"))
+                                        {
+                                            avatarPath = BaseUrl + avatarPath;
+                                        }
+
+                                        author.AvatarPath = avatarPath;
+                                    }
+                                    else
+                                    {
+                                        author.AvatarPath = "blankprofile.png";
                                     }
 
-                                    songView.Avatar = avatarPath;
-                                }
-                                else
-                                {
-                                    songView.Avatar = "blankprofile.png";
-                                }
+                                    songView.Author = author;
 
-                                if (!song.File.DownloadUrl.StartsWith("http"))
-                                {
-                                    songView.DownloadLink = BaseUrl + song.File.DownloadUrl;
-                                }
-                                else
-                                {
-                                    songView.DownloadLink = song.File.DownloadUrl;
-                                }
+                                    if (!song.File.DownloadUrl.StartsWith("http"))
+                                    {
+                                        songView.DownloadLink = BaseUrl + song.File.DownloadUrl;
+                                    }
+                                    else
+                                    {
+                                        songView.DownloadLink = song.File.DownloadUrl;
+                                    }
 
-                                if (song.File.DiffDrums.HasValue && song.File.DiffDrums.Value >= 0 && song.File.DiffDrums.Value < Ratings.Count)
-                                {
-                                    songView.DrumString = Ratings[(int)song.File.DiffDrums.Value];
-                                }
-                                else
-                                {
-                                    songView.DrumString = Ratings[0];
-                                }
+                                    songView.DrumString = GiveMeRatingsNow(song, "drums");
+                                    songView.GuitarString = GiveMeRatingsNow(song, "guitar");
+                                    songView.BassString = GiveMeRatingsNow(song, "bass");
+                                    songView.VocalString = GiveMeRatingsNow(song, "vocals");
+                                    songView.KeysString = GiveMeRatingsNow(song, "keys");
 
-                                if (song.File.DiffGuitar.HasValue && song.File.DiffGuitar.Value >= 0 && song.File.DiffGuitar.Value < Ratings.Count)
-                                {
-                                    songView.GuitarString = Ratings[(int)song.File.DiffGuitar.Value];
-                                }
-                                else
-                                {
-                                    songView.GuitarString = Ratings[0];
-                                }
+                                    if (dictionary.TryGetValue(song.File.Gameformat, out List<string>? value))
+                                    {
+                                        songView.Gameformat = value[1];
+                                    }
 
-                                if (song.File.DiffBass.HasValue && song.File.DiffBass.Value >= 0 && song.File.DiffBass.Value < Ratings.Count)
-                                {
-                                    songView.BassString = Ratings[(int)song.File.DiffBass.Value];
-                                }
-                                else
-                                {
-                                    songView.BassString = Ratings[0];
-                                }
-
-                                if (song.File.DiffVocals.HasValue && song.File.DiffVocals.Value >= 0 && song.File.DiffVocals.Value < Ratings.Count)
-                                {
-                                    songView.VocalString = Ratings[(int)song.File.DiffVocals.Value];
-                                }
-                                else
-                                {
-                                    songView.VocalString = Ratings[0];
-                                }
-
-                                if (dictionary.TryGetValue(song.File.Gameformat, out List<string>? value))
-                                {
-                                    songView.Gameformat = value[1];
-                                }
-
-                                if (!DataItems.Contains(songView))
-                                {
-                                    DataItems.Add(songView);
+                                    if (!DataItems.Contains(songView))
+                                    {
+                                        DataItems.Add(songView);
+                                    }
                                 }
                             }
                         }
@@ -368,6 +341,175 @@ namespace RhythmVerseClient.Services
                 // Handle exceptions
                 Logger.LogMessage($"An error occurred: {ex.Message}");
                 return [];
+            }
+        }
+
+        private string GiveMeRatingsNow(Song song, string instrument)
+        {
+            int dataRating;
+            int fileRating;
+            var data = song.Data.DataData;
+            var file = song.File;
+
+            switch (instrument)
+            {
+                case "drums":
+                    if (data != null)
+                    {
+                        if (data.DiffDrums.HasValue &&
+                                             data.DiffDrums.Value >= 0 &&
+                                             data.DiffDrums.Value < Ratings.Count)
+                        {
+                            dataRating = (int)data.DiffDrums.Value;
+                        }
+                        else
+                        {
+                            dataRating = 0;
+                        }
+                    }
+                    else
+                    {
+                        dataRating = 0;
+                    }
+
+                    if (file.DiffDrums.HasValue &&
+                        file.DiffDrums.Value >= 0 &&
+                        file.DiffDrums.Value < Ratings.Count)
+                    {
+                        fileRating = (int)file.DiffDrums.Value;
+                    }
+                    else
+                    {
+                        fileRating = 0;
+                    }
+
+                    return Ratings[Math.Max(dataRating, fileRating)];
+                case "guitar":
+                    if (data != null)
+                    {
+                        if (data.DiffGuitar.HasValue &&
+                                             data.DiffGuitar.Value >= 0 &&
+                                             data.DiffGuitar.Value < Ratings.Count)
+                        {
+                            dataRating = (int)data.DiffGuitar.Value;
+                        }
+                        else
+                        {
+                            dataRating = 0;
+                        }
+                    }
+                    else
+                    {
+                        dataRating = 0;
+                    }
+
+                    if (file.DiffGuitar.HasValue &&
+                        file.DiffGuitar.Value >= 0 &&
+                        file.DiffGuitar.Value < Ratings.Count)
+                    {
+                        fileRating = (int)file.DiffGuitar.Value;
+                    }
+                    else
+                    {
+                        fileRating = 0;
+                    }
+
+                    return Ratings[Math.Max(dataRating, fileRating)];
+                case "bass":
+                    if (data != null)
+                    {
+                        if (data.DiffBass.HasValue &&
+                                             data.DiffBass.Value >= 0 &&
+                                             data.DiffBass.Value < Ratings.Count)
+                        {
+                            dataRating = (int)data.DiffBass.Value;
+                        }
+                        else
+                        {
+                            dataRating = 0;
+                        }
+                    }
+                    else
+                    {
+                        dataRating = 0;
+                    }
+
+                    if (file.DiffBass.HasValue &&
+                        file.DiffBass.Value >= 0 &&
+                        file.DiffBass.Value < Ratings.Count)
+                    {
+                        fileRating = (int)file.DiffBass.Value;
+                    }
+                    else
+                    {
+                        fileRating = 0;
+                    }
+
+                    return Ratings[Math.Max(dataRating, fileRating)];
+                case "vocals":
+                    if (data != null)
+                    {
+                        if (data.DiffVocals.HasValue &&
+                                             data.DiffVocals.Value >= 0 &&
+                                             data.DiffVocals.Value < Ratings.Count)
+                        {
+                            dataRating = (int)data.DiffVocals.Value;
+                        }
+                        else
+                        {
+                            dataRating = 0;
+                        }
+                    }
+                    else
+                    {
+                        dataRating = 0;
+                    }
+
+                    if (file.DiffVocals.HasValue &&
+                        file.DiffVocals.Value >= 0 &&
+                        file.DiffVocals.Value < Ratings.Count)
+                    {
+                        fileRating = (int)file.DiffVocals.Value;
+                    }
+                    else
+                    {
+                        fileRating = 0;
+                    }
+
+                    return Ratings[Math.Max(dataRating, fileRating)];
+                case "keys":
+                    if (data != null)
+                    {
+                        if (data.DiffKeys.HasValue &&
+                                             data.DiffKeys.Value >= 0 &&
+                                             data.DiffKeys.Value < Ratings.Count)
+                        {
+                            dataRating = (int)data.DiffKeys.Value;
+                        }
+                        else
+                        {
+                            dataRating = 0;
+                        }
+                    }
+                    else
+                    {
+                        dataRating = 0;
+                    }
+
+                    if (file.DiffKeys.HasValue &&
+                        file.DiffKeys.Value >= 0 &&
+                        file.DiffKeys.Value < Ratings.Count)
+                    {
+                        fileRating = (int)file.DiffKeys.Value;
+                    }
+                    else
+                    {
+                        fileRating = 0;
+                    }
+
+                    return Ratings[Math.Max(dataRating, fileRating)];
+                default:
+                    return Ratings[0];
             }
         }
 
