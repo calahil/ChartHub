@@ -138,7 +138,7 @@ namespace RhythmVerseClient.Services
 
     public class GoogleDriveService(IConfiguration configuration)
     {
-        private static readonly string[] Scopes = [DriveService.Scope.DriveReadonly];
+        private static readonly string[] Scopes = [DriveService.Scope.Drive];
         private static readonly string ApplicationName = "RhythmVerseClient";
         private readonly IConfiguration _configuration = configuration;
         private DriveService? _driveService;
@@ -157,7 +157,7 @@ namespace RhythmVerseClient.Services
             Scopes,
             "user",
             CancellationToken.None,
-            new FileDataStore("token.json", false));
+            new FileDataStore(Toolbox.ConstructPath(FileSystem.Current.AppDataDirectory, "token.json"), false));
 
             return new DriveService(new BaseClientService.Initializer()
             {
@@ -173,9 +173,9 @@ namespace RhythmVerseClient.Services
             var request = _driveService.Files.Get(fileId);
             var savePath = Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName);
 
-
-
             using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            var file = await request.DownloadAsync(fileStream, cancellationToken);
+            downloadFile.FileSize = file.BytesDownloaded; // Update file size
             var mediaDownloader = new MediaDownloader(_driveService)
             {
                 ChunkSize = 256 * 1024  // Adjust the chunk size if needed

@@ -17,6 +17,7 @@ namespace RhythmVerseClient.ViewModels
 
         public ICommand CheckAllCommand { get; }
         public IAsyncRelayCommand InstallSongs { get; }
+        public IAsyncRelayCommand UploadCloud { get; }
 
         private bool _isAnyChecked;
         public bool IsAnyChecked
@@ -81,6 +82,7 @@ namespace RhythmVerseClient.ViewModels
             DownloadWatcher = new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
             CheckAllCommand = new Command(CheckAllItemsCommand);
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
+            UploadCloud = new AsyncRelayCommand(UploadCloudCommand);
             DownloadFiles = DownloadWatcher.Data;
             _pageStrings = new DownloadPageStrings();
             _googleDrive = googleDrive;
@@ -109,7 +111,25 @@ namespace RhythmVerseClient.ViewModels
             IsAllChecked = !IsAllChecked;
         }
 
-        private async Task InstallSongsCommand()
+        public async Task UploadCloudCommand()
+        {
+            List<string> items = [];
+
+            foreach (FileData file in DownloadFiles)
+            {
+                if (file.Checked)
+                {
+                    items.Add(file.FilePath);
+                }
+
+            }
+            foreach (string file in items)
+            {
+                await _googleDrive.UploadFileAsync(_googleDrive.RhythmVerseFolderId, file);
+            }
+        }
+
+        public async Task InstallSongsCommand()
         {
             List<string> items = [];
 

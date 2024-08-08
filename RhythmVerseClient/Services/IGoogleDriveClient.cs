@@ -14,6 +14,7 @@ namespace RhythmVerseClient.Services
         Task DownloadFileAsync(string fileId, string saveToPath);
         Task DeleteFileAsync(string fileId);
         Task<IList<Google.Apis.Drive.v3.Data.File>> ListFilesAsync(string directoryId);
+        public string RhythmVerseFolderId { get; }
     }
 
     public class GoogleDriveClient : IGoogleDriveClient
@@ -22,7 +23,7 @@ namespace RhythmVerseClient.Services
         private readonly IConfiguration _configuration;
         private static readonly string[] Scopes = [Google.Apis.Drive.v3.DriveService.Scope.Drive];
         private static readonly string ApplicationName = "RhythmVerseClient";
-        private string _rhythmVerseFolderId;
+        public string RhythmVerseFolderId {  get; private set; }
         static string credPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), ".credentials/drive-dotnet-maui.json");
 
         public GoogleDriveClient(IConfiguration configuration)
@@ -34,7 +35,7 @@ namespace RhythmVerseClient.Services
         private async void InitializeGoogleDriveService()
         {
             _driveService = await GetServiceAsync();
-            _rhythmVerseFolderId = await CreateDirectoryAsync("RhythmVerse");
+            RhythmVerseFolderId = await CreateDirectoryAsync("RhythmVerse");
         }
 
         public async Task<DriveService> GetServiceAsync()
