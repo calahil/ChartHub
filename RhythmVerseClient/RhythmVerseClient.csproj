@@ -139,6 +139,9 @@
 	  <MauiImage Update="Resources\Images\guitar_small.png">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </MauiImage>
+	  <MauiImage Update="Resources\Images\keys_small.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </MauiImage>
 	  <MauiImage Update="Resources\Images\logo.png">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </MauiImage>

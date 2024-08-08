@@ -72,7 +72,10 @@ namespace RhythmVerseClient.ViewModels
                 }
             }
         }
-        public DownloadViewModel(AppGlobalSettings settings)
+
+        private IGoogleDriveClient _googleDrive;
+
+        public DownloadViewModel(AppGlobalSettings settings, IGoogleDriveClient googleDrive)
         {
             globalSettings = settings;
             DownloadWatcher = new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
@@ -80,6 +83,7 @@ namespace RhythmVerseClient.ViewModels
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
             DownloadFiles = DownloadWatcher.Data;
             _pageStrings = new DownloadPageStrings();
+            _googleDrive = googleDrive;
 
             DownloadFiles.CollectionChanged += DownloadFiles_CollectionChanged;
         }

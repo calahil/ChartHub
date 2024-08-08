@@ -18,8 +18,8 @@ namespace RhythmVerseClient.ViewModels
         private string _displayName = string.Empty;
         private string _value = string.Empty;
 
-        public string DisplayName 
-        { 
+        public string DisplayName
+        {
             get => _displayName;
             set
             {
@@ -28,8 +28,8 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        public string Value 
-        { 
+        public string Value
+        {
             get => _value;
             set
             {
@@ -62,8 +62,8 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        public long? RecordsPerPage 
-        { 
+        public long? RecordsPerPage
+        {
             get { return ApiClient.RecordsPerPage; }
         }
 
@@ -108,7 +108,7 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        private bool _isLoading = false;
+        private bool _isLoading;
         public bool IsLoading
         {
             get => _isLoading;
@@ -118,6 +118,19 @@ namespace RhythmVerseClient.ViewModels
                 OnPropertyChanged();
             }
         }
+
+        private bool _isAuthorFiltered;
+        public bool IsAuthorFiltered
+        {
+            get => _isAuthorFiltered;
+            set
+            {
+                _isAuthorFiltered = value;
+                OnPropertyChanged();
+            }
+        }
+
+
 
         private bool isPlaceholder;
         public bool IsPlaceholder
@@ -129,7 +142,7 @@ namespace RhythmVerseClient.ViewModels
                 OnPropertyChanged();
             }
         }
-                
+
         private string _selectedFilter;
         public string SelectedFilter
         {
@@ -155,6 +168,67 @@ namespace RhythmVerseClient.ViewModels
                     _selectedOrder = value;
                     OnPropertyChanged();
                 }
+            }
+        }
+
+        private bool _isFilterPaneVisible;
+        public bool IsFilterPaneVisible
+        {
+            get => _isFilterPaneVisible;
+            set
+            {
+                if (_isFilterPaneVisible != value)
+                {
+                    _isFilterPaneVisible = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private GridLength _filterPaneWidth;
+        public GridLength FilterPaneWidth
+        {
+            get => _filterPaneWidth;
+            set
+            {
+                if (_filterPaneWidth != value)
+                {
+                    _filterPaneWidth = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        private string _searchAuthorText;
+        public string SearchAuthorText
+        {
+            get => _searchAuthorText;
+            set
+            {
+                _searchAuthorText = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _searchText;
+        public string SearchText
+        {
+            get => _searchText;
+            set
+            {
+                _searchText = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string _filterPaneButtonText;
+        public string FilterPaneButtonText
+        {
+            get => _filterPaneButtonText;
+            set
+            {
+                _filterPaneButtonText = value;
+                OnPropertyChanged();
             }
         }
 
@@ -207,11 +281,10 @@ namespace RhythmVerseClient.ViewModels
 
         public ObservableCollection<InstrumentItem> Instruments { get; set; }
 
-        public string SearchText { get; set; } = string.Empty;
-        public string SearchAuthorText {  get; set; } = string.Empty;
 
         public IAsyncRelayCommand RefreshButtonCommand { get; }
         public IAsyncRelayCommand DownloadFileCommand { get; }
+        public ICommand ToggleFilterPaneCommand { get; }
 
         public RhythmVersePageStrings PageStrings { get; }
 
@@ -224,13 +297,21 @@ namespace RhythmVerseClient.ViewModels
             _downloads = [];
             _selectedFilter = "Artist";
             _selectedOrder = "Ascending";
+            _searchAuthorText = string.Empty;
+            _searchText = string.Empty;
+            _isAuthorFiltered = false;
+            _isFilterPaneVisible = false;
+            _filterPaneButtonText = GetFilterPaneText();
+            _isLoading = false;
+            _filterPaneWidth = new GridLength(0);
             IsPlaceholder = true;
             NoResults = false;
             RefreshButtonCommand = new AsyncRelayCommand(RefreshButton);
             DownloadFileCommand = new AsyncRelayCommand(DownloadFile);
+            ToggleFilterPaneCommand = new Command(ToggleFilterPane);
 
             downloadService = new DownloadService(configuration);
-                     
+
             Instruments =
             [
                 new InstrumentItem { DisplayName = "None", Value = string.Empty },
@@ -259,6 +340,24 @@ namespace RhythmVerseClient.ViewModels
         {
             // Raise the PropertyChanged event for the corresponding property in the ViewModel
             OnPropertyChanged(e.PropertyName);
+        }
+
+        public void ToggleFilterPane()
+        {
+            IsFilterPaneVisible = !IsFilterPaneVisible;
+            FilterPaneButtonText = GetFilterPaneText();
+        }
+
+        private string GetFilterPaneText()
+        {
+            if (IsFilterPaneVisible)
+            {
+                return PageStrings.HideFilter;
+            }
+            else
+            {
+                return PageStrings.ShowFilter;
+            }
         }
 
         public async Task RefreshButton()
@@ -316,12 +415,12 @@ namespace RhythmVerseClient.ViewModels
             {
                 NoResults = false;
             }
-            
+
 
             IsLoading = false;
             IsPlaceholder = false;
         }
-    
+
         public event PropertyChangedEventHandler? PropertyChanged;
 
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)

@@ -150,7 +150,7 @@ namespace RhythmVerseClient.Services
                 string endpoint;
                 //string payload;
 
-                if (!string.IsNullOrEmpty(searchString) || !string.IsNullOrEmpty(authorText))
+                if (!string.IsNullOrEmpty(searchString))
                 {
                     endpoint = "api/all/songfiles/search/live";
                 }
@@ -218,7 +218,7 @@ namespace RhythmVerseClient.Services
                         {
                             if (song != null)
                             {
-                                if (!song.File.DownloadUrl.StartsWith("http://marketplace.xbox.com") && !song.File.DownloadUrl.StartsWith("none"))
+                                if (!song.File.DownloadUrl.StartsWith("http://marketplace.xbox.com") && !song.File.DownloadUrl.StartsWith("https://store.xbox.com/"))
                                 {
                                     var songView = new ViewSong();
 

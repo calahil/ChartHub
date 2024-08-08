@@ -10,7 +10,8 @@
              Title="{Binding PageStrings.Title}">
 
     <Grid RowDefinitions="Auto,*">
-        <HorizontalStackLayout Grid.Row="0" HorizontalOptions="End">
+        <HorizontalStackLayout Grid.Row="0" HorizontalOptions="End" >
+            <Button Text="{Binding PageStrings.UploadCloud}" WidthRequest="140" IsEnabled="{Binding IsAnyChecked}" Command="{Binding InstallSongs}" />
             <Button Text="{Binding PageStrings.InstallSongs}" WidthRequest="140" IsEnabled="{Binding IsAnyChecked}" Command="{Binding InstallSongs}" />
         </HorizontalStackLayout>
         <!-- DataGrid for List Items -->

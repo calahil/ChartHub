@@ -38,6 +38,7 @@
         public string FileType { get; } = "File Type";
         public string FileSize { get; } = "File Size";
         public string InstallSongs { get; } = "Install Songs";
+        public string UploadCloud { get; } = "Google Drive";
         public string Install { get; } = "Install";
 
     }
@@ -56,5 +57,7 @@
     {
         public string Title { get; } = "RhythmVerse";
         public string ApplyFilter { get; } = "Apply Filters";
+        public string ShowFilter { get; } = "Show Filters";
+        public string HideFilter { get; } = "Hide Filters";
     }
 }

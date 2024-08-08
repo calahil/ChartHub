@@ -176,8 +176,6 @@ namespace RhythmVerseClient.Services
 
 
             using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None);
-            var file = await request.DownloadAsync(fileStream, cancellationToken);
-            downloadFile.FileSize = file.BytesDownloaded; // Update file size
             var mediaDownloader = new MediaDownloader(_driveService)
             {
                 ChunkSize = 256 * 1024  // Adjust the chunk size if needed

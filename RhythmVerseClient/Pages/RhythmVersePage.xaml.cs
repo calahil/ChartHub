@@ -1,5 +1,6 @@
 using RhythmVerseClient.Models;
 using RhythmVerseClient.ViewModels;
+using System.ComponentModel;
 using WinRT;
 
 namespace RhythmVerseClient.Pages;
@@ -13,9 +14,23 @@ public partial class RhythmVersePage : ContentPage
         InitializeComponent();
         viewModel = verseModel;
         BindingContext = viewModel;
-
+        viewModel.PropertyChanged += ViewModel_PropertyChanged;
     }
 
+    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(viewModel.IsFilterPaneVisible))
+        {
+            if (viewModel.IsFilterPaneVisible)
+            {
+                FilterColumn.Width = new GridLength(350, GridUnitType.Auto); // Or whatever fixed width you prefer
+            }
+            else
+            {
+                FilterColumn.Width = new GridLength(0, GridUnitType.Auto);
+            }
+        }
+    }
     protected async override void OnAppearing()
     {
         base.OnAppearing();
@@ -72,6 +87,17 @@ public partial class RhythmVersePage : ContentPage
         {
             var song = (ViewSong)button.BindingContext;
             viewModel.SearchAuthorText = song.Author.Name;
+            viewModel.IsAuthorFiltered = true;
+        }
+        viewModel.RefreshButton();
+    }
+
+    private void Reset_Clicked(object sender, EventArgs e)
+    {
+        if (!string.IsNullOrEmpty(viewModel.SearchAuthorText))
+        {
+            viewModel.SearchAuthorText = string.Empty;
+            viewModel.IsAuthorFiltered = false;
         }
         viewModel.RefreshButton();
     }
