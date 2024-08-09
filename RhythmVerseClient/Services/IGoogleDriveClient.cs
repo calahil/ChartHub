@@ -63,6 +63,14 @@ namespace RhythmVerseClient.Services
 
         public async Task<string> CreateDirectoryAsync(string directoryName)
         {
+            // Check if the directory already exists
+            var folderId = await GetDirectoryIdAsync(directoryName);
+            if (!string.IsNullOrEmpty(folderId))
+            {
+                return folderId; // Return the existing directory ID
+            }
+
+            // If the directory doesn't exist, create it
             var fileMetadata = new Google.Apis.Drive.v3.Data.File()
             {
                 Name = directoryName,
@@ -72,6 +80,20 @@ namespace RhythmVerseClient.Services
             request.Fields = "id";
             var file = await request.ExecuteAsync();
             return file.Id;
+        }
+
+        private async Task<string> GetDirectoryIdAsync(string directoryName)
+        {
+            var request = _driveService.Files.List();
+            request.Q = $"mimeType='application/vnd.google-apps.folder' and name='{directoryName}' and trashed=false";
+            request.Spaces = "drive";
+            request.Fields = "files(id, name)";
+            request.PageSize = 1;
+
+            var result = await request.ExecuteAsync();
+            var folder = result.Files.FirstOrDefault();
+
+            return folder?.Id;
         }
 
         public async Task<string> UploadFileAsync(string directoryId, string filePath)
