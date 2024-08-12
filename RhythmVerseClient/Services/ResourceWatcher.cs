@@ -310,7 +310,7 @@ namespace RhythmVerseClient.Services
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
-
+//test
     public class FileData(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile, long sizeBytes) : INotifyPropertyChanged
     {
         private string _imageFile = imageFile;
