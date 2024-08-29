@@ -4,8 +4,7 @@
             xmlns:local="clr-namespace:RhythmVerseClient.Pages"
             x:Class="RhythmVerseClient.Pages.MainPage"
             xmlns:models="clr-namespace:RhythmVerseClient.ViewModels"
-            xmlns:services="clr-namespace:RhythmVerseClient.Services"
-            xmlns:control="clr-namespace:RhythmVerseClient.Controls">
+            xmlns:services="clr-namespace:RhythmVerseClient.Services">
 
 
 </TabbedPage>

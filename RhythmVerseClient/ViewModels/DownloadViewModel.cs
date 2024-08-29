@@ -74,9 +74,9 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        private IGoogleDriveClient _googleDrive;
+        //private IGoogleDriveClient _googleDrive;
 
-        public DownloadViewModel(AppGlobalSettings settings, IGoogleDriveClient googleDrive)
+        public DownloadViewModel(AppGlobalSettings settings)//, IGoogleDriveClient googleDrive)
         {
             globalSettings = settings;
             DownloadWatcher = new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
@@ -85,7 +85,7 @@ namespace RhythmVerseClient.ViewModels
             UploadCloud = new AsyncRelayCommand(UploadCloudCommand);
             DownloadFiles = DownloadWatcher.Data;
             _pageStrings = new DownloadPageStrings();
-            _googleDrive = googleDrive;
+            //_googleDrive = googleDrive;
 
             DownloadFiles.CollectionChanged += DownloadFiles_CollectionChanged;
         }
@@ -125,7 +125,7 @@ namespace RhythmVerseClient.ViewModels
             }
             foreach (string file in items)
             {
-                await _googleDrive.UploadFileAsync(_googleDrive.RhythmVerseFolderId, file);
+                //await _googleDrive.UploadFileAsync(_googleDrive.RhythmVerseFolderId, file);
             }
         }
 

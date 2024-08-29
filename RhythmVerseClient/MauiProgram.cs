@@ -64,7 +64,7 @@ namespace RhythmVerseClient
 
             builder.Services.AddSingleton<IKeystrokeSender, WindowsKeystrokeSender>();
             builder.Services.AddSingleton<AppGlobalSettings>();
-            builder.Services.AddSingleton<IGoogleDriveClient, GoogleDriveClient>();
+            //builder.Services.AddSingleton<IGoogleDriveClient, GoogleDriveClient>();
             builder.Services.AddSingleton<MainViewModel>();
             builder.Services.AddSingleton<DownloadViewModel>();
             builder.Services.AddSingleton<CloneHeroViewModel>();
