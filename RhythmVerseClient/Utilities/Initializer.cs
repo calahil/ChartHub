@@ -1,6 +1,5 @@
 ﻿using SharpCompress.Archives;
 using SharpCompress.Common;
-using Windows.Storage;
 
 namespace RhythmVerseClient.Utilities
 {

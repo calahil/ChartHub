@@ -268,9 +268,27 @@ namespace RhythmVerseClient.Services
         {
             string mimeType = "application/unknown";
             string ext = Path.GetExtension(fileName).ToLower();
+            
+#if WINDOWS
             Microsoft.Win32.RegistryKey regKey = Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(ext);
             if (regKey != null && regKey.GetValue("Content Type") != null)
                 mimeType = regKey.GetValue("Content Type").ToString();
+#else
+            // Fallback MIME type mapping on non-Windows platforms
+            mimeType = ext switch
+            {
+                ".mp3" => "audio/mpeg",
+                ".wav" => "audio/wav",
+                ".jpg" => "image/jpeg",
+                ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".pdf" => "application/pdf",
+                ".zip" => "application/zip",
+                ".rar" => "application/x-rar-compressed",
+                ".7z" => "application/x-7z-compressed",
+                _ => "application/unknown"
+            };
+#endif
             return mimeType;
         }
     }

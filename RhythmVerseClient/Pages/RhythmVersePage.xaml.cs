@@ -1,7 +1,6 @@
 using RhythmVerseClient.Models;
 using RhythmVerseClient.ViewModels;
 using System.ComponentModel;
-using WinRT;
 
 namespace RhythmVerseClient.Pages;
 

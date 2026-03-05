@@ -5,7 +5,6 @@ using SharpCompress.Archives.Rar;
 using SharpCompress.Archives.SevenZip;
 using SharpCompress.Archives.Zip;
 using System.Globalization;
-using Windows.Storage;
 
 namespace RhythmVerseClient.Utilities
 {

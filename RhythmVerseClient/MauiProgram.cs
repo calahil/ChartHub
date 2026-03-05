@@ -5,7 +5,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.LifecycleEvents;
 using Microsoft.Maui.Platform;
-using Microsoft.UI.Windowing;
 using RhythmVerseClient.Pages;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Utilities;
@@ -13,7 +12,6 @@ using RhythmVerseClient.ViewModels;
 using SettingsManager;
 using Syncfusion.Maui.Core.Hosting;
 using System.Text.Json;
-using WinUIEx;
 
 namespace RhythmVerseClient
 {

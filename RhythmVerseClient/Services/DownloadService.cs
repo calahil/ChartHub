@@ -12,7 +12,6 @@ using SharpCompress.Archives.Zip;
 using SharpCompress.Common;
 using System.ComponentModel;
 using System.Text.RegularExpressions;
-using Windows.Media.Protection.PlayReady;
 
 namespace RhythmVerseClient.Services
 {
