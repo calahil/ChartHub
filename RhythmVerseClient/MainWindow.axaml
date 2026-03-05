@@ -1,0 +1,13 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="RhythmVerseClient.MainWindow"
+        Title="RhythmVerseClient"
+        Width="1200" Height="800"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <TextBlock Text="RhythmVerseClient - Avalonia UI"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Center"
+                   FontSize="24" />
+    </Grid>
+</Window>

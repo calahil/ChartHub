@@ -1,5 +1,4 @@
 ﻿using CommunityToolkit.Mvvm.Input;
-using RhythmVerseClient.Pages;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
@@ -153,8 +152,9 @@ namespace RhythmVerseClient.ViewModels
                 await Task.Delay(100);
             }
 
-            var mainPage = Application.Current?.MainPage as MainPage;
-            mainPage?.FocusOnTab(3);
+            // TODO: Convert UI tab navigation to Avalonia
+            // var mainPage = Application.Current?.MainPage as MainPage;
+            // mainPage?.FocusOnTab(3);
 
         }
 

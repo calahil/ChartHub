@@ -38,10 +38,11 @@ namespace RhythmVerseClient.Services
 
                 Thread.Sleep(1000);
 
-                _keystrokeSender.SendSpecialKey("tab");
-                _keystrokeSender.SendSpecialKey("tab");
-                _keystrokeSender.SendSpecialKey("tab");
-                _keystrokeSender.SendSpecialKey("enter");
+                // Keystroke sending disabled - using command-line args instead
+                // _keystrokeSender.SendSpecialKey("tab");
+                // _keystrokeSender.SendSpecialKey("tab");
+                // _keystrokeSender.SendSpecialKey("tab");
+                // _keystrokeSender.SendSpecialKey("enter");
 
                 Thread.Sleep(1000);
 

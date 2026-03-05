@@ -1,5 +1,4 @@
 ﻿using CommunityToolkit.Mvvm.Input;
-using RhythmVerseClient.Pages;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
@@ -63,8 +62,9 @@ namespace RhythmVerseClient.ViewModels
         private void GoBack()
         {
             Toolbox.DebugResetSongProcessor(globalSettings.PhaseshiftDir, globalSettings.DownloadDir, globalSettings.PhaseshiftMusicDir);
-            var mainPage = Application.Current?.MainPage as MainPage;
-            mainPage?.FocusOnTab(1);
+            // TODO: Convert UI tab navigation to Avalonia
+            // var mainPage = Application.Current?.MainPage as MainPage;
+            // mainPage?.FocusOnTab(1);
         }
 
        private async Task StartBar()

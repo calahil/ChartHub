@@ -1,31 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net10.0</TargetFrameworks>
-		<!-- Windows target framework can be added on Windows: net10.0-windows10.0.19041.0 -->
-		<!-- <EnableWindowsTargeting>true</EnableWindowsTargeting> -->
-		<!-- <WindowsSdkPackageVersion>10.0.26100.38</WindowsSdkPackageVersion> -->
-		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
-		<!-- <TargetFrameworks>$(TargetFrameworks);net8.0-tizen</TargetFrameworks> -->
-
-		<!-- Note for MacCatalyst:
-		The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
-		When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
-		The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
-		either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
-		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
-
-		<OutputType>Library</OutputType>
-		<!-- OutputType changed to Library for Linux compilation. Will be changed to Exe when migrating to AvaloniaUI -->
+		<TargetFramework>net10.0</TargetFramework>
+		<OutputType>Exe</OutputType>
 		<RootNamespace>RhythmVerseClient</RootNamespace>
-		<UseMaui>false</UseMaui>
-		<!-- MAUI disabled for Linux compilation. Will be replaced with AvaloniaUI -->
-		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
-		<WindowsPackageType>None</WindowsPackageType>	
-		<WindowsAppSDKSelfContained Condition="'$(IsUnpackaged)' == 'true'">true</WindowsAppSDKSelfContained>
-		<SelfContained Condition="'$(IsUnpackaged)' == 'true'">true</SelfContained>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<UseAvaloniaUI>true</UseAvaloniaUI>
 
 		<!-- Display name -->
 		<ApplicationTitle>RhythmVerseClient</ApplicationTitle>
@@ -37,61 +19,29 @@
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">11.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">13.1</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
-		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
 		<UserSecretsId>b0e751a2-ccc2-493f-96d7-3a78ffe23a8b</UserSecretsId>
-		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<PackageIcon>logo.png</PackageIcon>
 		<Company>Calahil Studios</Company>
 		<Authors>Calahil</Authors>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
-
-		<!-- Splash Screen -->
-		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
-
-		<!-- Images -->
-		<MauiImage Include="Resources\Images\*" />
-
-		<!-- Custom Fonts -->
-		<MauiFont Include="Resources\Fonts\*" />
-
-		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
-		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+		<None Update="appsettings.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Remove="Resources\Images\blank.png" />
-	  <None Remove="Resources\Images\blankprofile.png" />
-	  <None Remove="Resources\Images\clonehero.png" />
-	  <None Remove="Resources\Images\folder.png" />
-	  <None Remove="Resources\Images\noalbumart.png" />
-	  <None Remove="Resources\Images\profileloading.png" />
-	  <None Remove="Resources\Images\rar.png" />
-	  <None Remove="Resources\Images\rb.png" />
-	  <None Remove="Resources\Images\sevenzip.png" />
-	  <None Remove="Resources\Images\zip.png" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<PackageReference Include="CommunityToolkit.Maui" Version="9.0.3" />
+		<PackageReference Include="Avalonia" Version="11.1.0" />
+		<PackageReference Include="Avalonia.X11" Version="11.1.0" />
+		<PackageReference Include="Avalonia.Controls.DataGrid" Version="11.1.0" />
+		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.1.0" />
+		<PackageReference Include="Avalonia.Fonts.Inter" Version="11.1.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.1" />
-		<PackageReference Include="FFImageLoading.Maui" Version="1.2.9" />
 		<PackageReference Include="Google.Apis.Drive.v3" Version="1.68.0.3490" />
 		<PackageReference Include="HtmlAgilityPack" Version="1.11.65" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.0" />
-		<PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
-		<PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="10.0.20" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
 		<PackageReference Include="SharpCompress" Version="0.38.0" />
-		<PackageReference Include="Syncfusion.Maui.DataGrid" Version="28.1.33" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -111,93 +61,6 @@
 	  <MauiImage Update="Resources\Images\albumloading.png">
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </MauiImage>
-	  <MauiImage Update="Resources\Images\bass_small.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\blank.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\blankprofile.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\ch.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\checkmark.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\clonehero.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\drums_small.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\folder.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\gh.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\guitar_small.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\keys_small.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\logo.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\noalbumart.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\profileloading.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\ps.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\rar.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\rb.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\rb2.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\rb3.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\rb3ps3.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\rb3wii.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\rb3xbox.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\rv.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\sevenzip.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\tbrb">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\vocals_small.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\wtde.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\yarg.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	  <MauiImage Update="Resources\Images\zip.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -208,28 +71,6 @@
 	    <Pack>True</Pack>
 	    <PackagePath>\</PackagePath>
 	  </None>
-	</ItemGroup>
-
-	<ItemGroup>
-	  <MauiXaml Update="Pages\CloneHeroPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Pages\DownloadPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Pages\InstallSongPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Pages\LoadingPage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	  <MauiXaml Update="Pages\RhythmVersePage.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </MauiXaml>
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Control\" />
 	</ItemGroup>
 
 </Project>
