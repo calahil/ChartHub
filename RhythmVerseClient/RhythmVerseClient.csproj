@@ -2,12 +2,11 @@
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
-		<OutputType>Exe</OutputType>
+		<OutputType>WinExe</OutputType>
 		<RootNamespace>RhythmVerseClient</RootNamespace>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<UseAvaloniaUI>true</UseAvaloniaUI>
 
 		<!-- Display name -->
 		<ApplicationTitle>RhythmVerseClient</ApplicationTitle>
@@ -32,6 +31,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Avalonia" Version="11.1.0" />
+		<PackageReference Include="Avalonia.Desktop" Version="11.1.0" />
 		<PackageReference Include="Avalonia.X11" Version="11.1.0" />
 		<PackageReference Include="Avalonia.Controls.DataGrid" Version="11.1.0" />
 		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.1.0" />

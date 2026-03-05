@@ -1,8 +1,7 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
-using RhythmVerseClient.Utilities;
-using System.Reflection;
+using RhythmVerseClient.Views;
 
 namespace RhythmVerseClient
 {
@@ -15,14 +14,11 @@ namespace RhythmVerseClient
 
         public override void OnFrameworkInitializationCompleted()
         {
-            // Dynamically set MainWindow since the interface may not be directly available
-            if (ApplicationLifetime != null)
+            // Set the main window via reflection to avoid namespace dependencies
+            var mainWindowProp = ApplicationLifetime?.GetType().GetProperty("MainWindow");
+            if (mainWindowProp != null && mainWindowProp.CanWrite)
             {
-                PropertyInfo? mainWindowProp = ApplicationLifetime.GetType().GetProperty("MainWindow");
-                if (mainWindowProp != null)
-                {
-                    mainWindowProp.SetValue(ApplicationLifetime, new MainWindow());
-                }
+                mainWindowProp.SetValue(ApplicationLifetime, new MainView());
             }
 
             base.OnFrameworkInitializationCompleted();

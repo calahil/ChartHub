@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="RhythmVerseClient.Views.DownloadView">
+
+    <Grid RowDefinitions="Auto,*" Margin="10">
+        <!-- Buttons -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
+            <Button Content="{Binding PageStrings.UploadCloud}" 
+                    IsEnabled="{Binding IsAnyChecked}"
+                    Command="{Binding UploadCloud}"
+                    Width="140" />
+            <Button Content="{Binding PageStrings.InstallSongs}"
+                    IsEnabled="{Binding IsAnyChecked}"
+                    Command="{Binding InstallSongs}"
+                    Width="140" />
+        </StackPanel>
+
+        <!-- DataGrid -->
+        <DataGrid Grid.Row="1" 
+                  ItemsSource="{Binding DownloadFiles}"
+                  SelectedItem="{Binding SelectedFile}"
+                  CanUserSortColumns="True"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="False">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="Install" Binding="{Binding Checked}" Width="80" />
+                <DataGridTextColumn Header="{Binding PageStrings.DisplayName}" Binding="{Binding DisplayName}" />
+                <DataGridTextColumn Header="{Binding PageStrings.FileType}" Binding="{Binding FileType}" Width="120" />
+                <DataGridTextColumn Header="{Binding PageStrings.FileSize}" Binding="{Binding FileSize}" Width="120" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+
+</UserControl>

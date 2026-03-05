@@ -1,0 +1,88 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+             x:Class="RhythmVerseClient.Views.RhythmVerseView">
+
+    <Grid RowDefinitions="Auto,*" ColumnDefinitions="*">
+        <!-- Search and Filter Bar -->
+        <Grid Grid.Row="0" ColumnDefinitions="300,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,100,100" 
+              Margin="10" Height="48">
+            <TextBox Grid.Column="0" Watermark="Search text..." Text="{Binding SearchText}" />
+            <NumericUpDown Grid.Column="1" Minimum="1" Maximum="{Binding TotalPages}" Value="{Binding CurrentPage}" />
+            <TextBlock Grid.Column="2" Text="|  Pages:" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="3" Text="{Binding CurrentPage}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="4" Text="/" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="5" Text="{Binding TotalPages}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="6" Text="|  Total:" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="7" Text="{Binding TotalResults}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="8" Text="Results:" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="9" Text="{Binding StartRecord}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="10" Text="-" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="11" Text="{Binding EndRecord}" VerticalAlignment="Center" />
+        </Grid>
+
+        <!-- Main Content Area -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" RowDefinitions="*" Margin="10">
+            <!-- Song List -->
+            <ItemsControl Grid.Column="0" ItemsSource="{Binding DataItems}" 
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="LightGray" BorderThickness="1" Margin="0,0,0,10" Padding="10" CornerRadius="5">
+                            <Grid ColumnDefinitions="128,*,200" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                                <!-- Album Art -->
+                                <Image Grid.Row="0" Grid.RowSpan="5" Grid.Column="0" 
+                                       Source="{Binding AlbumArt}" Width="128" Height="128" Margin="0,0,10,0" />
+                                
+                                <!-- Song Info -->
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Artist}" FontSize="16" FontWeight="Bold" Margin="0,0,0,5" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Title}" FontSize="16" Margin="0,0,0,5" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Album}" FontSize="12" Margin="0,0,0,5" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding FormattedTime, StringFormat='Time: \{0\}'}" FontSize="12" Margin="0,0,0,5" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Year, StringFormat='Released: \{0\}'}" FontSize="12" />
+
+                                <!-- Difficulty Indicators -->
+                                <StackPanel Grid.Row="0" Grid.RowSpan="5" Grid.Column="2" Spacing="5" VerticalAlignment="Top" Margin="10,0,0,0">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Image Source="drums_small.png" Width="32" Height="32" />
+                                        <TextBlock Text="{Binding DrumString}" FontSize="12" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Image Source="guitar_small.png" Width="32" Height="32" />
+                                        <TextBlock Text="{Binding GuitarString}" FontSize="12" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Image Source="bass_small.png" Width="32" Height="32" />
+                                        <TextBlock Text="{Binding BassString}" FontSize="12" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Image Source="vocals_small.png" Width="32" Height="32" />
+                                        <TextBlock Text="{Binding VocalsString}" FontSize="12" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Image Source="keys_small.png" Width="32" Height="32" />
+                                        <TextBlock Text="{Binding KeysString}" FontSize="12" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Filter Pane (Collapsible) -->
+            <Border Grid.Column="1" BorderBrush="LightGray" BorderThickness="1" Padding="10" 
+                    IsVisible="{Binding IsFilterPaneVisible}" Width="350" Margin="10,0,0,0">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Filters" FontSize="16" FontWeight="Bold" />
+                    <!-- Filter controls would go here based on IsFilterPaneVisible -->
+                    <Button Content="{Binding PageStrings.ApplyFilter}" 
+                           Command="{Binding RefreshButtonCommand}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+
+</UserControl>
