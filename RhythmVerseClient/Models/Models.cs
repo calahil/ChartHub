@@ -150,13 +150,13 @@ namespace RhythmVerseClient.Models
             }
         }
 
-        private string? _formattedTme;
-        public string? FormattedTme
+        private string? _formattedTime;
+        public string? FormattedTime
         {
-            get => _formattedTme;
+            get => _formattedTime;
             set
             {
-                _formattedTme = value;
+                _formattedTime = value;
                 OnPropertyChanged();
             }
         }

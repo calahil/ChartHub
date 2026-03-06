@@ -14,6 +14,7 @@ namespace RhythmVerseClient.Services
     public class RhythmVerseApiClient : INotifyPropertyChanged
     {
         private readonly HttpClient _httpClient;
+        private readonly IConfiguration _configuration;
         private readonly Dictionary<string, List<string>> dictionary = new()
         {
                 { "rb3", ["Rock Band 3", "rb3.png"] },
@@ -128,6 +129,7 @@ namespace RhythmVerseClient.Services
 
         public RhythmVerseApiClient(IConfiguration configuration)
         {
+            _configuration = configuration;
             _httpClient = new HttpClient
             {
                 BaseAddress = new Uri(BaseUrl)
@@ -192,11 +194,20 @@ namespace RhythmVerseClient.Services
                     collection.Add(new("records", $"{RecordsPerPage}"));
                     var content = new FormUrlEncodedContent(collection);
 
-                    HttpResponseMessage response = await _httpClient.PostAsync(endpoint, content);
+                    string responseBody;
+                    
+                    // Use mock data in development if UseMockData is true in appsettings.json
+                    if (_configuration["UseMockData"] == "True")
+                    {
+                        responseBody = await File.ReadAllTextAsync("RhythmVerseClient/Tests/test.json");
+                    }
+                    else
+                    {
+                        HttpResponseMessage response = await _httpClient.PostAsync(endpoint, content);
+                        response.EnsureSuccessStatusCode();
+                        responseBody = await response.Content.ReadAsStringAsync();
+                    }
 
-                    response.EnsureSuccessStatusCode();
-
-                    string responseBody = await response.Content.ReadAsStringAsync();
                     ResponseDebug = responseBody;
                     var DecodedResponse = RootResponse.FromJson(responseBody);
 
@@ -271,7 +282,7 @@ namespace RhythmVerseClient.Services
                                         songView.AlbumArt = image;
                                     }
 
-                                    songView.FormattedTme = Toolbox.ConvertSecondstoText(songView.SongLength);
+                                    songView.FormattedTime = Toolbox.ConvertSecondstoText(songView.SongLength);
 
                                     Author author = song.File.Author ?? new Author();
 

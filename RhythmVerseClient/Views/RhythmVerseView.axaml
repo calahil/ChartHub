@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:viewmodels="clr-namespace:RhythmVerseClient.ViewModels"
+             xmlns:asyncImage="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
              x:Class="RhythmVerseClient.Views.RhythmVerseView"
              x:DataType="viewmodels:RhythmVerseModel">
@@ -27,26 +28,33 @@
         <!-- Main Content Area -->
         <Grid Grid.Row="1" ColumnDefinitions="*,Auto" RowDefinitions="*" Margin="10">
             <!-- Song List -->
-            <ListBox Grid.Column="0" ItemsSource="{Binding DataItems}" 
+            <ListBox Grid.Column="0" ItemsSource="{Binding DataItems}"
                      ScrollViewer.VerticalScrollBarVisibility="Auto">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Border BorderBrush="LightGray" BorderThickness="1" Margin="0,0,0,10" Padding="10" CornerRadius="5">
-                            <Grid ColumnDefinitions="*,200" RowDefinitions="Auto,Auto,Auto,Auto">
+                            <Grid RowDefinitions="8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8"
+                                  ColumnDefinitions="128, *, *, 200, 175"
+                                  Margin="0,0,0,10"
+                                  >
+                                <!-- Album Art -->
+                                <Image asyncImage:ImageLoader.Source="{Binding AlbumArt}"
+                                       Grid.Row="0" Grid.Column="0" Grid.RowSpan="16"
+                                       VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+                                       Margin="10,10,10,10" />
+
                                 <!-- Song Info -->
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Artist}" FontSize="16" FontWeight="Bold" Margin="0,0,0,5" />
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Title}" FontSize="16" Margin="0,0,0,5" />
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="{Binding Album}" FontSize="12" Margin="0,0,0,5" />
-                                <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Horizontal" Spacing="20">
-                                    <TextBlock Text="{Binding FormattedTime, StringFormat='Time: {0}'}" FontSize="12" />
-                                    <TextBlock Text="{Binding Year, StringFormat='Released: {0}'}" FontSize="12" />
-                                </StackPanel>
+                                <TextBlock Grid.Row="1" Grid.RowSpan="3" Grid.Column="1" Text="{Binding Artist}" FontSize="16" FontWeight="Bold" Margin="0,0,0,5" />
+                                <TextBlock Grid.Row="3" Grid.RowSpan="3" Grid.Column="1" Text="{Binding Title}" FontSize="16" Margin="0,0,0,5" />
+                                <TextBlock Grid.Row="5" Grid.RowSpan="3" Grid.Column="1" Text="{Binding Album}" FontSize="12" Margin="0,0,0,5" />
+                                <TextBlock Grid.Row="7" Grid.RowSpan="2" Grid.Column="1" Text="{Binding FormattedTime, StringFormat='Time: {0}'}" FontSize="12" />
+                                <TextBlock Grid.Row="9" Grid.RowSpan="2" Grid.Column="1" Text="{Binding Year, StringFormat='Released: {0}'}" FontSize="12" />
+                                <TextBlock Grid.Row="11" Grid.RowSpan="2" Grid.Column="1" Text="{Binding Genre, StringFormat='Genre: {0}'}" FontSize="12" />
 
                                 <!-- Download Info -->
-                                <StackPanel Grid.Row="0" Grid.RowSpan="4" Grid.Column="1" Spacing="5" VerticalAlignment="Center" HorizontalAlignment="Right">
-                                    <TextBlock Text="{Binding DownloadCount, StringFormat='Downloads: {0}'}" FontSize="12" TextAlignment="Right" />
-                                    <TextBlock Text="{Binding FileSize, StringFormat='Size: {0}'}" FontSize="12" TextAlignment="Right" />
-                                </StackPanel>
+                                <TextBlock Grid.Row="1" Grid.RowSpan="3" Grid.Column="4" Text="{Binding Downloads, StringFormat='Downloads: {0}'}" FontSize="12" TextAlignment="Right" />
+                                <TextBlock Grid.Row="3" Grid.RowSpan="3" Grid.Column="4" Text="{Binding FileSize, StringFormat='Size: {0}'}" FontSize="12" TextAlignment="Right" />
+
                             </Grid>
                         </Border>
                     </DataTemplate>
@@ -54,12 +62,12 @@
             </ListBox>
 
             <!-- Filter Pane (Collapsible) -->
-            <Border Grid.Column="1" BorderBrush="LightGray" BorderThickness="1" Padding="10" 
+            <Border Grid.Column="1" BorderBrush="LightGray" BorderThickness="1" Padding="10"
                     IsVisible="{Binding IsFilterPaneVisible}" Width="300" Margin="10,0,0,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="15">
                         <TextBlock Text="Filters" FontSize="16" FontWeight="Bold" />
-                        
+
                         <StackPanel Spacing="5">
                             <TextBlock Text="Sort By:" FontWeight="Bold" />
                             <ComboBox ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" />

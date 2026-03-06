@@ -1115,6 +1115,11 @@ namespace RhythmVerseClient.Api
 
         public override long Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
+            if (reader.TokenType == JsonTokenType.Number)
+            {
+                return reader.GetInt64();
+            }
+
             var value = reader.GetString();
             long l;
             if (Int64.TryParse(value, out l))

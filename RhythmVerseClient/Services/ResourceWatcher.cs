@@ -186,7 +186,7 @@ namespace RhythmVerseClient.Services
             try
             {
                 using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
-                await fs.ReadAsync(fileSignature);
+                _ = await fs.ReadAsync(fileSignature);
             }
             catch (Exception ex)
             {

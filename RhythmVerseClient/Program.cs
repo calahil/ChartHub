@@ -40,6 +40,7 @@ class Program
     {
         // Build configuration with user secrets
         var configBuilder = new ConfigurationBuilder()
+            .AddJsonFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json"), optional: true)
             .AddJsonFile(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "appsettings.json"), optional: true)
             .AddUserSecrets<Program>(optional: true);
 
