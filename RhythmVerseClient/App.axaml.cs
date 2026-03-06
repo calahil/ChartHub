@@ -1,12 +1,16 @@
 ﻿using Avalonia;
-using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Microsoft.Extensions.DependencyInjection;
 using RhythmVerseClient.Views;
+using RhythmVerseClient.ViewModels;
 
 namespace RhythmVerseClient
 {
     public partial class App : Avalonia.Application
     {
+        public static IServiceProvider? ServiceProvider { get; set; }
+
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
@@ -14,11 +18,11 @@ namespace RhythmVerseClient
 
         public override void OnFrameworkInitializationCompleted()
         {
-            // Set the main window via reflection to avoid namespace dependencies
-            var mainWindowProp = ApplicationLifetime?.GetType().GetProperty("MainWindow");
-            if (mainWindowProp != null && mainWindowProp.CanWrite)
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
             {
-                mainWindowProp.SetValue(ApplicationLifetime, new MainView());
+                var mainWindow = new MainView();
+                mainWindow.DataContext = ServiceProvider?.GetRequiredService<MainViewModel>();
+                desktopLifetime.MainWindow = mainWindow;
             }
 
             base.OnFrameworkInitializationCompleted();

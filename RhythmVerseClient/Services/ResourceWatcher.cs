@@ -1,4 +1,5 @@
-﻿using RhythmVerseClient.Utilities;
+﻿using Avalonia.Threading;
+using RhythmVerseClient.Utilities;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -51,10 +52,10 @@ namespace RhythmVerseClient.Services
         private readonly WatcherType _watcherType;
 
 
-        private static readonly byte[] ZipSignature = [0x50, 0x4B, 0x03, 0x04];
-        private static readonly byte[] RarSignature = "Rar!"u8.ToArray();
-        private static readonly byte[] Rb3ConSignature = "CON"u8.ToArray();
-        private static readonly byte[] SevenZipSignature = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
+        private static readonly byte[] ZipSignature = { 0x50, 0x4B, 0x03, 0x04 };
+        private static readonly byte[] RarSignature = { 0x52, 0x61, 0x72, 0x21 };
+        private static readonly byte[] Rb3ConSignature = { 0x43, 0x4F, 0x4E };
+        private static readonly byte[] SevenZipSignature = { 0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C };
 
         public event EventHandler<string>? DirectoryNotFound;
         //public event EventHandler<string>? ErrorOccurred;
@@ -115,7 +116,7 @@ namespace RhythmVerseClient.Services
 
         private void OnRenamed(object sender, RenamedEventArgs e)
         {
-            MainThread.BeginInvokeOnMainThread(() =>
+            Dispatcher.UIThread.Post(() =>
             {
                 string itemName = String.Empty;
                 string oldItemName = String.Empty;
@@ -131,7 +132,7 @@ namespace RhythmVerseClient.Services
 
         private void OnDeleted(object sender, FileSystemEventArgs e)
         {
-            MainThread.BeginInvokeOnMainThread(() =>
+            Dispatcher.UIThread.Post(() =>
             {
                 try
                 {
@@ -151,7 +152,7 @@ namespace RhythmVerseClient.Services
 
         private void OnCreated(object sender, FileSystemEventArgs e)
         {
-            MainThread.BeginInvokeOnMainThread(async () =>
+            Dispatcher.UIThread.Post(async () =>
             {
                 string itemName = String.Empty;
                 if (e.Name == null)

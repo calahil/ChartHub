@@ -12,7 +12,7 @@
 		<ApplicationTitle>RhythmVerseClient</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.companyname.rhythmverseclient</ApplicationId>
+		<ApplicationId>com.calahilstudios.rhythmverseclient</ApplicationId>
 
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
@@ -34,13 +34,14 @@
 		<PackageReference Include="Google.Apis.Drive.v3" Version="1.68.0.3490" />
 		<PackageReference Include="HtmlAgilityPack" Version="1.11.65" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
 		<PackageReference Include="SharpCompress" Version="0.38.0" />
 		<PackageReference Include="YamlDotNet" Version="16.3.0" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\..\settingsmanager\SettingsManager\SettingsManager.csproj" />
+	  <ProjectReference Include="..\SettingsManager\SettingsManager.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

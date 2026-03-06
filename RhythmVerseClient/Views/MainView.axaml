@@ -10,20 +10,16 @@
 
     <TabControl>
         <TabItem Header="RhythmVerse">
-            <!-- RhythmVerseView will be included here -->
-            <Views:RhythmVerseView />
+            <ContentControl Content="{Binding RhythmVerseViewModel}" />
         </TabItem>
         <TabItem Header="Download">
-            <!-- DownloadView will be included here -->
-            <Views:DownloadView />
+            <ContentControl Content="{Binding DownloadViewModel}" />
         </TabItem>
         <TabItem Header="CloneHero">
-            <!-- CloneHeroView will be included here -->
-            <Views:CloneHeroView />
+            <ContentControl Content="{Binding CloneHeroViewModel}" />
         </TabItem>
         <TabItem Header="Install Song">
-            <!-- InstallSongView will be included here -->
-            <Views:InstallSongView />
+            <ContentControl Content="{Binding InstallSongViewModel}" />
         </TabItem>
     </TabControl>
 

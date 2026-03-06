@@ -39,29 +39,26 @@ namespace RhythmVerseClient.ViewModels
 
         public InstallPageStrings PageString { get; }
 
-        private IKeystrokeSender _keystrokeSender;
-
         public IResourceWatcher PhaseshiftWatcher { get; set; }
 
         private readonly AppGlobalSettings globalSettings;
 
-        public InstallSongViewModel(AppGlobalSettings settings, IKeystrokeSender keystrokeSender)
+        public InstallSongViewModel(AppGlobalSettings settings)
         {
             _progressValue = 0;
             _details = String.Empty;
             StartBarCommand = new AsyncRelayCommand(StartBar);
-            GoBackCommand = new Command(GoBack);
+            GoBackCommand = new RelayCommand(GoBack);
 
-            _keystrokeSender = keystrokeSender;
             PageString = new InstallPageStrings();
             globalSettings = settings;
 
-            PhaseshiftWatcher = new ResourceWatcher(globalSettings.PhaseshiftDir, WatcherType.File);
+            PhaseshiftWatcher = new ResourceWatcher(globalSettings.TempDir, WatcherType.File);
         }
 
         private void GoBack()
         {
-            Toolbox.DebugResetSongProcessor(globalSettings.PhaseshiftDir, globalSettings.DownloadDir, globalSettings.PhaseshiftMusicDir);
+            Toolbox.DebugResetSongProcessor(globalSettings.TempDir, globalSettings.DownloadDir, globalSettings.TempDir);
             // TODO: Convert UI tab navigation to Avalonia
             // var mainPage = Application.Current?.MainPage as MainPage;
             // mainPage?.FocusOnTab(1);
@@ -92,7 +89,7 @@ namespace RhythmVerseClient.ViewModels
                     using var archive = Toolbox.OpenArchive(song.FilePath);
                     foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
                     {
-                        entry.WriteToDirectory(globalSettings.PhaseshiftMusicDir, new ExtractionOptions
+                        entry.WriteToDirectory(globalSettings.TempDir, new ExtractionOptions
                         {
                             ExtractFullPath = true,
                             Overwrite = true
@@ -112,14 +109,14 @@ namespace RhythmVerseClient.ViewModels
             //    Details += ProgressValue.ToString() + "%" + Environment.NewLine;
             //    await Task.Delay(100);
             //}
-            var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
+            //var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
             Details += PageString.NautilusConversion;
             await Task.Delay(100);
-            await nautilus.RunAsync();
+            //await nautilus.RunAsync();
             Details += PageString.StopNautilus;
             await Task.Delay(100);
             Details += PageString.InstallSongs;
-            Toolbox.MoveDirectory(globalSettings.PhaseshiftMusicDir, globalSettings.CloneHeroSongsDir);
+            Toolbox.MoveDirectory(globalSettings.TempDir, globalSettings.CloneHeroSongsDir);
 
             foreach (string song in processedFiles)
             {

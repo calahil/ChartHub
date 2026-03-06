@@ -1,7 +1,6 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using Avalonia.Controls;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Configuration;
-using RhythmVerseClient.Api;
 using RhythmVerseClient.Models;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
@@ -308,7 +307,7 @@ namespace RhythmVerseClient.ViewModels
             NoResults = false;
             RefreshButtonCommand = new AsyncRelayCommand(RefreshButton);
             DownloadFileCommand = new AsyncRelayCommand(DownloadFile);
-            ToggleFilterPaneCommand = new Command(ToggleFilterPane);
+            ToggleFilterPaneCommand = new RelayCommand(ToggleFilterPane);
 
             downloadService = new DownloadService(configuration);
 
@@ -381,11 +380,11 @@ namespace RhythmVerseClient.ViewModels
             if (SelectedFile == null)
                 return;
 
-            var downloadFile = new DownloadFile(SelectedFile.FileName ?? string.Empty, globalSettings.StagingDir, SelectedFile.DownloadLink ?? string.Empty, SelectedFile.FileSize);
+            var downloadFile = new DownloadFile(SelectedFile.FileName ?? string.Empty, globalSettings.TempDir, SelectedFile.DownloadLink ?? string.Empty, SelectedFile.FileSize);
             Downloads.Add(downloadFile);
             await downloadService.DownloadFileAsync(downloadFile);
 
-            File.Move(Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName), Toolbox.ConstructPath(globalSettings.DownloadDir, downloadFile.DisplayName), true);
+            File.Move(Path.Combine(downloadFile.FilePath, downloadFile.DisplayName), Path.Combine(globalSettings.DownloadDir, downloadFile.DisplayName), true);
         }
 
         public async Task LoadDataAsync(bool search)

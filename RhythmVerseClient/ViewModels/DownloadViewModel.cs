@@ -79,7 +79,7 @@ namespace RhythmVerseClient.ViewModels
         {
             globalSettings = settings;
             DownloadWatcher = new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
-            CheckAllCommand = new Command(CheckAllItemsCommand);
+            CheckAllCommand = new RelayCommand(CheckAllItemsCommand);
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
             UploadCloud = new AsyncRelayCommand(UploadCloudCommand);
             DownloadFiles = DownloadWatcher.Data;
@@ -145,7 +145,7 @@ namespace RhythmVerseClient.ViewModels
             foreach (string file in items)
             {
                 var displayName = Path.GetFileName(file);
-                var newFilePath = Toolbox.ConstructPath(globalSettings.PhaseshiftDir, displayName);
+                var newFilePath = Path.Combine(globalSettings.TempDir, displayName);
 
                 File.Move(file, newFilePath);
 

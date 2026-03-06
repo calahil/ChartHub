@@ -1,4 +1,5 @@
-﻿using RhythmVerseClient.Services;
+﻿using Avalonia.Data.Converters;
+using RhythmVerseClient.Services;
 using SettingsManager;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Rar;
@@ -10,7 +11,7 @@ namespace RhythmVerseClient.Utilities
 {
     public static class Logger
     {
-        private static readonly string LogFilePath = Toolbox.ConstructPath(FileSystem.Current.AppDataDirectory, "errorlog.txt");
+        private static readonly string LogFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "errorlog.txt");
 
         public static void LogError(Exception ex)
         {
@@ -146,11 +147,6 @@ namespace RhythmVerseClient.Utilities
             return di.EnumerateFiles("*", SearchOption.AllDirectories).Sum(fi => fi.Length);
         }
 
-        public static string ConstructPath(params string[] pathSegments)
-        {
-            return Path.Combine(pathSegments);
-        }
-
         public static void CreateDirectoryIfNotExists(string directoryPath)
         {
             if (!Directory.Exists(directoryPath))
@@ -218,49 +214,29 @@ namespace RhythmVerseClient.Utilities
         private readonly ISettingsManager<AppSettings> _settingsManager;
         private readonly AppSettings _appSettings;
 
-        public string PhaseshiftDir
+        public string TempDir
         {
-            get => _appSettings.PhaseshiftDirectory ?? String.Empty;
-            set { _appSettings.PhaseshiftDirectory = value; _settingsManager.Save(); }
-        }
-
-        public string NautilusDirectoryPath
-        {
-            get => _appSettings.NautilusDirectoryPath ?? String.Empty;
-            set { _appSettings.NautilusDirectoryPath = value; _settingsManager.Save(); }
-        }
-
-        public string PhaseshiftMusicDir
-        {
-            get => _appSettings.PhaseshiftMusicDirectory ?? String.Empty;
-            set { _appSettings.PhaseshiftMusicDirectory = value; _settingsManager.Save(); }
-        }
-
-        public string RhythmverseAppPath
-        {
-            get => _appSettings.RhythmverseAppPath ?? String.Empty;
-            set { _appSettings.RhythmverseAppPath = value; _settingsManager.Save(); }
+            get => _appSettings.TempDirectory ?? String.Empty;
+            set { _appSettings.TempDirectory = value; _settingsManager.Save(); }
         }
 
         public string DownloadDir
         {
-            get => _appSettings.DownloadLocation ?? String.Empty;
-            set { _appSettings.DownloadLocation = value; _settingsManager.Save(); }
+            get => _appSettings.DownloadDirectory ?? String.Empty;
+            set { _appSettings.DownloadDirectory = value; _settingsManager.Save(); }
         }
 
-        public string StagingDir
+        public string CloneHeroDataDir
         {
-            get => _appSettings.DownloadStaging ?? String.Empty;
-            set { _appSettings.DownloadStaging = value; _settingsManager.Save(); }
+            get => _appSettings.CloneHeroDataDirectory ?? String.Empty;
+            set { _appSettings.CloneHeroDataDirectory = value; _settingsManager.Save(); }
         }
 
         public string CloneHeroSongsDir
         {
-            get => _appSettings.CloneHeroSongLocation ?? String.Empty;
-            set { _appSettings.CloneHeroSongLocation = value; _settingsManager.Save(); }
+            get => _appSettings.CloneHeroSongDirectory ?? String.Empty;
+            set { _appSettings.CloneHeroSongDirectory = value; _settingsManager.Save(); }
         }
-
-        public int WindowHeigtht;
 
         public AppGlobalSettings(ISettingsManager<AppSettings> settingsManager)
         {
@@ -268,41 +244,26 @@ namespace RhythmVerseClient.Utilities
 
             _appSettings = settingsManager.Settings;
 
-            if (RhythmverseAppPath == "first_install")
+            if (TempDir == "first_install")
             {
-                RhythmverseAppPath =  FileSystem.Current.AppDataDirectory;
+                TempDir = Path.Combine(Path.GetTempPath(), "RhythmVerseClient");
             }
 
-            if (NautilusDirectoryPath == "first_install")
-            {
-                NautilusDirectoryPath = Path.Combine(RhythmverseAppPath, "nautilus");
-            }
-
-            if (PhaseshiftDir == "first_install")
-            {
-                PhaseshiftDir = Toolbox.ConstructPath(NautilusDirectoryPath, "phaseshift");
-            }
-
-            if (PhaseshiftMusicDir == "first_install")
-            {
-
-                PhaseshiftMusicDir = Toolbox.ConstructPath(PhaseshiftDir, "Music");
-            }
+            Toolbox.CreateDirectoryIfNotExists(TempDir);
 
             if (DownloadDir == "first_install")
             {
-                DownloadDir = Toolbox.ConstructPath(PhaseshiftDir, "downloads"); ;
+                DownloadDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+            }
+
+            if (CloneHeroDataDir == "first_install")
+            {
+                CloneHeroDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".clonehero");
             }
 
             if (CloneHeroSongsDir == "first_install")
             {
-                var cloneHeroDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Clone Hero");
-                CloneHeroSongsDir = Toolbox.ConstructPath(cloneHeroDataDir, "Songs");
-            }
-
-            if (StagingDir == "first_install")
-            {
-                StagingDir = Toolbox.ConstructPath(PhaseshiftDir, "staging"); ;
+                CloneHeroSongsDir = Path.Combine(CloneHeroDataDir, "Songs");
             }
         }
 

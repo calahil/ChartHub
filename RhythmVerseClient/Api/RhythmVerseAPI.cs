@@ -43,27 +43,27 @@ namespace RhythmVerseClient.Api
     public partial class Pagination
     {
         [JsonPropertyName("start")]
-        public long Start { get; set; }
+        public long? Start { get; set; }
 
         [JsonPropertyName("records")]
         [JsonConverter(typeof(ParseStringConverter))]
-        public long Records { get; set; }
+        public long? Records { get; set; }
 
         [JsonPropertyName("page")]
         [JsonConverter(typeof(ParseStringConverter))]
-        public long Page { get; set; }
+        public long? Page { get; set; }
     }
 
     public partial class Records
     {
         [JsonPropertyName("total_available")]
-        public long TotalAvailable { get; set; }
+        public long? TotalAvailable { get; set; }
 
         [JsonPropertyName("total_filtered")]
-        public long TotalFiltered { get; set; }
+        public long? TotalFiltered { get; set; }
 
         [JsonPropertyName("returned")]
-        public long Returned { get; set; }
+        public long? Returned { get; set; }
     }
 
     public partial class Song
@@ -78,28 +78,28 @@ namespace RhythmVerseClient.Api
     public partial class DataData
     {
         [JsonPropertyName("song_id")]
-        public long SongId { get; set; }
+        public long? SongId { get; set; }
 
         [JsonPropertyName("member_id")]
-        public long MemberId { get; set; }
+        public long? MemberId { get; set; }
 
         [JsonPropertyName("record_saved")]
-        public long RecordSaved { get; set; }
+        public long? RecordSaved { get; set; }
 
         [JsonPropertyName("record_updated")]
-        public long RecordUpdated { get; set; }
+        public long? RecordUpdated { get; set; }
 
         [JsonPropertyName("record_locked")]
-        public long RecordLocked { get; set; }
+        public long? RecordLocked { get; set; }
 
         [JsonPropertyName("record_comments")]
-        public long RecordComments { get; set; }
+        public long? RecordComments { get; set; }
 
         [JsonPropertyName("record_views")]
-        public long RecordViews { get; set; }
+        public long? RecordViews { get; set; }
 
         [JsonPropertyName("song_length")]
-        public long SongLength { get; set; }
+        public long? SongLength { get; set; }
 
         [JsonPropertyName("genre")]
         public string Genre { get; set; }
@@ -108,7 +108,7 @@ namespace RhythmVerseClient.Api
         public string Subgenre { get; set; }
 
         [JsonPropertyName("year")]
-        public long Year { get; set; }
+        public long? Year { get; set; }
 
         [JsonPropertyName("album")]
         public string Album { get; set; }
@@ -120,7 +120,7 @@ namespace RhythmVerseClient.Api
         public long? AlbumTrackNumber { get; set; }
 
         [JsonPropertyName("decade")]
-        public long Decade { get; set; }
+        public long? Decade { get; set; }
 
         [JsonPropertyName("artist")]
         public string Artist { get; set; }
@@ -129,7 +129,7 @@ namespace RhythmVerseClient.Api
         public string ArtistS { get; set; }
 
         [JsonPropertyName("artist_id")]
-        public long ArtistId { get; set; }
+        public long? ArtistId { get; set; }
 
         [JsonPropertyName("title")]
         public string Title { get; set; }
@@ -171,11 +171,11 @@ namespace RhythmVerseClient.Api
         public long? DiffBand { get; set; }
 
         [JsonPropertyName("master")]
-        public long Master { get; set; }
+        public long? Master { get; set; }
 
         [JsonPropertyName("vocal_parts")]
         [JsonConverter(typeof(ParseStringConverter))]
-        public long VocalParts { get; set; }
+        public long? VocalParts { get; set; }
 
         [JsonPropertyName("gender")]
         public string Gender { get; set; }
@@ -190,10 +190,10 @@ namespace RhythmVerseClient.Api
         public string SongNotes { get; set; }
 
         [JsonPropertyName("downloads")]
-        public long Downloads { get; set; }
+        public long? Downloads { get; set; }
 
         [JsonPropertyName("record_approved")]
-        public long RecordApproved { get; set; }
+        public long? RecordApproved { get; set; }
 
         [JsonPropertyName("diff_rhythm")]
         [JsonConverter(typeof(ParseStringConverter))]
@@ -224,7 +224,7 @@ namespace RhythmVerseClient.Api
         public long? DiffBassghl { get; set; }
 
         [JsonPropertyName("genre_is_literal")]
-        public long GenreIsLiteral { get; set; }
+        public long? GenreIsLiteral { get; set; }
 
         [JsonPropertyName("rank_drums")]
         public long? RankDrums { get; set; }
@@ -429,7 +429,7 @@ namespace RhythmVerseClient.Api
         public string FileId { get; set; }
 
         [JsonPropertyName("db_id")]
-        public long DbId { get; set; }
+        public long? DbId { get; set; }
 
         [JsonPropertyName("user")]
         public string User { get; set; }
@@ -459,25 +459,25 @@ namespace RhythmVerseClient.Api
         public AltVersions AltVersions { get; set; }
 
         [JsonPropertyName("downloads")]
-        public long Downloads { get; set; }
+        public long? Downloads { get; set; }
 
         [JsonPropertyName("deleted")]
-        public long Deleted { get; set; }
+        public long? Deleted { get; set; }
 
         [JsonPropertyName("retired")]
-        public long Retired { get; set; }
+        public long? Retired { get; set; }
 
         [JsonPropertyName("destroyed")]
-        public long Destroyed { get; set; }
+        public long? Destroyed { get; set; }
 
         [JsonPropertyName("size")]
-        public long Size { get; set; }
+        public long? Size { get; set; }
 
         [JsonPropertyName("utility")]
-        public long Utility { get; set; }
+        public long? Utility { get; set; }
 
         [JsonPropertyName("unpitched")]
-        public long Unpitched { get; set; }
+        public long? Unpitched { get; set; }
 
         [JsonPropertyName("audio_type")]
         public string AudioType { get; set; }
@@ -536,10 +536,10 @@ namespace RhythmVerseClient.Api
         public object RetireDate { get; set; }
 
         [JsonPropertyName("pro_drums")]
-        public long ProDrums { get; set; }
+        public long? ProDrums { get; set; }
 
         [JsonPropertyName("vocals_lyrics_only")]
-        public long VocalsLyricsOnly { get; set; }
+        public long? VocalsLyricsOnly { get; set; }
 
         [JsonPropertyName("charter")]
         public string Charter { get; set; }
@@ -596,16 +596,16 @@ namespace RhythmVerseClient.Api
         public DateTimeOffset UploadDate { get; set; }
 
         [JsonPropertyName("off")]
-        public long Off { get; set; }
+        public long? Off { get; set; }
 
         [JsonPropertyName("author")]
         public Author Author { get; set; }
 
         [JsonPropertyName("hidden")]
-        public bool Hidden { get; set; }
+        public bool? Hidden { get; set; }
 
         [JsonPropertyName("game_completeness")]
-        public long GameCompleteness { get; set; }
+        public long? GameCompleteness { get; set; }
 
         [JsonPropertyName("file_url")]
         public string FileUrl { get; set; }
@@ -617,7 +617,7 @@ namespace RhythmVerseClient.Api
         public string AuthorId { get; set; }
 
         [JsonPropertyName("comments")]
-        public long Comments { get; set; }
+        public long? Comments { get; set; }
 
         [JsonPropertyName("update_date")]
         public DateTimeOffset UpdateDate { get; set; }
@@ -637,7 +637,7 @@ namespace RhythmVerseClient.Api
         public CreditsUnion Credits { get; set; }
 
         [JsonPropertyName("thanks")]
-        public long Thanks { get; set; }
+        public long? Thanks { get; set; }
 
         [JsonPropertyName("download_url")]
         public string DownloadUrl { get; set; }
@@ -652,7 +652,7 @@ namespace RhythmVerseClient.Api
         public Group Group { get; set; }
 
         [JsonPropertyName("song_length")]
-        public long SongLength { get; set; }
+        public long? SongLength { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("rank_drums")]
@@ -710,7 +710,7 @@ namespace RhythmVerseClient.Api
     public partial class Author
     {
         [JsonPropertyName("member_id")]
-        public long MemberId { get; set; }
+        public long? MemberId { get; set; }
 
         [JsonPropertyName("name")]
         public string Name { get; set; }
@@ -719,7 +719,7 @@ namespace RhythmVerseClient.Api
         public string Account { get; set; }
 
         [JsonPropertyName("releases")]
-        public long Releases { get; set; }
+        public long? Releases { get; set; }
 
         [JsonPropertyName("default_gameformat")]
         public string DefaultGameformat { get; set; }
@@ -737,16 +737,16 @@ namespace RhythmVerseClient.Api
         public Level Level { get; set; }
 
         [JsonPropertyName("confirmed")]
-        public long Confirmed { get; set; }
+        public long? Confirmed { get; set; }
 
         [JsonPropertyName("source")]
-        public long Source { get; set; }
+        public long? Source { get; set; }
 
         [JsonPropertyName("id")]
         public long? Id { get; set; }
 
         [JsonPropertyName("dl_count")]
-        public long DlCount { get; set; }
+        public long? DlCount { get; set; }
 
         [JsonPropertyName("public_profile_page")]
         public string PublicProfilePage { get; set; }
@@ -782,7 +782,7 @@ namespace RhythmVerseClient.Api
     public partial class BassElement
     {
         [JsonPropertyName("member_id")]
-        public long MemberId { get; set; }
+        public long? MemberId { get; set; }
 
         [JsonPropertyName("name")]
         public string Name { get; set; }
@@ -791,7 +791,7 @@ namespace RhythmVerseClient.Api
         public string Account { get; set; }
 
         [JsonPropertyName("releases")]
-        public long Releases { get; set; }
+        public long? Releases { get; set; }
 
         [JsonPropertyName("default_gameformat")]
         public string DefaultGameformat { get; set; }
@@ -806,19 +806,19 @@ namespace RhythmVerseClient.Api
         public object AuthorClass { get; set; }
 
         [JsonPropertyName("level")]
-        public bool Level { get; set; }
+        public bool? Level { get; set; }
 
         [JsonPropertyName("confirmed")]
-        public long Confirmed { get; set; }
+        public long? Confirmed { get; set; }
 
         [JsonPropertyName("source")]
-        public long Source { get; set; }
+        public long? Source { get; set; }
 
         [JsonPropertyName("id")]
-        public long Id { get; set; }
+        public long? Id { get; set; }
 
         [JsonPropertyName("dl_count")]
-        public long DlCount { get; set; }
+        public long? DlCount { get; set; }
 
         [JsonPropertyName("public_profile_page")]
         public string PublicProfilePage { get; set; }
@@ -836,7 +836,7 @@ namespace RhythmVerseClient.Api
         public string AvatarPath { get; set; }
 
         [JsonPropertyName("main_contributor")]
-        public long MainContributor { get; set; }
+        public long? MainContributor { get; set; }
 
         [JsonPropertyName("instrument")]
         public string Instrument { get; set; }
@@ -929,13 +929,13 @@ namespace RhythmVerseClient.Api
         public string GroupName { get; set; }
 
         [JsonPropertyName("activated")]
-        public long Activated { get; set; }
+        public long? Activated { get; set; }
 
         [JsonPropertyName("verified")]
-        public long Verified { get; set; }
+        public long? Verified { get; set; }
 
         [JsonPropertyName("releases")]
-        public long Releases { get; set; }
+        public long? Releases { get; set; }
 
         [JsonPropertyName("description")]
         public string Description { get; set; }
@@ -961,7 +961,7 @@ namespace RhythmVerseClient.Api
 
         [JsonPropertyName("open_applications")]
         [JsonConverter(typeof(ParseStringConverter))]
-        public long OpenApplications { get; set; }
+        public long? OpenApplications { get; set; }
 
         [JsonPropertyName("page_url")]
         public string PageUrl { get; set; }
@@ -970,16 +970,16 @@ namespace RhythmVerseClient.Api
         public string DashboardUrl { get; set; }
 
         [JsonPropertyName("authors")]
-        public long Authors { get; set; }
+        public long? Authors { get; set; }
 
         [JsonPropertyName("followers")]
-        public long Followers { get; set; }
+        public long? Followers { get; set; }
 
         [JsonPropertyName("songs")]
-        public long Songs { get; set; }
+        public long? Songs { get; set; }
 
         [JsonPropertyName("gameformats")]
-        public bool Gameformats { get; set; }
+        public bool? Gameformats { get; set; }
 
         [JsonPropertyName("logo_path")]
         public string LogoPath { get; set; }

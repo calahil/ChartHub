@@ -5,7 +5,6 @@ using Google.Apis.Services;
 using Google.Apis.Util.Store;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Configuration;
-using RhythmVerseClient.Api;
 using RhythmVerseClient.Utilities;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Zip;
@@ -156,7 +155,7 @@ namespace RhythmVerseClient.Services
             Scopes,
             "user",
             CancellationToken.None,
-            new FileDataStore(Toolbox.ConstructPath(FileSystem.Current.AppDataDirectory, "token.json"), false));
+            new FileDataStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "token.json"), false));
 
             return new DriveService(new BaseClientService.Initializer()
             {
@@ -170,7 +169,7 @@ namespace RhythmVerseClient.Services
             _driveService ??= await GetServiceAsync();
 
             var request = _driveService.Files.Get(fileId);
-            var savePath = Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName);
+            var savePath = Path.Combine(downloadFile.FilePath, downloadFile.DisplayName);
 
             using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None);
             var file = await request.DownloadAsync(fileStream, cancellationToken);
@@ -200,15 +199,15 @@ namespace RhythmVerseClient.Services
 
         public async Task DownloadFolderAsync(DownloadFile downloadFile, string fileId, CancellationToken cancellationToken = default)
         {
-            string folderPath = Toolbox.ConstructPath(Path.GetTempPath(), Guid.NewGuid().ToString());
+            string folderPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
             Directory.CreateDirectory(folderPath);
             var result = await GetFolderNameAsync(fileId);
 
-            string finalPath = Toolbox.ConstructPath(folderPath, result);
+            string finalPath = Path.Combine(folderPath, result);
 
             Directory.CreateDirectory(finalPath);
             await DownloadFilesInFolder(fileId, finalPath, cancellationToken);
-            var zipFile = Toolbox.ConstructPath(downloadFile.FilePath, downloadFile.DisplayName);
+            var zipFile = Path.Combine(downloadFile.FilePath, downloadFile.DisplayName);
             CreateZip(folderPath, zipFile);
 
             Directory.Delete(folderPath, true); // Cleanup the temporary folder

@@ -6,14 +6,10 @@ namespace SettingsManager
     {
         public T Settings
         {
-            get
-            {
-                return settings ?? new AppSettings("first_install", "first_install", "first_install", "first_install", "first_install",
-                    "first_install", "first_install", "first_install") as T;
-            }
-            set => settings = value;
+            get => field ?? new AppSettings("first_install", "first_install", "first_install", "first_install") as T;
+            set;
         }
-        
+
         private readonly string _settingsFilePath;
 
         public event Action<string, string>? SettingSaved;
@@ -23,10 +19,9 @@ namespace SettingsManager
             WriteIndented = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase // Use camelCase for JSON property names
         };
-        private T? settings;
 
         public SettingsManager(string settingsFilePath, AppSettings settings)
-        {            
+        {
             Settings = settings as T;
             _settingsFilePath = settingsFilePath;
         }

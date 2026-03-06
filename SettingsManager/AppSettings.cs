@@ -4,37 +4,21 @@ namespace SettingsManager
 {
     [method: JsonConstructor]
     public class AppSettings(
-        string? nautilusDirectoryPath,
-        string? phaseshiftDirectory,
-        string? phaseshiftMusicDirectory,
-        string? rhythmverseAppPath,
-        string? cloneHeroSongLocation,
-        string? downloadLocation,
-        string? cloneHeroEXELocation,
-        string? downloadStaging)
+        string? tempDirectory,
+        string? downloadDirectory,
+        string? cloneHeroSongDirectory,
+        string? cloneHeroDataDirectory)
     {
-        [JsonPropertyName("NautilusDirectoryPath")]
-        public string? NautilusDirectoryPath { get; set; } = nautilusDirectoryPath;
+        [JsonPropertyName("TempDirectory")]
+        public string? TempDirectory { get; set; } = tempDirectory;
 
-        [JsonPropertyName("PhaseshiftDirectory")]
-        public string? PhaseshiftDirectory { get; set; } = phaseshiftDirectory;
+        [JsonPropertyName("DownloadDirectory")]
+        public string? DownloadDirectory { get; set; } = downloadDirectory;
 
-        [JsonPropertyName("PhaseshiftMusicDirectory")]
-        public string? PhaseshiftMusicDirectory { get; set; } = phaseshiftMusicDirectory;
+        [JsonPropertyName("CloneHeroSongDirectory")]
+        public string? CloneHeroSongDirectory { get; set; } = cloneHeroSongDirectory;
 
-        [JsonPropertyName("RhythmverseAppPath")]
-        public string? RhythmverseAppPath { get; set; } = rhythmverseAppPath;
-
-        [JsonPropertyName("CloneHeroSongLocation")]
-        public string? CloneHeroSongLocation { get; set; } = cloneHeroSongLocation;
-
-        [JsonPropertyName("DownloadLocation")]
-        public string? DownloadLocation { get; set; } = downloadLocation;
-
-        [JsonPropertyName("CloneHeroEXELocation")]
-        public string? CloneHeroEXELocation { get; set; } = cloneHeroEXELocation;
-
-        [JsonPropertyName("DownloadStaging")]
-        public string? DownloadStaging { get; set; } = downloadStaging;
+        [JsonPropertyName("CloneHeroDataDirectory")]
+        public string? CloneHeroDataDirectory { get; set; } = cloneHeroDataDirectory;
     }
 }
