@@ -1,4 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
+        xmlns:Views="using:RhythmVerseClient.Views"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -10,19 +11,19 @@
     <TabControl>
         <TabItem Header="RhythmVerse">
             <!-- RhythmVerseView will be included here -->
-            <TextBlock Text="RhythmVerse View" VerticalAlignment="Center" HorizontalAlignment="Center" />
+            <Views:RhythmVerseView />
         </TabItem>
         <TabItem Header="Download">
             <!-- DownloadView will be included here -->
-            <TextBlock Text="Download View" VerticalAlignment="Center" HorizontalAlignment="Center" />
+            <Views:DownloadView />
         </TabItem>
         <TabItem Header="CloneHero">
             <!-- CloneHeroView will be included here -->
-            <TextBlock Text="CloneHero View" VerticalAlignment="Center" HorizontalAlignment="Center" />
+            <Views:CloneHeroView />
         </TabItem>
         <TabItem Header="Install Song">
             <!-- InstallSongView will be included here -->
-            <TextBlock Text="Install Song View" VerticalAlignment="Center" HorizontalAlignment="Center" />
+            <Views:InstallSongView />
         </TabItem>
     </TabControl>
 

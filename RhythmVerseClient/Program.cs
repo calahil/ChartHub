@@ -1,4 +1,5 @@
 using Avalonia;
+using Microsoft.Extensions.DependencyInjection;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Themes.Fluent;
 using Avalonia.X11;

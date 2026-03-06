@@ -5,7 +5,7 @@ VisualStudioVersion = 17.9.34622.214
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RhythmVerseClient", "RhythmVerseClient\RhythmVerseClient.csproj", "{CC4AE8D2-0B15-41B4-B28E-CA028FC9CBCA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SettingsManager", "..\settingsmanager\SettingsManager\SettingsManager.csproj", "{F06A9452-1D56-44F7-9542-3C10CBC7C155}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SettingsManager", "SettingsManager\SettingsManager.csproj", "{F06A9452-1D56-44F7-9542-3C10CBC7C155}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
