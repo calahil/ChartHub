@@ -214,6 +214,11 @@ namespace RhythmVerseClient.Utilities
         private readonly ISettingsManager<AppSettings> _settingsManager;
         private readonly AppSettings _appSettings;
 
+        public bool UseMockData
+        {
+            get => _appSettings.UseMockData;
+            set { _appSettings.UseMockData = value; _settingsManager.Save(); }
+        }
         public string TempDir
         {
             get => _appSettings.TempDirectory ?? String.Empty;
@@ -253,18 +258,23 @@ namespace RhythmVerseClient.Utilities
 
             if (DownloadDir == "first_install")
             {
-                DownloadDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+                DownloadDir = Path.Combine(TempDir, "Downloads");
             }
+
+            Toolbox.CreateDirectoryIfNotExists(DownloadDir);
 
             if (CloneHeroDataDir == "first_install")
             {
                 CloneHeroDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".clonehero");
             }
 
+            Toolbox.CreateDirectoryIfNotExists(CloneHeroDataDir);
+
             if (CloneHeroSongsDir == "first_install")
             {
                 CloneHeroSongsDir = Path.Combine(CloneHeroDataDir, "Songs");
             }
+            Toolbox.CreateDirectoryIfNotExists(CloneHeroSongsDir);
         }
 
 

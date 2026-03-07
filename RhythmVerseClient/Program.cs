@@ -38,10 +38,12 @@ class Program
 
     private static void ConfigureServices(IServiceCollection services)
     {
+        var configDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RhythmVerseClient");
+        Toolbox.CreateDirectoryIfNotExists(configDir);
+
         // Build configuration with user secrets
         var configBuilder = new ConfigurationBuilder()
-            .AddJsonFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json"), optional: true)
-            .AddJsonFile(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "appsettings.json"), optional: true)
+            .AddJsonFile(Path.Combine(configDir, "appsettings.json"), optional: true)
             .AddUserSecrets<Program>(optional: true);
 
         var config = configBuilder.Build();
@@ -49,7 +51,7 @@ class Program
 
         var settingsFileName = "appsettings.json";
             var sourceFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, settingsFileName);
-            var destinationFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), settingsFileName);
+            var destinationFilePath = Path.Combine(configDir, settingsFileName);
 
             if (!File.Exists(destinationFilePath))
             {
@@ -66,7 +68,7 @@ class Program
 
             services.AddSingleton<ISettingsManager<AppSettings>>(serviceProvider =>
             {
-                var settingsFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), settingsFileName);
+                var settingsFilePath = Path.Combine(configDir, settingsFileName);
                 var appSettings = serviceProvider.GetRequiredService<AppSettings>();
                 return new SettingsManager<AppSettings>(settingsFilePath, appSettings);
             });

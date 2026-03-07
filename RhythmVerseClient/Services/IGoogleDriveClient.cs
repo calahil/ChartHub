@@ -244,7 +244,7 @@ namespace RhythmVerseClient.Services
 
         private string GetIconForFileType(WatcherFileType fileType)
         {
-            return fileType switch
+            var iconFileName = fileType switch
             {
                 WatcherFileType.Rar => "rar.png",
                 WatcherFileType.Zip => "zip.png",
@@ -253,6 +253,8 @@ namespace RhythmVerseClient.Services
                 WatcherFileType.CloneHero => "clonehero.png",
                 _ => "blank.png",
             };
+
+            return $"avares://RhythmVerseClient/Resources/Images/{iconFileName}";
         }
 
         private async Task<long> GetFileSizeAsync(string fileId)

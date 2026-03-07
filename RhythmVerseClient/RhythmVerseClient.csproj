@@ -42,32 +42,19 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\SettingsManager\SettingsManager.csproj" />
+		<ProjectReference Include="..\SettingsManager\SettingsManager.csproj" />
 	</ItemGroup>
-
 	<ItemGroup>
-	  <Compile Update="Pages\CloneHeroPage.xaml.cs">
-	    <DependentUpon>CloneHeroPage.xaml</DependentUpon>
-	  </Compile>
-	  <Compile Update="Pages\InstallSongPage.xaml.cs">
-	    <DependentUpon>InstallSongPage.xaml</DependentUpon>
-	  </Compile>
+		<AvaloniaResource Include="Resources/Images/**"/>
 	</ItemGroup>
-
 	<ItemGroup>
-	  <MauiImage Update="Resources\Images\albumloading.png">
-	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-	  </MauiImage>
-	</ItemGroup>
-
-	<ItemGroup>
-	  <None Update="appsettings.json">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </None>
-	  <None Update="Resources\Images\logo.png">
-	    <Pack>True</Pack>
-	    <PackagePath>\</PackagePath>
-	  </None>
+		<None Update="appsettings.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Resources\Images\logo.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
 	</ItemGroup>
 
 </Project>

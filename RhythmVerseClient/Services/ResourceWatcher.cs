@@ -1,4 +1,5 @@
 ﻿using Avalonia.Threading;
+using Microsoft.Extensions.FileSystemGlobbing.Abstractions;
 using RhythmVerseClient.Utilities;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -52,10 +53,10 @@ namespace RhythmVerseClient.Services
         private readonly WatcherType _watcherType;
 
 
-        private static readonly byte[] ZipSignature = { 0x50, 0x4B, 0x03, 0x04 };
-        private static readonly byte[] RarSignature = { 0x52, 0x61, 0x72, 0x21 };
-        private static readonly byte[] Rb3ConSignature = { 0x43, 0x4F, 0x4E };
-        private static readonly byte[] SevenZipSignature = { 0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C };
+        private static readonly byte[] ZipSignature = [0x50, 0x4B, 0x03, 0x04];
+        private static readonly byte[] RarSignature = "Rar!"u8.ToArray();
+        private static readonly byte[] Rb3ConSignature = "CON"u8.ToArray();
+        private static readonly byte[] SevenZipSignature = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
 
         public event EventHandler<string>? DirectoryNotFound;
         //public event EventHandler<string>? ErrorOccurred;
@@ -67,7 +68,6 @@ namespace RhythmVerseClient.Services
             _data = [];
             fileSystemWatcher = new FileSystemWatcher();
             existingEntries = [];
-
             fileSystemWatcher.Path = DirectoryPath;
             fileSystemWatcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName;
             fileSystemWatcher.Filter = "*.*";
@@ -214,7 +214,7 @@ namespace RhythmVerseClient.Services
             {
                 return WatcherFileType.CloneHero;
             }
-            else if (fileSignature.AsSpan()[..SevenZipSignature.Length].SequenceEqual(SevenZipSignature))
+            else if (fileSignature.Length >= SevenZipSignature.Length && fileSignature.AsSpan()[..SevenZipSignature.Length].SequenceEqual(SevenZipSignature))
             {
                 return WatcherFileType.SevenZip;
             }
@@ -230,7 +230,7 @@ namespace RhythmVerseClient.Services
 
         private static string GetIconForFileType(WatcherFileType fileType)
         {
-            return fileType switch
+            var iconFileName = fileType switch
             {
                 WatcherFileType.Rar => "rar.png",
                 WatcherFileType.Zip => "zip.png",
@@ -239,13 +239,13 @@ namespace RhythmVerseClient.Services
                 WatcherFileType.CloneHero => "clonehero.png",
                 _ => "blank.png",
             };
+
+            return $"avares://RhythmVerseClient/Resources/Images/{iconFileName}";
         }
 
         private async Task AddItem(string itemName, string itemPath)
         {
-            existingEntries.TryGetValue(itemPath, out var entry);
-
-            if (entry == null)
+            if (!existingEntries.Contains(itemPath))
             {
                 var fileType = await GetFileTypeAsync(itemPath);
                 var imageFile = GetIconForFileType(fileType);
@@ -277,9 +277,8 @@ namespace RhythmVerseClient.Services
             {
                 Data.Remove(itemToRemove);
             }
-            existingEntries.TryGetValue(itemPath, out var entry);
 
-            if (entry != null)
+            if (existingEntries.Contains(itemPath))
             {
                 existingEntries.Remove(itemPath);
             }
@@ -293,12 +292,12 @@ namespace RhythmVerseClient.Services
             {
                 itemToEdit.FileType = await GetFileTypeAsync(itemPath);
                 var imageFile = GetIconForFileType(itemToEdit.FileType);
+                itemToEdit.ImageFile = imageFile;
                 itemToEdit.FilePath = itemPath;
                 itemToEdit.DisplayName = itemName;
             }
-            existingEntries.TryGetValue(oldItemPath, out var entry);
 
-            if (entry != null)
+            if (existingEntries.Contains(oldItemPath))
             {
                 existingEntries.Remove(oldItemPath);
             }
@@ -311,7 +310,7 @@ namespace RhythmVerseClient.Services
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
-//test
+
     public class FileData(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile, long sizeBytes) : INotifyPropertyChanged
     {
         private string _imageFile = imageFile;
