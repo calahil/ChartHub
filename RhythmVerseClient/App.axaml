@@ -6,6 +6,7 @@
 
     <Application.Resources>
         <local:ViewLocator x:Key="ViewLocator" />
+        <FontFamily x:Key="FontAwesome">avares://RhythmVerseClient/Resources/Fonts#Font Awesome 6 Free</FontFamily>
     </Application.Resources>
 
     <Application.DataTemplates>

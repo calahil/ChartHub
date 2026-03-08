@@ -282,7 +282,7 @@ namespace RhythmVerseClient.ViewModels
 
 
         public IAsyncRelayCommand RefreshButtonCommand { get; }
-        public IAsyncRelayCommand DownloadFileCommand { get; }
+        public ICommand DownloadFileCommand { get; }
         public ICommand ToggleFilterPaneCommand { get; }
 
         public RhythmVersePageStrings PageStrings { get; }

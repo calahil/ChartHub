@@ -46,6 +46,7 @@
 	</ItemGroup>
 	<ItemGroup>
 		<AvaloniaResource Include="Resources/Images/**"/>
+		<AvaloniaResource Include="Resources/Fonts/**"/>
 	</ItemGroup>
 	<ItemGroup>
 		<None Update="appsettings.json">

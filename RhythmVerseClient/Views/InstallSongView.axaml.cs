@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 
 namespace RhythmVerseClient.Views;
-
 public partial class InstallSongView : UserControl
 {
     public InstallSongView()

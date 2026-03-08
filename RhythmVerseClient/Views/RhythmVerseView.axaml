@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:viewmodels="clr-namespace:RhythmVerseClient.ViewModels"
+             xmlns:models="clr-namespace:RhythmVerseClient.Models"
              xmlns:asyncImage="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
              x:Class="RhythmVerseClient.Views.RhythmVerseView"
@@ -12,15 +13,15 @@
         <!-- Search and Filter Bar -->
         <Grid Grid.Row="0" ColumnDefinitions="300,100,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,100"
               Margin="10" Height="48">
-            <TextBox Grid.Column="0" Watermark="Search text..." Text="{Binding SearchText}" />
-            <TextBox Grid.Column="1" Watermark="Author..." Text="{Binding SearchAuthorText}" />
-            <TextBlock Grid.Column="2" Text="|  Pages:" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="3" Text="{Binding CurrentPage}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="4" Text="/" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="5" Text="{Binding TotalPages}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="6" Text="|  Total:" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="7" Text="{Binding TotalResults}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="8" Text="Results:" VerticalAlignment="Center" />
+            <TextBox Grid.Column="0" Height="20" Watermark="Search text..." Text="{Binding SearchText}" />
+            <ButtonSpinner Grid.Column="2" Height="20" Width="130" ButtonSpinnerLocation="Left" >
+                <TextBlock Text="{Binding CurrentPage}" VerticalAlignment="Center" />
+            </ButtonSpinner>
+            <TextBlock Grid.Column="3" Text=" / " VerticalAlignment="Center" />
+            <TextBlock Grid.Column="4" Text="{Binding TotalPages}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="5" Text=" |  Total: " VerticalAlignment="Center" />
+            <TextBlock Grid.Column="6" Text="{Binding TotalResults}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="7" Text=" Results: " VerticalAlignment="Center" />
             <Button Grid.Column="9" Content="Refresh" Command="{Binding RefreshButtonCommand}" HorizontalAlignment="Right" />
             <Button Grid.Column="10" Content="{Binding FilterPaneButtonText}" Command="{Binding ToggleFilterPaneCommand}" />
         </Grid>
@@ -51,9 +52,47 @@
                                 <TextBlock Grid.Row="9" Grid.RowSpan="2" Grid.Column="1" Text="{Binding Year, StringFormat='Released: {0}'}" FontSize="12" />
                                 <TextBlock Grid.Row="11" Grid.RowSpan="2" Grid.Column="1" Text="{Binding Genre, StringFormat='Genre: {0}'}" FontSize="12" />
 
+                                <!-- Instrument Info -->
+                                <Grid Grid.Row="0" Grid.Column="2" Grid.RowSpan="16" ColumnDefinitions="32,105,32,105"
+                                        RowDefinitions="*, *, *, *, *">
+                                    <!-- Drum Rating -->
+                                    <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/drums_small.png"
+                                            Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DrumString}"
+                                            FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
+                                    <!-- Guitar Rating -->
+                                    <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/guitar_small.png"
+                                            Grid.Row="2" Grid.Column="0" VerticalAlignment="Top" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding GuitarString}"
+                                            FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
+                                    <!-- Keyboard Rating -->
+                                    <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/keys_small.png"
+                                            Grid.Row="3" Grid.Column="0" VerticalAlignment="Top" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding KeysString}"
+                                            FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
+                                    <!-- Bass Rating -->
+                                    <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/bass_small.png"
+                                            Grid.Row="1" Grid.Column="2" VerticalAlignment="Top" />
+                                    <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding BassString}"
+                                            FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
+                                    <!-- Vocals Rating -->
+                                     <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/vocals_small.png"
+                                            Grid.Row="2" Grid.Column="2" VerticalAlignment="Top" />
+                                    <TextBlock Grid.Row="2" Grid.Column="3" Text="{Binding VocalString}"
+                                            FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
+                                </Grid>
                                 <!-- Download Info -->
-                                <TextBlock Grid.Row="1" Grid.RowSpan="3" Grid.Column="4" Text="{Binding Downloads, StringFormat='Downloads: {0}'}" FontSize="12" TextAlignment="Right" />
-                                <TextBlock Grid.Row="3" Grid.RowSpan="3" Grid.Column="4" Text="{Binding FileSize, StringFormat='Size: {0}'}" FontSize="12" TextAlignment="Right" />
+                                <Grid Grid.Row="0" Grid.Column="4" Grid.RowSpan="16" ColumnDefinitions="45,45,45,45"
+                                        RowDefinitions="48,48,32,14">
+                                    <Button Grid.Row="0" Grid.ColumnSpan="4" Click="Button_Click"
+                                            Margin="0,0,5,5">
+                                        <Button.Content>
+                                            <Image x:DataType="models:ViewSong" VerticalAlignment="Stretch" HorizontalAlignment="Center"
+                                                    asyncImage:ImageLoader.Source="{Binding Gameformat, StringFormat='avares://RhythmVerseClient/Resources/Images/{0}'}" />
+                                        </Button.Content>
+                                    </Button>
+                                    <TextBlock Grid.Row="2" Grid.ColumnSpan="4" Grid.Column="0" Text="{Binding Downloads, StringFormat='Downloads: {0}'}" FontSize="12" TextAlignment="Right" />
+                                </Grid>
 
                             </Grid>
                         </Border>

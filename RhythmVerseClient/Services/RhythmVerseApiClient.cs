@@ -195,7 +195,7 @@ namespace RhythmVerseClient.Services
                     var content = new FormUrlEncodedContent(collection);
 
                     string responseBody;
-                    
+
                     // Use mock data in development if UseMockData is true in appsettings.json
                     if (_configuration["UseMockData"] == "True")
                     {
