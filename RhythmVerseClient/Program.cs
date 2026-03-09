@@ -78,10 +78,10 @@ class Program
         services.AddSingleton<DownloadViewModel>();
         services.AddSingleton<CloneHeroViewModel>();
         services.AddSingleton<InstallSongViewModel>();
-        services.AddSingleton<RhythmVerseModel>();
+        services.AddSingleton<RhythmVerseViewModel>();
         services.AddSingleton<MainViewModel>(serviceProvider =>
             new MainViewModel(
-                serviceProvider.GetRequiredService<RhythmVerseModel>(),
+                serviceProvider.GetRequiredService<RhythmVerseViewModel>(),
                 serviceProvider.GetRequiredService<DownloadViewModel>(),
                 serviceProvider.GetRequiredService<CloneHeroViewModel>(),
                 serviceProvider.GetRequiredService<InstallSongViewModel>()

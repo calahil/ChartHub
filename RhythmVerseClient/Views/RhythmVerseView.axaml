@@ -4,10 +4,15 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:viewmodels="clr-namespace:RhythmVerseClient.ViewModels"
              xmlns:models="clr-namespace:RhythmVerseClient.Models"
+             xmlns:utilities="clr-namespace:RhythmVerseClient.Utilities"
              xmlns:asyncImage="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
              x:Class="RhythmVerseClient.Views.RhythmVerseView"
-             x:DataType="viewmodels:RhythmVerseModel">
+             x:DataType="viewmodels:RhythmVerseViewModel">
+
+    <UserControl.Resources>
+        <utilities:SafeImageUrlConverter x:Key="SafeImageUrlConverter"/>
+    </UserControl.Resources>
 
     <Grid RowDefinitions="Auto,*" ColumnDefinitions="*">
         <!-- Search and Filter Bar -->
@@ -30,6 +35,9 @@
         <Grid Grid.Row="1" ColumnDefinitions="*,Auto" RowDefinitions="*" Margin="10">
             <!-- Song List -->
             <ListBox Grid.Column="0" ItemsSource="{Binding DataItems}"
+                     SelectionMode="Single"
+                     SelectedItem="{Binding SelectedFile}"
+                     x:Name="SongsListBox"
                      ScrollViewer.VerticalScrollBarVisibility="Auto">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
@@ -39,56 +47,83 @@
                                   Margin="0,0,0,10"
                                   >
                                 <!-- Album Art -->
-                                <Image asyncImage:ImageLoader.Source="{Binding AlbumArt}"
+                                <Image asyncImage:ImageLoader.Source="{Binding AlbumArt, Converter={StaticResource SafeImageUrlConverter}, ConverterParameter=album}"
                                        Grid.Row="0" Grid.Column="0" Grid.RowSpan="16"
                                        VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
                                        Margin="10,10,10,10" />
 
                                 <!-- Song Info -->
-                                <TextBlock Grid.Row="1" Grid.RowSpan="3" Grid.Column="1" Text="{Binding Artist}" FontSize="16" FontWeight="Bold" Margin="0,0,0,5" />
-                                <TextBlock Grid.Row="3" Grid.RowSpan="3" Grid.Column="1" Text="{Binding Title}" FontSize="16" Margin="0,0,0,5" />
-                                <TextBlock Grid.Row="5" Grid.RowSpan="3" Grid.Column="1" Text="{Binding Album}" FontSize="12" Margin="0,0,0,5" />
-                                <TextBlock Grid.Row="7" Grid.RowSpan="2" Grid.Column="1" Text="{Binding FormattedTime, StringFormat='Time: {0}'}" FontSize="12" />
-                                <TextBlock Grid.Row="9" Grid.RowSpan="2" Grid.Column="1" Text="{Binding Year, StringFormat='Released: {0}'}" FontSize="12" />
-                                <TextBlock Grid.Row="11" Grid.RowSpan="2" Grid.Column="1" Text="{Binding Genre, StringFormat='Genre: {0}'}" FontSize="12" />
-
+                                <Grid Grid.Row="2" Grid.Column="1" Grid.RowSpan="12" ColumnDefinitions="*"
+                                      RowDefinitions="16,15,14,13,12,12">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Artist}"
+                                               FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding Title}"
+                                               FontSize="15" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{Binding Album}"
+                                               FontSize="14" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="3" Grid.Column="0"
+                                               Text="{Binding FormattedTime, StringFormat='Time: {0}'}"
+                                               FontSize="13" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="4" Grid.Column="0"
+                                               Text="{Binding Year, StringFormat='Released: {0}'}"
+                                               FontSize="12" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="5" Grid.Column="0"
+                                               Text="{Binding Genre, StringFormat='Genre: {0}'}"
+                                               FontSize="12" VerticalAlignment="Center" />
+                                </Grid>
                                 <!-- Instrument Info -->
                                 <Grid Grid.Row="0" Grid.Column="2" Grid.RowSpan="16" ColumnDefinitions="32,105,32,105"
-                                        RowDefinitions="*, *, *, *, *">
+                                      RowDefinitions="*, *, *, *, *">
                                     <!-- Drum Rating -->
                                     <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/drums_small.png"
-                                            Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" />
+                                           Grid.Row="1" Grid.Column="0" VerticalAlignment="Top" />
                                     <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding DrumString}"
-                                            FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
+                                               FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
                                     <!-- Guitar Rating -->
                                     <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/guitar_small.png"
-                                            Grid.Row="2" Grid.Column="0" VerticalAlignment="Top" />
+                                           Grid.Row="2" Grid.Column="0" VerticalAlignment="Top" />
                                     <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding GuitarString}"
-                                            FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
+                                               FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
                                     <!-- Keyboard Rating -->
                                     <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/keys_small.png"
-                                            Grid.Row="3" Grid.Column="0" VerticalAlignment="Top" />
+                                           Grid.Row="3" Grid.Column="0" VerticalAlignment="Top" />
                                     <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding KeysString}"
-                                            FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
+                                               FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
                                     <!-- Bass Rating -->
                                     <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/bass_small.png"
-                                            Grid.Row="1" Grid.Column="2" VerticalAlignment="Top" />
+                                           Grid.Row="1" Grid.Column="2" VerticalAlignment="Top" />
                                     <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding BassString}"
-                                            FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
+                                               FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
                                     <!-- Vocals Rating -->
-                                     <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/vocals_small.png"
-                                            Grid.Row="2" Grid.Column="2" VerticalAlignment="Top" />
+                                    <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/vocals_small.png"
+                                           Grid.Row="2" Grid.Column="2" VerticalAlignment="Top" />
                                     <TextBlock Grid.Row="2" Grid.Column="3" Text="{Binding VocalString}"
-                                            FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
+                                               FontFamily="{StaticResource FontAwesome}" FontSize="18" Margin="0,0,0,5" />
+                                </Grid>
+                                <!-- Creator Info -->
+                                <Grid Grid.Row="0" Grid.Column="3" Grid.RowSpan="16" ColumnDefinitions="45,45,45,45"
+                                      RowDefinitions="48, 48, 32, 14" >
+                                        <Image asyncImage:ImageLoader.Source="{Binding Author.AvatarPath}"
+                                           Grid.Row="0" Grid.Column="0" VerticalAlignment="Top" />
+                                        <Button Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3"
+                                                Margin="0,0,5,5"
+                                                Background= "White"
+                                                Command="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).ViewCreatorCommand}">
+                                            <Button.Content>
+                                                <TextBlock Text="{Binding Author.Name}" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                                            </Button.Content>
+                                        </Button>
                                 </Grid>
                                 <!-- Download Info -->
                                 <Grid Grid.Row="0" Grid.Column="4" Grid.RowSpan="16" ColumnDefinitions="45,45,45,45"
-                                        RowDefinitions="48,48,32,14">
-                                    <Button Grid.Row="0" Grid.ColumnSpan="4" Click="Button_Click"
-                                            Margin="0,0,5,5">
+                                      RowDefinitions="48,48,32,14">
+                                    <Button Grid.Row="0" Grid.ColumnSpan="4"
+                                            Margin="0,0,5,5"
+                                            Background= "White"
+                                            Command="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}">
                                         <Button.Content>
-                                            <Image x:DataType="models:ViewSong" VerticalAlignment="Stretch" HorizontalAlignment="Center"
-                                                    asyncImage:ImageLoader.Source="{Binding Gameformat, StringFormat='avares://RhythmVerseClient/Resources/Images/{0}'}" />
+                                            <Image VerticalAlignment="Stretch" HorizontalAlignment="Center"
+                                                   asyncImage:ImageLoader.Source="{Binding Gameformat, StringFormat='avares://RhythmVerseClient/Resources/Images/{0}'}\" />
                                         </Button.Content>
                                     </Button>
                                     <TextBlock Grid.Row="2" Grid.ColumnSpan="4" Grid.Column="0" Text="{Binding Downloads, StringFormat='Downloads: {0}'}" FontSize="12" TextAlignment="Right" />

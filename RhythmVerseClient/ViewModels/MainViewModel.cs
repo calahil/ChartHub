@@ -5,12 +5,12 @@ namespace RhythmVerseClient.ViewModels
 {
     public class MainViewModel : INotifyPropertyChanged
     {
-        private RhythmVerseModel _rhythmVerseViewModel;
+        private RhythmVerseViewModel _rhythmVerseViewModel;
         private DownloadViewModel _downloadViewModel;
         private CloneHeroViewModel _cloneHeroViewModel;
         private InstallSongViewModel _installSongViewModel;
 
-        public RhythmVerseModel RhythmVerseViewModel
+        public RhythmVerseViewModel RhythmVerseViewModel
         {
             get => _rhythmVerseViewModel;
             set
@@ -54,7 +54,7 @@ namespace RhythmVerseClient.ViewModels
         {
         }
 
-        public MainViewModel(RhythmVerseModel rhythmVerseViewModel, DownloadViewModel downloadViewModel, CloneHeroViewModel cloneHeroViewModel, InstallSongViewModel installSongViewModel)
+        public MainViewModel(RhythmVerseViewModel rhythmVerseViewModel, DownloadViewModel downloadViewModel, CloneHeroViewModel cloneHeroViewModel, InstallSongViewModel installSongViewModel)
         {
             _rhythmVerseViewModel = rhythmVerseViewModel;
             _downloadViewModel = downloadViewModel;

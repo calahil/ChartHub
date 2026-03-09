@@ -45,7 +45,7 @@ namespace RhythmVerseClient.ViewModels
         }
     }
 
-    public class RhythmVerseModel : INotifyPropertyChanged
+    public class RhythmVerseViewModel : INotifyPropertyChanged
     {
         private readonly AppGlobalSettings globalSettings;
         private readonly DownloadService downloadService;
@@ -282,12 +282,12 @@ namespace RhythmVerseClient.ViewModels
 
 
         public IAsyncRelayCommand RefreshButtonCommand { get; }
-        public ICommand DownloadFileCommand { get; }
+        public IAsyncRelayCommand DownloadFileCommand { get; }
         public ICommand ToggleFilterPaneCommand { get; }
 
         public RhythmVersePageStrings PageStrings { get; }
 
-        public RhythmVerseModel(AppGlobalSettings settings, IConfiguration configuration)
+        public RhythmVerseViewModel(AppGlobalSettings settings, IConfiguration configuration)
         {
             globalSettings = settings;
             PageStrings = new RhythmVersePageStrings();

@@ -229,7 +229,8 @@ namespace RhythmVerseClient.Services
                         {
                             if (song != null)
                             {
-                                if (!song.File.DownloadUrl.StartsWith("http://marketplace.xbox.com") && !song.File.DownloadUrl.StartsWith("https://store.xbox.com/"))
+                                var downloadUrl = song.File.DownloadUrl ?? string.Empty;
+                                if (!downloadUrl.StartsWith("http://marketplace.xbox.com") && !downloadUrl.StartsWith("https://store.xbox.com/"))
                                 {
                                     var songView = new ViewSong();
 
@@ -272,14 +273,24 @@ namespace RhythmVerseClient.Services
                                     songView.FileName = song.File.FileName ?? song.File.Filename ?? "missing";
                                     songView.FileSize = song.File.Size;
 
-                                    var image = song.File.AlbumArt;
-                                    if (image != null)
+                                    string? apiAlbumArt = song.Data.DataData?.AlbumArt.String;
+                                    string? fileAlbumArt = song.File.AlbumArt;
+                                    var image = !string.IsNullOrWhiteSpace(apiAlbumArt)
+                                        ? apiAlbumArt
+                                        : (!string.IsNullOrWhiteSpace(fileAlbumArt) ? fileAlbumArt : null);
+
+                                    if (image != null && !string.IsNullOrWhiteSpace(image))
                                     {
-                                        if (!image.StartsWith(BaseUrl))
+                                        if (!image.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                                            && !image.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))
                                         {
                                             image = BaseUrl + image;
                                         }
                                         songView.AlbumArt = image;
+                                    }
+                                    else
+                                    {
+                                        songView.AlbumArt = "avares://RhythmVerseClient/Resources/Images/noalbumart.png";
                                     }
 
                                     songView.FormattedTime = Toolbox.ConvertSecondstoText(songView.SongLength);
@@ -298,18 +309,18 @@ namespace RhythmVerseClient.Services
                                     }
                                     else
                                     {
-                                        author.AvatarPath = "blankprofile.png";
+                                        author.AvatarPath = "avares://RhythmVerseClient/Resources/Images/blankprofile.png";
                                     }
 
                                     songView.Author = author;
 
-                                    if (!song.File.DownloadUrl.StartsWith("http"))
+                                    if (!downloadUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        songView.DownloadLink = BaseUrl + song.File.DownloadUrl;
+                                        songView.DownloadLink = BaseUrl + downloadUrl;
                                     }
                                     else
                                     {
-                                        songView.DownloadLink = song.File.DownloadUrl;
+                                        songView.DownloadLink = downloadUrl;
                                     }
 
                                     songView.DrumString = GiveMeRatingsNow(song, "drums");
@@ -318,7 +329,8 @@ namespace RhythmVerseClient.Services
                                     songView.VocalString = GiveMeRatingsNow(song, "vocals");
                                     songView.KeysString = GiveMeRatingsNow(song, "keys");
 
-                                    if (dictionary.TryGetValue(song.File.Gameformat, out List<string>? value))
+                                    var gameFormat = song.File.Gameformat ?? string.Empty;
+                                    if (dictionary.TryGetValue(gameFormat, out List<string>? value))
                                     {
                                         songView.Gameformat = value[1];
                                     }
