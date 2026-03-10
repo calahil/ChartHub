@@ -21,8 +21,7 @@ public partial class CloneHeroView : UserControl
     {
         base.OnAttachedToVisualTree(e);
         // View is now attached to the visual tree, you can perform any additional setup here
-        var viewModel = this.DataContext as CloneHeroViewModel;
-        if (viewModel != null)
+        if (this.DataContext is CloneHeroViewModel viewModel)
         {
             // You can access the ViewModel properties and methods here
             viewModel.CloneHeroWatcher.LoadItems();

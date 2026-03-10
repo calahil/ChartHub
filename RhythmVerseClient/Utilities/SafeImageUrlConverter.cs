@@ -12,6 +12,7 @@ namespace RhythmVerseClient.Utilities
     {
         private const string FallbackAlbumArt = "avares://RhythmVerseClient/Resources/Images/noalbumart.png";
         private const string FallbackGeneric = "avares://RhythmVerseClient/Resources/Images/blank.png";
+        private const string FallbackAvatar = "avares://RhythmVerseClient/Resources/Images/blankprofile.png";
 
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
@@ -39,10 +40,15 @@ namespace RhythmVerseClient.Utilities
 
         private static string GetFallback(object? parameter)
         {
-            // Use parameter to specify fallback type: "album" or "generic"
-            if (parameter is string param && param.Equals("album", StringComparison.OrdinalIgnoreCase))
+            // Use parameter to specify fallback type: "album", "avatar", or "generic"
+            if (parameter is string param)
             {
-                return FallbackAlbumArt;
+                return param.ToLowerInvariant() switch
+                {
+                    "album" => FallbackAlbumArt,
+                    "avatar" => FallbackAvatar,
+                    _ => FallbackGeneric,
+                };
             }
             return FallbackGeneric;
         }

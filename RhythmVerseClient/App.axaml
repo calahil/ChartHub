@@ -2,11 +2,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:RhythmVerseClient"
              x:Class="RhythmVerseClient.App"
-             RequestedThemeVariant="Default">
+             RequestedThemeVariant="Dark">
 
     <Application.Resources>
-        <local:ViewLocator x:Key="ViewLocator" />
-        <FontFamily x:Key="FontAwesome">avares://RhythmVerseClient/Resources/Fonts#Font Awesome 6 Free</FontFamily>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://RhythmVerseClient/Themes/CatppuccinMacchiato/Theme.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <local:ViewLocator x:Key="ViewLocator" />
+            <FontFamily x:Key="FontAwesome">avares://RhythmVerseClient/Resources/Fonts#Font Awesome 6 Free</FontFamily>
+        </ResourceDictionary>
     </Application.Resources>
 
     <Application.DataTemplates>

@@ -14,17 +14,17 @@ public class ViewLocator : IDataTemplate
             return new TextBlock { Text = "No View Model" };
 
         var name = data.GetType().FullName!;
-        
+
         // Handle the naming convention: ViewModels -> Views, ViewModel -> View, Model -> View
         name = name.Replace("ViewModels", "Views");
-        
+
         // Replace ViewModel with View only if it ends with ViewModel
         if (name.EndsWith("ViewModel"))
             name = name.Replace("ViewModel", "View");
         // Otherwise if it ends with Model, replace with View
         else if (name.EndsWith("Model"))
             name = name.Replace("Model", "View");
-        
+
         var type = Type.GetType(name);
 
         if (type != null)

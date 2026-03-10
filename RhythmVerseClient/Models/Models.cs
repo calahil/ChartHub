@@ -172,8 +172,8 @@ namespace RhythmVerseClient.Models
             }
         }
 
-        private string? _drumString;
-        public string? DrumString
+        private int _drumString;
+        public int DrumString
         {
             get => _drumString;
             set
@@ -183,8 +183,8 @@ namespace RhythmVerseClient.Models
             }
         }
 
-        private string? _guitarString;
-        public string? GuitarString
+        private int _guitarString;
+        public int GuitarString
         {
             get => _guitarString;
             set
@@ -194,8 +194,8 @@ namespace RhythmVerseClient.Models
             }
         }
 
-        private string? _bassString;
-        public string? BassString
+        private int _bassString;
+        public int BassString
         {
             get => _bassString;
             set
@@ -205,8 +205,8 @@ namespace RhythmVerseClient.Models
             }
         }
 
-        private string? _vocalString;
-        public string? VocalString
+        private int _vocalString;
+        public int VocalString
         {
             get => _vocalString;
             set
@@ -216,13 +216,24 @@ namespace RhythmVerseClient.Models
             }
         }
 
-        private string? _keysString;
-        public string? KeysString
+        private int _keysString;
+        public int KeysString
         {
             get => _keysString;
             set
             {
                 _keysString = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private long? _comments;
+        public long? Comments
+        {
+            get => _comments;
+            set
+            {
+                _comments = value;
                 OnPropertyChanged();
             }
         }

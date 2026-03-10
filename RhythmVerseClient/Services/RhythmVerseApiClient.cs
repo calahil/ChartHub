@@ -36,14 +36,14 @@ namespace RhythmVerseClient.Services
 
         private const string BaseUrl = "https://rhythmverse.co";
 
-        private readonly List<string> Ratings = [
-                "OOOOO",
-                "\u2B24" + "OOOO",
-                "\u2B24" + "\u2B24" + "OOO",
-                "\u2B24" + "\u2B24" +"\u2B24" + "OO",
-                "\u2B24" + "\u2B24" + "\u2B24" + "\u2B24" + "O",
-                "\u2B24" + "\u2B24" + "\u2B24" + "\u2B24" + "\u2B24"
-            ];
+        private readonly List<string> Ratings = new()
+        {
+            "\uebb5\uebb5\uebb5\uebb5\uebb5",
+            "\u2B24\uebb5\uebb5\uebb5\uebb5",
+            "\u2B24\u2B24\uebb5\uebb5\uebb5",
+            "\u2B24\u2B24\u2B24\uebb5\uebb5",
+            "\u2B24\u2B24\u2B24\u2B24\uebb5",
+        };
 
         private ObservableCollection<ViewSong>? _dataItems;
         public ObservableCollection<ViewSong>? DataItems
@@ -196,7 +196,7 @@ namespace RhythmVerseClient.Services
 
                     string responseBody;
 
-                    // Use mock data in development if UseMockData is true in appsettings.json
+                    //Use mock data in development if UseMockData is true in appsettings.json
                     if (_configuration["UseMockData"] == "True")
                     {
                         responseBody = await File.ReadAllTextAsync("RhythmVerseClient/Tests/test.json");
@@ -240,6 +240,7 @@ namespace RhythmVerseClient.Services
                                         songView.Title = song.File.FileTitle as string ?? song.Data.DataData.Title ?? song.File.Filename ?? "Unknown";
                                         songView.Album = song.File.FileAlbum as string ?? song.Data.DataData.Album ?? song.File.Filename ?? "Unknown";
                                         songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : song.Data.DataData.Downloads;
+                                        songView.Comments = (long)song.File.Comments;
 
                                         if (song.Data.DataData.SongLength > 0)
                                         {
@@ -367,7 +368,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        private string GiveMeRatingsNow(Song song, string instrument)
+        private int GiveMeRatingsNow(Song song, string instrument)
         {
             int dataRating;
             int fileRating;
@@ -406,7 +407,7 @@ namespace RhythmVerseClient.Services
                         fileRating = 0;
                     }
 
-                    return Ratings[Math.Max(dataRating, fileRating)];
+                    return Math.Max(dataRating, fileRating);
                 case "guitar":
                     if (data != null)
                     {
@@ -437,7 +438,7 @@ namespace RhythmVerseClient.Services
                         fileRating = 0;
                     }
 
-                    return Ratings[Math.Max(dataRating, fileRating)];
+                    return Math.Max(dataRating, fileRating);
                 case "bass":
                     if (data != null)
                     {
@@ -468,7 +469,7 @@ namespace RhythmVerseClient.Services
                         fileRating = 0;
                     }
 
-                    return Ratings[Math.Max(dataRating, fileRating)];
+                    return Math.Max(dataRating, fileRating);
                 case "vocals":
                     if (data != null)
                     {
@@ -499,7 +500,7 @@ namespace RhythmVerseClient.Services
                         fileRating = 0;
                     }
 
-                    return Ratings[Math.Max(dataRating, fileRating)];
+                    return Math.Max(dataRating, fileRating);
                 case "keys":
                     if (data != null)
                     {
@@ -530,9 +531,9 @@ namespace RhythmVerseClient.Services
                         fileRating = 0;
                     }
 
-                    return Ratings[Math.Max(dataRating, fileRating)];
+                    return Math.Max(dataRating, fileRating);
                 default:
-                    return Ratings[0];
+                    return 0;
             }
         }
 

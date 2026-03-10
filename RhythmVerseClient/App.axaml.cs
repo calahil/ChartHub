@@ -1,7 +1,9 @@
 ﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using AsyncImageLoader;
 using Microsoft.Extensions.DependencyInjection;
+using RhythmVerseClient.Services;
 using RhythmVerseClient.Views;
 using RhythmVerseClient.ViewModels;
 
@@ -13,6 +15,10 @@ namespace RhythmVerseClient
 
         public override void Initialize()
         {
+            // Register custom image loader with 404 fallback support
+            var fallbackLoader = new FallbackAsyncImageLoader();
+            ImageLoader.AsyncImageLoader = fallbackLoader;
+
             AvaloniaXamlLoader.Load(this);
         }
 

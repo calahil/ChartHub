@@ -282,7 +282,8 @@ namespace RhythmVerseClient.ViewModels
 
 
         public IAsyncRelayCommand RefreshButtonCommand { get; }
-        public IAsyncRelayCommand DownloadFileCommand { get; }
+        public IAsyncRelayCommand<ViewSong?> DownloadFileCommand { get; }
+        public IAsyncRelayCommand<ViewSong?> ViewCreatorCommand { get; }
         public ICommand ToggleFilterPaneCommand { get; }
 
         public RhythmVersePageStrings PageStrings { get; }
@@ -306,7 +307,8 @@ namespace RhythmVerseClient.ViewModels
             IsPlaceholder = true;
             NoResults = false;
             RefreshButtonCommand = new AsyncRelayCommand(RefreshButton);
-            DownloadFileCommand = new AsyncRelayCommand(DownloadFile);
+            DownloadFileCommand = new AsyncRelayCommand<ViewSong?>(DownloadFile);
+            ViewCreatorCommand = new AsyncRelayCommand<ViewSong?>(ViewCreator);
             ToggleFilterPaneCommand = new RelayCommand(ToggleFilterPane);
 
             downloadService = new DownloadService(configuration);
@@ -375,16 +377,26 @@ namespace RhythmVerseClient.ViewModels
             await LoadDataAsync(string.IsNullOrEmpty(SearchText) || string.IsNullOrEmpty(SearchAuthorText));
         }
 
-        public async Task DownloadFile()
+        public async Task DownloadFile(ViewSong? song)
         {
-            if (SelectedFile == null)
+            var file = song ?? SelectedFile;
+            if (file == null)
                 return;
 
-            var downloadFile = new DownloadFile(SelectedFile.FileName ?? string.Empty, globalSettings.TempDir, SelectedFile.DownloadLink ?? string.Empty, SelectedFile.FileSize);
+            var downloadFile = new DownloadFile(file.FileName ?? string.Empty, globalSettings.TempDir, file.DownloadLink ?? string.Empty, file.FileSize);
             Downloads.Add(downloadFile);
             await downloadService.DownloadFileAsync(downloadFile);
 
             File.Move(Path.Combine(downloadFile.FilePath, downloadFile.DisplayName), Path.Combine(globalSettings.DownloadDir, downloadFile.DisplayName), true);
+        }
+        public async Task ViewCreator(ViewSong? song)
+        {
+            var file = song ?? SelectedFile;
+            if (file == null || file.Author == null)
+                return;
+
+            SearchAuthorText = file.Author.Shortname;
+            await LoadDataAsync(string.IsNullOrEmpty(SearchText) || string.IsNullOrEmpty(SearchAuthorText));
         }
 
         public async Task LoadDataAsync(bool search)
@@ -404,6 +416,7 @@ namespace RhythmVerseClient.ViewModels
             var filter = Toolbox.ConvertFilter(SelectedFilter);
             var order = Toolbox.GetSortOrder(filter, SelectedOrder);
             var instrument = SelectedInstruments.ToList();
+            DataItems = [];
             DataItems = await ApiClient.GetSongFilesAsync(search, SearchText.ToLower(), filter, order, instrument, SearchAuthorText);
 
             if (DataItems.Count < 1)
