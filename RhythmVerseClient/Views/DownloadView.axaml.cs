@@ -16,15 +16,4 @@ public partial class DownloadView : UserControl
         base.OnDataContextChanged(e);
         // DataContext is now set to DownloadViewModel
     }
-
-    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        base.OnAttachedToVisualTree(e);
-        // View is now attached to the visual tree, you can perform any additional setup here
-        if (this.DataContext is DownloadViewModel viewModel)
-        {
-            // You can access the ViewModel properties and methods here
-            viewModel.DownloadWatcher.LoadItems();
-        }
-    }
 }

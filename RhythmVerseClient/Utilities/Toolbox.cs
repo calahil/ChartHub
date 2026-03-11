@@ -225,10 +225,22 @@ namespace RhythmVerseClient.Utilities
             set { _appSettings.TempDirectory = value; _settingsManager.Save(); }
         }
 
+        public string StagingDir
+        {
+            get => _appSettings.StagingDirectory ?? String.Empty;
+            set { _appSettings.StagingDirectory = value; _settingsManager.Save(); }
+        }
+
         public string DownloadDir
         {
             get => _appSettings.DownloadDirectory ?? String.Empty;
             set { _appSettings.DownloadDirectory = value; _settingsManager.Save(); }
+        }
+
+        public string OutputDir
+        {
+            get => _appSettings.OutputDirectory ?? String.Empty;
+            set { _appSettings.OutputDirectory = value; _settingsManager.Save(); }
         }
 
         public string CloneHeroDataDir
@@ -249,28 +261,35 @@ namespace RhythmVerseClient.Utilities
 
             _appSettings = settingsManager.Settings;
 
-            if (TempDir == "first_install")
+            if (TempDir == "first_install" || TempDir == String.Empty)
             {
                 TempDir = Path.Combine(Path.GetTempPath(), "RhythmVerseClient");
             }
 
             Toolbox.CreateDirectoryIfNotExists(TempDir);
 
-            if (DownloadDir == "first_install")
+            if (DownloadDir == "first_install" || DownloadDir == String.Empty)
             {
                 DownloadDir = Path.Combine(TempDir, "Downloads");
             }
 
             Toolbox.CreateDirectoryIfNotExists(DownloadDir);
 
-            if (CloneHeroDataDir == "first_install")
+            if (StagingDir == "first_install" || StagingDir == String.Empty)
             {
-                CloneHeroDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".clonehero");
+                StagingDir = Path.Combine(TempDir, "Staging");
             }
 
-            Toolbox.CreateDirectoryIfNotExists(CloneHeroDataDir);
+            Toolbox.CreateDirectoryIfNotExists(StagingDir);
 
-            if (CloneHeroSongsDir == "first_install")
+            if (OutputDir == "first_install" || OutputDir == String.Empty)
+            {
+                OutputDir = Path.Combine(TempDir, "Output");
+            }
+
+            Toolbox.CreateDirectoryIfNotExists(OutputDir);
+
+            if (CloneHeroSongsDir == "first_install" || CloneHeroSongsDir == String.Empty)
             {
                 CloneHeroSongsDir = Path.Combine(CloneHeroDataDir, "Songs");
             }

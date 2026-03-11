@@ -23,19 +23,23 @@ public partial class RhythmVerseView : UserControl
         }
     }
 
-protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
-    {
-        base.OnAttachedToVisualTree(e);
-        // View is now attached to the visual tree, you can perform any additional setup here
-        if (this.DataContext is RhythmVerseViewModel viewModel)
-        {
-            // You can access the ViewModel properties and methods here
-            _ = viewModel.LoadDataAsync(false);
-        }
-    }
-
     private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         // Handle any UI updates needed when view model properties change
+    }
+
+    private void Button_Spin(object? sender, SpinEventArgs e)
+    {
+        if (DataContext is RhythmVerseViewModel viewModel)
+        {
+            if (e.Direction == SpinDirection.Increase)
+            {
+                viewModel.CurrentPage++;
+            }
+            else if (e.Direction == SpinDirection.Decrease)
+            {
+                viewModel.CurrentPage--;
+            }
+        }
     }
 }

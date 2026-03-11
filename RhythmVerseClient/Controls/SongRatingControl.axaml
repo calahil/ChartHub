@@ -1,0 +1,81 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:asyncImage="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
+             xmlns:controls="clr-namespace:RhythmVerseClient.Controls;assembly=RhythmVerseClient"
+             x:Class="RhythmVerseClient.Controls.SongRatingControl">
+
+    <Grid x:Name="SongRatingGrid"
+          ColumnDefinitions="*,3*"
+          RowDefinitions="*, *, *, *, *">
+        <!-- Drum Rating -->
+        <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/drums_small.png"
+               Grid.Row="0"
+               Grid.Column="0"
+               VerticalAlignment="Top" />
+        <controls:StarRatingControl Rating="{Binding DrumString}"
+                                    GlyphWidth="22"
+                                    FontSize="18"
+                                    FilledBrush="{DynamicResource BrushYellow}"
+                                    EmptyBrush="{DynamicResource BrushSurface2}"
+                                    Grid.Row="0"
+                                    Grid.Column="1"
+                                    FontFamily="{StaticResource FontAwesome}"
+                                    Foreground="{StaticResource ThemeAccentBrush}"/>
+        <!-- Guitar Rating -->
+        <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/guitar_small.png"
+               Grid.Row="1"
+               Grid.Column="0"
+               VerticalAlignment="Top" />
+        <controls:StarRatingControl Rating="{Binding GuitarString}"
+                                    GlyphWidth="22"
+                                    FontSize="18"
+                                    FilledBrush="{DynamicResource BrushYellow}"
+                                    EmptyBrush="{DynamicResource BrushSurface2}"
+                                    Grid.Row="1"
+                                    Grid.Column="1"
+                                    FontFamily="{StaticResource FontAwesome}"
+                                    Foreground="{StaticResource ThemeAccentBrush}"/>
+        <!-- Keyboard Rating -->
+        <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/keys_small.png"
+               Grid.Row="2"
+               Grid.Column="0"
+               VerticalAlignment="Top" />
+        <controls:StarRatingControl Rating="{Binding KeysString}"
+                                    GlyphWidth="22"
+                                    FontSize="18"
+                                    FilledBrush="{DynamicResource BrushYellow}"
+                                    EmptyBrush="{DynamicResource BrushSurface2}"
+                                    Grid.Row="2"
+                                    Grid.Column="1"
+                                    FontFamily="{StaticResource FontAwesome}"
+                                    Foreground="{StaticResource ThemeAccentBrush}"/>
+        <!-- Bass Rating -->
+        <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/bass_small.png"
+               Grid.Row="3"
+               Grid.Column="0"
+               VerticalAlignment="Top" />
+        <controls:StarRatingControl Rating="{Binding BassString}"
+                                    GlyphWidth="22"
+                                    FontSize="18"
+                                    FilledBrush="{DynamicResource BrushYellow}"
+                                    EmptyBrush="{DynamicResource BrushSurface2}"
+                                    Grid.Row="3"
+                                    Grid.Column="1"
+                                    FontFamily="{StaticResource FontAwesome}"
+                                    Foreground="{StaticResource ThemeAccentBrush}"/>
+        <!-- Vocals Rating -->
+        <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/vocals_small.png"
+               Grid.Row="4"
+               Grid.Column="0"
+               VerticalAlignment="Top" />
+        <controls:StarRatingControl Rating="{Binding VocalString}"
+                                    GlyphWidth="22"
+                                    FontSize="18"
+                                    FilledBrush="{DynamicResource BrushYellow}"
+                                    EmptyBrush="{DynamicResource BrushSurface2}"
+                                    Grid.Row="4"
+                                    Grid.Column="1"
+                                    FontFamily="{StaticResource FontAwesome}"
+                                    Foreground="{StaticResource ThemeAccentBrush}"/>
+    </Grid>
+</UserControl>

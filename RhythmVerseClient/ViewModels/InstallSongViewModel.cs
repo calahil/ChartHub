@@ -39,7 +39,7 @@ namespace RhythmVerseClient.ViewModels
 
         public InstallPageStrings PageString { get; }
 
-        public IResourceWatcher PhaseshiftWatcher { get; set; }
+        public IResourceWatcher OnyxWatcher { get; set; }
 
         private readonly AppGlobalSettings globalSettings;
 
@@ -53,7 +53,7 @@ namespace RhythmVerseClient.ViewModels
             PageString = new InstallPageStrings();
             globalSettings = settings;
 
-            PhaseshiftWatcher = new ResourceWatcher(globalSettings.TempDir, WatcherType.File);
+            OnyxWatcher = new ResourceWatcher(globalSettings.StagingDir, WatcherType.File);
         }
 
         private void GoBack()
@@ -64,15 +64,17 @@ namespace RhythmVerseClient.ViewModels
             // mainPage?.FocusOnTab(1);
         }
 
-       private async Task StartBar()
+        private async Task StartBar()
         {
             Details = String.Empty;
             ProgressValue = 0;
             Details += PageString.StartProcess;
             var processedFiles = new List<string>();
+            var totalFiles = OnyxWatcher.Data.Count + 1; // +1 to account for Cleanup step
 
             await Task.Delay(100);
-            foreach (var song in PhaseshiftWatcher.Data)
+            double progressIncrement = 1.0;
+            foreach (var song in OnyxWatcher.Data)
             {
                 var extension = Path.GetExtension(song.FilePath).ToLower();
                 processedFiles.Add(song.FilePath);
@@ -89,34 +91,34 @@ namespace RhythmVerseClient.ViewModels
                     using var archive = Toolbox.OpenArchive(song.FilePath);
                     foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
                     {
-                        entry.WriteToDirectory(globalSettings.TempDir, new ExtractionOptions
+                        entry.WriteToDirectory(globalSettings.OutputDir, new ExtractionOptions
                         {
                             ExtractFullPath = true,
                             Overwrite = true
                         });
+                        var progress = progressIncrement / totalFiles;
+                        ProgressValue = progress;
+                        progressIncrement += 1.0;
                     }
                     Details += PageString.Done;
                     await Task.Delay(100);
                 }
+                else
+                {
+                    Details += PageString.OnyxImport.FormatString(song.DisplayName);
+                    Details += PageString.OnyxBuild.FormatString(song.DisplayName);
+                    Onyx onyx = new Onyx(globalSettings, song.FilePath);
+                    Details += PageString.OnyxFinish;
+                    var progress = progressIncrement / totalFiles;
+                    ProgressValue = progress;
+                    progressIncrement += 1.0;
+                }
             }
 
-            Details += PageString.StartNautilus;
 
             await Task.Delay(100);
-            //while (ProgressValue < 1)
-            //{
-            //    ProgressValue += 0.01;
-            //    Details += ProgressValue.ToString() + "%" + Environment.NewLine;
-            //    await Task.Delay(100);
-            //}
-            //var nautilus = new Nautilus(_keystrokeSender, globalSettings.NautilusDirectoryPath);
-            Details += PageString.NautilusConversion;
-            await Task.Delay(100);
-            //await nautilus.RunAsync();
-            Details += PageString.StopNautilus;
-            await Task.Delay(100);
             Details += PageString.InstallSongs;
-            Toolbox.MoveDirectory(globalSettings.TempDir, globalSettings.CloneHeroSongsDir);
+            Toolbox.MoveDirectory(globalSettings.OutputDir, globalSettings.CloneHeroSongsDir);
 
             foreach (string song in processedFiles)
             {

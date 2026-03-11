@@ -7,6 +7,8 @@ namespace SettingsManager
         bool useMockData,
         string? tempDirectory,
         string? downloadDirectory,
+        string? stagingDirectory,
+        string? outputDirectory,
         string? cloneHeroSongDirectory,
         string? cloneHeroDataDirectory)
     {
@@ -18,6 +20,10 @@ namespace SettingsManager
 
         [JsonPropertyName("DownloadDirectory")]
         public string? DownloadDirectory { get; set; } = downloadDirectory;
+        [JsonPropertyName("StagingDirectory")]
+        public string? StagingDirectory { get; set; } = stagingDirectory;
+        [JsonPropertyName("OutputDirectory")]
+        public string? OutputDirectory { get; set; } = outputDirectory;
 
         [JsonPropertyName("CloneHeroSongDirectory")]
         public string? CloneHeroSongDirectory { get; set; } = cloneHeroSongDirectory;

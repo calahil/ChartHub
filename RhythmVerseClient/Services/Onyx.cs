@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using RhythmVerseClient.Utilities;
 using YamlDotNet.RepresentationModel;
 
 namespace RhythmVerseClient.Services
@@ -7,29 +8,38 @@ namespace RhythmVerseClient.Services
     {
         private string TempPath { get; set; }
         private string DestPath { get; set; }
+        private string StagingPath { get; set; }
+        private readonly AppGlobalSettings globalSettings;
 
-        public Onyx(List<string> songPaths)
+        public Onyx(AppGlobalSettings settings, string songPath)
         {
-            TempPath = Path.Combine(
-                Path.GetTempPath(),
-                "RhythmVerseClient",
+            globalSettings = settings;
+            TempPath = Path.Combine(globalSettings.TempDir,
                 Guid.NewGuid().ToString()
             );
-            string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            DestPath = Path.Combine(home, ".clonehero/Songs");
-            Directory.CreateDirectory(TempPath);
-
-            foreach (var songPath in songPaths)
+            DestPath = globalSettings.OutputDir;
+            StagingPath = globalSettings.StagingDir;
+            var importPath = Path.Combine(TempPath, Path.GetFileName(songPath));
+            Process.Start(new ProcessStartInfo
             {
-                var importPath = Path.Combine(TempPath, Path.GetFileName(songPath));
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "./tools/onyx",
-                    Arguments = $"import \"{songPath}\" --to \"{importPath}\"",
-                    CreateNoWindow = true,
-                    UseShellExecute = true
-                })?.WaitForExit();
-            }
+                FileName = "./tools/onyx",
+                Arguments = $"import \"{songPath}\" --to \"{importPath}\"",
+                CreateNoWindow = true,
+                UseShellExecute = true
+            })?.WaitForExit();
+
+            if (Directory.GetFiles(importPath, "song.yml").Length == 0)
+                return;
+
+            var file = Path.Combine(importPath, "song.yml");
+            ProcessYaml(file);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "./tools/onyx",
+                Arguments = $"build \"{file}\" --target ps --to \"{DestPath}\"",
+                CreateNoWindow = true,
+                UseShellExecute = true
+            })?.WaitForExit();
         }
 
         private void ProcessYaml(string songPath)
@@ -67,28 +77,6 @@ namespace RhythmVerseClient.Services
             }
             using var writer = new StreamWriter(songPath);
             yaml.Save(writer, assignAnchors: false);
-        }
-
-        public async Task RunAsync()
-        {
-            await Task.Run(() =>
-            {
-                foreach (var directory in Directory.GetDirectories(TempPath))
-                {
-                    if (Directory.GetFiles(directory, "song.yml").Length == 0)
-                        continue;
-
-                    var file = Path.Combine(directory, "song.yml");
-                    ProcessYaml(file);
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = "./tools/onyx",
-                        Arguments = $"build \"{file}\" --target ps --to \"{DestPath}\"",
-                        CreateNoWindow = true,
-                        UseShellExecute = true
-                    })?.WaitForExit();
-                }
-            });
         }
     }
 }

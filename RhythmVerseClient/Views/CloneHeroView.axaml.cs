@@ -23,8 +23,6 @@ public partial class CloneHeroView : UserControl
         // View is now attached to the visual tree, you can perform any additional setup here
         if (this.DataContext is CloneHeroViewModel viewModel)
         {
-            // You can access the ViewModel properties and methods here
-            viewModel.CloneHeroWatcher.LoadItems();
         }
     }
 }

@@ -145,7 +145,7 @@ namespace RhythmVerseClient.ViewModels
             foreach (string file in items)
             {
                 var displayName = Path.GetFileName(file);
-                var newFilePath = Path.Combine(globalSettings.TempDir, displayName);
+                var newFilePath = Path.Combine(globalSettings.StagingDir, displayName);
 
                 File.Move(file, newFilePath);
 

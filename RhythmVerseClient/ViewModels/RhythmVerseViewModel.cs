@@ -47,6 +47,32 @@ namespace RhythmVerseClient.ViewModels
 
     public class RhythmVerseViewModel : INotifyPropertyChanged
     {
+        public enum PaneMode
+        {
+            None,
+            Filters,
+            Downloads
+        }
+
+        private PaneMode _activePane;
+        public PaneMode ActivePane
+        {
+            get => _activePane;
+            set
+            {
+                _activePane = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(isPaneOpen));
+                OnPropertyChanged(nameof(IsFiltersPaneVisible));
+                OnPropertyChanged(nameof(IsDownloadsPaneVisible));
+            }
+        }
+        public bool IsFiltersPaneVisible => ActivePane == PaneMode.Filters;
+        public bool IsDownloadsPaneVisible => ActivePane == PaneMode.Downloads;
+        public bool isPaneOpen => ActivePane != PaneMode.None;
+        public ICommand ShowFilterPaneCommand { get; }
+        public ICommand ShowDownloadsPaneCommand { get; }
+
         private readonly AppGlobalSettings globalSettings;
         private readonly DownloadService downloadService;
 
@@ -84,6 +110,27 @@ namespace RhythmVerseClient.ViewModels
         public long? CurrentPage
         {
             get { return ApiClient.CurrentPage; }
+            set
+            {
+                if (value != null && value > 0 && value <= TotalPages)
+                {
+                    ApiClient.CurrentPage = value;
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(CurrentPage));
+                    if (DataItems != null)
+                    {
+                        DataItems.Clear();
+                    }
+                    else
+                    {
+                        DataItems = [];
+                    }
+                    IsLoading = false;
+                    IsPlaceholder = true;
+                    NoResults = false;
+                    _ = Task.Run(() => LoadDataAsync(false));
+                }
+            }
         }
 
         public long? StartRecord
@@ -170,34 +217,6 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        private bool _isFilterPaneVisible;
-        public bool IsFilterPaneVisible
-        {
-            get => _isFilterPaneVisible;
-            set
-            {
-                if (_isFilterPaneVisible != value)
-                {
-                    _isFilterPaneVisible = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        private GridLength _filterPaneWidth;
-        public GridLength FilterPaneWidth
-        {
-            get => _filterPaneWidth;
-            set
-            {
-                if (_filterPaneWidth != value)
-                {
-                    _filterPaneWidth = value;
-                    OnPropertyChanged();
-                }
-            }
-        }
-
         private string _searchAuthorText;
         public string SearchAuthorText
         {
@@ -216,17 +235,6 @@ namespace RhythmVerseClient.ViewModels
             set
             {
                 _searchText = value;
-                OnPropertyChanged();
-            }
-        }
-
-        private string _filterPaneButtonText;
-        public string FilterPaneButtonText
-        {
-            get => _filterPaneButtonText;
-            set
-            {
-                _filterPaneButtonText = value;
                 OnPropertyChanged();
             }
         }
@@ -275,8 +283,8 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        public List<string> Filters { get; } = ["Artist", "Downloads", "Song Length", "Title"];
-        public List<string> Orders { get; } = ["Ascending", "Descending"];
+        public List<string> Filters { get; set; }
+        public List<string> Orders { get; set; }
 
         public ObservableCollection<InstrumentItem> Instruments { get; set; }
 
@@ -284,7 +292,6 @@ namespace RhythmVerseClient.ViewModels
         public IAsyncRelayCommand RefreshButtonCommand { get; }
         public IAsyncRelayCommand<ViewSong?> DownloadFileCommand { get; }
         public IAsyncRelayCommand<ViewSong?> ViewCreatorCommand { get; }
-        public ICommand ToggleFilterPaneCommand { get; }
 
         public RhythmVersePageStrings PageStrings { get; }
 
@@ -295,22 +302,29 @@ namespace RhythmVerseClient.ViewModels
             _apiClient = new RhythmVerseApiClient(configuration);
             _dataItems = [];
             _downloads = [];
-            _selectedFilter = "Artist";
-            _selectedOrder = "Ascending";
+            Filters = PageStrings.Filters;
+            Orders = PageStrings.Orders;
+            _selectedFilter = Filters[0];
+            _selectedOrder = Orders[0];
             _searchAuthorText = string.Empty;
             _searchText = string.Empty;
             _isAuthorFiltered = false;
-            _isFilterPaneVisible = false;
-            _filterPaneButtonText = GetFilterPaneText();
             _isLoading = false;
-            _filterPaneWidth = new GridLength(0);
             IsPlaceholder = true;
             NoResults = false;
             RefreshButtonCommand = new AsyncRelayCommand(RefreshButton);
             DownloadFileCommand = new AsyncRelayCommand<ViewSong?>(DownloadFile);
             ViewCreatorCommand = new AsyncRelayCommand<ViewSong?>(ViewCreator);
-            ToggleFilterPaneCommand = new RelayCommand(ToggleFilterPane);
+            _activePane = PaneMode.None;
+            ShowFilterPaneCommand = new RelayCommand(() =>
+            {
+                ActivePane = ActivePane == PaneMode.Filters ? PaneMode.None : PaneMode.Filters;
+            });
 
+            ShowDownloadsPaneCommand = new RelayCommand(() =>
+            {
+                ActivePane = ActivePane == PaneMode.Downloads ? PaneMode.None : PaneMode.Downloads;
+            });
             downloadService = new DownloadService(configuration);
 
             Instruments =
@@ -331,34 +345,16 @@ namespace RhythmVerseClient.ViewModels
                 new InstrumentItem { DisplayName = "Pro Guitar", Value = "proguitar" },
                 new InstrumentItem { DisplayName = "Rhythm Guitar", Value = "rhythm" },
             ];
-            _selectedInstruments = [];
-            _selectedInstruments.Add(Instruments[0]);
+            _selectedInstruments = [Instruments[0]];
 
             _apiClient.PropertyChanged += ApiClient_PropertyChanged;
+            _ = Task.Run(() => LoadDataAsync(false));
         }
 
         private void ApiClient_PropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             // Raise the PropertyChanged event for the corresponding property in the ViewModel
             OnPropertyChanged(e.PropertyName);
-        }
-
-        public void ToggleFilterPane()
-        {
-            IsFilterPaneVisible = !IsFilterPaneVisible;
-            FilterPaneButtonText = GetFilterPaneText();
-        }
-
-        private string GetFilterPaneText()
-        {
-            if (IsFilterPaneVisible)
-            {
-                return PageStrings.HideFilter;
-            }
-            else
-            {
-                return PageStrings.ShowFilter;
-            }
         }
 
         public async Task RefreshButton()

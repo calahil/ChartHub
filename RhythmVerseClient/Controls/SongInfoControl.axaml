@@ -1,0 +1,98 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:RhythmVerseClient.Controls;assembly=RhythmVerseClient"
+             x:Class="RhythmVerseClient.Controls.SongInfoControl"
+             x:Name="Root">
+
+    <Grid x:Name="SongInfoGrid"
+            ColumnDefinitions="Auto,*"
+            RowDefinitions="*,*,*,*,*,*">
+        <TextBlock Grid.Row="0"
+                   Grid.Column="0"
+                   Text="{Binding SongStrings.Artist, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                   Foreground="{StaticResource BrushYellow}"
+                   FontSize="16"
+                   FontWeight="Bold"
+                   VerticalAlignment="Center" />
+        <TextBlock Grid.Row="0"
+                   Grid.Column="1"
+                   Text="{Binding Artist}"
+                   Foreground="{StaticResource ThemeForegroundBrush}"
+                   FontSize="16"
+                   FontWeight="Bold"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center" />
+        <TextBlock Grid.Row="1"
+                   Grid.Column="0"
+                   Text="{Binding SongStrings.SongTitle, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                   Foreground="{StaticResource BrushYellow}"
+                   FontSize="15"
+                   FontWeight="Bold"
+                   VerticalAlignment="Center" />
+        <TextBlock Grid.Row="1"
+                   Grid.Column="1"
+                   Text="{Binding Title}"
+                   Foreground="{StaticResource ThemeForegroundBrush}"
+                   FontSize="15"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center" />
+        <TextBlock Grid.Row="2"
+                   Grid.Column="0"
+                   Text="{Binding SongStrings.Album, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                   Foreground="{StaticResource BrushYellow}"
+                   FontSize="14"
+                   FontWeight="Bold"
+                   VerticalAlignment="Center" />
+        <TextBlock Grid.Row="2"
+                   Grid.Column="1"
+                   Text="{Binding Album}"
+                   Foreground="{StaticResource ThemeForegroundBrush}"
+                   FontSize="14"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center" />
+        <TextBlock Grid.Row="3"
+                   Grid.Column="0"
+                   Text="{Binding SongStrings.Time, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                   Foreground="{StaticResource BrushYellow}"
+                   FontSize="13"
+                   FontWeight="Bold"
+                   VerticalAlignment="Center" />
+        <TextBlock Grid.Row="3"
+                   Grid.Column="1"
+                   Text="{Binding FormattedTime}"
+                   Foreground="{StaticResource ThemeForegroundBrush}"
+                   FontSize="13"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Right" />
+        <TextBlock Grid.Row="4"
+                   Grid.Column="0"
+                   Text="{Binding SongStrings.Released, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                   Foreground="{StaticResource BrushYellow}"
+                   FontSize="12"
+                   FontWeight="Bold"
+                   VerticalAlignment="Center" />
+        <TextBlock Grid.Row="4"
+                   Grid.Column="1"
+                   Text="{Binding Year}"
+                   Foreground="{StaticResource ThemeForegroundBrush}"
+                   FontSize="12"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Right" />
+        <TextBlock Grid.Row="5"
+                   Grid.Column="0"
+                   Text="{Binding SongStrings.Genre, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                   Foreground="{StaticResource BrushYellow}"
+                   FontSize="12"
+                   FontWeight="Bold"
+                   VerticalAlignment="Center" />
+        <TextBlock Grid.Row="5"
+                   Grid.Column="1"
+                   Text="{Binding Genre}"
+                   Foreground="{StaticResource ThemeForegroundBrush}"
+                   FontSize="12"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Right" />
+    </Grid>
+
+
+</UserControl>

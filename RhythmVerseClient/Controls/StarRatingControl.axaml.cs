@@ -3,7 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using System.Collections.Generic;
 
-namespace RhythmVerseClient.Services;
+namespace RhythmVerseClient.Controls;
 
 /// <summary>
 /// Displays a 0–5 star rating using uniform fixed-width glyph cells.

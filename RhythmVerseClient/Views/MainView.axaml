@@ -8,17 +8,24 @@
         Title="RhythmVerseClient" Width="1200" Height="800"
         WindowStartupLocation="CenterScreen">
 
+    
     <TabControl>
-        <TabItem Header="RhythmVerse">
+        <TabItem Header="RhythmVerse"
+                FontSize="16">
             <ContentControl Content="{Binding RhythmVerseViewModel}" />
         </TabItem>
-        <TabItem Header="Download">
+        <TabItem Header="Download"
+                FontSize="16"
+                IsVisible="{Binding IsDownloadTabVisible}">
             <ContentControl Content="{Binding DownloadViewModel}" />
         </TabItem>
-        <TabItem Header="CloneHero">
+        <TabItem Header="CloneHero"
+                FontSize="16"
+                IsVisible="{Binding IsCloneHeroTabVisible}">
             <ContentControl Content="{Binding CloneHeroViewModel}" />
         </TabItem>
-        <TabItem Header="Install Song">
+        <TabItem Header="Install Song"
+                FontSize="16">
             <ContentControl Content="{Binding InstallSongViewModel}" />
         </TabItem>
     </TabControl>

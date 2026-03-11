@@ -6,7 +6,8 @@ namespace SettingsManager
     {
         public T Settings
         {
-            get => field ?? new AppSettings(true, "first_install", "first_install", "first_install", "first_install") as T;
+            get => field ?? new AppSettings(true,"first_install", "first_install",
+                    "first_install", "first_install", "first_install", "first_install") as T;
             set;
         }
 
