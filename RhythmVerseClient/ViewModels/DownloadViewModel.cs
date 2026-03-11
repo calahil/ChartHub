@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.Input;
+using RhythmVerseClient.Models;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;

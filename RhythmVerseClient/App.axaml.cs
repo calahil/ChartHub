@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Views;
 using RhythmVerseClient.ViewModels;
+using RhythmVerseClient.Utilities;
 
 namespace RhythmVerseClient
 {
