@@ -3,10 +3,9 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using AsyncImageLoader;
 using Microsoft.Extensions.DependencyInjection;
-using RhythmVerseClient.Services;
+using RhythmVerseClient.Utilities;
 using RhythmVerseClient.Views;
 using RhythmVerseClient.ViewModels;
-using RhythmVerseClient.Utilities;
 
 namespace RhythmVerseClient
 {
@@ -25,11 +24,21 @@ namespace RhythmVerseClient
 
         public override void OnFrameworkInitializationCompleted()
         {
+            ServiceProvider ??= AppBootstrapper.CreateServiceProvider();
+            var mainViewModel = ServiceProvider.GetRequiredService<MainViewModel>();
+
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
             {
-                var mainWindow = new MainView();
-                mainWindow.DataContext = ServiceProvider?.GetRequiredService<MainViewModel>();
+                var mainWindow = new MainWindow();
+                mainWindow.DataContext = mainViewModel;
                 desktopLifetime.MainWindow = mainWindow;
+            }
+            else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewLifetime)
+            {
+                singleViewLifetime.MainView = new MainView
+                {
+                    DataContext = mainViewModel
+                };
             }
 
             base.OnFrameworkInitializationCompleted();

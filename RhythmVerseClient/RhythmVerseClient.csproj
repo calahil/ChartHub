@@ -1,8 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net10.0</TargetFramework>
-		<OutputType>WinExe</OutputType>
+		<TargetFramework Condition="'$(EnableAndroid)'!='true'">net10.0</TargetFramework>
+		<TargetFrameworks Condition="'$(EnableAndroid)'=='true'">net10.0;net10.0-android</TargetFrameworks>
+		<OutputType Condition="'$(TargetFramework)'!='net10.0-android'">WinExe</OutputType>
+		<OutputType Condition="'$(TargetFramework)'=='net10.0-android'">Exe</OutputType>
 		<RootNamespace>RhythmVerseClient</RootNamespace>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
@@ -23,11 +25,18 @@
 		<Authors>Calahil</Authors>
 	</PropertyGroup>
 
+	<PropertyGroup Condition="'$(TargetFramework)'=='net10.0-android'">
+		<SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
+		<ApplicationId>com.calahilstudios.rhythmverseclient</ApplicationId>
+		<AndroidManifest>Android/AndroidManifest.xml</AndroidManifest>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<PackageReference Include="AsyncImageLoader.Avalonia" Version="3.7.0" />
 		<PackageReference Include="Avalonia" Version="11.1.0" />
-		<PackageReference Include="Avalonia.Desktop" Version="11.1.0" />
-		<PackageReference Include="Avalonia.X11" Version="11.1.0" />
+		<PackageReference Include="Avalonia.Desktop" Version="11.1.0" Condition="'$(TargetFramework)'!='net10.0-android'" />
+		<PackageReference Include="Avalonia.X11" Version="11.1.0" Condition="'$(TargetFramework)'!='net10.0-android'" />
+		<PackageReference Include="Avalonia.Android" Version="11.1.0" Condition="'$(TargetFramework)'=='net10.0-android'" />
 		<PackageReference Include="Avalonia.Controls.DataGrid" Version="11.1.0" />
 		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.1.0" />
 		<PackageReference Include="Avalonia.Fonts.Inter" Version="11.1.0" />
@@ -44,6 +53,20 @@
 	<ItemGroup>
 		<ProjectReference Include="..\SettingsManager\SettingsManager.csproj" />
 	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)'=='net10.0-android'">
+		<Compile Remove="Program.cs" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)'!='net10.0-android'">
+		<Compile Remove="Android/**/*.cs" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)'=='net10.0-android'">
+		<AndroidResource Include="Android/Resources/**" />
+		<AndroidResource Remove="Resources/**" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<AvaloniaResource Include="Resources/Images/**"/>
 		<AvaloniaResource Include="Resources/Fonts/**"/>
@@ -55,6 +78,12 @@
 		<None Update="Resources\Images\logo.png">
 			<Pack>True</Pack>
 			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)'=='net10.0-android'">
+		<None Update="Resources\Images\logo.png">
+			<Pack>False</Pack>
 		</None>
 	</ItemGroup>
 

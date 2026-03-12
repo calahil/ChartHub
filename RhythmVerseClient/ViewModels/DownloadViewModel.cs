@@ -12,8 +12,11 @@ namespace RhythmVerseClient.ViewModels
     public class DownloadViewModel : INotifyPropertyChanged
     {
         private readonly AppGlobalSettings globalSettings;
+        public bool IsCompanionMode => OperatingSystem.IsAndroid();
+        public bool IsDesktopMode => !OperatingSystem.IsAndroid();
 
         public IResourceWatcher DownloadWatcher { get; set; }
+        public GoogleDriveWatcher GoogleWatcher { get; set; }
 
         public ICommand CheckAllCommand { get; }
         public IAsyncRelayCommand InstallSongs { get; }
@@ -47,8 +50,8 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        private FileData? _selectedFile;
-        public FileData? SelectedFile
+        private WatcherFile? _selectedFile;
+        public WatcherFile? SelectedFile
         {
             get => _selectedFile;
             set
@@ -58,7 +61,8 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        public ObservableCollection<FileData> DownloadFiles { get; set; }
+        public ObservableCollection<WatcherFile> DownloadFiles { get; set; }
+        public ObservableCollection<WatcherFile> GoogleFiles { get; set; }
 
         private DownloadPageStrings _pageStrings;
         public DownloadPageStrings PageStrings
@@ -74,25 +78,29 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
-        //private IGoogleDriveClient _googleDrive;
+        private IGoogleDriveClient _googleDrive;
 
-        public DownloadViewModel(AppGlobalSettings settings)//, IGoogleDriveClient googleDrive)
+        public DownloadViewModel(AppGlobalSettings settings, IGoogleDriveClient googleDrive)
         {
             globalSettings = settings;
-            DownloadWatcher = new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
+            _googleDrive = googleDrive;
+            DownloadWatcher = OperatingSystem.IsAndroid()
+                ? new SnapshotResourceWatcher(globalSettings.DownloadDir, WatcherType.File)
+                : new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
+            GoogleWatcher = new GoogleDriveWatcher(_googleDrive);
             CheckAllCommand = new RelayCommand(CheckAllItemsCommand);
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
             UploadCloud = new AsyncRelayCommand(UploadCloudCommand);
             DownloadFiles = DownloadWatcher.Data;
+            GoogleFiles = GoogleWatcher.Data;
             _pageStrings = new DownloadPageStrings();
-            //_googleDrive = googleDrive;
 
             DownloadFiles.CollectionChanged += DownloadFiles_CollectionChanged;
         }
 
         private void DownloadFiles_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
-            foreach (FileData file in DownloadFiles)
+            foreach (WatcherFile file in DownloadFiles)
             {
                 file.PropertyChanged += ItemPropertyChanged;
             }
@@ -100,7 +108,7 @@ namespace RhythmVerseClient.ViewModels
 
         private void ItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(FileData.Checked))
+            if (e.PropertyName == nameof(WatcherFile.Checked))
             {
                 IsAnyChecked = AnyItemChecked();
             }
@@ -114,18 +122,36 @@ namespace RhythmVerseClient.ViewModels
         public async Task UploadCloudCommand()
         {
             List<string> items = [];
-
-            foreach (FileData file in DownloadFiles)
+            if (string.IsNullOrWhiteSpace(_googleDrive.RhythmVerseFolderId))
+            {
+                throw new InvalidOperationException("Google Drive is not initialized.");
+            }
+            foreach (WatcherFile file in DownloadFiles)
             {
                 if (file.Checked)
                 {
-                    items.Add(file.FilePath);
+                    try
+                    {
+                        if (!File.Exists(file.FilePath))
+                        {
+                            continue;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"File {file.FilePath} does not exist: {ex.Message}");
+                        continue;
+                    }
+                    try
+                    {
+                        await _googleDrive.UploadFileAsync(_googleDrive.RhythmVerseFolderId, file.FilePath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Failed to upload {file.FilePath}: {ex.Message}");
+                    }
                 }
 
-            }
-            foreach (string file in items)
-            {
-                //await _googleDrive.UploadFileAsync(_googleDrive.RhythmVerseFolderId, file);
             }
         }
 
@@ -133,7 +159,7 @@ namespace RhythmVerseClient.ViewModels
         {
             List<string> items = [];
 
-            foreach (FileData file in DownloadFiles)
+            foreach (WatcherFile file in DownloadFiles)
             {
                 if (file.Checked)
                 {

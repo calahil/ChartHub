@@ -10,12 +10,15 @@
              xmlns:asyncImage="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
              x:Class="RhythmVerseClient.Views.RhythmVerseView"
+             x:Name="Root"
              x:DataType="viewmodels:RhythmVerseViewModel">
 
         <UserControl.Resources>
                 <utilities:SafeImageUrlConverter x:Key="SafeImageUrlConverter"/>
         </UserControl.Resources>
-        <SplitView IsPaneOpen="{Binding isPaneOpen}"
+        <Grid RowDefinitions="*" ColumnDefinitions="*">
+        <SplitView Grid.Row="0" Grid.Column="0" IsVisible="{Binding IsDesktopMode}"
+                   IsPaneOpen="{Binding isPaneOpen}"
                    OpenPaneLength="400"
                    PanePlacement="Right"
                    DisplayMode="CompactOverlay">
@@ -26,15 +29,19 @@
                                       Background="{StaticResource ThemeBackgroundBrush}">
                                         <Button Grid.Column="0"
                                                 Grid.Row="0"
-                                                Content=""
+                                                Content="{Binding PageStrings.ShowDownloads}"
                                                 FontSize="24"
+                                                FontFamily="{StaticResource FontAwesomeSolid}"
+                                                FontWeight="Black"
                                                 Command="{Binding ShowDownloadsPaneCommand}"
                                                 HorizontalAlignment="Right" />
                                         <Button Grid.Column="0"
                                                 Grid.Row="1"
                                                 HorizontalAlignment="Right"
-                                                Content=""
+                                                Content="{Binding PageStrings.ShowFilters}"
                                                 FontSize="24"
+                                                FontFamily="{StaticResource FontAwesomeSolid}"
+                                                FontWeight="Black"
                                                 Command="{Binding ShowFilterPaneCommand}" />
                                 </Grid>
                                 <!-- Filter Pane (Collapsible) -->
@@ -53,6 +60,7 @@
                                                         <StackPanel Spacing="5">
                                                                 <TextBlock Text="{Binding PageStrings.SortBy}"
                                                                            FontWeight="Bold"
+                                                                           FontSize="24"
                                                                            Foreground="{StaticResource ThemeForegroundBrush}" />
                                                                 <ComboBox ItemsSource="{Binding Filters}"
                                                                           SelectedItem="{Binding SelectedFilter}" />
@@ -61,6 +69,7 @@
                                                         <StackPanel Spacing="5">
                                                                 <TextBlock Text="{Binding PageStrings.Order}"
                                                                            FontWeight="Bold"
+                                                                           FontSize="24"
                                                                            Foreground="{StaticResource ThemeForegroundBrush}" />
                                                                 <ComboBox ItemsSource="{Binding Orders}"
                                                                           SelectedItem="{Binding SelectedOrder}" />
@@ -69,6 +78,7 @@
                                                         <StackPanel Spacing="5">
                                                                 <TextBlock Text="{Binding PageStrings.Instrument}"
                                                                            FontWeight="Bold"
+                                                                           FontSize="24"
                                                                            Foreground="{StaticResource ThemeForegroundBrush}" />
                                                                 <ListBox ItemsSource="{Binding Instruments}"
                                                                          SelectedItems="{Binding SelectedInstruments}"
@@ -83,6 +93,7 @@
                                                         </StackPanel>
 
                                                         <Button Content="{Binding PageStrings.ApplyFilter}"
+                                                                FontSize="24"
                                                                 Command="{Binding RefreshButtonCommand}" />
                                                 </StackPanel>
                                         </ScrollViewer>
@@ -118,7 +129,9 @@
                         </Grid>
                 </SplitView.Pane>
                 <Grid RowDefinitions="Auto,*"
-                      ColumnDefinitions="*">
+                      ColumnDefinitions="*"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch">
                         <!-- Search and Filter Bar -->
                         <Grid Grid.Row="0"
                               Margin="0,10,10,0"
@@ -188,7 +201,7 @@
                               ColumnDefinitions="*,Auto"
                               RowDefinitions="*"
                               Margin="0,10,0,10"
-                              IsVisible="{Binding !IsPlaceholder}" >
+                              IsVisible="{Binding HasResults}" >
                                 <!-- Song List -->
                                 <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
                                         Grid.Column="0"
@@ -207,7 +220,7 @@
                                                                         BorderThickness="1"
                                                                         CornerRadius="5">
                                                                         <Grid RowDefinitions="8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8"
-                                                                              ColumnDefinitions="128, 2.5*, 2*, 2*, 2*">
+                                                                              ColumnDefinitions="128, 2.5*, 2.2*, 2*, 2*">
                                                                                 <!-- Album Art -->
                                                                                 <Image asyncImage:ImageLoader.Source="{Binding AlbumArt, Converter={StaticResource SafeImageUrlConverter}, ConverterParameter=album}"
                                                                                        Grid.Row="0"
@@ -220,8 +233,7 @@
                                                                                 <!-- Song Info -->
                                                                                 <Grid Grid.Row="2"
                                                                                       Grid.Column="1"
-                                                                                      Grid.RowSpan="12"
-                                                                                      Margin="10,10,10,10">
+                                                                                      Grid.RowSpan="12">
                                                                                         <controls:SongInfoControl Song="{Binding}"
                                                                                                                   SongStrings="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings}"/>
                                                                                 </Grid>
@@ -231,7 +243,10 @@
                                                                                       Grid.RowSpan="16"
                                                                                       Margin="10,10,10,10">
                                                                                         <controls:SongRatingControl Song="{Binding}"
-                                                                                                                    HorizontalAlignment="Center" />
+                                                                                                                    HorizontalAlignment="Center"
+                                                                                                                    GlyphWidth="22"
+                                                                                                                    GlyphFontSize="16"
+                                                                                                                    GlyphFontFamily="{StaticResource FontAwesomeSolid}" />
                                                                                 </Grid>
                                                                                 <!-- Creator Info -->
                                                                                 <Grid Grid.Row="0"
@@ -301,7 +316,7 @@
                                                                                                 Command="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
                                                                                                 CommandParameter="{Binding}">
                                                                                                 <Button.Content>
-                                                                                                        <TextBlock Text="Download"
+                                                                                                        <TextBlock Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.ShowDownloads}"
                                                                                                                    Foreground="{StaticResource ThemeAccentBrush}"
                                                                                                                    VerticalAlignment="Center"
                                                                                                                    HorizontalAlignment="Center" />
@@ -342,4 +357,94 @@
                         </Grid>
                 </Grid>
         </SplitView>
+
+        <Grid Grid.Row="0" Grid.Column="0" IsVisible="{Binding IsCompanionMode}"
+              RowDefinitions="Auto,*"
+              Margin="10">
+                <Grid Grid.Row="0"
+                                                                                        ColumnDefinitions="*,Auto">
+                        <TextBox Grid.Column="0"
+                                 Watermark="{Binding PageStrings.SearchText}"
+                                                                                                                                 Text="{Binding SearchText}"
+                                                                                                                                 Margin="0,0,8,0" />
+                        <Button Grid.Column="1"
+                                Content="{Binding PageStrings.Refresh}"
+                                Command="{Binding RefreshButtonCommand}" />
+                </Grid>
+
+                <Grid Grid.Row="1"
+                      Margin="0,10,0,0">
+                        <Grid IsVisible="{Binding IsPlaceholder}">
+                                <Grid RowDefinitions="Auto,Auto"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center">
+                                        <ProgressBar Grid.Row="0"
+                                                     IsIndeterminate="True"
+                                                     Width="200"
+                                                     Height="30" />
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding PageStrings.LoadingResults}"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,20,0,0" />
+                                </Grid>
+                        </Grid>
+
+                        <Grid IsVisible="{Binding NoResults}">
+                                <TextBlock Text="{Binding PageStrings.NoResults}"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"/>
+                        </Grid>
+
+                        <Border IsVisible="{Binding HasResults}"
+                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                BorderThickness="1"
+                                Padding="8">
+                                <ListBox ItemsSource="{Binding DataItems}"
+                                         SelectionMode="Single"
+                                         SelectedItem="{Binding SelectedFile}"
+                                         Background="{StaticResource ListBoxBackground}"
+                                         x:Name="MobileSongsListBox"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                        <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                        <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="5"
+                                                                Padding="8"
+                                                                Margin="0,0,0,6">
+                                                                <Grid RowDefinitions="Auto,Auto,Auto"
+                                                                                                                                                                                                                                                                                        ColumnDefinitions="*,Auto">
+                                                                        <TextBlock Grid.Row="0"
+                                                                                   Grid.Column="0"
+                                                                                   Text="{Binding Title}"
+                                                                                   FontWeight="Bold" />
+                                                                        <TextBlock Grid.Row="1"
+                                                                                   Grid.Column="0"
+                                                                                                                                                                                                                                                                                                                                         Text="{Binding Artist}"
+                                                                                                                                                                                                                                                                                                                                         Margin="0,4,0,0" />
+                                                                        <TextBlock Grid.Row="2"
+                                                                                   Grid.Column="0"
+                                                                                                                                                                                                                                                                                                                                         Text="{Binding FormattedTime}"
+                                                                                                                                                                                                                                                                                                                                         Margin="0,4,0,0" />
+                                                                        <Button Grid.RowSpan="3"
+                                                                                Grid.Column="1"
+                                                                                VerticalAlignment="Center"
+                                                                                                                                                                                                                                                                                                                                Margin="8,0,0,0"
+                                                                                Command="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
+                                                                                CommandParameter="{Binding}">
+                                                                                <Button.Content>
+                                                                                        <TextBlock Text="Download"
+                                                                                                   Foreground="{StaticResource ThemeAccentBrush}" />
+                                                                                </Button.Content>
+                                                                        </Button>
+                                                                </Grid>
+                                                        </Border>
+                                                </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                </ListBox>
+                        </Border>
+                </Grid>
+        </Grid>
+        </Grid>
 </UserControl>

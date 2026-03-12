@@ -1,6 +1,5 @@
 ﻿
 using Microsoft.Extensions.Configuration;
-using RhythmVerseClient.Api;
 using RhythmVerseClient.Models;
 using RhythmVerseClient.Utilities;
 using RhythmVerseClient.ViewModels;
@@ -11,7 +10,7 @@ using System.Runtime.CompilerServices;
 
 namespace RhythmVerseClient.Services
 {
-    public class RhythmVerseApiClient : INotifyPropertyChanged
+    public class ApiClientService : INotifyPropertyChanged
     {
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
@@ -127,7 +126,7 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        public RhythmVerseApiClient(IConfiguration configuration)
+        public ApiClientService(IConfiguration configuration)
         {
             _configuration = configuration;
             _httpClient = new HttpClient
@@ -199,7 +198,18 @@ namespace RhythmVerseClient.Services
                     //Use mock data in development if UseMockData is true in appsettings.json
                     if (_configuration["UseMockData"] == "True")
                     {
-                        responseBody = await File.ReadAllTextAsync("RhythmVerseClient/Tests/test.json");
+                        var mockDataPath = ResolveMockDataPath();
+                        if (mockDataPath != null)
+                        {
+                            responseBody = await File.ReadAllTextAsync(mockDataPath);
+                        }
+                        else
+                        {
+                            Logger.LogMessage("UseMockData is enabled, but test.json was not found. Falling back to live API.");
+                            HttpResponseMessage response = await _httpClient.PostAsync(endpoint, content);
+                            response.EnsureSuccessStatusCode();
+                            responseBody = await response.Content.ReadAsStringAsync();
+                        }
                     }
                     else
                     {
@@ -366,6 +376,21 @@ namespace RhythmVerseClient.Services
                 Logger.LogMessage($"An error occurred: {ex.Message}");
                 return [];
             }
+        }
+
+        private static string? ResolveMockDataPath()
+        {
+            // Support launches from IDE and from built output directories.
+            var candidates = new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "Tests", "test.json"),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "RhythmVerseClient", "Tests", "test.json")),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "RhythmVerseClient", "Tests", "test.json")),
+                Path.Combine(Directory.GetCurrentDirectory(), "RhythmVerseClient", "Tests", "test.json"),
+                Path.Combine(Directory.GetCurrentDirectory(), "Tests", "test.json")
+            };
+
+            return candidates.FirstOrDefault(File.Exists);
         }
 
         private int GiveMeRatingsNow(Song song, string instrument)

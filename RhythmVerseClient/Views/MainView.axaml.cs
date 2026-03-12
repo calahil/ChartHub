@@ -1,6 +1,8 @@
+using Avalonia.Controls;
+
 namespace RhythmVerseClient.Views;
 
-public partial class MainView : Avalonia.Controls.Window
+public partial class MainView : UserControl
 {
     public MainView()
     {

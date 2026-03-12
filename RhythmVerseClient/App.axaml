@@ -10,7 +10,11 @@
                 <ResourceInclude Source="avares://RhythmVerseClient/Themes/CatppuccinMacchiato/Theme.axaml"/>
             </ResourceDictionary.MergedDictionaries>
             <local:ViewLocator x:Key="ViewLocator" />
-            <FontFamily x:Key="FontAwesome">avares://RhythmVerseClient/Resources/Fonts#Font Awesome 6 Free</FontFamily>
+            <FontFamily x:Key="AppDefaultFontFamily">avares://RhythmVerseClient/Resources/Fonts/OpenSans-Regular.ttf#Open Sans</FontFamily>
+            <FontFamily x:Key="FontAwesomeSolid">avares://RhythmVerseClient/Resources/Fonts/fa-solid-900.ttf#Font Awesome 6 Free</FontFamily>
+            <FontFamily x:Key="FontAwesomeRegular">avares://RhythmVerseClient/Resources/Fonts/fa-regular-400.ttf#Font Awesome 6 Free</FontFamily>
+            <FontFamily x:Key="FontAwesomeBrands">avares://RhythmVerseClient/Resources/Fonts/fa-brands-400.ttf#Font Awesome 6 Brands</FontFamily>
+            <FontFamily x:Key="FontAwesome">{StaticResource FontAwesomeSolid}</FontFamily>
         </ResourceDictionary>
     </Application.Resources>
 
@@ -20,6 +24,12 @@
 
     <Application.Styles>
         <FluentTheme />
+        <Style Selector=":is(TemplatedControl)">
+            <Setter Property="FontFamily" Value="{StaticResource AppDefaultFontFamily}" />
+        </Style>
+        <Style Selector="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource AppDefaultFontFamily}" />
+        </Style>
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
     </Application.Styles>
 

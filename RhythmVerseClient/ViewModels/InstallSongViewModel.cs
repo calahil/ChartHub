@@ -54,7 +54,9 @@ namespace RhythmVerseClient.ViewModels
             PageString = new InstallPageStrings();
             globalSettings = settings;
 
-            OnyxWatcher = new ResourceWatcher(globalSettings.StagingDir, WatcherType.File);
+            OnyxWatcher = OperatingSystem.IsAndroid()
+                ? new SnapshotResourceWatcher(globalSettings.StagingDir, WatcherType.File)
+                : new ResourceWatcher(globalSettings.StagingDir, WatcherType.File);
         }
 
         private void GoBack()
@@ -89,7 +91,7 @@ namespace RhythmVerseClient.ViewModels
                         _ => PageString.ExtractFile.FormatString(song.DisplayName),
                     };
                     await Task.Delay(100);
-                    using var archive = Toolbox.OpenArchive(song.FilePath);
+                    using var archive = FileTools.OpenArchive(song.FilePath);
                     foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
                     {
                         entry.WriteToDirectory(globalSettings.OutputDir, new ExtractionOptions
@@ -108,7 +110,7 @@ namespace RhythmVerseClient.ViewModels
                 {
                     Details += PageString.OnyxImport.FormatString(song.DisplayName);
                     Details += PageString.OnyxBuild.FormatString(song.DisplayName);
-                    Onyx onyx = new Onyx(globalSettings, song.FilePath);
+                    OnyxService onyx = new OnyxService(globalSettings, song.FilePath);
                     Details += PageString.OnyxFinish;
                     var progress = progressIncrement / totalFiles;
                     ProgressValue = progress;
@@ -119,7 +121,7 @@ namespace RhythmVerseClient.ViewModels
 
             await Task.Delay(100);
             Details += PageString.InstallSongs;
-            Toolbox.MoveDirectory(globalSettings.OutputDir, globalSettings.CloneHeroSongsDir);
+            FileTools.MoveDirectory(globalSettings.OutputDir, globalSettings.CloneHeroSongsDir);
 
             foreach (string song in processedFiles)
             {

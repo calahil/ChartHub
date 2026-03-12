@@ -10,7 +10,7 @@ namespace RhythmVerseClient.Services
     public interface IResourceWatcher
     {
         string DirectoryPath { get; }
-        ObservableCollection<FileData> Data { get; set; }
+        ObservableCollection<WatcherFile> Data { get; set; }
         void LoadItems();
         event EventHandler<string> DirectoryNotFound;
         //event EventHandler<string> ErrorOccurred;
@@ -18,8 +18,8 @@ namespace RhythmVerseClient.Services
 
     public class ResourceWatcher : IResourceWatcher, INotifyPropertyChanged
     {
-        private ObservableCollection<FileData> _data;
-        public ObservableCollection<FileData> Data
+        private ObservableCollection<WatcherFile> _data;
+        public ObservableCollection<WatcherFile> Data
         {
             get => _data;
             set
@@ -171,14 +171,37 @@ namespace RhythmVerseClient.Services
             });*/
         }
 
-        private static async Task<WatcherFileType> GetFileTypeAsync(string filePath)
+        internal static async Task<WatcherFileType> GetFileTypeForSnapshotAsync(string filePath)
         {
+            if (Directory.Exists(filePath))
+            {
+                return WatcherFileType.CloneHero;
+            }
+
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
+            if (extension == ".zip")
+            {
+                return WatcherFileType.Zip;
+            }
+            if (extension == ".rar")
+            {
+                return WatcherFileType.Rar;
+            }
+            if (extension == ".7z")
+            {
+                return WatcherFileType.SevenZip;
+            }
+
             byte[] fileSignature = new byte[6];
 
             try
             {
-                using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read);
+                using FileStream fs = new(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
                 _ = await fs.ReadAsync(fileSignature);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return WatcherFileType.Unknown;
             }
             catch (Exception ex)
             {
@@ -186,7 +209,7 @@ namespace RhythmVerseClient.Services
                 {
                     return WatcherFileType.CloneHero;
                 }
-                Console.WriteLine($"Error reading file: {ex.Message}");
+                Logger.LogMessage($"Error reading file metadata: {ex.Message}");
                 return WatcherFileType.Unknown;
             }
 
@@ -202,17 +225,9 @@ namespace RhythmVerseClient.Services
             {
                 return WatcherFileType.Con;
             }
-            else if (File.GetAttributes(filePath).HasFlag(FileAttributes.Directory))
-            {
-                return WatcherFileType.CloneHero;
-            }
             else if (fileSignature.Length >= SevenZipSignature.Length && fileSignature.AsSpan()[..SevenZipSignature.Length].SequenceEqual(SevenZipSignature))
             {
                 return WatcherFileType.SevenZip;
-            }
-            else if (Directory.Exists(filePath))
-            {
-                return WatcherFileType.CloneHero;
             }
             else
             {
@@ -220,7 +235,12 @@ namespace RhythmVerseClient.Services
             }
         }
 
-        private static string GetIconForFileType(WatcherFileType fileType)
+        private static async Task<WatcherFileType> GetFileTypeAsync(string filePath)
+        {
+            return await GetFileTypeForSnapshotAsync(filePath);
+        }
+
+        internal static string GetIconForSnapshot(WatcherFileType fileType)
         {
             var iconFileName = fileType switch
             {
@@ -235,6 +255,11 @@ namespace RhythmVerseClient.Services
             return $"avares://RhythmVerseClient/Resources/Images/{iconFileName}";
         }
 
+        private static string GetIconForFileType(WatcherFileType fileType)
+        {
+            return GetIconForSnapshot(fileType);
+        }
+
         private async Task AddItem(string itemName, string itemPath)
         {
             if (!existingEntries.Contains(itemPath))
@@ -246,18 +271,32 @@ namespace RhythmVerseClient.Services
                 switch (_watcherType)
                 {
                     case WatcherType.File:
-                        var info = new FileInfo(itemPath);
-                        sizeBytes = info.Length;
+                        try
+                        {
+                            var info = new FileInfo(itemPath);
+                            sizeBytes = info.Length;
+                        }
+                        catch (UnauthorizedAccessException)
+                        {
+                            sizeBytes = 0;
+                        }
                         break;
                     case WatcherType.Directory:
-                        sizeBytes = Toolbox.GetDirectorySize(itemPath);
+                        sizeBytes = FileTools.GetDirectorySize(itemPath);
                         break;
                     default:
                         sizeBytes = 0;
                         break;
                 }
-                Data.Add(new FileData(itemName, itemPath, fileType, imageFile, sizeBytes));
-                existingEntries.Add(itemPath);
+
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (!existingEntries.Contains(itemPath))
+                    {
+                        Data.Add(new WatcherFile(itemName, itemPath, fileType, imageFile, sizeBytes));
+                        existingEntries.Add(itemPath);
+                    }
+                });
             }
         }
 
@@ -301,6 +340,248 @@ namespace RhythmVerseClient.Services
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+    }
+
+    public class SnapshotResourceWatcher : IResourceWatcher, INotifyPropertyChanged
+    {
+        private readonly WatcherType _watcherType;
+        private ObservableCollection<WatcherFile> _data = [];
+
+        public string DirectoryPath { get; }
+
+        public ObservableCollection<WatcherFile> Data
+        {
+            get => _data;
+            set
+            {
+                _data = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public event EventHandler<string>? DirectoryNotFound;
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public SnapshotResourceWatcher(string path, WatcherType watcherType)
+        {
+            DirectoryPath = path;
+            _watcherType = watcherType;
+        }
+
+        public async void LoadItems()
+        {
+            if (!Directory.Exists(DirectoryPath))
+            {
+                DirectoryNotFound?.Invoke(this, DirectoryPath);
+                return;
+            }
+
+            string[] items = _watcherType switch
+            {
+                WatcherType.Directory => Directory.GetDirectories(DirectoryPath),
+                WatcherType.File => Directory.GetFiles(DirectoryPath),
+                _ => []
+            };
+
+            var files = new List<WatcherFile>();
+            foreach (var item in items)
+            {
+                try
+                {
+                    var itemName = Path.GetFileName(item);
+                    var itemType = await ResourceWatcher.GetFileTypeForSnapshotAsync(item);
+                    var imageFile = ResourceWatcher.GetIconForSnapshot(itemType);
+                    long sizeBytes = _watcherType == WatcherType.Directory
+                        ? FileTools.GetDirectorySize(item)
+                        : new FileInfo(item).Length;
+
+                    files.Add(new WatcherFile(itemName, item, itemType, imageFile, sizeBytes));
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogMessage($"SnapshotResourceWatcher skipped '{item}': {ex.Message}");
+                }
+            }
+
+            Dispatcher.UIThread.Post(() => Data = new ObservableCollection<WatcherFile>(files));
+        }
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+    }
+
+    /// <summary>
+    /// An <see cref="IResourceWatcher"/> backed by a Google Drive folder.
+    /// Loads files on construction and then polls at <see cref="PollingInterval"/>,
+    /// adding/removing entries in <see cref="Data"/> to match the remote folder.
+    /// </summary>
+    public class GoogleDriveWatcher : IResourceWatcher, INotifyPropertyChanged, IAsyncDisposable
+    {
+        private readonly IGoogleDriveClient _driveClient;
+        private readonly CancellationTokenSource _cts = new();
+        private Task? _pollTask;
+
+        public TimeSpan PollingInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+        // IResourceWatcher.DirectoryPath surfaces the Drive folder ID.
+        public string DirectoryPath => _driveClient.RhythmVerseFolderId;
+
+        private ObservableCollection<WatcherFile> _data = [];
+        public ObservableCollection<WatcherFile> Data
+        {
+            get => _data;
+            set { _data = value; OnPropertyChanged(); }
+        }
+
+        public event EventHandler<string>? DirectoryNotFound;
+
+        private static readonly string[] KnownExtensions = [".zip", ".rar", ".7z"];
+
+        public GoogleDriveWatcher(IGoogleDriveClient driveClient)
+        {
+            _driveClient = driveClient;
+        }
+
+        /// <summary>
+        /// Performs an initial load then starts background polling.
+        /// Call this once after construction (e.g. from InitializeAsync in the ViewModel).
+        /// </summary>
+        public async Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(_driveClient.RhythmVerseFolderId))
+            {
+                DirectoryNotFound?.Invoke(this, "RhythmVerse folder not initialised on Google Drive.");
+                return;
+            }
+
+            _ = LoadItemsAsync(cancellationToken);
+            _pollTask = PollAsync(_cts.Token);
+        }
+
+        // Synchronous IResourceWatcher.LoadItems() — kicks off an async load and returns immediately.
+        public void LoadItems()
+        {
+            if (string.IsNullOrWhiteSpace(_driveClient.RhythmVerseFolderId))
+            {
+                DirectoryNotFound?.Invoke(this, "RhythmVerse folder not initialised on Google Drive.");
+                return;
+            }
+
+            _ = LoadItemsAsync(CancellationToken.None);
+        }
+
+        private async Task LoadItemsAsync(CancellationToken cancellationToken)
+        {
+            IList<Google.Apis.Drive.v3.Data.File> files;
+            try
+            {
+                files = await _driveClient.ListFilesAsync(_driveClient.RhythmVerseFolderId);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogMessage($"GoogleDriveWatcher: failed to list files – {ex.Message}");
+                return;
+            }
+
+            var seenIds = new HashSet<string>(files.Select(f => f.Id));
+
+            // Remove entries that are no longer on Drive
+            var toRemove = Data.Where(w => !seenIds.Contains(w.FilePath)).ToList();
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                foreach (var item in toRemove)
+                    Data.Remove(item);
+            });
+
+            // Add new entries
+            var existingIds = new HashSet<string>(Data.Select(w => w.FilePath));
+            foreach (var file in files)
+            {
+                if (existingIds.Contains(file.Id))
+                    continue;
+
+                var watcherFile = await BuildWatcherFileAsync(file);
+                await Dispatcher.UIThread.InvokeAsync(() => Data.Add(watcherFile));
+            }
+        }
+
+        private async Task PollAsync(CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(PollingInterval, cancellationToken);
+                    await LoadItemsAsync(cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogMessage($"GoogleDriveWatcher poll error: {ex.Message}");
+                }
+            }
+        }
+
+        private static async Task<WatcherFile> BuildWatcherFileAsync(Google.Apis.Drive.v3.Data.File file)
+        {
+            var fileType = DetermineFileType(file.Name);
+            var imageFile = GetIconForFileType(fileType);
+
+            // Size is included via ListFilesAsync which requests fields(id, name, size, mimeType).
+            long sizeBytes = file.Size ?? 0;
+
+            return await Task.FromResult(new WatcherFile(
+                displayName: file.Name,
+                filePath: file.Id,
+                watcherFileType: fileType,
+                imageFile: imageFile,
+                sizeBytes: sizeBytes));
+        }
+
+        private static WatcherFileType DetermineFileType(string fileName)
+        {
+            return Path.GetExtension(fileName).ToLowerInvariant() switch
+            {
+                ".zip" => WatcherFileType.Zip,
+                ".rar" => WatcherFileType.Rar,
+                ".7z" => WatcherFileType.SevenZip,
+                "" => WatcherFileType.Con,
+                _ => WatcherFileType.Unknown,
+            };
+        }
+
+        private static string GetIconForFileType(WatcherFileType fileType)
+        {
+            var iconFileName = fileType switch
+            {
+                WatcherFileType.Rar => "rar.png",
+                WatcherFileType.Zip => "zip.png",
+                WatcherFileType.Con => "rb.png",
+                WatcherFileType.SevenZip => "sevenzip.png",
+                WatcherFileType.CloneHero => "clonehero.png",
+                _ => "blank.png",
+            };
+            return $"avares://RhythmVerseClient/Resources/Images/{iconFileName}";
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _cts.CancelAsync();
+            if (_pollTask is not null)
+            {
+                try { await _pollTask; } catch (OperationCanceledException) { }
+            }
+            _cts.Dispose();
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 
 }

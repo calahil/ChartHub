@@ -12,8 +12,8 @@ namespace RhythmVerseClient.ViewModels
     {
         private readonly AppGlobalSettings globalSettings;
 
-        private ObservableCollection<FileData> _dataItems;
-        public ObservableCollection<FileData> DataItems
+        private ObservableCollection<WatcherFile> _dataItems;
+        public ObservableCollection<WatcherFile> DataItems
         {
             get => _dataItems;
             set
@@ -25,8 +25,8 @@ namespace RhythmVerseClient.ViewModels
 
         public IResourceWatcher CloneHeroWatcher { get; set; }
 
-        private FileData? _selectedFile;
-        public FileData? SelectedFile
+        private WatcherFile? _selectedFile;
+        public WatcherFile? SelectedFile
         {
             get => _selectedFile;
             set
@@ -41,7 +41,9 @@ namespace RhythmVerseClient.ViewModels
         public CloneHeroViewModel(AppGlobalSettings settings)
         {
             globalSettings = settings;
-            CloneHeroWatcher = new ResourceWatcher(globalSettings.CloneHeroSongsDir, WatcherType.Directory);
+            CloneHeroWatcher = OperatingSystem.IsAndroid()
+                ? new SnapshotResourceWatcher(globalSettings.CloneHeroSongsDir, WatcherType.Directory)
+                : new ResourceWatcher(globalSettings.CloneHeroSongsDir, WatcherType.Directory);
             _dataItems = CloneHeroWatcher.Data;
             PageStrings = new CloneHeroPageStrings();
         }

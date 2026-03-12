@@ -181,13 +181,13 @@ namespace RhythmVerseClient.Services
 
             mediaDownloader.ProgressChanged += progressEvent =>
             {
-                if (progressEvent.Status == DownloadStatus.Downloading)
+                if (progressEvent.Status == Google.Apis.Download.DownloadStatus.Downloading)
                 {
                     double progressPercentage = (double)((double)progressEvent.BytesDownloaded / downloadFile.FileSize * 100);
                     progress?.Report(progressPercentage); // Correctly reporting progress
                     downloadFile.DownloadProgress = progressPercentage;
                 }
-                else if (progressEvent.Status == DownloadStatus.Completed)
+                else if (progressEvent.Status == Google.Apis.Download.DownloadStatus.Completed)
                 {
                     downloadFile.Finished = true;
                     downloadFile.DownloadProgress = 100;

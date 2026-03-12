@@ -47,6 +47,9 @@ namespace RhythmVerseClient.ViewModels
 
     public class RhythmVerseViewModel : INotifyPropertyChanged
     {
+        public bool IsCompanionMode => OperatingSystem.IsAndroid();
+        public bool IsDesktopMode => !OperatingSystem.IsAndroid();
+
         public enum PaneMode
         {
             None,
@@ -76,8 +79,8 @@ namespace RhythmVerseClient.ViewModels
         private readonly AppGlobalSettings globalSettings;
         private readonly DownloadService downloadService;
 
-        private RhythmVerseApiClient _apiClient;
-        public RhythmVerseApiClient ApiClient
+        private ApiClientService _apiClient;
+        public ApiClientService ApiClient
         {
             get => _apiClient;
             set
@@ -186,8 +189,11 @@ namespace RhythmVerseClient.ViewModels
             {
                 isPlaceholder = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(HasResults));
             }
         }
+
+        public bool HasResults => !IsPlaceholder;
 
         private string _selectedFilter;
         public string SelectedFilter
@@ -299,7 +305,7 @@ namespace RhythmVerseClient.ViewModels
         {
             globalSettings = settings;
             PageStrings = new RhythmVersePageStrings();
-            _apiClient = new RhythmVerseApiClient(configuration);
+            _apiClient = new ApiClientService(configuration);
             _dataItems = [];
             _downloads = [];
             Filters = PageStrings.Filters;
@@ -400,33 +406,32 @@ namespace RhythmVerseClient.ViewModels
             if (IsLoading) return;
 
             IsLoading = true;
-
-            if (!ApiClient.HasMoreRecords) return;
-
-
-            if (string.IsNullOrEmpty(SelectedFilter) || string.IsNullOrEmpty(SelectedOrder))
+            try
             {
-                SelectedFilter = "Artist";
-                SelectedOrder = "Ascending";
-            }
-            var filter = Toolbox.ConvertFilter(SelectedFilter);
-            var order = Toolbox.GetSortOrder(filter, SelectedOrder);
-            var instrument = SelectedInstruments.ToList();
-            DataItems = [];
-            DataItems = await ApiClient.GetSongFilesAsync(search, SearchText.ToLower(), filter, order, instrument, SearchAuthorText);
+                if (!ApiClient.HasMoreRecords)
+                {
+                    NoResults = DataItems == null || DataItems.Count < 1;
+                    return;
+                }
 
-            if (DataItems.Count < 1)
+                if (string.IsNullOrEmpty(SelectedFilter) || string.IsNullOrEmpty(SelectedOrder))
+                {
+                    SelectedFilter = "Artist";
+                    SelectedOrder = "Ascending";
+                }
+                var filter = Toolbox.ConvertFilter(SelectedFilter);
+                var order = Toolbox.GetSortOrder(filter, SelectedOrder);
+                var instrument = SelectedInstruments.ToList();
+                DataItems = [];
+                DataItems = await ApiClient.GetSongFilesAsync(search, SearchText.ToLower(), filter, order, instrument, SearchAuthorText);
+
+                NoResults = DataItems.Count < 1;
+            }
+            finally
             {
-                NoResults = true;
+                IsLoading = false;
+                IsPlaceholder = false;
             }
-            else
-            {
-                NoResults = false;
-            }
-
-
-            IsLoading = false;
-            IsPlaceholder = false;
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

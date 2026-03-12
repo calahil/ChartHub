@@ -4,14 +4,14 @@ using YamlDotNet.RepresentationModel;
 
 namespace RhythmVerseClient.Services
 {
-    public partial class Onyx
+    public partial class OnyxService
     {
         private string TempPath { get; set; }
         private string DestPath { get; set; }
         private string StagingPath { get; set; }
         private readonly AppGlobalSettings globalSettings;
 
-        public Onyx(AppGlobalSettings settings, string songPath)
+        public OnyxService(AppGlobalSettings settings, string songPath)
         {
             globalSettings = settings;
             TempPath = Path.Combine(globalSettings.TempDir,

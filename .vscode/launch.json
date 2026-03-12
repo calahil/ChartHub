@@ -2,16 +2,46 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET Core Launch (console)",
+            "name": "Desktop: Debug RhythmVerseClient",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/RhythmVerseClient/bin/Debug/net10.0/RhythmVerseClient.dll",
             "args": [],
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/RhythmVerseClient",
             "stopAtEntry": false,
             "console": "internalConsole",
             "internalConsoleOptions": "openOnSessionStart"
+        },
+        {
+            "name": "Android: Install To Device/Emulator",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "dotnet build ${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:AndroidSdkDirectory=$HOME/Android/Sdk"
+        },
+        {
+            "name": "Android: Start Emulator",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "${env:HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -netdelay none -netspeed full"
+        },
+        {
+            "name": "Android: Build+Install (Wait For Device)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "if ! ${env:HOME}/Android/Sdk/platform-tools/adb devices | grep -q '^emulator-5554\\s'; then ${env:HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/rhythmverse-emulator.log 2>&1 & fi; ${env:HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 wait-for-device; until [ \"$(${env:HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')\" = \"1\" ]; do sleep 2; done; until ${env:HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd package list packages >/dev/null 2>&1; do sleep 2; done; dotnet build ${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:Device=emulator-5554 -p:EmbedAssembliesIntoApk=true -p:AndroidSdkDirectory=$HOME/Android/Sdk"
+        },
+        {
+            "name": "Android: Install To Emulator (emulator-5554)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "if ! ${env:HOME}/Android/Sdk/platform-tools/adb devices | grep -q '^emulator-5554\\s'; then ${env:HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/rhythmverse-emulator.log 2>&1 & fi; ${env:HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 wait-for-device; until [ \"$(${env:HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')\" = \"1\" ]; do sleep 2; done; until ${env:HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd package list packages >/dev/null 2>&1; do sleep 2; done; dotnet build ${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:Device=emulator-5554 -p:EmbedAssembliesIntoApk=true -p:AndroidSdkDirectory=$HOME/Android/Sdk"
+        },
+        {
+            "name": "Android: Install To Phone (R5CY10G7DWP)",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "dotnet build ${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:Device=R5CY10G7DWP -p:AndroidSdkDirectory=$HOME/Android/Sdk"
         },
         {
             "name": ".NET Core Attach",

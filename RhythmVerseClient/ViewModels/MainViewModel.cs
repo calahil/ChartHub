@@ -1,4 +1,5 @@
-﻿using System.ComponentModel;
+﻿using Avalonia.Threading;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 namespace RhythmVerseClient.ViewModels
@@ -72,6 +73,17 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        private bool _isInstallSongTabVisible;
+        public bool IsInstallSongTabVisible
+        {
+            get => _isInstallSongTabVisible;
+            set
+            {
+                _isInstallSongTabVisible = value;
+                OnPropertyChanged();
+            }
+        }
+
         public MainViewModel()
         {
         }
@@ -84,15 +96,31 @@ namespace RhythmVerseClient.ViewModels
             _installSongViewModel = installSongViewModel;
             _isCloneHeroTabVisible = false;
             _isDownloadTabVisible = false;
+            _isInstallSongTabVisible = false;
+
+            var supportsCloneHero = !OperatingSystem.IsAndroid();
+            var supportsDesktopInstallPipeline = !OperatingSystem.IsAndroid();
+
+            if (supportsCloneHero)
+            {
+                _ = Task.Run(() => {
+                    _cloneHeroViewModel.CloneHeroWatcher.LoadItems();
+                    Dispatcher.UIThread.Post(() => IsCloneHeroTabVisible = true);
+                    });
+            }
+
+            if (supportsDesktopInstallPipeline)
+            {
+                Dispatcher.UIThread.Post(() => IsInstallSongTabVisible = true);
+            }
 
             _ = Task.Run(() => {
-                _cloneHeroViewModel.CloneHeroWatcher.LoadItems();
-                IsCloneHeroTabVisible = true;
-                });
-
-            _ = Task.Run(() => {
-                _downloadViewModel.DownloadWatcher.LoadItems();
-                IsDownloadTabVisible = true;
+                if (!OperatingSystem.IsAndroid())
+                {
+                    _downloadViewModel.DownloadWatcher.LoadItems();
+                }
+                _ = _downloadViewModel.GoogleWatcher.StartAsync();
+                Dispatcher.UIThread.Post(() => IsDownloadTabVisible = true);
                 });
         }
 

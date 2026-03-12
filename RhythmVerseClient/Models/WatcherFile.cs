@@ -21,14 +21,14 @@ namespace RhythmVerseClient.Models
         Zip
     }
 
-    public class FileData(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile, long sizeBytes) : INotifyPropertyChanged
+    public class WatcherFile(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile, long sizeBytes) : INotifyPropertyChanged
     {
         private string _imageFile = imageFile;
         private bool _checked = false;
         private string _displayName = displayName;
         private string _filePath = filePath;
         private WatcherFileType _fileType = watcherFileType;
-        private string _fileSize = Toolbox.ConvertFileSize(sizeBytes);
+        private string _fileSize = FileTools.ConvertFileSize(sizeBytes);
         private long _sizeBytes = sizeBytes;
         private double _downloadProgress = 0;
 
@@ -144,7 +144,7 @@ namespace RhythmVerseClient.Models
 
         public override bool Equals(object? obj)
         {
-            if (obj is FileData other)
+            if (obj is WatcherFile other)
             {
                 return this.DisplayName == other.DisplayName && this.FilePath == other.FilePath;
             }

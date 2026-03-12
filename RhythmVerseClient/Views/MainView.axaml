@@ -1,12 +1,10 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:Views="using:RhythmVerseClient.Views"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
-        x:Class="RhythmVerseClient.Views.MainView"
-        Title="RhythmVerseClient" Width="1200" Height="800"
-        WindowStartupLocation="CenterScreen">
+<UserControl xmlns="https://github.com/avaloniaui"
+         xmlns:Views="using:RhythmVerseClient.Views"
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+         x:Class="RhythmVerseClient.Views.MainView">
 
     
     <TabControl>
@@ -25,9 +23,10 @@
             <ContentControl Content="{Binding CloneHeroViewModel}" />
         </TabItem>
         <TabItem Header="Install Song"
-                FontSize="16">
+                FontSize="16"
+                IsVisible="{Binding IsInstallSongTabVisible}">
             <ContentControl Content="{Binding InstallSongViewModel}" />
         </TabItem>
     </TabControl>
 
-</Window>
+</UserControl>

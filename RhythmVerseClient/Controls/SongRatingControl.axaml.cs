@@ -12,12 +12,55 @@ public partial class SongRatingControl : UserControl
     public static readonly StyledProperty<ViewSong> SongProperty =
         AvaloniaProperty.Register<SongRatingControl, ViewSong>(
             nameof(Song),
-            defaultValue: null);
+            defaultValue: new ViewSong());
+
+    /// <summary>Fixed pixel width of each glyph cell. Defaults to 20.</summary>
+    public static readonly StyledProperty<double> GlyphWidthProperty =
+        AvaloniaProperty.Register<SongRatingControl, double>(
+            nameof(GlyphWidth),
+            defaultValue: 22d);
+
+    /// <summary>Font size of each glyph. Defaults to 16.</summary>
+    public static readonly StyledProperty<int> GlyphFontSizeProperty =
+        AvaloniaProperty.Register<SongRatingControl, int>(
+            nameof(GlyphFontSize),
+            defaultValue: 16);
+
+     public static readonly StyledProperty<FontFamily> GlyphFontFamilyProperty =
+        AvaloniaProperty.Register<SongRatingControl, FontFamily>(
+            nameof(GlyphFontFamily),
+            defaultValue: new FontFamily("avares://RhythmVerseClient/Resources/Fonts/fa-solid-900.ttf#Font Awesome 6 Free"));
+
+    // ── CLR wrappers ──────────────────────────────────────────────────────
 
     public ViewSong Song
     {
         get => (ViewSong)GetValue(SongProperty);
         set => SetValue(SongProperty, value);
+    }
+
+    public double GlyphWidth
+    {
+        get => GetValue(GlyphWidthProperty);
+        set => SetValue(GlyphWidthProperty, value);
+    }
+
+    public int GlyphFontSize
+    {
+        get => GetValue(GlyphFontSizeProperty);
+        set => SetValue(GlyphFontSizeProperty, value);
+    }
+
+    public FontFamily GlyphFontFamily
+    {
+        get => GetValue(GlyphFontFamilyProperty);
+        set => SetValue(GlyphFontFamilyProperty, value);
+    }
+
+    // ── Property change handling ──────────────────────────────────────────
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
     }
 
     public SongRatingControl()
