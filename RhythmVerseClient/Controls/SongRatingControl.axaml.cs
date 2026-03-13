@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Media;
 using RhythmVerseClient.Models;
 using RhythmVerseClient.Strings;
 using System.Collections.Generic;
@@ -25,11 +24,6 @@ public partial class SongRatingControl : UserControl
         AvaloniaProperty.Register<SongRatingControl, int>(
             nameof(GlyphFontSize),
             defaultValue: 16);
-
-     public static readonly StyledProperty<FontFamily> GlyphFontFamilyProperty =
-        AvaloniaProperty.Register<SongRatingControl, FontFamily>(
-            nameof(GlyphFontFamily),
-            defaultValue: new FontFamily("avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-Regular.ttf#CaskaydiaCove NF"));
 
      public static readonly StyledProperty<bool> IsDesktopModeProperty =
         AvaloniaProperty.Register<SongRatingControl, bool>(
@@ -58,13 +52,6 @@ public partial class SongRatingControl : UserControl
         get => GetValue(GlyphFontSizeProperty);
         set => SetValue(GlyphFontSizeProperty, value);
     }
-
-    public FontFamily GlyphFontFamily
-    {
-        get => GetValue(GlyphFontFamilyProperty);
-        set => SetValue(GlyphFontFamilyProperty, value);
-    }
-
 
     public bool IsDesktopMode
     {

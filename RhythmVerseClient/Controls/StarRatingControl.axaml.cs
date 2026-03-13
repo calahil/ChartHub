@@ -1,22 +1,18 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Media;
 using System.Collections.Generic;
 
 namespace RhythmVerseClient.Controls;
 
 /// <summary>
-/// Displays a 0–5 star rating using uniform fixed-width glyph cells.
-/// Each slot is either a filled glyph (≤ Rating) or an empty glyph (> Rating).
+/// Displays a 0-5 rating using uniform fixed-width icon cells.
+/// Each slot is either a filled icon (at or below Rating) or an empty icon (above Rating).
 /// </summary>
 public partial class StarRatingControl : UserControl
 {
-    // ── Glyphs ────────────────────────────────────────────────────────────
-    private const string EmptyGlyph= "○";
-    // Note: The filled glyph is a full circle instead of a star, because star glyphs can look uneven in fixed-width cells.
-    // space before the circle is intentional to add padding on the left side, since the font doesn't have built-in padding and we want to avoid clipping the circle on the left edge.
-    private const string FilledGlyph  = "●";
-    private const int    TotalStars  = 5;
+    private const string EmptyIcon = "avares://RhythmVerseClient/Resources/Images/circleempty24dp.png";
+    private const string FilledIcon = "avares://RhythmVerseClient/Resources/Images/circlefilled24p.png";
+    private const int TotalStars = 5;
 
     // ── Styled Properties ─────────────────────────────────────────────────
 
@@ -33,17 +29,17 @@ public partial class StarRatingControl : UserControl
             nameof(GlyphWidth),
             defaultValue: 20d);
 
-    /// <summary>Brush used for filled stars. Defaults to Yellow.</summary>
-    public static readonly StyledProperty<IBrush> FilledBrushProperty =
-        AvaloniaProperty.Register<StarRatingControl, IBrush>(
-            nameof(FilledBrush),
-            defaultValue: Brushes.Gold);
+    /// <summary>Image URI used for filled rating slots.</summary>
+    public static readonly StyledProperty<string> FilledIconSourceProperty =
+        AvaloniaProperty.Register<StarRatingControl, string>(
+            nameof(FilledIconSource),
+            defaultValue: FilledIcon);
 
-    /// <summary>Brush used for empty stars. Defaults to Gray.</summary>
-    public static readonly StyledProperty<IBrush> EmptyBrushProperty =
-        AvaloniaProperty.Register<StarRatingControl, IBrush>(
-            nameof(EmptyBrush),
-            defaultValue: Brushes.Gold);
+    /// <summary>Image URI used for empty rating slots.</summary>
+    public static readonly StyledProperty<string> EmptyIconSourceProperty =
+        AvaloniaProperty.Register<StarRatingControl, string>(
+            nameof(EmptyIconSource),
+            defaultValue: EmptyIcon);
 
     // ── CLR wrappers ──────────────────────────────────────────────────────
 
@@ -59,16 +55,16 @@ public partial class StarRatingControl : UserControl
         set => SetValue(GlyphWidthProperty, value);
     }
 
-    public IBrush FilledBrush
+    public string FilledIconSource
     {
-        get => GetValue(FilledBrushProperty);
-        set => SetValue(FilledBrushProperty, value);
+        get => GetValue(FilledIconSourceProperty);
+        set => SetValue(FilledIconSourceProperty, value);
     }
 
-    public IBrush EmptyBrush
+    public string EmptyIconSource
     {
-        get => GetValue(EmptyBrushProperty);
-        set => SetValue(EmptyBrushProperty, value);
+        get => GetValue(EmptyIconSourceProperty);
+        set => SetValue(EmptyIconSourceProperty, value);
     }
 
     // ── Constructor ───────────────────────────────────────────────────────
@@ -85,9 +81,9 @@ public partial class StarRatingControl : UserControl
     {
         base.OnPropertyChanged(change);
 
-        if (change.Property == RatingProperty   ||
-            change.Property == FilledBrushProperty ||
-            change.Property == EmptyBrushProperty)
+        if (change.Property == RatingProperty ||
+            change.Property == FilledIconSourceProperty ||
+            change.Property == EmptyIconSourceProperty)
         {
             UpdateStars();
         }
@@ -103,8 +99,7 @@ public partial class StarRatingControl : UserControl
         {
             bool filled = i <= Rating;
             slots.Add(new StarSlot(
-                Glyph: filled ? FilledGlyph : EmptyGlyph,
-                Brush: filled ? FilledBrush  : EmptyBrush));
+                IconSource: filled ? FilledIconSource : EmptyIconSource));
         }
 
         StarsHost.ItemsSource = slots;
@@ -115,6 +110,5 @@ public partial class StarRatingControl : UserControl
 
     // ── Inner model ───────────────────────────────────────────────────────
 
-    /// <summary>View-model for a single star slot.</summary>
-    public sealed record StarSlot(string Glyph, IBrush Brush);
+    public sealed record StarSlot(string IconSource);
 }

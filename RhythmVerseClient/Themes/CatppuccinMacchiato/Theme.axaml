@@ -159,4 +159,12 @@
   <SolidColorBrush x:Key="SemanticInfo"      Color="{StaticResource MacchiatoBlue}"/>
   <SolidColorBrush x:Key="SemanticLink"      Color="{StaticResource MacchiatoSapphire}"/>
 
+  <!-- ── Icon size tokens (Material 24dp grid) ──────────────── -->
+  <x:Double x:Key="IconSizeInline">16</x:Double>
+  <x:Double x:Key="IconSizeInlineCompact">12</x:Double>
+  <x:Double x:Key="IconSizeDense">18</x:Double>
+  <x:Double x:Key="IconSizeDefault">24</x:Double>
+  <x:Double x:Key="IconSizeProminent">32</x:Double>
+  <x:Double x:Key="IconTouchTargetSize">48</x:Double>
+
 </ResourceDictionary>

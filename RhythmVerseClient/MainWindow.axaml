@@ -5,5 +5,5 @@
         Title="RhythmVerse Client"
         Width="1200" Height="800"
         WindowStartupLocation="CenterScreen">
-    <views:MainView Margin= "0,10,0,0" />
+    <views:MainView />
 </Window>

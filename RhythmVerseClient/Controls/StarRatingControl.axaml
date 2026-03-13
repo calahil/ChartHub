@@ -1,6 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:RhythmVerseClient.Controls;assembly=RhythmVerseClient"
+             xmlns:utilities="using:RhythmVerseClient.Utilities"
              x:Class="RhythmVerseClient.Controls.StarRatingControl">
+
+  <UserControl.Resources>
+    <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+  </UserControl.Resources>
 
   <ItemsControl x:Name="StarsHost"
                 HorizontalAlignment="Left"
@@ -12,13 +18,11 @@
     </ItemsControl.ItemsPanel>
     <ItemsControl.ItemTemplate>
       <DataTemplate>
-        <TextBlock Text="{Binding Glyph}"
-                   FontFamily="{Binding $parent[UserControl].FontFamily}"
-                   FontSize="{Binding $parent[UserControl].FontSize}"
-                   Foreground="{Binding Brush}"
-                   Width="{Binding $parent[UserControl].GlyphWidth}"
-                   TextAlignment="Center"
-                   VerticalAlignment="Center"/>
+        <Image Source="{Binding IconSource, Converter={StaticResource AssetPathToImageConverter}}"
+               Width="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:StarRatingControl}}"
+               Height="{Binding FontSize, RelativeSource={RelativeSource AncestorType=controls:StarRatingControl}}"
+               Stretch="Uniform"
+               VerticalAlignment="Center"/>
       </DataTemplate>
     </ItemsControl.ItemTemplate>
   </ItemsControl>

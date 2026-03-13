@@ -16,13 +16,10 @@
                             Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                      <controls:StarRatingControl Rating="{Binding DrumString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontFamily="{Binding GlyphFontFamily, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FilledBrush="{DynamicResource BrushYellow}"
-                                                 EmptyBrush="{DynamicResource BrushYellow}"
                                                  Grid.Row="0"
                                                  Grid.Column="1"
-                                                 FontWeight="Black"
+                                                 FontWeight="Bold"
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
                      <!-- Guitar Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/guitar_small.png"
@@ -32,12 +29,9 @@
                      <controls:StarRatingControl Rating="{Binding GuitarString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FilledBrush="{DynamicResource BrushYellow}"
-                                                 EmptyBrush="{DynamicResource BrushYellow}"
                                                  Grid.Row="1"
                                                  Grid.Column="1"
-                                                 FontFamily="{Binding GlyphFontFamily, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontWeight="Black"
+                                                 FontWeight="Bold"
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
                      <!-- Keyboard Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/keys_small.png"
@@ -47,12 +41,9 @@
                      <controls:StarRatingControl Rating="{Binding KeysString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FilledBrush="{DynamicResource BrushYellow}"
-                                                 EmptyBrush="{DynamicResource BrushYellow}"
                                                  Grid.Row="2"
                                                  Grid.Column="1"
-                                                 FontFamily="{Binding GlyphFontFamily, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontWeight="Black"
+                                                 FontWeight="Bold"
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
                      <!-- Bass Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/bass_small.png"
@@ -62,12 +53,9 @@
                      <controls:StarRatingControl Rating="{Binding BassString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FilledBrush="{DynamicResource BrushYellow}"
-                                                 EmptyBrush="{DynamicResource BrushYellow}"
                                                  Grid.Row="3"
                                                  Grid.Column="1"
-                                                 FontFamily="{Binding GlyphFontFamily, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontWeight="Black"
+                                                 FontWeight="Bold"
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
                      <!-- Vocals Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/vocals_small.png"
@@ -77,12 +65,9 @@
                      <controls:StarRatingControl Rating="{Binding VocalString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FilledBrush="{DynamicResource BrushYellow}"
-                                                 EmptyBrush="{DynamicResource BrushYellow}"
                                                  Grid.Row="4"
                                                  Grid.Column="1"
-                                                 FontFamily="{Binding GlyphFontFamily, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontWeight="Black"
+                                                 FontWeight="Bold"
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
               </Grid>
               <Grid x:Name="SongRatingMinGrid"
@@ -97,13 +82,10 @@
                             Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                      <controls:StarRatingControl Rating="{Binding DrumString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontFamily="{Binding GlyphFontFamily, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FilledBrush="{DynamicResource BrushYellow}"
-                                                 EmptyBrush="{DynamicResource BrushYellow}"
                                                  Grid.Row="0"
                                                  Grid.Column="1"
-                                                 FontWeight="Black"
+                                                 FontWeight="Bold"
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
                      <!-- Guitar Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/guitar_small.png"
@@ -115,12 +97,9 @@
                      <controls:StarRatingControl Rating="{Binding GuitarString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FilledBrush="{DynamicResource BrushYellow}"
-                                                 EmptyBrush="{DynamicResource BrushYellow}"
                                                  Grid.Row="0"
                                                  Grid.Column="3"
-                                                 FontFamily="{Binding GlyphFontFamily, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontWeight="Black"
+                                                 FontWeight="Bold"
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
                      <!-- Keyboard Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/keys_small.png"
@@ -132,12 +111,9 @@
                      <controls:StarRatingControl Rating="{Binding KeysString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FilledBrush="{DynamicResource BrushYellow}"
-                                                 EmptyBrush="{DynamicResource BrushYellow}"
                                                  Grid.Row="0"
                                                  Grid.Column="5"
-                                                 FontFamily="{Binding GlyphFontFamily, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontWeight="Black" />
+                                                 FontWeight="Bold" />
                      <!-- Bass Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/bass_small.png"
                             Grid.Row="1"
@@ -147,12 +123,9 @@
                      <controls:StarRatingControl Rating="{Binding BassString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FilledBrush="{DynamicResource BrushYellow}"
-                                                 EmptyBrush="{DynamicResource BrushYellow}"
                                                  Grid.Row="1"
                                                  Grid.Column="1"
-                                                 FontFamily="{Binding GlyphFontFamily, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontWeight="Black"
+                                                 FontWeight="Bold"
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
                      <!-- Vocals Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/vocals_small.png"
@@ -163,12 +136,9 @@
                      <controls:StarRatingControl Rating="{Binding VocalString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FilledBrush="{DynamicResource BrushYellow}"
-                                                 EmptyBrush="{DynamicResource BrushYellow}"
                                                  Grid.Row="1"
                                                  Grid.Column="3"
-                                                 FontFamily="{Binding GlyphFontFamily, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontWeight="Black"
+                                                 FontWeight="Bold"
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
               </Grid>
        </StackPanel>
