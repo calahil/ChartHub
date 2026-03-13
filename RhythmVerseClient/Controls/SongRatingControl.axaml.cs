@@ -29,9 +29,17 @@ public partial class SongRatingControl : UserControl
      public static readonly StyledProperty<FontFamily> GlyphFontFamilyProperty =
         AvaloniaProperty.Register<SongRatingControl, FontFamily>(
             nameof(GlyphFontFamily),
-            defaultValue: new FontFamily("avares://RhythmVerseClient/Resources/Fonts/fa-solid-900.ttf#Font Awesome 6 Free"));
+            defaultValue: new FontFamily("avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-Regular.ttf#CaskaydiaCove NF"));
 
-    // ── CLR wrappers ──────────────────────────────────────────────────────
+     public static readonly StyledProperty<bool> IsDesktopModeProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(
+            nameof(IsDesktopMode),
+            defaultValue: !OperatingSystem.IsAndroid());
+
+    public static readonly StyledProperty<bool> IsCompanionModeProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(
+            nameof(IsCompanionMode),
+            defaultValue: OperatingSystem.IsAndroid());
 
     public ViewSong Song
     {
@@ -55,6 +63,19 @@ public partial class SongRatingControl : UserControl
     {
         get => GetValue(GlyphFontFamilyProperty);
         set => SetValue(GlyphFontFamilyProperty, value);
+    }
+
+
+    public bool IsDesktopMode
+    {
+        get => GetValue(IsDesktopModeProperty);
+        set => SetValue(IsDesktopModeProperty, value);
+    }
+
+    public bool IsCompanionMode
+    {
+        get => GetValue(IsCompanionModeProperty);
+        set => SetValue(IsCompanionModeProperty, value);
     }
 
     // ── Property change handling ──────────────────────────────────────────

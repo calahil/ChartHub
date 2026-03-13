@@ -17,434 +17,465 @@
                 <utilities:SafeImageUrlConverter x:Key="SafeImageUrlConverter"/>
         </UserControl.Resources>
         <Grid RowDefinitions="*" ColumnDefinitions="*">
-        <SplitView Grid.Row="0" Grid.Column="0" IsVisible="{Binding IsDesktopMode}"
-                   IsPaneOpen="{Binding isPaneOpen}"
-                   OpenPaneLength="400"
-                   PanePlacement="Right"
-                   DisplayMode="CompactOverlay">
-                <SplitView.Pane>
-                        <Grid Grid.ColumnDefinitions="48,*">
-                                <Grid Grid.Column="0"
-                                      Grid.RowDefinitions="Auto,Auto"
-                                      Background="{StaticResource ThemeBackgroundBrush}">
-                                        <Button Grid.Column="0"
-                                                Grid.Row="0"
-                                                Content="{Binding PageStrings.ShowDownloads}"
-                                                FontSize="24"
-                                                FontFamily="{StaticResource FontAwesomeSolid}"
-                                                FontWeight="Black"
-                                                Command="{Binding ShowDownloadsPaneCommand}"
-                                                HorizontalAlignment="Right" />
-                                        <Button Grid.Column="0"
-                                                Grid.Row="1"
-                                                HorizontalAlignment="Right"
-                                                Content="{Binding PageStrings.ShowFilters}"
-                                                FontSize="24"
-                                                FontFamily="{StaticResource FontAwesomeSolid}"
-                                                FontWeight="Black"
-                                                Command="{Binding ShowFilterPaneCommand}" />
-                                </Grid>
-                                <!-- Filter Pane (Collapsible) -->
-                                <Border IsVisible="{Binding IsFiltersPaneVisible}"
-                                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                                        Grid.Column="1"
-                                        BorderThickness="1"
-                                        Padding="10">
-                                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                                <StackPanel Spacing="15"
-                                                            Background="{StaticResource ListBoxBackground}">
-                                                        <TextBlock Text="{Binding PageStrings.FilterTitle}"
-                                                                   FontSize="16"
-                                                                   FontWeight="Bold"
-                                                                   Foreground="{StaticResource ThemeForegroundBrush}" />
-                                                        <StackPanel Spacing="5">
-                                                                <TextBlock Text="{Binding PageStrings.SortBy}"
+                <SplitView Grid.Row="0" Grid.Column="0" IsVisible="{Binding IsDesktopMode}"
+                           IsPaneOpen="{Binding isPaneOpen}"
+                           OpenPaneLength="400"
+                           PanePlacement="Right"
+                           DisplayMode="CompactOverlay">
+                        <SplitView.Pane>
+                                <Grid Grid.ColumnDefinitions="48,*">
+                                        <Grid Grid.Column="0"
+                                              Grid.RowDefinitions="Auto,Auto"
+                                              Background="{StaticResource ThemeBackgroundBrush}">
+                                                <Button Grid.Column="0"
+                                                        Grid.Row="0"
+                                                        Content="{Binding PageStrings.ShowDownloads}"
+                                                        FontSize="20"
+                                                        FontFamily="{StaticResource GlyphIconFontFamily}"
+                                                        FontWeight="Black"
+                                                        Margin="10,0,0,0"
+                                                        Command="{Binding ShowDownloadsPaneCommand}"
+                                                        HorizontalAlignment="Right" />
+                                                <Button Grid.Column="0"
+                                                        Grid.Row="1"
+                                                        HorizontalAlignment="Right"
+                                                        Content="{Binding PageStrings.ShowFilters}"
+                                                        FontSize="20"
+                                                        FontFamily="{StaticResource GlyphIconFontFamily}"
+                                                        FontWeight="Black"
+                                                        Margin="10,0,0,0"
+                                                        Command="{Binding ShowFilterPaneCommand}" />
+                                        </Grid>
+                                        <!-- Filter Pane (Collapsible) -->
+                                        <Border IsVisible="{Binding IsFiltersPaneVisible}"
+                                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                Grid.Column="1"
+                                                BorderThickness="1"
+                                                Padding="10">
+                                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                                        <StackPanel Spacing="15"
+                                                                    Background="{StaticResource ListBoxBackground}">
+                                                                <TextBlock Text="{Binding PageStrings.FilterTitle}"
+                                                                           FontSize="16"
                                                                            FontWeight="Bold"
-                                                                           FontSize="24"
                                                                            Foreground="{StaticResource ThemeForegroundBrush}" />
-                                                                <ComboBox ItemsSource="{Binding Filters}"
-                                                                          SelectedItem="{Binding SelectedFilter}" />
-                                                        </StackPanel>
+                                                                <StackPanel Spacing="5">
+                                                                        <TextBlock Text="{Binding PageStrings.SortBy}"
+                                                                                   FontWeight="Bold"
+                                                                                   FontSize="24"
+                                                                                   Foreground="{StaticResource ThemeForegroundBrush}" />
+                                                                        <ComboBox ItemsSource="{Binding Filters}"
+                                                                                  SelectedItem="{Binding SelectedFilter}" />
+                                                                </StackPanel>
 
-                                                        <StackPanel Spacing="5">
-                                                                <TextBlock Text="{Binding PageStrings.Order}"
-                                                                           FontWeight="Bold"
-                                                                           FontSize="24"
-                                                                           Foreground="{StaticResource ThemeForegroundBrush}" />
-                                                                <ComboBox ItemsSource="{Binding Orders}"
-                                                                          SelectedItem="{Binding SelectedOrder}" />
-                                                        </StackPanel>
+                                                                <StackPanel Spacing="5">
+                                                                        <TextBlock Text="{Binding PageStrings.Order}"
+                                                                                   FontWeight="Bold"
+                                                                                   FontSize="24"
+                                                                                   Foreground="{StaticResource ThemeForegroundBrush}" />
+                                                                        <ComboBox ItemsSource="{Binding Orders}"
+                                                                                  SelectedItem="{Binding SelectedOrder}" />
+                                                                </StackPanel>
 
-                                                        <StackPanel Spacing="5">
-                                                                <TextBlock Text="{Binding PageStrings.Instrument}"
-                                                                           FontWeight="Bold"
-                                                                           FontSize="24"
-                                                                           Foreground="{StaticResource ThemeForegroundBrush}" />
-                                                                <ListBox ItemsSource="{Binding Instruments}"
-                                                                         SelectedItems="{Binding SelectedInstruments}"
-                                                                         SelectionMode="Multiple" >
-                                                                        <ListBox.ItemTemplate>
+                                                                <StackPanel Spacing="5">
+                                                                        <TextBlock Text="{Binding PageStrings.Instrument}"
+                                                                                   FontWeight="Bold"
+                                                                                   FontSize="24"
+                                                                                   Foreground="{StaticResource ThemeForegroundBrush}" />
+                                                                        <ListBox ItemsSource="{Binding Instruments}"
+                                                                                 SelectedItems="{Binding SelectedInstruments}"
+                                                                                 SelectionMode="Multiple" >
+                                                                                <ListBox.ItemTemplate>
+                                                                                        <DataTemplate>
+                                                                                                <TextBlock Text="{Binding DisplayName}"
+                                                                                                           Foreground="{StaticResource ThemeForegroundBrush}" />
+                                                                                        </DataTemplate>
+                                                                                </ListBox.ItemTemplate>
+                                                                        </ListBox>
+                                                                </StackPanel>
+
+                                                                <Button Content="{Binding PageStrings.ApplyFilter}"
+                                                                        FontSize="24"
+                                                                        Command="{Binding RefreshButtonCommand}" />
+                                                        </StackPanel>
+                                                </ScrollViewer>
+                                        </Border>
+                                        <Border IsVisible="{Binding IsDownloadsPaneVisible}"
+                                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                Grid.Column="1"
+                                                BorderThickness="1"
+                                                Padding="10">
+                                                <DataGrid ItemsSource="{Binding Downloads}"
+                                                          AutoGenerateColumns="False"
+                                                          IsReadOnly="True">
+                                                        <DataGrid.Columns>
+                                                                <DataGridTextColumn Header="File"
+                                                                                    Binding="{Binding DisplayName}"
+                                                                                    Width="2*" />
+                                                                <DataGridTemplateColumn Header="Progress"
+                                                                                        Width="2*">
+                                                                        <DataGridTemplateColumn.CellTemplate>
                                                                                 <DataTemplate>
-                                                                                        <TextBlock Text="{Binding DisplayName}"
-                                                                                                   Foreground="{StaticResource ThemeForegroundBrush}" />
+                                                                                        <ProgressBar Value="{Binding DownloadProgress}"
+                                                                                                     Height="18"
+                                                                                                     Maximum="100" />
                                                                                 </DataTemplate>
-                                                                        </ListBox.ItemTemplate>
-                                                                </ListBox>
-                                                        </StackPanel>
-
-                                                        <Button Content="{Binding PageStrings.ApplyFilter}"
-                                                                FontSize="24"
-                                                                Command="{Binding RefreshButtonCommand}" />
-                                                </StackPanel>
-                                        </ScrollViewer>
-                                </Border>
-                                <Border IsVisible="{Binding IsDownloadsPaneVisible}"
-                                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                                        Grid.Column="1"
-                                        BorderThickness="1"
-                                        Padding="10">
-                                        <DataGrid ItemsSource="{Binding Downloads}"
-                                                  AutoGenerateColumns="False"
-                                                  IsReadOnly="True">
-                                                <DataGrid.Columns>
-                                                        <DataGridTextColumn Header="File"
-                                                                            Binding="{Binding DisplayName}"
-                                                                            Width="2*" />
-                                                        <DataGridTemplateColumn Header="Progress"
-                                                                                Width="2*">
-                                                                <DataGridTemplateColumn.CellTemplate>
-                                                                        <DataTemplate>
-                                                                                <ProgressBar Value="{Binding DownloadProgress}"
-                                                                                             Height="18"
-                                                                                             Maximum="100" />
-                                                                        </DataTemplate>
-                                                                </DataGridTemplateColumn.CellTemplate>
-                                                        </DataGridTemplateColumn>
-                                                        <DataGridCheckBoxColumn Header="Done"
-                                                                                Binding="{Binding Finished}"
-                                                                                Width="1.2*" />
-                                                </DataGrid.Columns>
-                                        </DataGrid>
-                                </Border>
-                        </Grid>
-                </SplitView.Pane>
-                <Grid RowDefinitions="Auto,*"
-                      ColumnDefinitions="*"
-                      HorizontalAlignment="Stretch"
-                      VerticalAlignment="Stretch">
-                        <!-- Search and Filter Bar -->
-                        <Grid Grid.Row="0"
-                              Margin="0,10,10,0"
-                              ColumnDefinitions="300,50,Auto,Auto,Auto,Auto,Auto,50,Auto,*,100" >
-                                <TextBox Grid.Column="0"
-                                         Height="20"
-                                         Watermark="{Binding PageStrings.SearchText}"
-                                         VerticalAlignment="Top"
-                                         Text="{Binding SearchText}" />
-                                <ButtonSpinner Grid.Column="2"
-                                               Height="20"
-                                               Width="130"
-                                               Spin="Button_Spin"
-                                               VerticalAlignment="Top"
-                                               ButtonSpinnerLocation="Left" >
-                                        <TextBox Text="{Binding CurrentPage}"
-                                                   VerticalAlignment="Top"
-                                                   HorizontalAlignment="Center" />
-                                </ButtonSpinner>
-                                <TextBlock Grid.Column="3"
-                                           Text="{Binding PageStrings.PageSeparator}"
-                                           VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="4"
-                                           Text="{Binding TotalPages}"
-                                           VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="5"
-                                           Text="{Binding PageStrings.Total}"
-                                           VerticalAlignment="Center" />
-                                <TextBlock Grid.Column="6"
-                                           Text="{Binding TotalResults}"
-                                           VerticalAlignment="Center" />
-                                <Button Grid.Column="8"
-                                        Content="{Binding PageStrings.Refresh}"
-                                        Command="{Binding RefreshButtonCommand}"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Top" />
-                        </Grid>
-
-                        <!-- Main Content Area -->
-                        <Grid IsVisible="{Binding IsPlaceholder}"
-                                        Grid.Row="1" >
-                                <Grid RowDefinitions="Auto,Auto"
+                                                                        </DataGridTemplateColumn.CellTemplate>
+                                                                </DataGridTemplateColumn>
+                                                                <DataGridCheckBoxColumn Header="Done"
+                                                                                        Binding="{Binding Finished}"
+                                                                                        Width="1.2*" />
+                                                        </DataGrid.Columns>
+                                                </DataGrid>
+                                        </Border>
+                                </Grid>
+                        </SplitView.Pane>
+                        <Grid RowDefinitions="Auto,*"
+                              ColumnDefinitions="*"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch">
+                                <!-- Search and Filter Bar -->
+                                <Grid Grid.Row="0"
+                                      Margin="0,10,10,0"
+                                      ColumnDefinitions="300,50,Auto,Auto,Auto,Auto,Auto,50,Auto,*,100" >
+                                        <TextBox Grid.Column="0"
+                                                 Height="20"
+                                                 Watermark="{Binding PageStrings.SearchText}"
+                                                 VerticalAlignment="Top"
+                                                 Text="{Binding SearchText}" />
+                                        <ButtonSpinner Grid.Column="2"
+                                                       Height="20"
+                                                       Width="130"
+                                                       Spin="Button_Spin"
+                                                       VerticalAlignment="Top"
+                                                       ButtonSpinnerLocation="Left" >
+                                                <TextBox Text="{Binding CurrentPage}"
+                                                         VerticalAlignment="Top"
+                                                         HorizontalAlignment="Center" />
+                                        </ButtonSpinner>
+                                        <TextBlock Grid.Column="3"
+                                                   Text="{Binding PageStrings.PageSeparator}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="4"
+                                                   Text="{Binding TotalPages}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="5"
+                                                   Text="{Binding PageStrings.Total}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="6"
+                                                   Text="{Binding TotalResults}"
+                                                   VerticalAlignment="Center" />
+                                        <Button Grid.Column="8"
+                                                FontSize="18"
+                                                Height="36"
+                                                Content="{Binding PageStrings.Refresh}"
+                                                VerticalContentAlignment="Bottom"
+                                                HorizontalContentAlignment="Center"
+                                                Command="{Binding RefreshButtonCommand}"
                                                 HorizontalAlignment="Center"
-                                                VerticalAlignment="Center">
-                                        <!-- ActivityIndicator (using TextBlock with animated progress) -->
-                                        <ProgressBar Grid.Row="0"
-                                                        IsIndeterminate="True"
-                                                        Width="200"
-                                                        Height="30" />
-                                        <TextBlock Grid.Row="1"
-                                                        Text="{Binding PageStrings.LoadingResults}"
-                                                        HorizontalAlignment="Center"
-                                                        VerticalAlignment="Center"
-                                                        Margin="0,20,0,0" />
+                                                VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <!-- Main Content Area -->
+                                <Grid IsVisible="{Binding IsPlaceholder}"
+                                      Grid.Row="1" >
+                                        <Grid RowDefinitions="Auto,Auto"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center">
+                                                <!-- ActivityIndicator (using TextBlock with animated progress) -->
+                                                <ProgressBar Grid.Row="0"
+                                                             IsIndeterminate="True"
+                                                             Width="200"
+                                                             Height="30" />
+                                                <TextBlock Grid.Row="1"
+                                                           Text="{Binding PageStrings.LoadingResults}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Margin="0,20,0,0" />
+                                        </Grid>
+                                </Grid>
+                                <Grid Grid.Row="1"
+                                      RowDefinitions="*,*,*,*"
+                                      IsVisible="{Binding NoResults}">
+                                        <TextBlock  Grid.Row="1"
+                                                    Grid.ColumnSpan="2"
+                                                    Text="{Binding PageStrings.NoResults}"
+                                                    VerticalAlignment="Bottom"
+                                                    HorizontalAlignment="Center"/>
+                                </Grid>
+                                <Grid Grid.Row="1"
+                                      ColumnDefinitions="*,Auto"
+                                      RowDefinitions="*"
+                                      Margin="0,10,0,10"
+                                      IsVisible="{Binding HasResults}" >
+                                        <!-- Song List -->
+                                        <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                Grid.Column="0"
+                                                BorderThickness="1"
+                                                Padding="10">
+                                                <ListBox ItemsSource="{Binding DataItems}"
+                                                         SelectionMode="Single"
+                                                         SelectedItem="{Binding SelectedFile}"
+                                                         Background="{StaticResource ListBoxBackground}"
+                                                         VerticalAlignment="Stretch"
+                                                         x:Name="SongsListBox"
+                                                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                                        <ListBox.ItemTemplate>
+                                                                <DataTemplate>
+                                                                        <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                                                BorderThickness="1"
+                                                                                CornerRadius="5">
+                                                                                <Grid RowDefinitions="8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8"
+                                                                                      ColumnDefinitions="128, 2.5*, 2.2*, 2*, 2*">
+                                                                                        <!-- Album Art -->
+                                                                                        <Image asyncImage:ImageLoader.Source="{Binding AlbumArt, Converter={StaticResource SafeImageUrlConverter}, ConverterParameter=album}"
+                                                                                               Grid.Row="0"
+                                                                                               Grid.Column="0"
+                                                                                               Grid.RowSpan="16"
+                                                                                               VerticalAlignment="Stretch"
+                                                                                               HorizontalAlignment="Stretch"
+                                                                                               Margin="10,10,10,10" />
+
+                                                                                        <!-- Song Info -->
+                                                                                        <Grid Grid.Row="2"
+                                                                                              Grid.Column="1"
+                                                                                              Grid.RowSpan="12">
+                                                                                                <controls:SongInfoControl Song="{Binding}"
+                                                                                                                          SongStrings="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings}"
+                                                                                                                          IsDesktopMode="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsDesktopMode}"
+                                                                                                                          IsCompanionMode="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsCompanionMode}"/>
+                                                                                        </Grid>
+                                                                                        <!-- Instrument Info -->
+                                                                                        <Grid Grid.Row="0"
+                                                                                              Grid.Column="2"
+                                                                                              Grid.RowSpan="16"
+                                                                                              Margin="10,10,10,10">
+                                                                                                <controls:SongRatingControl Song="{Binding}"
+                                                                                                                            HorizontalAlignment="Center"
+                                                                                                                            GlyphWidth="22"
+                                                                                                                            GlyphFontSize="16"
+                                                                                                                            GlyphFontFamily="{StaticResource GlyphIconFontFamily}"
+                                                                                                                            IsCompanionMode="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsCompanionMode}"
+                                                                                                                            IsDesktopMode="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsDesktopMode}" />
+
+                                                                                        </Grid>
+                                                                                        <!-- Creator Info -->
+                                                                                        <Grid Grid.Row="0"
+                                                                                              Grid.Column="3"
+                                                                                              Grid.RowSpan="16"
+                                                                                              Margin="10,10,10,10"
+                                                                                              ColumnDefinitions="*,3*"
+                                                                                              RowDefinitions="32,Auto,*">
+                                                                                                <Image asyncImage:ImageLoader.Source="{Binding Author.AvatarPath, Converter={StaticResource SafeImageUrlConverter}, ConverterParameter=avatar}"
+                                                                                                       Grid.Row="0"
+                                                                                                       Grid.Column="0"
+                                                                                                       VerticalAlignment="Top"
+                                                                                                       HorizontalAlignment="Left" />
+                                                                                                <Button Grid.Row="0"
+                                                                                                        Grid.Column="1"
+                                                                                                        HorizontalAlignment="Stretch"
+                                                                                                        VerticalAlignment="Stretch"
+                                                                                                        Command="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).ViewCreatorCommand}"
+                                                                                                        CommandParameter="{Binding}">
+                                                                                                        <Button.Content>
+                                                                                                                <TextBlock Text="{Binding Author.Name}"
+                                                                                                                           Foreground="{StaticResource ThemeAccentBrush}"
+                                                                                                                           VerticalAlignment="Center"
+                                                                                                                           HorizontalAlignment="Center" />
+                                                                                                        </Button.Content>
+                                                                                                </Button>
+                                                                                                <Grid Grid.Row="1"
+                                                                                                      Grid.Column="1"
+                                                                                                      Grid.RowDefinitions="*"
+                                                                                                      Grid.ColumnDefinitions="Auto, Auto, *, Auto, Auto">
+                                                                                                        <TextBlock Grid.Row="0"
+                                                                                                                   Grid.Column="0"
+                                                                                                                   Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Releases}"
+                                                                                                                   HorizontalAlignment="Right"
+                                                                                                                   Foreground="{StaticResource BrushYellow}" />
+                                                                                                        <TextBlock Grid.Row="0"
+                                                                                                                   Grid.Column="1"
+                                                                                                                   HorizontalAlignment="Left"
+                                                                                                                   Text="{Binding Author.Releases}"
+                                                                                                                   Foreground="{StaticResource ThemeForegroundBrush}" />
+                                                                                                        <TextBlock Grid.Row="0"
+                                                                                                                   Grid.Column="3"
+                                                                                                                   Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Roles}"
+                                                                                                                   HorizontalAlignment="Right"
+                                                                                                                   Foreground="{StaticResource BrushYellow}" />
+                                                                                                        <TextBlock Grid.Row="0"
+                                                                                                                   Grid.Column="4"
+                                                                                                                   HorizontalAlignment="Left"
+                                                                                                                   Text="{Binding Author.Role}"
+                                                                                                                   Foreground="{StaticResource ThemeForegroundBrush}" />
+                                                                                                </Grid>
+                                                                                        </Grid>
+                                                                                        <!-- Download Info -->
+                                                                                        <Grid Grid.Row="0"
+                                                                                              Grid.Column="4"
+                                                                                              Grid.RowSpan="16"
+                                                                                              Margin="10,10,10,10"
+                                                                                              ColumnDefinitions="*,3*"
+                                                                                              RowDefinitions="32,Auto,*">
+                                                                                                <Image asyncImage:ImageLoader.Source="{Binding Gameformat, StringFormat='avares://RhythmVerseClient/Resources/Images/{0}'}"
+                                                                                                       VerticalAlignment="Top"
+                                                                                                       HorizontalAlignment="Left"
+                                                                                                       Margin="0,0,2,0"
+                                                                                                       Grid.Row="0"
+                                                                                                       Grid.Column="0"/>
+                                                                                                <Button Grid.Row="0"
+                                                                                                        Grid.Column="1"
+                                                                                                        HorizontalAlignment="Stretch"
+                                                                                                        VerticalAlignment="Stretch"
+                                                                                                        Command="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
+                                                                                                        CommandParameter="{Binding}">
+                                                                                                        <Button.Content>
+                                                                                                                <TextBlock Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.ShowDownloads}"
+                                                                                                                           Foreground="{StaticResource ThemeAccentBrush}"
+                                                                                                                           VerticalAlignment="Center"
+                                                                                                                           HorizontalAlignment="Center" />
+                                                                                                        </Button.Content>
+                                                                                                </Button>
+                                                                                                <Grid Grid.Row="1"
+                                                                                                      Grid.Column="1"
+                                                                                                      Grid.RowDefinitions="*"
+                                                                                                      Grid.ColumnDefinitions="Auto, Auto, *, Auto, Auto">
+                                                                                                        <TextBlock Grid.Row="0"
+                                                                                                                   Grid.Column="0"
+                                                                                                                   Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Downloads}"
+                                                                                                                   Foreground="{StaticResource BrushYellow}" />
+                                                                                                        <TextBlock Grid.Row="0"
+                                                                                                                   Grid.Column="1"
+                                                                                                                   Text="{Binding Downloads}"
+                                                                                                                   HorizontalAlignment="Right"
+                                                                                                                   Foreground="{StaticResource ThemeForegroundBrush}" />
+                                                                                                        <TextBlock Grid.Row="0"
+                                                                                                                   Grid.Column="3"
+                                                                                                                   Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Comments}"
+                                                                                                                   Foreground="{StaticResource BrushYellow}" />
+                                                                                                        <TextBlock Grid.Row="0"
+                                                                                                                   Grid.Column="4"
+                                                                                                                   Text="{Binding Comments}"
+                                                                                                                   HorizontalAlignment="Right"
+                                                                                                                   Foreground="{StaticResource ThemeForegroundBrush}"       />
+                                                                                                </Grid>
+                                                                                        </Grid>
+
+                                                                                </Grid>
+                                                                        </Border>
+                                                                </DataTemplate>
+                                                        </ListBox.ItemTemplate>
+                                                </ListBox>
+                                        </Border>
+
                                 </Grid>
                         </Grid>
-                        <Grid Grid.Row="1"
-                              RowDefinitions="*,*,*,*"
-                              IsVisible="{Binding NoResults}">
-                                <TextBlock  Grid.Row="1"
-                                                Grid.ColumnSpan="2"
-                                                Text="{Binding PageStrings.NoResults}"
-                                                VerticalAlignment="Bottom"
-                                                HorizontalAlignment="Center"/>
+                </SplitView>
+
+                <Grid Grid.Row="0" Grid.Column="0" IsVisible="{Binding IsCompanionMode}"
+                      RowDefinitions="Auto,*"
+                      Margin="10">
+                        <Grid Grid.Row="0"
+                              ColumnDefinitions="*,Auto">
+                                <TextBox Grid.Column="0"
+                                         Watermark="{Binding PageStrings.SearchText}"
+                                         Text="{Binding SearchText}"
+                                         Margin="0,0,8,0" />
+                                <Button Grid.Column="1"
+                                        Content="{Binding PageStrings.Refresh}"
+                                        Command="{Binding RefreshButtonCommand}" />
                         </Grid>
+
                         <Grid Grid.Row="1"
-                              ColumnDefinitions="*,Auto"
-                              RowDefinitions="*"
-                              Margin="0,10,0,10"
-                              IsVisible="{Binding HasResults}" >
-                                <!-- Song List -->
-                                <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                                        Grid.Column="0"
+                              Margin="0,10,0,0">
+                                <Grid IsVisible="{Binding IsPlaceholder}">
+                                        <Grid RowDefinitions="Auto,Auto"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center">
+                                                <ProgressBar Grid.Row="0"
+                                                             IsIndeterminate="True"
+                                                             Width="200"
+                                                             Height="30" />
+                                                <TextBlock Grid.Row="1"
+                                                           Text="{Binding PageStrings.LoadingResults}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Margin="0,20,0,0" />
+                                        </Grid>
+                                </Grid>
+
+                                <Grid IsVisible="{Binding NoResults}">
+                                        <TextBlock Text="{Binding PageStrings.NoResults}"
+                                                   VerticalAlignment="Center"
+                                                   HorizontalAlignment="Center"/>
+                                </Grid>
+
+                                <Border IsVisible="{Binding HasResults}"
+                                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
                                         BorderThickness="1"
-                                        Padding="10">
+                                        Padding="8">
                                         <ListBox ItemsSource="{Binding DataItems}"
                                                  SelectionMode="Single"
                                                  SelectedItem="{Binding SelectedFile}"
                                                  Background="{StaticResource ListBoxBackground}"
-                                                 VerticalAlignment="Stretch"
-                                                 x:Name="SongsListBox"
+                                                 x:Name="MobileSongsListBox"
                                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
                                                 <ListBox.ItemTemplate>
                                                         <DataTemplate>
                                                                 <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
                                                                         BorderThickness="1"
-                                                                        CornerRadius="5">
-                                                                        <Grid RowDefinitions="8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8"
-                                                                              ColumnDefinitions="128, 2.5*, 2.2*, 2*, 2*">
-                                                                                <!-- Album Art -->
+                                                                        CornerRadius="5"
+                                                                        Padding="8"
+                                                                        Margin="0,0,0,6">
+                                                                        <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+                                                                              ColumnDefinitions="48,*,Auto">
                                                                                 <Image asyncImage:ImageLoader.Source="{Binding AlbumArt, Converter={StaticResource SafeImageUrlConverter}, ConverterParameter=album}"
                                                                                        Grid.Row="0"
                                                                                        Grid.Column="0"
-                                                                                       Grid.RowSpan="16"
                                                                                        VerticalAlignment="Stretch"
-                                                                                       HorizontalAlignment="Stretch"
-                                                                                       Margin="10,10,10,10" />
+                                                                                       HorizontalAlignment="Stretch" />
 
                                                                                 <!-- Song Info -->
-                                                                                <Grid Grid.Row="2"
-                                                                                      Grid.Column="1"
-                                                                                      Grid.RowSpan="12">
+                                                                                <Grid Grid.Row="0"
+                                                                                      Grid.Column="1">
                                                                                         <controls:SongInfoControl Song="{Binding}"
-                                                                                                                  SongStrings="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings}"/>
+                                                                                                                  SongStrings="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings}"
+                                                                                                                  IsDesktopMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsDesktopMode}"
+                                                                                                                  IsCompanionMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsCompanionMode}"/>
                                                                                 </Grid>
                                                                                 <!-- Instrument Info -->
-                                                                                <Grid Grid.Row="0"
-                                                                                      Grid.Column="2"
-                                                                                      Grid.RowSpan="16"
-                                                                                      Margin="10,10,10,10">
+                                                                                <Grid Grid.Row="1"
+                                                                                      Grid.Column="0"
+                                                                                      Grid.ColumnSpan="3">
                                                                                         <controls:SongRatingControl Song="{Binding}"
-                                                                                                                    HorizontalAlignment="Center"
-                                                                                                                    GlyphWidth="22"
-                                                                                                                    GlyphFontSize="16"
-                                                                                                                    GlyphFontFamily="{StaticResource FontAwesomeSolid}" />
+                                                                                                                    HorizontalAlignment="Stretch"
+                                                                                                                    GlyphWidth="16"
+                                                                                                                    GlyphFontSize="14"
+                                                                                                                    GlyphFontFamily="{StaticResource GlyphIconFontFamily}"
+                                                                                                                    IsCompanionMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsCompanionMode}"
+                                                                                                                    IsDesktopMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsDesktopMode}" />
                                                                                 </Grid>
-                                                                                <!-- Creator Info -->
-                                                                                <Grid Grid.Row="0"
-                                                                                      Grid.Column="3"
-                                                                                      Grid.RowSpan="16"
-                                                                                      Margin="10,10,10,10"
-                                                                                      ColumnDefinitions="*,3*"
-                                                                                      RowDefinitions="48,Auto,*">
-                                                                                        <Image asyncImage:ImageLoader.Source="{Binding Author.AvatarPath, Converter={StaticResource SafeImageUrlConverter}, ConverterParameter=avatar}"
-                                                                                               Grid.Row="0"
-                                                                                               Grid.Column="0"
-                                                                                               VerticalAlignment="Top"
-                                                                                               HorizontalAlignment="Left" />
-                                                                                        <Button Grid.Row="0"
-                                                                                                Grid.Column="1"
-                                                                                                HorizontalAlignment="Stretch"
-                                                                                                VerticalAlignment="Stretch"
-                                                                                                Command="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).ViewCreatorCommand}"
-                                                                                                CommandParameter="{Binding}">
-                                                                                                <Button.Content>
-                                                                                                        <TextBlock Text="{Binding Author.Name}"
-                                                                                                                   Foreground="{StaticResource ThemeAccentBrush}"
-                                                                                                                   VerticalAlignment="Center"
-                                                                                                                   HorizontalAlignment="Center" />
-                                                                                                </Button.Content>
-                                                                                        </Button>
-                                                                                        <Grid Grid.Row="1"
-                                                                                              Grid.Column="1"
-                                                                                              Grid.RowDefinitions="*,*"
-                                                                                              Grid.ColumnDefinitions="*,*">
-                                                                                                <TextBlock Grid.Row="0"
-                                                                                                           Grid.Column="0"
-                                                                                                           Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Releases}"
-                                                                                                           Foreground="{StaticResource BrushYellow}" />
-                                                                                                <TextBlock Grid.Row="0"
-                                                                                                           Grid.Column="1"
-                                                                                                           HorizontalAlignment="Right"
-                                                                                                           Text="{Binding Author.Releases}"
-                                                                                                           Foreground="{StaticResource ThemeForegroundBrush}" />
-                                                                                                <TextBlock Grid.Row="1"
-                                                                                                           Grid.Column="0"
-                                                                                                           Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Roles}"
-                                                                                                           Foreground="{StaticResource BrushYellow}" />
-                                                                                                <TextBlock Grid.Row="1"
-                                                                                                           Grid.Column="1"
-                                                                                                           HorizontalAlignment="Right"
-                                                                                                           Text="{Binding Author.Role}"
-                                                                                                           Foreground="{StaticResource ThemeForegroundBrush}" />
-                                                                                        </Grid>
-                                                                                </Grid>
-                                                                                <!-- Download Info -->
-                                                                                <Grid Grid.Row="0"
-                                                                                      Grid.Column="4"
-                                                                                      Grid.RowSpan="16"
-                                                                                      Margin="10,10,10,10"
-                                                                                      ColumnDefinitions="*,3*"
-                                                                                      RowDefinitions="48,Auto,*">
-                                                                                        <Image asyncImage:ImageLoader.Source="{Binding Gameformat, StringFormat='avares://RhythmVerseClient/Resources/Images/{0}'}"
-                                                                                               VerticalAlignment="Top"
-                                                                                               HorizontalAlignment="Left"
-                                                                                               Grid.Row="0"
-                                                                                               Grid.Column="0"/>
-                                                                                        <Button Grid.Row="0"
-                                                                                                Grid.Column="1"
-                                                                                                HorizontalAlignment="Stretch"
-                                                                                                VerticalAlignment="Stretch"
-                                                                                                Command="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
-                                                                                                CommandParameter="{Binding}">
-                                                                                                <Button.Content>
-                                                                                                        <TextBlock Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.ShowDownloads}"
-                                                                                                                   Foreground="{StaticResource ThemeAccentBrush}"
-                                                                                                                   VerticalAlignment="Center"
-                                                                                                                   HorizontalAlignment="Center" />
-                                                                                                </Button.Content>
-                                                                                        </Button>
-                                                                                        <Grid Grid.Row="1"
-                                                                                              Grid.Column="1"
-                                                                                              Grid.RowDefinitions="*,*"
-                                                                                              Grid.ColumnDefinitions="*,*">
-                                                                                                <TextBlock Grid.Row="0"
-                                                                                                           Grid.Column="0"
-                                                                                                           Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Downloads}"
-                                                                                                           Foreground="{StaticResource BrushYellow}" />
-                                                                                                <TextBlock Grid.Row="0"
-                                                                                                           Grid.Column="1"
-                                                                                                           Text="{Binding Downloads}"
-                                                                                                           HorizontalAlignment="Right"
-                                                                                                           Foreground="{StaticResource ThemeForegroundBrush}" />
-                                                                                                <TextBlock Grid.Row="1"
-                                                                                                           Grid.Column="0"
-                                                                                                           Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Comments}"
-                                                                                                           Foreground="{StaticResource BrushYellow}" />
-                                                                                                <TextBlock Grid.Row="1"
-                                                                                                           Grid.Column="1"
-                                                                                                           Text="{Binding Comments}"
-                                                                                                           HorizontalAlignment="Right"
-                                                                                                           Foreground="{StaticResource ThemeForegroundBrush}"       />
-                                                                                        </Grid>
-                                                                                </Grid>
-
+                                                                                <Button Grid.Row="0"
+                                                                                        Grid.Column="2"
+                                                                                        VerticalAlignment="Top"
+                                                                                        HorizontalAlignment="Center"
+                                                                                        Width="32"
+                                                                                        Command="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
+                                                                                        CommandParameter="{Binding}">
+                                                                                        <Button.Content>
+                                                                                                <TextBlock Text="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.ShowDownloads}"
+                                                                                                           HorizontalAlignment="Center"
+                                                                                                           VerticalAlignment="Center"
+                                                                                                           Foreground="{StaticResource ThemeAccentBrush}" />
+                                                                                        </Button.Content>
+                                                                                </Button>
                                                                         </Grid>
                                                                 </Border>
                                                         </DataTemplate>
                                                 </ListBox.ItemTemplate>
                                         </ListBox>
                                 </Border>
-
                         </Grid>
                 </Grid>
-        </SplitView>
-
-        <Grid Grid.Row="0" Grid.Column="0" IsVisible="{Binding IsCompanionMode}"
-              RowDefinitions="Auto,*"
-              Margin="10">
-                <Grid Grid.Row="0"
-                                                                                        ColumnDefinitions="*,Auto">
-                        <TextBox Grid.Column="0"
-                                 Watermark="{Binding PageStrings.SearchText}"
-                                                                                                                                 Text="{Binding SearchText}"
-                                                                                                                                 Margin="0,0,8,0" />
-                        <Button Grid.Column="1"
-                                Content="{Binding PageStrings.Refresh}"
-                                Command="{Binding RefreshButtonCommand}" />
-                </Grid>
-
-                <Grid Grid.Row="1"
-                      Margin="0,10,0,0">
-                        <Grid IsVisible="{Binding IsPlaceholder}">
-                                <Grid RowDefinitions="Auto,Auto"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center">
-                                        <ProgressBar Grid.Row="0"
-                                                     IsIndeterminate="True"
-                                                     Width="200"
-                                                     Height="30" />
-                                        <TextBlock Grid.Row="1"
-                                                   Text="{Binding PageStrings.LoadingResults}"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   Margin="0,20,0,0" />
-                                </Grid>
-                        </Grid>
-
-                        <Grid IsVisible="{Binding NoResults}">
-                                <TextBlock Text="{Binding PageStrings.NoResults}"
-                                           VerticalAlignment="Center"
-                                           HorizontalAlignment="Center"/>
-                        </Grid>
-
-                        <Border IsVisible="{Binding HasResults}"
-                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                                BorderThickness="1"
-                                Padding="8">
-                                <ListBox ItemsSource="{Binding DataItems}"
-                                         SelectionMode="Single"
-                                         SelectedItem="{Binding SelectedFile}"
-                                         Background="{StaticResource ListBoxBackground}"
-                                         x:Name="MobileSongsListBox"
-                                         ScrollViewer.VerticalScrollBarVisibility="Auto">
-                                        <ListBox.ItemTemplate>
-                                                <DataTemplate>
-                                                        <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                                                                BorderThickness="1"
-                                                                CornerRadius="5"
-                                                                Padding="8"
-                                                                Margin="0,0,0,6">
-                                                                <Grid RowDefinitions="Auto,Auto,Auto"
-                                                                                                                                                                                                                                                                                        ColumnDefinitions="*,Auto">
-                                                                        <TextBlock Grid.Row="0"
-                                                                                   Grid.Column="0"
-                                                                                   Text="{Binding Title}"
-                                                                                   FontWeight="Bold" />
-                                                                        <TextBlock Grid.Row="1"
-                                                                                   Grid.Column="0"
-                                                                                                                                                                                                                                                                                                                                         Text="{Binding Artist}"
-                                                                                                                                                                                                                                                                                                                                         Margin="0,4,0,0" />
-                                                                        <TextBlock Grid.Row="2"
-                                                                                   Grid.Column="0"
-                                                                                                                                                                                                                                                                                                                                         Text="{Binding FormattedTime}"
-                                                                                                                                                                                                                                                                                                                                         Margin="0,4,0,0" />
-                                                                        <Button Grid.RowSpan="3"
-                                                                                Grid.Column="1"
-                                                                                VerticalAlignment="Center"
-                                                                                                                                                                                                                                                                                                                                Margin="8,0,0,0"
-                                                                                Command="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
-                                                                                CommandParameter="{Binding}">
-                                                                                <Button.Content>
-                                                                                        <TextBlock Text="Download"
-                                                                                                   Foreground="{StaticResource ThemeAccentBrush}" />
-                                                                                </Button.Content>
-                                                                        </Button>
-                                                                </Grid>
-                                                        </Border>
-                                                </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                </ListBox>
-                        </Border>
-                </Grid>
-        </Grid>
         </Grid>
 </UserControl>

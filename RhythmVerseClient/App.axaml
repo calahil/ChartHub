@@ -10,11 +10,20 @@
                 <ResourceInclude Source="avares://RhythmVerseClient/Themes/CatppuccinMacchiato/Theme.axaml"/>
             </ResourceDictionary.MergedDictionaries>
             <local:ViewLocator x:Key="ViewLocator" />
-            <FontFamily x:Key="AppDefaultFontFamily">avares://RhythmVerseClient/Resources/Fonts/OpenSans-Regular.ttf#Open Sans</FontFamily>
-            <FontFamily x:Key="FontAwesomeSolid">avares://RhythmVerseClient/Resources/Fonts/fa-solid-900.ttf#Font Awesome 6 Free</FontFamily>
-            <FontFamily x:Key="FontAwesomeRegular">avares://RhythmVerseClient/Resources/Fonts/fa-regular-400.ttf#Font Awesome 6 Free</FontFamily>
-            <FontFamily x:Key="FontAwesomeBrands">avares://RhythmVerseClient/Resources/Fonts/fa-brands-400.ttf#Font Awesome 6 Brands</FontFamily>
-            <FontFamily x:Key="FontAwesome">{StaticResource FontAwesomeSolid}</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdRegular">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-Regular.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdItalic">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-Italic.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdLight">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-Light.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdLightItalic">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-LightItalic.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdSemiLight">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-SemiLight.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdSemiLightItalic">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-SemiLightItalic.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdExtraLight">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-ExtraLight.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdExtraLightItalic">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-ExtraLightItalic.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdSemiBold">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-SemiBold.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdSemiBoldItalic">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-SemiBoldItalic.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdBold">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-Bold.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdBoldItalic">avares://RhythmVerseClient/Resources/Fonts/CaskaydiaCoveNerdFont-BoldItalic.ttf#CaskaydiaCove NF</FontFamily>
+            <FontFamily x:Key="GlyphIconFontFamily">{StaticResource CaskaydiaNerdRegular}</FontFamily>
+            <FontFamily x:Key="AppDefaultFontFamily">{StaticResource CaskaydiaNerdRegular}</FontFamily>
         </ResourceDictionary>
     </Application.Resources>
 

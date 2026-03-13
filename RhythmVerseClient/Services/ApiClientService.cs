@@ -1,4 +1,5 @@
 ﻿
+using Avalonia.Platform;
 using Microsoft.Extensions.Configuration;
 using RhythmVerseClient.Models;
 using RhythmVerseClient.Utilities;
@@ -195,17 +196,26 @@ namespace RhythmVerseClient.Services
 
                     string responseBody;
 
-                    //Use mock data in development if UseMockData is true in appsettings.json
-                    if (_configuration["UseMockData"] == "True")
+                    // On Android, prefer embedded mock payload to speed up UI testing.
+                    var useMockData = string.Equals(_configuration["UseMockData"], "True", StringComparison.OrdinalIgnoreCase)
+                        || OperatingSystem.IsAndroid();
+
+                    if (useMockData)
                     {
-                        var mockDataPath = ResolveMockDataPath();
-                        if (mockDataPath != null)
+                        responseBody = LoadMockDataFromEmbeddedResource() ?? string.Empty;
+
+                        if (string.IsNullOrEmpty(responseBody))
                         {
-                            responseBody = await File.ReadAllTextAsync(mockDataPath);
+                            var mockDataPath = ResolveMockDataPath();
+                            if (mockDataPath != null)
+                            {
+                                responseBody = await File.ReadAllTextAsync(mockDataPath);
+                            }
                         }
-                        else
+
+                        if (string.IsNullOrEmpty(responseBody))
                         {
-                            Logger.LogMessage("UseMockData is enabled, but test.json was not found. Falling back to live API.");
+                            Logger.LogMessage("Mock data is enabled, but test.json was not found. Falling back to live API.");
                             HttpResponseMessage response = await _httpClient.PostAsync(endpoint, content);
                             response.EnsureSuccessStatusCode();
                             responseBody = await response.Content.ReadAsStringAsync();
@@ -391,6 +401,27 @@ namespace RhythmVerseClient.Services
             };
 
             return candidates.FirstOrDefault(File.Exists);
+        }
+
+        private static string? LoadMockDataFromEmbeddedResource()
+        {
+            try
+            {
+                var uri = new Uri("avares://RhythmVerseClient/Tests/test.json");
+                if (!AssetLoader.Exists(uri))
+                {
+                    return null;
+                }
+
+                using var stream = AssetLoader.Open(uri);
+                using var reader = new StreamReader(stream);
+                return reader.ReadToEnd();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogMessage($"Failed to load mock data from embedded resource: {ex.Message}");
+                return null;
+            }
         }
 
         private int GiveMeRatingsNow(Song song, string instrument)

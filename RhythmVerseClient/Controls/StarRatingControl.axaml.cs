@@ -12,8 +12,10 @@ namespace RhythmVerseClient.Controls;
 public partial class StarRatingControl : UserControl
 {
     // ── Glyphs ────────────────────────────────────────────────────────────
-    private const string EmptyGlyph= "\uebb5";
-    private const string FilledGlyph  = "\u2B24";
+    private const string EmptyGlyph= "○";
+    // Note: The filled glyph is a full circle instead of a star, because star glyphs can look uneven in fixed-width cells.
+    // space before the circle is intentional to add padding on the left side, since the font doesn't have built-in padding and we want to avoid clipping the circle on the left edge.
+    private const string FilledGlyph  = "●";
     private const int    TotalStars  = 5;
 
     // ── Styled Properties ─────────────────────────────────────────────────
@@ -41,7 +43,7 @@ public partial class StarRatingControl : UserControl
     public static readonly StyledProperty<IBrush> EmptyBrushProperty =
         AvaloniaProperty.Register<StarRatingControl, IBrush>(
             nameof(EmptyBrush),
-            defaultValue: Brushes.Gray);
+            defaultValue: Brushes.Gold);
 
     // ── CLR wrappers ──────────────────────────────────────────────────────
 

@@ -72,6 +72,9 @@
 		<AvaloniaResource Include="Resources/Fonts/**"/>
 	</ItemGroup>
 	<ItemGroup>
+		<AvaloniaResource Include="Tests/test.json"/>
+	</ItemGroup>
+	<ItemGroup>
 		<None Update="appsettings.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>

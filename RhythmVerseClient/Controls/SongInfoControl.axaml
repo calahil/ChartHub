@@ -3,96 +3,171 @@
              xmlns:controls="clr-namespace:RhythmVerseClient.Controls;assembly=RhythmVerseClient"
              x:Class="RhythmVerseClient.Controls.SongInfoControl"
              x:Name="Root">
-
-    <Grid x:Name="SongInfoGrid"
-          ColumnDefinitions="Auto,*"
-          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
-        <TextBlock Grid.Row="0"
-                   Grid.Column="0"
-                   Text="{Binding SongStrings.Artist, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
-                   Foreground="{StaticResource BrushYellow}"
-                   FontSize="16"
-                   VerticalAlignment="Center" />
-        <TextBlock Grid.Row="0"
-                   Grid.Column="1"
-                   Text="{Binding Artist}"
-                   Foreground="{StaticResource ThemeForegroundBrush}"
-                   FontSize="13"
-                   HorizontalAlignment="Left"
-                   VerticalAlignment="Center" />
-        <TextBlock Grid.Row="1"
-                   Grid.Column="0"
-                   Text="{Binding SongStrings.SongTitle, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
-                   Foreground="{StaticResource BrushYellow}"
-                   FontSize="16"
-                   VerticalAlignment="Center" />
-        <TextBlock Grid.Row="1"
-                   Grid.Column="1"
-                   Text="{Binding Title}"
-                   Foreground="{StaticResource ThemeForegroundBrush}"
-                   FontSize="13"
-                   HorizontalAlignment="Left"
-                   VerticalAlignment="Center" />
-        <TextBlock Grid.Row="2"
-                   Grid.Column="0"
-                   Text="{Binding SongStrings.Album, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
-                   Foreground="{StaticResource BrushYellow}"
-                   FontSize="16"
-                   VerticalAlignment="Center" />
-        <TextBlock Grid.Row="2"
-                   Grid.Column="1"
-                   Text="{Binding Album}"
-                   Foreground="{StaticResource ThemeForegroundBrush}"
-                   FontSize="12"
-                   HorizontalAlignment="Left"
-                   VerticalAlignment="Center" />
-        <Grid Grid.Row="3"
-              Grid.Column="0"
-              Grid.ColumnSpan="2"
-              ColumnDefinitions="Auto,*,Auto,*,Auto,*"
-              RowDefinitions="Auto">
+    <StackPanel>
+        <Grid x:Name="SongInfoGrid"
+              IsVisible="{Binding IsDesktopMode, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+              ColumnDefinitions="Auto,*"
+              RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
             <TextBlock Grid.Row="0"
                        Grid.Column="0"
-                       Text="{Binding SongStrings.Time, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                       Text="{Binding SongStrings.Artist, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
                        Foreground="{StaticResource BrushYellow}"
                        FontSize="16"
                        VerticalAlignment="Center" />
             <TextBlock Grid.Row="0"
                        Grid.Column="1"
-                       Text="{Binding FormattedTime}"
+                       Text="{Binding Song.Artist, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
                        Foreground="{StaticResource ThemeForegroundBrush}"
-                       FontSize="11"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Left" />
-            <TextBlock Grid.Row="0"
-                       Grid.Column="2"
-                       Text="{Binding SongStrings.Released, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                       FontSize="13"
+                       HorizontalAlignment="Left"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Row="1"
+                       Grid.Column="0"
+                       Text="{Binding SongStrings.SongTitle, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
                        Foreground="{StaticResource BrushYellow}"
                        FontSize="16"
                        VerticalAlignment="Center" />
-            <TextBlock Grid.Row="0"
-                       Grid.Column="3"
-                       Text="{Binding Year}"
+            <TextBlock Grid.Row="1"
+                       Grid.Column="1"
+                       Text="{Binding Song.Title, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
                        Foreground="{StaticResource ThemeForegroundBrush}"
-                       FontSize="11"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Left" />
-            <TextBlock Grid.Row="0"
-                       Grid.Column="4"
-                       Text="{Binding SongStrings.Genre, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                       FontSize="13"
+                       HorizontalAlignment="Left"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Row="2"
+                       Grid.Column="0"
+                       Text="{Binding SongStrings.Album, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
                        Foreground="{StaticResource BrushYellow}"
                        FontSize="16"
                        VerticalAlignment="Center" />
-            <TextBlock Grid.Row="0"
-                       Grid.Column="5"
-                       Text="{Binding Genre}"
+            <TextBlock Grid.Row="2"
+                       Grid.Column="1"
+                       Text="{Binding Song.Album, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
                        Foreground="{StaticResource ThemeForegroundBrush}"
-                       FontSize="11"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Left" />
+                       FontSize="12"
+                       HorizontalAlignment="Left"
+                       VerticalAlignment="Center" />
+            <Grid Grid.Row="3"
+                  Grid.Column="0"
+                  Grid.ColumnSpan="2"
+                  ColumnDefinitions="Auto,*,Auto,*,Auto,*"
+                  RowDefinitions="Auto">
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           Text="{Binding SongStrings.Time, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource BrushYellow}"
+                           FontSize="16"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="1"
+                           Text="{Binding Song.FormattedTime, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource ThemeForegroundBrush}"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Left" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="2"
+                           Text="{Binding SongStrings.Released, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource BrushYellow}"
+                           FontSize="16"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="3"
+                           Text="{Binding Song.Year, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource ThemeForegroundBrush}"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Left" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="4"
+                           Text="{Binding SongStrings.Genre, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource BrushYellow}"
+                           FontSize="16"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="5"
+                           Text="{Binding Song.Genre, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource ThemeForegroundBrush}"
+                           FontSize="11"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Left" />
+            </Grid>
         </Grid>
-
-    </Grid>
-
-
+        <Grid x:Name="SongInfoMinGrid"
+              IsVisible="{Binding IsCompanionMode, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+              ColumnDefinitions="Auto,*"
+              RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+            <TextBlock Grid.Row="0"
+                       Grid.Column="0"
+                       Text="{Binding SongStrings.Artist, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                       Foreground="{StaticResource BrushYellow}"
+                       FontSize="12"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Row="0"
+                       Grid.Column="1"
+                       Text="{Binding Song.Artist, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                       Foreground="{StaticResource ThemeForegroundBrush}"
+                       FontSize="11"
+                       HorizontalAlignment="Left"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Row="1"
+                       Grid.Column="0"
+                       Text="{Binding SongStrings.SongTitle, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                       Foreground="{StaticResource BrushYellow}"
+                       FontSize="12"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Row="1"
+                       Grid.Column="1"
+                       Text="{Binding Song.Title, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                       Foreground="{StaticResource ThemeForegroundBrush}"
+                       FontSize="11"
+                       HorizontalAlignment="Left"
+                       VerticalAlignment="Center" />
+            <Grid Grid.Row="2"
+                  Grid.Column="0"
+                  Grid.ColumnSpan="2"
+                  ColumnDefinitions="Auto,*,Auto,*,Auto,*"
+                  RowDefinitions="Auto">
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           Text="{Binding SongStrings.Time, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource BrushYellow}"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="1"
+                           Text="{Binding Song.FormattedTime, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource ThemeForegroundBrush}"
+                           FontSize="9"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Left" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="2"
+                           Text="{Binding SongStrings.Released, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource BrushYellow}"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="3"
+                           Text="{Binding Song.Year, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource ThemeForegroundBrush}"
+                           FontSize="9"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Left" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="4"
+                           Text="{Binding SongStrings.Genre, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource BrushYellow}"
+                           FontSize="12"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="5"
+                           Text="{Binding Song.Genre, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
+                           Foreground="{StaticResource ThemeForegroundBrush}"
+                           FontSize="9"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Left" />
+            </Grid>
+        </Grid>
+    </StackPanel>
 </UserControl>
