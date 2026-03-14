@@ -6,6 +6,8 @@ using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using SkiaSharp;
+using Svg.Skia;
 
 namespace RhythmVerseClient.Utilities
 {
@@ -94,21 +96,62 @@ namespace RhythmVerseClient.Utilities
             {
                 var uri = Uri.TryCreate(p, UriKind.Absolute, out var absoluteUri)
                     ? absoluteUri
-                    : new Uri($"avares://RhythmVerseClient/Resources/Images/{p}");
+                    : p.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)
+                        ? new Uri($"avares://RhythmVerseClient/Resources/Svg/{p}")
+                        : new Uri($"avares://RhythmVerseClient/Resources/Images/{p}");
 
                 try
                 {
-                    using var stream = AssetLoader.Open(uri);
-                    return new Bitmap(stream);
+                    if (uri.Scheme.Equals("avares", StringComparison.OrdinalIgnoreCase) && !AssetLoader.Exists(uri))
+                    {
+                        return LoadBitmap(new Uri("avares://RhythmVerseClient/Resources/Images/blank.png"));
+                    }
+
+                    if (uri.AbsolutePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return LoadSvgBitmap(uri);
+                    }
+
+                    return LoadBitmap(uri);
                 }
                 catch (FileNotFoundException)
                 {
                     // Use a safe bundled fallback icon if a specific asset is missing.
-                    var fallbackUri = new Uri("avares://RhythmVerseClient/Resources/Images/blank.png");
-                    using var fallbackStream = AssetLoader.Open(fallbackUri);
-                    return new Bitmap(fallbackStream);
+                    return LoadBitmap(new Uri("avares://RhythmVerseClient/Resources/Images/blank.png"));
                 }
             });
+        }
+
+        private static Bitmap LoadBitmap(Uri uri)
+        {
+            using var stream = AssetLoader.Open(uri);
+            return new Bitmap(stream);
+        }
+
+        private static Bitmap LoadSvgBitmap(Uri uri)
+        {
+            using var stream = AssetLoader.Open(uri);
+            using var svg = new SKSvg();
+            var picture = svg.Load(stream);
+
+            var rect = picture?.CullRect ?? SKRect.Empty;
+            var width = Math.Max(1, (int)Math.Ceiling(rect.Width));
+            var height = Math.Max(1, (int)Math.Ceiling(rect.Height));
+
+            using var surface = SKSurface.Create(new SKImageInfo(width, height));
+            surface.Canvas.Clear(SKColors.Transparent);
+
+            if (picture is not null)
+            {
+                surface.Canvas.DrawPicture(picture);
+            }
+
+            surface.Canvas.Flush();
+
+            using var image = surface.Snapshot();
+            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+            using var ms = new MemoryStream(data.ToArray());
+            return new Bitmap(ms);
         }
 
         public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

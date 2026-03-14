@@ -10,8 +10,8 @@ namespace RhythmVerseClient.Controls;
 /// </summary>
 public partial class StarRatingControl : UserControl
 {
-    private const string EmptyIcon = "avares://RhythmVerseClient/Resources/Images/circleempty24dp.png";
-    private const string FilledIcon = "avares://RhythmVerseClient/Resources/Images/circlefilled24p.png";
+    private const string EmptyIcon = "avares://RhythmVerseClient/Resources/Svg/radio_button_unchecked_24dp.svg";
+    private const string FilledIcon = "avares://RhythmVerseClient/Resources/Svg/radio_button_checked_24dp.svg";
     private const int TotalStars = 5;
 
     // ── Styled Properties ─────────────────────────────────────────────────
