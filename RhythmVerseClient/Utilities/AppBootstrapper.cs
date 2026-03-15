@@ -1,8 +1,10 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Google.Apis.Drive.v3;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using RhythmVerseClient.Services;
+using RhythmVerseClient.Services.Transfers;
 using RhythmVerseClient.ViewModels;
 using SettingsManager;
 
@@ -19,16 +21,7 @@ namespace RhythmVerseClient.Utilities
             var services = new ServiceCollection();
             ConfigureServices(services);
 
-            var serviceProvider = services.BuildServiceProvider();
-            try
-            {
-                serviceProvider.GetRequiredService<IGoogleDriveClient>().InitializeAsync().GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogMessage($"Google Drive initialization failed during bootstrap: {ex.Message}");
-            }
-            return serviceProvider;
+            return services.BuildServiceProvider();
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -39,7 +32,8 @@ namespace RhythmVerseClient.Utilities
             // Build configuration with user secrets
             var configBuilder = new ConfigurationBuilder()
                 .AddJsonFile(Path.Combine(configDir, "appsettings.json"), optional: true)
-                .AddUserSecrets<UserSecretsAnchor>(optional: true);
+                .AddUserSecrets<UserSecretsAnchor>(optional: true)
+                .AddEnvironmentVariables();
 
             var config = configBuilder.Build();
             services.AddSingleton<IConfiguration>(config);
@@ -71,6 +65,8 @@ namespace RhythmVerseClient.Utilities
                 }
             }
 
+            SyncGoogleDriveConfig(sourceFilePath, destinationFilePath);
+
             string json = File.ReadAllText(destinationFilePath);
 
             AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json, JsonCerealOptions.Instance)
@@ -86,7 +82,18 @@ namespace RhythmVerseClient.Utilities
             });
 
             services.AddSingleton<AppGlobalSettings>();
+
+            if (OperatingSystem.IsAndroid())
+                services.AddSingleton<IGoogleAuthProvider, AndroidGoogleAuthProvider>();
+            else
+                services.AddSingleton<IGoogleAuthProvider, DesktopGoogleAuthProvider>();
+
             services.AddSingleton<IGoogleDriveClient, GoogleDriveClient>();
+            services.AddSingleton<DownloadService>();
+            services.AddSingleton<ITransferSourceResolver, TransferSourceResolver>();
+            services.AddSingleton<ILocalDestinationWriter, LocalDestinationWriter>();
+            services.AddSingleton<IGoogleDriveDestinationWriter, GoogleDriveDestinationWriter>();
+            services.AddSingleton<ITransferOrchestrator, TransferOrchestrator>();
             services.AddSingleton<DownloadViewModel>();
             services.AddSingleton<CloneHeroViewModel>();
             services.AddSingleton<InstallSongViewModel>();
@@ -101,6 +108,52 @@ namespace RhythmVerseClient.Utilities
             );
             services.AddSingleton<DriveService>();
             services.AddSingleton<Initializer>();
+        }
+
+        private static void SyncGoogleDriveConfig(string sourceFilePath, string destinationFilePath)
+        {
+            if (!File.Exists(destinationFilePath))
+                return;
+
+            JsonObject destinationRoot;
+            try
+            {
+                destinationRoot = JsonNode.Parse(File.ReadAllText(destinationFilePath)) as JsonObject ?? [];
+            }
+            catch
+            {
+                destinationRoot = [];
+            }
+
+            JsonObject sourceRoot = [];
+            if (File.Exists(sourceFilePath))
+            {
+                try
+                {
+                    sourceRoot = JsonNode.Parse(File.ReadAllText(sourceFilePath)) as JsonObject ?? [];
+                }
+                catch
+                {
+                    sourceRoot = [];
+                }
+            }
+
+            var destinationGoogle = destinationRoot["GoogleDrive"] as JsonObject ?? [];
+            var sourceGoogle = sourceRoot["GoogleDrive"] as JsonObject;
+
+            if (sourceGoogle is not null)
+            {
+                foreach (var key in sourceGoogle)
+                {
+                    if (!destinationGoogle.ContainsKey(key.Key) && key.Value is not null)
+                    {
+                        destinationGoogle[key.Key] = key.Value.DeepClone();
+                    }
+                }
+            }
+
+            destinationRoot["GoogleDrive"] = destinationGoogle;
+            File.WriteAllText(destinationFilePath, destinationRoot.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
     }
 }

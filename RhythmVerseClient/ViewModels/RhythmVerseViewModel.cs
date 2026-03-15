@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Configuration;
 using RhythmVerseClient.Models;
 using RhythmVerseClient.Services;
+using RhythmVerseClient.Services.Transfers;
 using RhythmVerseClient.Strings;
 using RhythmVerseClient.Utilities;
 using System.Collections.ObjectModel;
@@ -76,8 +77,7 @@ namespace RhythmVerseClient.ViewModels
         public ICommand ShowFilterPaneCommand { get; }
         public ICommand ShowDownloadsPaneCommand { get; }
 
-        private readonly AppGlobalSettings globalSettings;
-        private readonly DownloadService downloadService;
+        private readonly ITransferOrchestrator _transferOrchestrator;
 
         private ApiClientService _apiClient;
         public ApiClientService ApiClient
@@ -298,12 +298,15 @@ namespace RhythmVerseClient.ViewModels
         public IAsyncRelayCommand RefreshButtonCommand { get; }
         public IAsyncRelayCommand<ViewSong?> DownloadFileCommand { get; }
         public IAsyncRelayCommand<ViewSong?> ViewCreatorCommand { get; }
+        public IRelayCommand<DownloadFile?> CancelDownloadCommand { get; }
+
+        private readonly Dictionary<DownloadFile, CancellationTokenSource> _downloadTokens = [];
 
         public RhythmVersePageStrings PageStrings { get; }
 
-        public RhythmVerseViewModel(AppGlobalSettings settings, IConfiguration configuration)
+        public RhythmVerseViewModel(IConfiguration configuration, ITransferOrchestrator transferOrchestrator)
         {
-            globalSettings = settings;
+            _transferOrchestrator = transferOrchestrator;
             PageStrings = new RhythmVersePageStrings();
             _apiClient = new ApiClientService(configuration);
             _dataItems = [];
@@ -321,6 +324,7 @@ namespace RhythmVerseClient.ViewModels
             RefreshButtonCommand = new AsyncRelayCommand(RefreshButton);
             DownloadFileCommand = new AsyncRelayCommand<ViewSong?>(DownloadFile);
             ViewCreatorCommand = new AsyncRelayCommand<ViewSong?>(ViewCreator);
+            CancelDownloadCommand = new RelayCommand<DownloadFile?>(CancelDownload);
             _activePane = PaneMode.None;
             ShowFilterPaneCommand = new RelayCommand(() =>
             {
@@ -331,8 +335,6 @@ namespace RhythmVerseClient.ViewModels
             {
                 ActivePane = ActivePane == PaneMode.Downloads ? PaneMode.None : PaneMode.Downloads;
             });
-            downloadService = new DownloadService(configuration);
-
             Instruments =
             [
                 new InstrumentItem { DisplayName = "None", Value = string.Empty },
@@ -385,11 +387,34 @@ namespace RhythmVerseClient.ViewModels
             if (file == null)
                 return;
 
-            var downloadFile = new DownloadFile(file.FileName ?? string.Empty, globalSettings.TempDir, file.DownloadLink ?? string.Empty, file.FileSize);
-            Downloads.Add(downloadFile);
-            await downloadService.DownloadFileAsync(downloadFile);
+            var downloadItem = new DownloadFile(
+                file.FileName ?? string.Empty,
+                Path.GetTempPath(),
+                file.DownloadLink ?? string.Empty,
+                file.FileSize);
 
-            File.Move(Path.Combine(downloadFile.FilePath, downloadFile.DisplayName), Path.Combine(globalSettings.DownloadDir, downloadFile.DisplayName), true);
+            var cts = new CancellationTokenSource();
+            _downloadTokens[downloadItem] = cts;
+
+            var result = await _transferOrchestrator.QueueSongDownloadAsync(file, downloadItem, Downloads, cts.Token);
+            if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
+                Logger.LogMessage($"Song transfer failed: {result.Error}");
+
+            _downloadTokens.Remove(downloadItem);
+            cts.Dispose();
+        }
+
+        private void CancelDownload(DownloadFile? downloadItem)
+        {
+            if (downloadItem is null)
+                return;
+
+            if (_downloadTokens.TryGetValue(downloadItem, out var cts))
+            {
+                downloadItem.Status = TransferStage.Cancelling.ToString();
+                downloadItem.ErrorMessage = null;
+                cts.Cancel();
+            }
         }
         public async Task ViewCreator(ViewSong? song)
         {

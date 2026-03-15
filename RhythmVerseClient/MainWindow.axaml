@@ -5,5 +5,5 @@
         Title="RhythmVerse Client"
         Width="1200" Height="800"
         WindowStartupLocation="CenterScreen">
-    <views:MainView />
+    <views:AppShellView />
 </Window>

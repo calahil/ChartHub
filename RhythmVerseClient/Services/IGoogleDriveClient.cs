@@ -1,9 +1,11 @@
 ﻿using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
-using Google.Apis.Util.Store;
-using Microsoft.Extensions.Configuration;
 using RhythmVerseClient.Models;
+using RhythmVerseClient.Services.Transfers;
+using SharpCompress.Archives;
+using SharpCompress.Archives.Zip;
+using SharpCompress.Common;
 using System.Collections.ObjectModel;
 
 namespace RhythmVerseClient.Services
@@ -12,7 +14,13 @@ namespace RhythmVerseClient.Services
     {
         Task<string> CreateDirectoryAsync(string directoryName);
         Task<string> GetDirectoryIdAsync(string directoryName);
-        Task<string> UploadFileAsync(string directoryId, string filePath);
+        Task<string> UploadFileAsync(string directoryId, string filePath, string? desiredFileName = null);
+        Task<string> CopyFileIntoFolderAsync(string sourceFileId, string destinationFolderId, string desiredFileName);
+        Task DownloadFolderAsZipAsync(
+            string folderId,
+            string zipFilePath,
+            IProgress<TransferProgressUpdate>? stageProgress = null,
+            CancellationToken cancellationToken = default);
         Task DownloadFileAsync(string fileId, string saveToPath);
         Task DeleteFileAsync(string fileId);
         Task<IList<Google.Apis.Drive.v3.Data.File>> ListFilesAsync(string directoryId);
@@ -20,22 +28,23 @@ namespace RhythmVerseClient.Services
         public string RhythmVerseFolderId { get; }
 
         Task InitializeAsync(CancellationToken cancellationToken = default);
+        Task SignOutAsync(CancellationToken cancellationToken = default);
         Task<ObservableCollection<WatcherFile>> GetFileDataCollectionAsync(string directoryId);
     }
 
     public class GoogleDriveClient : IGoogleDriveClient
     {
         private DriveService? _driveService;
-        private readonly IConfiguration _configuration;
+        private readonly IGoogleAuthProvider _authProvider;
         private CancellationTokenSource? _monitorCts;
-        private static readonly string[] Scopes = [Google.Apis.Drive.v3.DriveService.Scope.Drive];
+        private static readonly string[] Scopes = [DriveService.Scope.DriveReadonly, DriveService.Scope.DriveFile];
         private static readonly string ApplicationName = "RhythmVerseClient";
         public string RhythmVerseFolderId { get; private set; } = string.Empty;
-        static string credPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), ".credentials/drive-dotnet-maui.json");
+        private UserCredential? _credential;
 
-        public GoogleDriveClient(IConfiguration configuration)
+        public GoogleDriveClient(IGoogleAuthProvider authProvider)
         {
-            _configuration = configuration;
+            _authProvider = authProvider;
         }
 
         public async Task InitializeAsync(CancellationToken cancellationToken = default)
@@ -46,27 +55,35 @@ namespace RhythmVerseClient.Services
             _ = MonitorDirectoryAsync(RhythmVerseFolderId, TimeSpan.FromSeconds(30), OnFileChanged, _monitorCts.Token);
         }
 
+        public async Task SignOutAsync(CancellationToken cancellationToken = default)
+        {
+            _monitorCts?.Cancel();
+            _monitorCts = null;
+            _driveService?.Dispose();
+            _driveService = null;
+            await _authProvider.SignOutAsync(_credential, cancellationToken);
+            _credential = null;
+            RhythmVerseFolderId = string.Empty;
+        }
+
         public async Task<DriveService> GetServiceAsync(CancellationToken cancellationToken = default)
         {
-            UserCredential credential;
-            var clientSecrets = new ClientSecrets
-            {
-                ClientId = _configuration["GoogleDrive:client_id"],
-                ClientSecret = _configuration["GoogleDrive:client_secret"]
-            };
+            if (_driveService is not null)
+                return _driveService;
 
-            credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-                clientSecrets,
-                Scopes,
-                "user",
-                cancellationToken,
-                new FileDataStore(credPath, true));
-
-            return new DriveService(new BaseClientService.Initializer()
+            if (_credential is null)
             {
-                HttpClientInitializer = credential,
+                _credential = await _authProvider.TryAuthorizeSilentAsync(Scopes, cancellationToken)
+                    ?? await _authProvider.AuthorizeInteractiveAsync(Scopes, cancellationToken);
+            }
+
+            _driveService = new DriveService(new BaseClientService.Initializer()
+            {
+                HttpClientInitializer = _credential,
                 ApplicationName = ApplicationName,
             });
+
+            return _driveService;
         }
 
         private void OnFileChanged(Google.Apis.Drive.v3.Data.File file, string changeType)
@@ -145,11 +162,11 @@ namespace RhythmVerseClient.Services
             return folder?.Id;
         }
 
-        public async Task<string> UploadFileAsync(string directoryId, string filePath)
+        public async Task<string> UploadFileAsync(string directoryId, string filePath, string? desiredFileName = null)
         {
             var fileMetadata = new Google.Apis.Drive.v3.Data.File()
             {
-                Name = Path.GetFileName(filePath),
+                Name = string.IsNullOrWhiteSpace(desiredFileName) ? Path.GetFileName(filePath) : desiredFileName,
                 Parents = new List<string> { directoryId }
             };
 
@@ -163,6 +180,22 @@ namespace RhythmVerseClient.Services
             }
         }
 
+        public async Task<string> CopyFileIntoFolderAsync(string sourceFileId, string destinationFolderId, string desiredFileName)
+        {
+            _driveService ??= await GetServiceAsync();
+
+            var metadata = new Google.Apis.Drive.v3.Data.File
+            {
+                Name = desiredFileName,
+                Parents = new List<string> { destinationFolderId },
+            };
+
+            var request = _driveService.Files.Copy(metadata, sourceFileId);
+            request.Fields = "id,name";
+            var copied = await request.ExecuteAsync();
+            return copied.Id;
+        }
+
         public async Task DownloadFileAsync(string fileId, string saveToPath)
         {
             var request = _driveService!.Files.Get(fileId);
@@ -174,6 +207,107 @@ namespace RhythmVerseClient.Services
                     stream.WriteTo(fileStream);
                 }
             }
+        }
+
+        public async Task DownloadFolderAsZipAsync(
+            string folderId,
+            string zipFilePath,
+            IProgress<TransferProgressUpdate>? stageProgress = null,
+            CancellationToken cancellationToken = default)
+        {
+            _driveService ??= await GetServiceAsync(cancellationToken);
+
+            var tempRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempRoot);
+
+            try
+            {
+                var folderName = await GetDriveItemNameAsync(folderId, cancellationToken);
+                if (string.IsNullOrWhiteSpace(folderName))
+                    folderName = folderId;
+
+                var safeFolderName = MakeSafePathName(folderName);
+                var stagedRoot = Path.Combine(tempRoot, safeFolderName);
+                Directory.CreateDirectory(stagedRoot);
+
+                stageProgress?.Report(new TransferProgressUpdate(TransferStage.DownloadingFolder, 35));
+                await DownloadFilesInFolderRecursiveAsync(folderId, stagedRoot, cancellationToken);
+
+                stageProgress?.Report(new TransferProgressUpdate(TransferStage.ZippingFolder, 70));
+                CreateZip(tempRoot, zipFilePath);
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                    Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+
+        private async Task DownloadFilesInFolderRecursiveAsync(string folderId, string destinationFolder, CancellationToken cancellationToken)
+        {
+            _driveService ??= await GetServiceAsync(cancellationToken);
+
+            var request = _driveService.Files.List();
+            request.Q = $"'{folderId}' in parents and trashed=false";
+            request.Fields = "files(id, name, mimeType)";
+
+            var result = await request.ExecuteAsync(cancellationToken);
+            foreach (var file in result.Files)
+            {
+                var safeName = MakeSafePathName(file.Name);
+                if (file.MimeType == "application/vnd.google-apps.folder")
+                {
+                    var childPath = Path.Combine(destinationFolder, safeName);
+                    Directory.CreateDirectory(childPath);
+                    await DownloadFilesInFolderRecursiveAsync(file.Id, childPath, cancellationToken);
+                    continue;
+                }
+
+                var filePath = Path.Combine(destinationFolder, safeName);
+                using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await _driveService.Files.Get(file.Id).DownloadAsync(fileStream, cancellationToken);
+            }
+        }
+
+        private async Task<string> GetDriveItemNameAsync(string itemId, CancellationToken cancellationToken)
+        {
+            _driveService ??= await GetServiceAsync(cancellationToken);
+            var request = _driveService.Files.Get(itemId);
+            request.Fields = "name";
+            var item = await request.ExecuteAsync(cancellationToken);
+            return item.Name ?? string.Empty;
+        }
+
+        private static string MakeSafePathName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return "untitled";
+
+            foreach (var ch in Path.GetInvalidFileNameChars())
+                name = name.Replace(ch, '_');
+
+            return name;
+        }
+
+        private static void CreateZip(string sourceFolderPath, string destinationZipFilePath)
+        {
+            using var archive = ZipArchive.Create();
+            AddFilesToArchive(archive, sourceFolderPath, sourceFolderPath);
+
+            using var stream = File.Open(destinationZipFilePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            archive.SaveTo(stream, CompressionType.Deflate);
+        }
+
+        private static void AddFilesToArchive(ZipArchive archive, string rootPath, string currentPath)
+        {
+            foreach (var filePath in Directory.GetFiles(currentPath))
+            {
+                var relativePath = Path.GetRelativePath(rootPath, filePath);
+                archive.AddEntry(relativePath, filePath);
+            }
+
+            foreach (var subDirPath in Directory.GetDirectories(currentPath))
+                AddFilesToArchive(archive, rootPath, subDirPath);
         }
 
         public async Task DeleteFileAsync(string fileId)

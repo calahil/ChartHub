@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "printf": true,
+        "\"$adb_cmd\"": true,
+        "set": true,
+        "$adb_cmd": true
+    }
+}

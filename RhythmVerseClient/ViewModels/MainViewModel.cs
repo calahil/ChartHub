@@ -6,6 +6,9 @@ namespace RhythmVerseClient.ViewModels
 {
     public class MainViewModel : INotifyPropertyChanged
     {
+        public bool IsCompanionMode => OperatingSystem.IsAndroid();
+        public bool IsDesktopMode => !OperatingSystem.IsAndroid();
+
         private RhythmVerseViewModel _rhythmVerseViewModel;
         private DownloadViewModel _downloadViewModel;
         private CloneHeroViewModel _cloneHeroViewModel;

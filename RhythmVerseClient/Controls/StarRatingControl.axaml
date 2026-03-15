@@ -6,6 +6,7 @@
 
   <UserControl.Resources>
     <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+    <utilities:SvgColorImageConverter x:Key="SvgColorImageConverter" />
   </UserControl.Resources>
 
   <ItemsControl x:Name="StarsHost"

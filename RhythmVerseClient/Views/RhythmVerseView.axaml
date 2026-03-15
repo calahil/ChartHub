@@ -16,121 +16,10 @@
         <UserControl.Resources>
                 <utilities:SafeImageUrlConverter x:Key="SafeImageUrlConverter"/>
                 <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+                <utilities:SvgColorImageConverter x:Key="SvgColorImageConverter" />
         </UserControl.Resources>
         <Grid RowDefinitions="*" ColumnDefinitions="*">
-                <SplitView Grid.Row="0" Grid.Column="0"
-                           IsPaneOpen="{Binding isPaneOpen}"
-                           OpenPaneLength="400"
-                           PanePlacement="Right"
-                           DisplayMode="CompactOverlay">
-                        <SplitView.Pane>
-                                <Grid Grid.ColumnDefinitions="48,*">
-                                        <Grid Grid.Column="0"
-                                              Grid.RowDefinitions="Auto,Auto"
-                                              Background="{StaticResource ThemeBackgroundBrush}">
-                                                <Button Grid.Column="0"
-                                                        Grid.Row="0"
-                                                        Margin="10,0,0,0"
-                                                        Command="{Binding ShowDownloadsPaneCommand}"
-                                                        HorizontalAlignment="Right">
-                                                                <Image Source="{Binding PageStrings.ShowDownloads, Converter={StaticResource AssetPathToImageConverter}}"
-                                                               Width="{StaticResource IconSizeDense}"
-                                                               Height="{StaticResource IconSizeDense}" />
-                                                </Button>
-                                                <Button Grid.Column="0"
-                                                        Grid.Row="1"
-                                                        HorizontalAlignment="Right"
-                                                        Margin="10,0,0,0"
-                                                        Command="{Binding ShowFilterPaneCommand}">
-                                                                <Image Source="{Binding PageStrings.ShowFilters, Converter={StaticResource AssetPathToImageConverter}}"
-                                                               Width="{StaticResource IconSizeDense}"
-                                                               Height="{StaticResource IconSizeDense}" />
-                                                </Button>
-                                        </Grid>
-                                        <!-- Filter Pane (Collapsible) -->
-                                        <Border IsVisible="{Binding IsFiltersPaneVisible}"
-                                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                                                Grid.Column="1"
-                                                BorderThickness="1"
-                                                Padding="10">
-                                                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                                        <StackPanel Spacing="15"
-                                                                    Background="{StaticResource ListBoxBackground}">
-                                                                <TextBlock Text="{Binding PageStrings.FilterTitle}"
-                                                                           FontSize="16"
-                                                                           FontWeight="Bold"
-                                                                           Foreground="{StaticResource ThemeForegroundBrush}" />
-                                                                <StackPanel Spacing="5">
-                                                                                  <Image Source="{Binding PageStrings.SortBy, Converter={StaticResource AssetPathToImageConverter}}"
-                                                                                          Width="{StaticResource IconSizeDefault}"
-                                                                                          Height="{StaticResource IconSizeDefault}" />
-                                                                        <ComboBox ItemsSource="{Binding Filters}"
-                                                                                  SelectedItem="{Binding SelectedFilter}" />
-                                                                </StackPanel>
-
-                                                                <StackPanel Spacing="5">
-                                                                                  <Image Source="{Binding PageStrings.Order, Converter={StaticResource AssetPathToImageConverter}}"
-                                                                                          Width="{StaticResource IconSizeDefault}"
-                                                                                          Height="{StaticResource IconSizeDefault}" />
-                                                                        <ComboBox ItemsSource="{Binding Orders}"
-                                                                                  SelectedItem="{Binding SelectedOrder}" />
-                                                                </StackPanel>
-
-                                                                <StackPanel Spacing="5">
-                                                                                  <Image Source="{Binding PageStrings.Instrument, Converter={StaticResource AssetPathToImageConverter}}"
-                                                                                          Width="{StaticResource IconSizeDefault}"
-                                                                                          Height="{StaticResource IconSizeDefault}" />
-                                                                        <ListBox ItemsSource="{Binding Instruments}"
-                                                                                 SelectedItems="{Binding SelectedInstruments}"
-                                                                                 SelectionMode="Multiple" >
-                                                                                <ListBox.ItemTemplate>
-                                                                                        <DataTemplate>
-                                                                                                <TextBlock Text="{Binding DisplayName}"
-                                                                                                           Foreground="{StaticResource ThemeForegroundBrush}" />
-                                                                                        </DataTemplate>
-                                                                                </ListBox.ItemTemplate>
-                                                                        </ListBox>
-                                                                </StackPanel>
-
-                                                                <Button Command="{Binding RefreshButtonCommand}">
-                                                                                  <Image Source="{Binding PageStrings.ApplyFilter, Converter={StaticResource AssetPathToImageConverter}}"
-                                                                               Width="{StaticResource IconSizeDefault}"
-                                                                               Height="{StaticResource IconSizeDefault}" />
-                                                                </Button>
-                                                        </StackPanel>
-                                                </ScrollViewer>
-                                        </Border>
-                                        <Border IsVisible="{Binding IsDownloadsPaneVisible}"
-                                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                                                Grid.Column="1"
-                                                BorderThickness="1"
-                                                Padding="10">
-                                                <DataGrid ItemsSource="{Binding Downloads}"
-                                                          AutoGenerateColumns="False"
-                                                          IsReadOnly="True">
-                                                        <DataGrid.Columns>
-                                                                <DataGridTextColumn Header="File"
-                                                                                    Binding="{Binding DisplayName}"
-                                                                                    Width="2*" />
-                                                                <DataGridTemplateColumn Header="Progress"
-                                                                                        Width="2*">
-                                                                        <DataGridTemplateColumn.CellTemplate>
-                                                                                <DataTemplate>
-                                                                                        <ProgressBar Value="{Binding DownloadProgress}"
-                                                                                                     Height="18"
-                                                                                                     Maximum="100" />
-                                                                                </DataTemplate>
-                                                                        </DataGridTemplateColumn.CellTemplate>
-                                                                </DataGridTemplateColumn>
-                                                                <DataGridCheckBoxColumn Header="Done"
-                                                                                        Binding="{Binding Finished}"
-                                                                                        Width="1.2*" />
-                                                        </DataGrid.Columns>
-                                                </DataGrid>
-                                        </Border>
-                                </Grid>
-                        </SplitView.Pane>
-                                <Grid>
+                <Grid>
                                 <Grid RowDefinitions="Auto,*"
                                         ColumnDefinitions="*"
                                         IsVisible="{Binding IsDesktopMode}"
@@ -484,6 +373,5 @@
                         </Grid>
                 </Grid>
                 </Grid>
-                </SplitView>
         </Grid>
 </UserControl>

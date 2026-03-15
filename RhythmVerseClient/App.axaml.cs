@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using AsyncImageLoader;
 using Microsoft.Extensions.DependencyInjection;
+using RhythmVerseClient.Services;
 using RhythmVerseClient.Utilities;
 using RhythmVerseClient.Views;
 using RhythmVerseClient.ViewModels;
@@ -25,19 +26,20 @@ namespace RhythmVerseClient
         public override void OnFrameworkInitializationCompleted()
         {
             ServiceProvider ??= AppBootstrapper.CreateServiceProvider();
-            var mainViewModel = ServiceProvider.GetRequiredService<MainViewModel>();
+            var googleDriveClient = ServiceProvider.GetRequiredService<IGoogleDriveClient>();
+            var shellViewModel = new AppShellViewModel(ServiceProvider, googleDriveClient);
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
             {
                 var mainWindow = new MainWindow();
-                mainWindow.DataContext = mainViewModel;
+                mainWindow.DataContext = shellViewModel;
                 desktopLifetime.MainWindow = mainWindow;
             }
             else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewLifetime)
             {
-                singleViewLifetime.MainView = new MainView
+                singleViewLifetime.MainView = new AppShellView
                 {
-                    DataContext = mainViewModel
+                    DataContext = shellViewModel
                 };
             }
 

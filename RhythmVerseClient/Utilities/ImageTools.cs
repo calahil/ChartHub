@@ -1,6 +1,11 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
 using AsyncImageLoader;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
@@ -78,48 +83,55 @@ namespace RhythmVerseClient.Utilities
         }
     }
 
-      /// <summary>
-    /// Converter that append asset paths.
+    /// <summary>
+    /// Converts an asset path string to IImage, rasterizing SVG assets at the requested color.
+    /// ConverterParameter: optional hex color string (e.g. "#CAD3F5") to tint SVG icons.
+    /// SVG files must use fill="currentColor" as a placeholder for the substitution to work.
     /// </summary>
     public class AssetPathToImageConverter : IValueConverter
     {
-        private static readonly ConcurrentDictionary<string, IImage> Cache = new();
+        // Default icon color — matches MacchiatoYellow (BrushYellow) from the Catppuccin Macchiato palette.
+        internal const string DefaultSvgColor = "#EED49F";
+
+        // Cache keyed by "uri|color" so each tinted variant is stored independently.
+        internal static readonly ConcurrentDictionary<string, IImage> Cache = new();
 
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is not string path || string.IsNullOrWhiteSpace(path))
-            {
                 return null;
-            }
 
-            return Cache.GetOrAdd(path, static p =>
+            var color = parameter as string ?? DefaultSvgColor;
+            var cacheKey = $"{path}|{color}";
+
+            return Cache.GetOrAdd(cacheKey, _ => Load(path, color));
+        }
+
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+            => throw new NotSupportedException();
+
+        internal static IImage Load(string path, string color)
+        {
+            var uri = Uri.TryCreate(path, UriKind.Absolute, out var absolute)
+                ? absolute
+                : path.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)
+                    ? new Uri($"avares://RhythmVerseClient/Resources/Svg/{path}")
+                    : new Uri($"avares://RhythmVerseClient/Resources/Images/{path}");
+
+            try
             {
-                var uri = Uri.TryCreate(p, UriKind.Absolute, out var absoluteUri)
-                    ? absoluteUri
-                    : p.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)
-                        ? new Uri($"avares://RhythmVerseClient/Resources/Svg/{p}")
-                        : new Uri($"avares://RhythmVerseClient/Resources/Images/{p}");
-
-                try
-                {
-                    if (uri.Scheme.Equals("avares", StringComparison.OrdinalIgnoreCase) && !AssetLoader.Exists(uri))
-                    {
-                        return LoadBitmap(new Uri("avares://RhythmVerseClient/Resources/Images/blank.png"));
-                    }
-
-                    if (uri.AbsolutePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return LoadSvgBitmap(uri);
-                    }
-
-                    return LoadBitmap(uri);
-                }
-                catch (FileNotFoundException)
-                {
-                    // Use a safe bundled fallback icon if a specific asset is missing.
+                if (uri.Scheme.Equals("avares", StringComparison.OrdinalIgnoreCase) && !AssetLoader.Exists(uri))
                     return LoadBitmap(new Uri("avares://RhythmVerseClient/Resources/Images/blank.png"));
-                }
-            });
+
+                if (uri.AbsolutePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                    return LoadSvgBitmap(uri, color);
+
+                return LoadBitmap(uri);
+            }
+            catch (FileNotFoundException)
+            {
+                return LoadBitmap(new Uri("avares://RhythmVerseClient/Resources/Images/blank.png"));
+            }
         }
 
         private static Bitmap LoadBitmap(Uri uri)
@@ -128,11 +140,18 @@ namespace RhythmVerseClient.Utilities
             return new Bitmap(stream);
         }
 
-        private static Bitmap LoadSvgBitmap(Uri uri)
+        private static Bitmap LoadSvgBitmap(Uri uri, string color)
         {
+            // Read SVG text and substitute currentColor with the requested theme color.
+            // This lets every SVG use fill="currentColor" as a neutral placeholder.
             using var stream = AssetLoader.Open(uri);
+            using var reader = new StreamReader(stream);
+            var svgText = reader.ReadToEnd()
+                .Replace("currentColor", color, StringComparison.OrdinalIgnoreCase);
+
             using var svg = new SKSvg();
-            var picture = svg.Load(stream);
+            using var svgStream = new MemoryStream(Encoding.UTF8.GetBytes(svgText));
+            var picture = svg.Load(svgStream);
 
             var rect = picture?.CullRect ?? SKRect.Empty;
             var width = Math.Max(1, (int)Math.Ceiling(rect.Width));
@@ -140,12 +159,8 @@ namespace RhythmVerseClient.Utilities
 
             using var surface = SKSurface.Create(new SKImageInfo(width, height));
             surface.Canvas.Clear(SKColors.Transparent);
-
             if (picture is not null)
-            {
                 surface.Canvas.DrawPicture(picture);
-            }
-
             surface.Canvas.Flush();
 
             using var image = surface.Snapshot();
@@ -153,10 +168,39 @@ namespace RhythmVerseClient.Utilities
             using var ms = new MemoryStream(data.ToArray());
             return new Bitmap(ms);
         }
+    }
 
-        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+    /// <summary>
+    /// Multi-value converter for dynamically tinting SVG icons with a bound theme color.
+    /// Bindings: [0] = asset path string, [1] = color hex string or SolidColorBrush.
+    /// Usage in XAML:
+    ///   &lt;Image.Source&gt;
+    ///     &lt;MultiBinding Converter="{StaticResource SvgColorImageConverter}"&gt;
+    ///       &lt;Binding Path="MyIconPath"/&gt;
+    ///       &lt;Binding Source="{StaticResource ThemeForegroundBrush}"/&gt;
+    ///     &lt;/MultiBinding&gt;
+    ///   &lt;/Image.Source&gt;
+    /// </summary>
+    public class SvgColorImageConverter : IMultiValueConverter
+    {
+        public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
         {
-            throw new NotSupportedException();
+            if (values is not [string path, ..] || string.IsNullOrWhiteSpace(path))
+                return null;
+
+            var color = AssetPathToImageConverter.DefaultSvgColor;
+            if (values.Count > 1)
+            {
+                color = values[1] switch
+                {
+                    string hex when !string.IsNullOrWhiteSpace(hex) => hex,
+                    SolidColorBrush brush => $"#{brush.Color.R:X2}{brush.Color.G:X2}{brush.Color.B:X2}",
+                    _ => color,
+                };
+            }
+
+            var cacheKey = $"{path}|{color}";
+            return AssetPathToImageConverter.Cache.GetOrAdd(cacheKey, _ => AssetPathToImageConverter.Load(path, color));
         }
     }
     /// <summary>
@@ -166,6 +210,7 @@ namespace RhythmVerseClient.Utilities
     public class FallbackAsyncImageLoader : IAsyncImageLoader, IDisposable
     {
         private static readonly HttpClient ProbeClient = new();
+        private static readonly HttpClient NetworkImageClient = CreateNetworkImageClient();
         private readonly IAsyncImageLoader _innerLoader;
         private readonly string _avatarFallback = "avares://RhythmVerseClient/Resources/Images/blankprofile.png";
         private readonly string _albumFallback = "avares://RhythmVerseClient/Resources/Images/noalbumart.png";
@@ -179,6 +224,14 @@ namespace RhythmVerseClient.Utilities
 
         public async Task<Bitmap?> ProvideImageAsync(string url)
         {
+            // Some desktop hosts reject the default async-loader requests for plain HTTP links.
+            // Try a direct image fetch first for HTTP(S) URLs.
+            var directNetworkBitmap = await TryLoadNetworkBitmapAsync(url);
+            if (directNetworkBitmap is not null)
+            {
+                return directNetworkBitmap;
+            }
+
             if (await IsMissingHttpResourceAsync(url))
             {
                 return await TryLoadFallbackAsync(url);
@@ -219,6 +272,50 @@ namespace RhythmVerseClient.Utilities
             {
                 // For non-HTTP errors, propagate the exception
                 throw;
+            }
+        }
+
+        private static HttpClient CreateNetworkImageClient()
+        {
+            var client = new HttpClient(new HttpClientHandler
+            {
+                AllowAutoRedirect = true,
+            });
+
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("RhythmVerseClient/1.0");
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("image/*"));
+            return client;
+        }
+
+        private static async Task<Bitmap?> TryLoadNetworkBitmapAsync(string url)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                return null;
+            }
+
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+            {
+                return null;
+            }
+
+            try
+            {
+                using var response = await NetworkImageClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+
+                await using var stream = await response.Content.ReadAsStreamAsync();
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                ms.Position = 0;
+                return new Bitmap(ms);
+            }
+            catch
+            {
+                return null;
             }
         }
 

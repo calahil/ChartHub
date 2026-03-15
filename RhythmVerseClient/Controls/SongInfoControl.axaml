@@ -6,6 +6,7 @@
              x:Name="Root">
   <UserControl.Resources>
     <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+    <utilities:SvgColorImageConverter x:Key="SvgColorImageConverter" />
   </UserControl.Resources>
     <StackPanel>
         <Grid x:Name="SongInfoGrid"

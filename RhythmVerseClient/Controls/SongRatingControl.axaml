@@ -72,8 +72,8 @@
               </Grid>
               <Grid x:Name="SongRatingMinGrid"
                     IsVisible="{Binding IsCompanionMode, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                    ColumnDefinitions="Auto,Auto,*,Auto,*,Auto"
-                    RowDefinitions="*, *">
+                    ColumnDefinitions="Auto,Auto,*,Auto"
+                    RowDefinitions="*, *, *">
                      <!-- Drum Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/drums_small.png"
                             Grid.Row="0"
@@ -103,41 +103,42 @@
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
                      <!-- Keyboard Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/keys_small.png"
-                            Grid.Row="0"
-                            Grid.Column="4"
+                            Grid.Row="1"
+                            Grid.Column="0"
                             VerticalAlignment="Top"
                             HorizontalAlignment="Right"
                             Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                      <controls:StarRatingControl Rating="{Binding KeysString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 Grid.Row="0"
-                                                 Grid.Column="5"
+                                                 Grid.Row="1"
+                                                 Grid.Column="1"
                                                  FontWeight="Bold" />
                      <!-- Bass Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/bass_small.png"
                             Grid.Row="1"
-                            Grid.Column="0"
+                            Grid.Column="2"
                             VerticalAlignment="Top"
+                            HorizontalAlignment="Right"
                             Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                      <controls:StarRatingControl Rating="{Binding BassString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  Grid.Row="1"
-                                                 Grid.Column="1"
+                                                 Grid.Column="3"
                                                  FontWeight="Bold"
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
                      <!-- Vocals Rating -->
                      <Image asyncImage:ImageLoader.Source="avares://RhythmVerseClient/Resources/Images/vocals_small.png"
-                            Grid.Row="1"
-                            Grid.Column="2"
+                            Grid.Row="2"
+                            Grid.Column="0"
                             VerticalAlignment="Top"
                             Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                      <controls:StarRatingControl Rating="{Binding VocalString}"
                                                  GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                  FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 Grid.Row="1"
-                                                 Grid.Column="3"
+                                                 Grid.Row="2"
+                                                 Grid.Column="1"
                                                  FontWeight="Bold"
                                                  Foreground="{StaticResource ThemeAccentBrush}"/>
               </Grid>

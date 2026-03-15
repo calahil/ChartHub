@@ -1,0 +1,68 @@
+namespace RhythmVerseClient.Services.Transfers;
+
+public sealed class GoogleDriveDestinationWriter(IGoogleDriveClient googleDriveClient) : IGoogleDriveDestinationWriter
+{
+    private readonly IGoogleDriveClient _googleDriveClient = googleDriveClient;
+
+    public async Task<DestinationWriteResult> WriteFromTempAsync(
+        string tempFilePath,
+        string desiredName,
+        CancellationToken cancellationToken = default)
+    {
+        var folderId = await GetRhythmVerseFolderIdAsync(cancellationToken);
+        var finalName = await ResolveUniqueNameAsync(folderId, desiredName, cancellationToken);
+
+        await _googleDriveClient.UploadFileAsync(folderId, tempFilePath, finalName);
+
+        return new DestinationWriteResult(
+            FinalName: finalName,
+            FinalLocation: $"drive://{folderId}/{finalName}",
+            DestinationContainer: folderId);
+    }
+
+    public async Task<DestinationWriteResult?> TryCopyDriveFileAsync(
+        string sourceFileId,
+        string desiredName,
+        CancellationToken cancellationToken = default)
+    {
+        var folderId = await GetRhythmVerseFolderIdAsync(cancellationToken);
+        var finalName = await ResolveUniqueNameAsync(folderId, desiredName, cancellationToken);
+
+        try
+        {
+            await _googleDriveClient.CopyFileIntoFolderAsync(sourceFileId, folderId, finalName);
+        }
+        catch
+        {
+            return null;
+        }
+
+        return new DestinationWriteResult(
+            FinalName: finalName,
+            FinalLocation: $"drive://{folderId}/{finalName}",
+            DestinationContainer: folderId);
+    }
+
+    public async Task<string> GetRhythmVerseFolderIdAsync(CancellationToken cancellationToken = default)
+    {
+        await _googleDriveClient.InitializeAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(_googleDriveClient.RhythmVerseFolderId))
+            throw new InvalidOperationException("Google Drive folder is not initialised.");
+
+        return _googleDriveClient.RhythmVerseFolderId;
+    }
+
+    private async Task<string> ResolveUniqueNameAsync(
+        string folderId,
+        string desiredName,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _googleDriveClient.ListFilesAsync(folderId);
+        var existingNames = existing
+            .Where(f => !string.IsNullOrWhiteSpace(f.Name))
+            .Select(f => f.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return NameConflictResolver.ResolveUniqueName(desiredName, name => existingNames.Contains(name));
+    }
+}

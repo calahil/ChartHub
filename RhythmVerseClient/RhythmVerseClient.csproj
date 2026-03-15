@@ -29,6 +29,7 @@
 		<SupportedOSPlatformVersion>24</SupportedOSPlatformVersion>
 		<ApplicationId>com.calahilstudios.rhythmverseclient</ApplicationId>
 		<AndroidManifest>Android/AndroidManifest.xml</AndroidManifest>
+		<RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -44,10 +45,14 @@
 		<PackageReference Include="Google.Apis.Drive.v3" Version="1.68.0.3490" />
 		<PackageReference Include="HtmlAgilityPack" Version="1.11.65" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.0" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
 		<PackageReference Include="SharpCompress" Version="0.38.0" />
-		<PackageReference Include="Svg.Skia" Version="3.0.3" />
+		<PackageReference Include="Svg.Skia" Version="2.0.0.8" />
+		<PackageReference Include="SkiaSharp" Version="2.88.9" />
+		<PackageReference Include="SkiaSharp.HarfBuzz" Version="2.88.9" />
+		<PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.9" />
 		<PackageReference Include="YamlDotNet" Version="16.3.0" />
 	</ItemGroup>
 

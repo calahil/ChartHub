@@ -2,9 +2,7 @@
 using Google.Apis.Download;
 using Google.Apis.Drive.v3;
 using Google.Apis.Services;
-using Google.Apis.Util.Store;
 using HtmlAgilityPack;
-using Microsoft.Extensions.Configuration;
 using RhythmVerseClient.Utilities;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Zip;
@@ -14,79 +12,75 @@ using System.Text.RegularExpressions;
 
 namespace RhythmVerseClient.Services
 {
-    public class DownloadService(IConfiguration configuration)
+    public class DownloadService(IGoogleAuthProvider authProvider)
     {
         private readonly HttpClient _httpClient = new();
         private readonly UrlHelper _urlHelper = new();
-        private readonly GoogleDriveService _googleDriveService = new(configuration);
+        private readonly GoogleDriveService _googleDriveService = new(authProvider);
         private IProgress<double> _progress = new Progress<double>();
 
-        public async Task DownloadFileAsync(DownloadFile song)
+        public async Task DownloadFileAsync(DownloadFile song, CancellationToken cancellationToken = default)
         {
-            try
+            string finalUrl = await _urlHelper.GetFinalRedirectUrlAsync(song.Url);
+            song.Url = finalUrl;
+
+            if (song.Url.StartsWith("https://drive.google.com/drive"))
             {
-                string finalUrl = await _urlHelper.GetFinalRedirectUrlAsync(song.Url);
-                song.Url = finalUrl;
-                if (song.Url.StartsWith("https://drive.google.com/drive"))
+                song.Status = "DownloadingDriveFolder";
+                var fileId = UrlExtractor.ExtractIdFromUrl(song.Url);
+                await _googleDriveService.DownloadFolderAsync(song, fileId, cancellationToken);
+            }
+            else if (song.Url.StartsWith("https://drive.google.com/file"))
+            {
+                song.Status = "DownloadingDriveFile";
+                var fileId = UrlExtractor.ExtractIdFromUrl(song.Url);
+                await _googleDriveService.DownloadFileAsync(song, _progress, fileId, cancellationToken);
+            }
+            else if (song.Url.StartsWith("https://www.mediafire.com") || song.Url.StartsWith("http://www.mediafire.com"))
+            {
+                song.Status = "ResolvingMediaFire";
+                HttpResponseMessage response = await _httpClient.GetAsync(finalUrl, cancellationToken);
+                response.EnsureSuccessStatusCode();
+
+                string content = await response.Content.ReadAsStringAsync(cancellationToken);
+
+                HtmlDocument doc = new();
+                doc.LoadHtml(content);
+
+                var linkNode = doc.DocumentNode.SelectSingleNode("//a[@id='downloadButton']");
+
+                if (linkNode != null)
                 {
-                    var fileId = UrlExtractor.ExtractIdFromUrl(song.Url);
-                    await _googleDriveService.DownloadFolderAsync(song, fileId);
-                }
-                else if (song.Url.StartsWith("https://drive.google.com/file"))
-                {
-                    var fileId = UrlExtractor.ExtractIdFromUrl(song.Url);
-                    await _googleDriveService.DownloadFileAsync(song, _progress, fileId);
-                }
-                else if (song.Url.StartsWith("https://www.mediafire.com") || song.Url.StartsWith("http://www.mediafire.com"))
-                {
-                    HttpResponseMessage response = await _httpClient.GetAsync(finalUrl);
-                    response.EnsureSuccessStatusCode();
-
-                    string content = await response.Content.ReadAsStringAsync();
-
-                    HtmlDocument doc = new();
-                    doc.LoadHtml(content);
-
-                    var linkNode = doc.DocumentNode.SelectSingleNode("//a[@id='downloadButton']");
-
-                    if (linkNode != null)
-                    {
-                        string downloadLink = linkNode.GetAttributeValue("href", "");
-                        song.Url = downloadLink;
-                        song.DisplayName = ExtractMediaFireFileName(downloadLink);
-                        await DownloadAsync(song);
-                        Console.WriteLine($"Download link: {downloadLink}");
-                    }
-                    else
-                    {
-                        Console.WriteLine("Download link not found.");
-                    }
-
+                    string downloadLink = linkNode.GetAttributeValue("href", "");
+                    song.Url = downloadLink;
+                    song.DisplayName = ExtractMediaFireFileName(downloadLink);
+                    await DownloadAsync(song, cancellationToken);
                 }
                 else
                 {
-                    await DownloadAsync(song);
+                    throw new InvalidOperationException("MediaFire download link not found on page.");
                 }
-                if (song.DownloadProgress != 100)
-                    song.DownloadProgress = 100;
-                song.Finished = true;
 
             }
-            catch (Exception ex)
+            else
             {
-                Logger.LogMessage($"An error occurred: {ex.Message}");
+                await DownloadAsync(song, cancellationToken);
             }
+
+            if (song.DownloadProgress != 100)
+                song.DownloadProgress = 100;
+            song.Finished = true;
         }
 
-        private async Task DownloadAsync(DownloadFile song)
+        private async Task DownloadAsync(DownloadFile song, CancellationToken cancellationToken)
         {
-            var response = await _httpClient.GetAsync(song.Url, HttpCompletionOption.ResponseHeadersRead);
+            var response = await _httpClient.GetAsync(song.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var totalBytes = response.Content.Headers.ContentLength ?? -1L;
             var canReportProgress = totalBytes != -1;
 
-            using var contentStream = await response.Content.ReadAsStreamAsync();
+            using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
             var totalRead = 0L;
             var buffer = new byte[8192];
             var isMoreToRead = true;
@@ -94,7 +88,7 @@ namespace RhythmVerseClient.Services
             using var fileStream = new FileStream(Path.Combine(song.FilePath, song.DisplayName), FileMode.Create, FileAccess.Write, FileShare.None, buffer.Length, true);
             do
             {
-                var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+                var read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
                 if (read == 0)
                 {
                     isMoreToRead = false;
@@ -102,7 +96,7 @@ namespace RhythmVerseClient.Services
                     continue;
                 }
 
-                await fileStream.WriteAsync(buffer.AsMemory(0, read));
+                await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
 
                 totalRead += read;
 
@@ -134,34 +128,32 @@ namespace RhythmVerseClient.Services
         }
     }
 
-    public class GoogleDriveService(IConfiguration configuration)
+    public class GoogleDriveService(IGoogleAuthProvider authProvider)
     {
-        private static readonly string[] Scopes = [DriveService.Scope.Drive];
+        private static readonly string[] Scopes = [DriveService.Scope.DriveReadonly, DriveService.Scope.DriveFile];
         private static readonly string ApplicationName = "RhythmVerseClient";
-        private readonly IConfiguration _configuration = configuration;
+        private readonly IGoogleAuthProvider _authProvider = authProvider;
         private DriveService? _driveService;
+        private UserCredential? _credential;
 
-        public async Task<DriveService> GetServiceAsync()
+        public async Task<DriveService> GetServiceAsync(CancellationToken cancellationToken = default)
         {
-            UserCredential credential;
-            var clientSecrets = new ClientSecrets
-            {
-                ClientId = _configuration["GoogleDrive:client_id"],
-                ClientSecret = _configuration["GoogleDrive:client_secret"]
-            };
+            if (_driveService is not null)
+                return _driveService;
 
-            credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-            clientSecrets,
-            Scopes,
-            "user",
-            CancellationToken.None,
-            new FileDataStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "token.json"), false));
-
-            return new DriveService(new BaseClientService.Initializer()
+            if (_credential is null)
             {
-                HttpClientInitializer = credential,
+                _credential = await _authProvider.TryAuthorizeSilentAsync(Scopes, cancellationToken)
+                    ?? await _authProvider.AuthorizeInteractiveAsync(Scopes, cancellationToken);
+            }
+
+            _driveService = new DriveService(new BaseClientService.Initializer()
+            {
+                HttpClientInitializer = _credential,
                 ApplicationName = ApplicationName,
             });
+
+            return _driveService;
         }
 
         public async Task DownloadFileAsync(DownloadFile downloadFile, IProgress<double> progress, string fileId, CancellationToken cancellationToken = default)
@@ -171,21 +163,17 @@ namespace RhythmVerseClient.Services
             var request = _driveService.Files.Get(fileId);
             var savePath = Path.Combine(downloadFile.FilePath, downloadFile.DisplayName);
 
-            using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None);
-            var file = await request.DownloadAsync(fileStream, cancellationToken);
-            downloadFile.FileSize = file.BytesDownloaded; // Update file size
-            var mediaDownloader = new MediaDownloader(_driveService)
-            {
-                ChunkSize = 256 * 1024  // Adjust the chunk size if needed
-            };
-
-            mediaDownloader.ProgressChanged += progressEvent =>
+            request.MediaDownloader.ChunkSize = 256 * 1024;
+            request.MediaDownloader.ProgressChanged += progressEvent =>
             {
                 if (progressEvent.Status == Google.Apis.Download.DownloadStatus.Downloading)
                 {
-                    double progressPercentage = (double)((double)progressEvent.BytesDownloaded / downloadFile.FileSize * 100);
-                    progress?.Report(progressPercentage); // Correctly reporting progress
-                    downloadFile.DownloadProgress = progressPercentage;
+                    if (downloadFile.FileSize is > 0)
+                    {
+                        double progressPercentage = (double)progressEvent.BytesDownloaded / downloadFile.FileSize.Value * 100;
+                        progress?.Report(progressPercentage);
+                        downloadFile.DownloadProgress = progressPercentage;
+                    }
                 }
                 else if (progressEvent.Status == Google.Apis.Download.DownloadStatus.Completed)
                 {
@@ -194,7 +182,9 @@ namespace RhythmVerseClient.Services
                 }
             };
 
-            await mediaDownloader.DownloadAsync(downloadFile.Url, fileStream, cancellationToken);
+            using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None);
+            var file = await request.DownloadAsync(fileStream, cancellationToken);
+            downloadFile.FileSize = Math.Max(downloadFile.FileSize ?? 0, file.BytesDownloaded);
         }
 
         public async Task DownloadFolderAsync(DownloadFile downloadFile, string fileId, CancellationToken cancellationToken = default)
@@ -428,6 +418,42 @@ namespace RhythmVerseClient.Services
             {
                 _finished = value;
                 OnPropertyChanged(nameof(Finished));
+                OnPropertyChanged(nameof(CanCancel));
+            }
+        }
+
+        private string _status = "Queued";
+        public string Status
+        {
+            get => _status;
+            set
+            {
+                if (_status != value)
+                {
+                    _status = value;
+                    OnPropertyChanged(nameof(Status));
+                    OnPropertyChanged(nameof(CanCancel));
+                }
+            }
+        }
+
+        public bool CanCancel => !Finished
+            && !string.Equals(Status, "Cancelling", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(Status, "Failed", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(Status, "Completed", StringComparison.OrdinalIgnoreCase);
+
+        private string? _errorMessage;
+        public string? ErrorMessage
+        {
+            get => _errorMessage;
+            set
+            {
+                if (_errorMessage != value)
+                {
+                    _errorMessage = value;
+                    OnPropertyChanged(nameof(ErrorMessage));
+                }
             }
         }
 
