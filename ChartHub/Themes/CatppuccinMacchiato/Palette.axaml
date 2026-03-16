@@ -1,0 +1,80 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ============================================================ -->
+  <!--   Catppuccin Macchiato — Base Palette                        -->
+  <!--   https://github.com/catppuccin/catppuccin                   -->
+  <!-- ============================================================ -->
+
+  <!-- Base colours -->
+  <Color x:Key="MacchiatoRosewater">#F4DBD6</Color>
+  <Color x:Key="MacchiatoFlamingo">#F0C6C6</Color>
+  <Color x:Key="MacchiatoPink">#F5BDE6</Color>
+  <Color x:Key="MacchiatoMauve">#C6A0F6</Color>
+  <Color x:Key="MacchiatoRed">#ED8796</Color>
+  <Color x:Key="MacchiatoMaroon">#EE99A0</Color>
+  <Color x:Key="MacchiatoPeach">#F5A97F</Color>
+  <Color x:Key="MacchiatoYellow">#EED49F</Color>
+  <Color x:Key="MacchiatoGreen">#A6DA95</Color>
+  <Color x:Key="MacchiatoTeal">#8BD5CA</Color>
+  <Color x:Key="MacchiatoSky">#91D7E3</Color>
+  <Color x:Key="MacchiatoSapphire">#7DC4E4</Color>
+  <Color x:Key="MacchiatoBlue">#8AADF4</Color>
+  <Color x:Key="MacchiatoLavender">#B7BDF8</Color>
+
+  <!-- Text -->
+  <Color x:Key="MacchiatoText">#CAD3F5</Color>
+  <Color x:Key="MacchiatoSubtext1">#B8C0E0</Color>
+  <Color x:Key="MacchiatoSubtext0">#A5ADCB</Color>
+
+  <!-- Overlay -->
+  <Color x:Key="MacchiatoOverlay2">#939AB7</Color>
+  <Color x:Key="MacchiatoOverlay1">#8087A2</Color>
+  <Color x:Key="MacchiatoOverlay0">#6E738D</Color>
+
+  <!-- Surface -->
+  <Color x:Key="MacchiatoSurface2">#5B6078</Color>
+  <Color x:Key="MacchiatoSurface1">#494D64</Color>
+  <Color x:Key="MacchiatoSurface0">#363A4F</Color>
+
+  <!-- Base layers -->
+  <Color x:Key="MacchiatoBase">#24273A</Color>
+  <Color x:Key="MacchiatoMantle">#1E2030</Color>
+  <Color x:Key="MacchiatoCrust">#181926</Color>
+
+  <!-- ============================================================ -->
+  <!--   Solid-colour brushes (direct palette brushes)              -->
+  <!-- ============================================================ -->
+
+  <SolidColorBrush x:Key="BrushRosewater"  Color="{StaticResource MacchiatoRosewater}"/>
+  <SolidColorBrush x:Key="BrushFlamingo"   Color="{StaticResource MacchiatoFlamingo}"/>
+  <SolidColorBrush x:Key="BrushPink"       Color="{StaticResource MacchiatoPink}"/>
+  <SolidColorBrush x:Key="BrushMauve"      Color="{StaticResource MacchiatoMauve}"/>
+  <SolidColorBrush x:Key="BrushRed"        Color="{StaticResource MacchiatoRed}"/>
+  <SolidColorBrush x:Key="BrushMaroon"     Color="{StaticResource MacchiatoMaroon}"/>
+  <SolidColorBrush x:Key="BrushPeach"      Color="{StaticResource MacchiatoPeach}"/>
+  <SolidColorBrush x:Key="BrushYellow"     Color="{StaticResource MacchiatoYellow}"/>
+  <SolidColorBrush x:Key="BrushGreen"      Color="{StaticResource MacchiatoGreen}"/>
+  <SolidColorBrush x:Key="BrushTeal"       Color="{StaticResource MacchiatoTeal}"/>
+  <SolidColorBrush x:Key="BrushSky"        Color="{StaticResource MacchiatoSky}"/>
+  <SolidColorBrush x:Key="BrushSapphire"   Color="{StaticResource MacchiatoSapphire}"/>
+  <SolidColorBrush x:Key="BrushBlue"       Color="{StaticResource MacchiatoBlue}"/>
+  <SolidColorBrush x:Key="BrushLavender"   Color="{StaticResource MacchiatoLavender}"/>
+
+  <SolidColorBrush x:Key="BrushText"       Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="BrushSubtext1"   Color="{StaticResource MacchiatoSubtext1}"/>
+  <SolidColorBrush x:Key="BrushSubtext0"   Color="{StaticResource MacchiatoSubtext0}"/>
+
+  <SolidColorBrush x:Key="BrushOverlay2"   Color="{StaticResource MacchiatoOverlay2}"/>
+  <SolidColorBrush x:Key="BrushOverlay1"   Color="{StaticResource MacchiatoOverlay1}"/>
+  <SolidColorBrush x:Key="BrushOverlay0"   Color="{StaticResource MacchiatoOverlay0}"/>
+
+  <SolidColorBrush x:Key="BrushSurface2"   Color="{StaticResource MacchiatoSurface2}"/>
+  <SolidColorBrush x:Key="BrushSurface1"   Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="BrushSurface0"   Color="{StaticResource MacchiatoSurface0}"/>
+
+  <SolidColorBrush x:Key="BrushBase"       Color="{StaticResource MacchiatoBase}"/>
+  <SolidColorBrush x:Key="BrushMantle"     Color="{StaticResource MacchiatoMantle}"/>
+  <SolidColorBrush x:Key="BrushCrust"      Color="{StaticResource MacchiatoCrust}"/>
+
+</ResourceDictionary>

@@ -1,0 +1,45 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:ChartHub"
+             x:Class="ChartHub.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://ChartHub/Themes/CatppuccinMacchiato/Theme.axaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <local:ViewLocator x:Key="ViewLocator" />
+            <FontFamily x:Key="CaskaydiaNerdRegular">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-Regular.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdItalic">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-Italic.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdLight">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-Light.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdLightItalic">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-LightItalic.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdSemiLight">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-SemiLight.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdSemiLightItalic">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-SemiLightItalic.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdExtraLight">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-ExtraLight.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdExtraLightItalic">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-ExtraLightItalic.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdSemiBold">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-SemiBold.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdSemiBoldItalic">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-SemiBoldItalic.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdBold">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-Bold.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="CaskaydiaNerdBoldItalic">avares://ChartHub/Resources/Fonts/CaskaydiaCoveNerdFont-BoldItalic.ttf#CaskaydiaCove Nerd Font</FontFamily>
+            <FontFamily x:Key="GlyphIconFontFamily">{StaticResource CaskaydiaNerdRegular}</FontFamily>
+            <FontFamily x:Key="AppDefaultFontFamily">{StaticResource CaskaydiaNerdRegular}</FontFamily>
+        </ResourceDictionary>
+    </Application.Resources>
+
+    <Application.DataTemplates>
+        <local:ViewLocator />
+    </Application.DataTemplates>
+
+    <Application.Styles>
+        <FluentTheme />
+        <Style Selector=":is(TemplatedControl)">
+            <Setter Property="FontFamily" Value="{StaticResource AppDefaultFontFamily}" />
+        </Style>
+        <Style Selector="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource AppDefaultFontFamily}" />
+        </Style>
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+    </Application.Styles>
+
+</Application>

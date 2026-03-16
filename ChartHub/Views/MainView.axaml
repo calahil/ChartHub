@@ -1,0 +1,355 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+         xmlns:Views="using:ChartHub.Views"
+         xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
+         xmlns:utilities="clr-namespace:ChartHub.Utilities"
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+         x:Class="ChartHub.Views.MainView"
+         x:Name="MainViewRoot"
+         x:DataType="viewmodels:MainViewModel">
+
+    <UserControl.Resources>
+        <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+    </UserControl.Resources>
+
+    <SplitView IsPaneOpen="{Binding IsFilterPaneOpen}"
+               OpenPaneLength="380"
+               CompactPaneLength="48"
+               PanePlacement="Right"
+               DisplayMode="CompactOverlay">
+        <SplitView.Pane>
+            <Grid ColumnDefinitions="48,*">
+                <Grid Grid.Column="0"
+                      Grid.RowDefinitions="Auto,Auto"
+                      Background="{StaticResource ThemeBackgroundBrush}">
+                    <Button Grid.Row="0"
+                            Margin="10,0,0,0"
+                            Command="{Binding ShowDownloadsPaneCommand}"
+                            HorizontalAlignment="Right">
+                        <Image Source="{Binding RhythmVerseViewModel.PageStrings.ShowDownloads, Converter={StaticResource AssetPathToImageConverter}}"
+                               Width="{StaticResource IconSizeDense}"
+                               Height="{StaticResource IconSizeDense}" />
+                    </Button>
+                    <Button Grid.Row="1"
+                            Margin="10,0,0,0"
+                            Command="{Binding ShowFiltersPaneCommand}"
+                            HorizontalAlignment="Right">
+                        <Image Source="{Binding RhythmVerseViewModel.PageStrings.ShowFilters, Converter={StaticResource AssetPathToImageConverter}}"
+                               Width="{StaticResource IconSizeDense}"
+                               Height="{StaticResource IconSizeDense}" />
+                    </Button>
+                </Grid>
+
+                <Border Grid.Column="1"
+                        IsVisible="{Binding IsFilterPaneOpen}"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        BorderThickness="1"
+                        Padding="12"
+                        Background="{StaticResource ListBoxBackground}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <Grid>
+                        <StackPanel Spacing="12"
+                                    IsVisible="{Binding ShowRhythmVerseFilters}">
+                            <TextBlock Text="RhythmVerse Filters"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource ThemeForegroundBrush}" />
+
+                            <Image Source="{Binding RhythmVerseViewModel.PageStrings.SortBy, Converter={StaticResource AssetPathToImageConverter}}"
+                                Width="{StaticResource IconSizeDefault}"
+                                Height="{StaticResource IconSizeDefault}"
+                                HorizontalAlignment="Left" />
+                            <ComboBox ItemsSource="{Binding RhythmVerseViewModel.Filters}"
+                                      SelectedItem="{Binding RhythmVerseViewModel.SelectedFilter}" />
+
+                            <Image Source="{Binding RhythmVerseViewModel.PageStrings.Order, Converter={StaticResource AssetPathToImageConverter}}"
+                                Width="{StaticResource IconSizeDefault}"
+                                Height="{StaticResource IconSizeDefault}"
+                                HorizontalAlignment="Left" />
+                            <ComboBox ItemsSource="{Binding RhythmVerseViewModel.Orders}"
+                                      SelectedItem="{Binding RhythmVerseViewModel.SelectedOrder}" />
+
+                            <Image Source="{Binding RhythmVerseViewModel.PageStrings.Instrument, Converter={StaticResource AssetPathToImageConverter}}"
+                                Width="{StaticResource IconSizeDefault}"
+                                Height="{StaticResource IconSizeDefault}"
+                                HorizontalAlignment="Left" />
+                            <ListBox ItemsSource="{Binding RhythmVerseViewModel.Instruments}"
+                                     SelectedItems="{Binding RhythmVerseViewModel.SelectedInstruments}"
+                                     SelectionMode="Multiple,Toggle">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   Foreground="{StaticResource ThemeForegroundBrush}" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <Button Command="{Binding RhythmVerseViewModel.RefreshButtonCommand}">
+                                <TextBlock Text="Apply RhythmVerse Filters" />
+                            </Button>
+                        </StackPanel>
+
+                        <StackPanel Spacing="10"
+                                    IsVisible="{Binding ShowEncoreFilters}">
+                            <TextBlock Text="Encore Advanced Filters"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource ThemeForegroundBrush}" />
+
+                            <TextBlock Text="Instrument"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <ComboBox ItemsSource="{Binding EncoreViewModel.Instruments}"
+                                      SelectedItem="{Binding EncoreViewModel.SelectedInstrument}" />
+                            <TextBlock Text="Difficulty"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <ComboBox ItemsSource="{Binding EncoreViewModel.Difficulties}"
+                                      SelectedItem="{Binding EncoreViewModel.SelectedDifficulty}" />
+                            <TextBlock Text="Drum Type"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <ComboBox ItemsSource="{Binding EncoreViewModel.DrumTypes}"
+                                      SelectedItem="{Binding EncoreViewModel.SelectedDrumType}" />
+                            <TextBlock Text="Sort Column"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <ComboBox ItemsSource="{Binding EncoreViewModel.PageStrings.SortColumns}"
+                                      SelectedItem="{Binding EncoreViewModel.SelectedSort}" />
+                            <TextBlock Text="Sort Direction"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <ComboBox ItemsSource="{Binding EncoreViewModel.PageStrings.SortDirections}"
+                                      SelectedItem="{Binding EncoreViewModel.SelectedSortDirection}" />
+
+                            <TextBlock Text="Advanced Name"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <TextBox Watermark="Advanced name"
+                                     Text="{Binding EncoreViewModel.AdvancedName}" />
+                            <TextBlock Text="Advanced Artist"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <TextBox Watermark="Advanced artist"
+                                     Text="{Binding EncoreViewModel.AdvancedArtist}" />
+                            <TextBlock Text="Advanced Charter"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <TextBox Watermark="Advanced charter"
+                                     Text="{Binding EncoreViewModel.AdvancedCharter}" />
+                            <TextBlock Text="Advanced Album"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <TextBox Watermark="Advanced album"
+                                     Text="{Binding EncoreViewModel.AdvancedAlbum}" />
+                            <TextBlock Text="Advanced Genre"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <TextBox Watermark="Advanced genre"
+                                     Text="{Binding EncoreViewModel.AdvancedGenre}" />
+                            <TextBlock Text="Advanced Year"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <TextBox Watermark="Advanced year"
+                                     Text="{Binding EncoreViewModel.AdvancedYear}" />
+                            <TextBlock Text="Min Year"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <TextBox Watermark="Min year"
+                                     Text="{Binding EncoreViewModel.MinYear}" />
+                            <TextBlock Text="Max Year"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <TextBox Watermark="Max year"
+                                     Text="{Binding EncoreViewModel.MaxYear}" />
+                            <TextBlock Text="Min Length (ms)"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <TextBox Watermark="Min length (ms)"
+                                     Text="{Binding EncoreViewModel.MinLength}" />
+                            <TextBlock Text="Max Length (ms)"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <TextBox Watermark="Max length (ms)"
+                                     Text="{Binding EncoreViewModel.MaxLength}" />
+
+                            <TextBlock Text="Drums Reviewed"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <CheckBox Content="Drums reviewed"
+                                      IsChecked="{Binding EncoreViewModel.DrumsReviewed}" />
+                            <TextBlock Text="Has Video"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <CheckBox Content="Has video"
+                                      IsThreeState="True"
+                                      IsChecked="{Binding EncoreViewModel.HasVideoBackground}" />
+                            <TextBlock Text="Has Lyrics"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <CheckBox Content="Has lyrics"
+                                      IsThreeState="True"
+                                      IsChecked="{Binding EncoreViewModel.HasLyrics}" />
+                            <TextBlock Text="Has Vocals"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <CheckBox Content="Has vocals"
+                                      IsThreeState="True"
+                                      IsChecked="{Binding EncoreViewModel.HasVocals}" />
+                            <TextBlock Text="Has 2x Kick"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <CheckBox Content="Has 2x kick"
+                                      IsThreeState="True"
+                                      IsChecked="{Binding EncoreViewModel.Has2xKick}" />
+                            <TextBlock Text="Has Issues"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <CheckBox Content="Has issues"
+                                      IsThreeState="True"
+                                      IsChecked="{Binding EncoreViewModel.HasIssues}" />
+                            <TextBlock Text="Modchart"
+                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            <CheckBox Content="Modchart"
+                                      IsThreeState="True"
+                                      IsChecked="{Binding EncoreViewModel.Modchart}" />
+
+                            <Button Command="{Binding EncoreViewModel.RefreshCommand}">
+                                <TextBlock Text="Apply Encore Filters" />
+                            </Button>
+                        </StackPanel>
+
+                        <StackPanel Spacing="8"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    IsVisible="{Binding ShowFilterFallback}">
+                            <TextBlock Text="Filters"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Select either the RhythmVerse or Encore tab to view filters."
+                                       TextWrapping="Wrap"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                        </StackPanel>
+
+                        <Grid IsVisible="{Binding IsDownloadsPaneVisible}">
+                            <Grid RowDefinitions="Auto,*">
+                                <TextBlock Grid.Row="0"
+                                           Text="Source Downloads"
+                                           FontSize="16"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource ThemeForegroundBrush}" />
+
+                                <Grid Grid.Row="1">
+                                    <TextBlock Text="No source downloads queued yet."
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource ThemeForegroundLowBrush}"
+                                                                                             IsVisible="{Binding NoSharedDownloads}" />
+
+                                    <ListBox ItemsSource="{Binding SharedDownloads}"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                                                                         IsVisible="{Binding HasSharedDownloads}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="0,0,0,8"
+                                                        Padding="12"
+                                                        BorderThickness="1"
+                                                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                        CornerRadius="8"
+                                                        Background="{StaticResource ThemeControlLowBrush}">
+                                                    <Grid RowDefinitions="Auto,Auto,Auto"
+                                                          ColumnDefinitions="*,Auto">
+                                                        <StackPanel Grid.Row="0"
+                                                                    Grid.Column="0"
+                                                                    Spacing="6">
+                                                            <TextBlock Text="{Binding DisplayName}"
+                                                                       FontWeight="SemiBold"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <StackPanel Orientation="Horizontal"
+                                                                        Spacing="8">
+                                                                <Border Padding="8,2"
+                                                                        CornerRadius="10"
+                                                                        BorderThickness="1"
+                                                                        BorderBrush="{StaticResource ThemeAccentBrush}"
+                                                                        Background="{StaticResource ThemeControlMidBrush}">
+                                                                    <TextBlock Text="{Binding SourceName}"
+                                                                               FontSize="11"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{StaticResource ThemeAccentBrush}" />
+                                                                </Border>
+                                                                <Border Padding="8,2"
+                                                                        CornerRadius="10"
+                                                                        BorderThickness="1"
+                                                                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                                        Background="{StaticResource ThemeControlMidBrush}">
+                                                                    <TextBlock Text="{Binding Status}"
+                                                                               FontSize="11"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                                </Border>
+                                                            </StackPanel>
+                                                        </StackPanel>
+
+                                                        <Button Grid.Row="0"
+                                                                Grid.Column="1"
+                                                                Content="Cancel"
+                                                                Margin="8,0,0,0"
+                                                                MinHeight="34"
+                                                                Padding="12,6"
+                                                                Command="{Binding #MainViewRoot.DataContext.CancelSharedDownloadCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                IsEnabled="{Binding CanCancel}"
+                                                                IsVisible="{Binding CanCancel}" />
+
+                                                        <ProgressBar Grid.Row="1"
+                                                                     Grid.ColumnSpan="2"
+                                                                     Margin="0,8,0,0"
+                                                                     Height="16"
+                                                                     Maximum="100"
+                                                                     Value="{Binding DownloadProgress}" />
+
+                                                        <Grid Grid.Row="2"
+                                                              Grid.ColumnSpan="2"
+                                                              Margin="0,8,0,0"
+                                                              ColumnDefinitions="Auto,*">
+                                                            <TextBlock Grid.Column="0"
+                                                                       Text="{Binding DownloadProgress, StringFormat='{}{0:F0}%'}"
+                                                                       FontSize="11"
+                                                                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                            <TextBlock Grid.Column="1"
+                                                                       Margin="10,0,0,0"
+                                                                       Text="{Binding ErrorMessage}"
+                                                                       TextWrapping="Wrap"
+                                                                       Foreground="{StaticResource SemanticError}" />
+                                                        </Grid>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                        </Grid>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </SplitView.Pane>
+
+        <TabControl SelectedIndex="{Binding SelectedMainTabIndex}">
+            <TabItem Header="RhythmVerse"
+                    FontSize="16">
+                <ContentControl Content="{Binding RhythmVerseViewModel}" />
+            </TabItem>
+            <TabItem Header="Encore"
+                    FontSize="16">
+                <ContentControl Content="{Binding EncoreViewModel}" />
+            </TabItem>
+            <TabItem Header="Download"
+                    FontSize="16"
+                    IsVisible="{Binding IsDownloadTabVisible}">
+                <ContentControl Content="{Binding DownloadViewModel}" />
+            </TabItem>
+            <TabItem Header="CloneHero"
+                    FontSize="16"
+                    IsVisible="{Binding IsCloneHeroTabVisible}">
+                <ContentControl Content="{Binding CloneHeroViewModel}" />
+            </TabItem>
+            <TabItem Header="Install Song"
+                    FontSize="16"
+                    IsVisible="{Binding IsInstallSongTabVisible}">
+                <ContentControl Content="{Binding InstallSongViewModel}" />
+            </TabItem>
+            <TabItem Header="Settings"
+                    FontSize="16"
+                    IsVisible="{Binding IsSettingsTabVisible}">
+                <ContentControl Content="{Binding SettingsViewModel}" />
+            </TabItem>
+        </TabControl>
+    </SplitView>
+
+</UserControl>
