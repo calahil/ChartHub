@@ -53,12 +53,14 @@ public class ViewLocator : IDataTemplate
     public bool Match(object? data)
     {
         return data is RhythmVerseViewModel
+            or EncoreViewModel
             or MainViewModel
             or DownloadViewModel
             or CloneHeroViewModel
             or InstallSongViewModel
             or SettingsViewModel
             or AppShellViewModel
+            or SplashViewModel
             or AuthGateViewModel;
     }
 }

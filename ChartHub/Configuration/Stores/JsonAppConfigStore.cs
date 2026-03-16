@@ -58,6 +58,9 @@ public sealed class JsonAppConfigStore : IAppConfigStore
         if (config.Runtime is null)
             config.Runtime = new RuntimeAppConfig();
 
+        if (config.EncoreUi is null)
+            config.EncoreUi = new EncoreUiStateConfig();
+
         var rootNode = JsonNode.Parse(json) as JsonObject;
         if (rootNode is not null)
         {

@@ -364,6 +364,20 @@ namespace ChartHub.Services
     }
     public class DownloadFile(string displayName, string filePath, string urlString, long? fileSize) : INotifyPropertyChanged
     {
+        private string _sourceName = string.Empty;
+        public string SourceName
+        {
+            get => _sourceName;
+            set
+            {
+                if (_sourceName != value)
+                {
+                    _sourceName = value;
+                    OnPropertyChanged(nameof(SourceName));
+                }
+            }
+        }
+
         private string _displayName = displayName;
         public string DisplayName
         {
@@ -477,6 +491,8 @@ namespace ChartHub.Services
                 }
             }
         }
+
+        public Action? CancelAction { get; set; }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 

@@ -27,8 +27,18 @@ dotnet run --project ChartHub/ChartHub.csproj
 ## Run tests
 
 ```bash
-dotnet test ChartHub.Tests/ChartHub.csproj
+dotnet test ChartHub.Tests/ChartHub.Tests.csproj
 ```
+
+## Data Sources
+
+- `RhythmVerse` and `Chorus Encore` are both available as search/download sources in the app.
+- Downloads from either source can be routed through the same local destination flow.
+
+## Library Catalog
+
+- ChartHub stores source membership metadata in `library-catalog.db` under the app config directory.
+- Source IDs are tracked per provider (`rhythmverse`, `encore`) to support `In Library` badges across views.
 
 ## Android build/install
 

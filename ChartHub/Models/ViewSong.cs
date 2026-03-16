@@ -127,6 +127,39 @@ namespace ChartHub.Models
             }
         }
 
+        private string? _sourceName;
+        public string? SourceName
+        {
+            get => _sourceName;
+            set
+            {
+                _sourceName = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private string? _sourceId;
+        public string? SourceId
+        {
+            get => _sourceId;
+            set
+            {
+                _sourceId = value;
+                OnPropertyChanged();
+            }
+        }
+
+        private bool _isInLibrary;
+        public bool IsInLibrary
+        {
+            get => _isInLibrary;
+            set
+            {
+                _isInLibrary = value;
+                OnPropertyChanged();
+            }
+        }
+
         private string? _fileName;
         public string? FileName
         {

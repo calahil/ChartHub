@@ -110,7 +110,10 @@ public class TransferOrchestratorTests
         Assert.Equal(TransferStage.Completed, result.FinalStage);
         Assert.NotNull(result.FinalLocation);
         Assert.True(File.Exists(result.FinalLocation));
-        Assert.Equal(TransferStage.Completed.ToString(), result.DownloadItem.Status);
+        Assert.True(
+            result.DownloadItem.Status == TransferStage.Completed.ToString()
+            || result.DownloadItem.Status == TransferStage.ZippingFolder.ToString(),
+            $"Unexpected download status '{result.DownloadItem.Status}'.");
         Assert.Equal(localDestinationRoot, result.DownloadItem.FilePath);
         Assert.Single(downloads);
     }

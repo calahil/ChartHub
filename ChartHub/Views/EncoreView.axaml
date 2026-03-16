@@ -1,0 +1,153 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
+             xmlns:models="clr-namespace:ChartHub.Models"
+             xmlns:asyncImage="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
+             mc:Ignorable="d"
+             d:DesignWidth="1200"
+             d:DesignHeight="800"
+             x:Class="ChartHub.Views.EncoreView"
+             x:DataType="viewmodels:EncoreViewModel">
+
+    <Grid RowDefinitions="Auto,*"
+          Margin="12">
+        <Grid Grid.Row="0"
+              ColumnDefinitions="3*,Auto,Auto">
+            <TextBox Grid.Column="0"
+                     Watermark="{Binding PageStrings.SearchText}"
+                 Margin="0,0,8,0"
+                 Text="{Binding SearchText}" />
+            <Button Grid.Column="1"
+                Margin="0,0,8,0"
+                    Command="{Binding RefreshCommand}">
+                <Image Source="{Binding PageStrings.Refresh}"
+                       Width="20"
+                       Height="20" />
+            </Button>
+            <Button Grid.Column="2"
+                    Command="{Binding LoadMoreCommand}"
+                    IsVisible="{Binding HasResults}">
+                <TextBlock Text="More" />
+            </Button>
+        </Grid>
+        <Grid Grid.Row="1">
+            <Grid IsVisible="{Binding IsPlaceholder}">
+                <Grid RowDefinitions="Auto,Auto"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center">
+                    <ProgressBar Grid.Row="0"
+                                 IsIndeterminate="True"
+                                 Width="200"
+                                 Height="30" />
+                    <TextBlock Grid.Row="1"
+                               Margin="0,20,0,0"
+                               HorizontalAlignment="Center"
+                               Text="{Binding PageStrings.LoadingResults}" />
+                </Grid>
+            </Grid>
+
+            <Grid IsVisible="{Binding NoResults}">
+                <TextBlock HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Text="{Binding PageStrings.NoResults}" />
+            </Grid>
+
+            <ListBox x:Name="EncoreSongsListBox"
+                     ItemsSource="{Binding DataItems}"
+                     SelectedItem="{Binding SelectedSong}"
+                     IsVisible="{Binding HasResults}"
+                     Background="{StaticResource ListBoxBackground}"
+                     BorderThickness="1"
+                     BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="models:EncoreSong">
+                        <Border Margin="0,0,0,8"
+                                Padding="12"
+                                CornerRadius="8"
+                                BorderThickness="1"
+                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                Background="{StaticResource ThemeControlLowBrush}">
+                                <Grid ColumnDefinitions="72,*,Auto"
+                                    RowDefinitions="Auto,Auto,Auto">
+                                <Image Grid.Row="0"
+                                       Grid.Column="0"
+                                       Grid.RowSpan="3"
+                                       Width="72"
+                                       Height="72"
+                                       Stretch="UniformToFill"
+                                       Margin="0,0,12,0"
+                                       asyncImage:ImageLoader.Source="{Binding AlbumArtUrl}" />
+
+                                <StackPanel Grid.Row="0"
+                                            Grid.Column="1"
+                                          Margin="0,0,12,0"
+                                            Spacing="2">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontWeight="Bold"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Artist}"
+                                               Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                    <TextBlock Text="{Binding Album}"
+                                               Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                </StackPanel>
+
+                                <Button Grid.Row="0"
+                                        Grid.Column="2"
+                                        VerticalAlignment="Top"
+                                        Command="{Binding #EncoreSongsListBox.((viewmodels:EncoreViewModel)DataContext).DownloadSongCommand}"
+                                        CommandParameter="{Binding}">
+                                    <Image Source="{Binding #EncoreSongsListBox.((viewmodels:EncoreViewModel)DataContext).PageStrings.Download}"
+                                           Width="20"
+                                           Height="20" />
+                                </Button>
+
+                                <WrapPanel Grid.Row="1"
+                                           Grid.Column="1"
+                                           Margin="0,6,12,0"
+                                           ItemHeight="28"
+                                           ItemWidth="120">
+                                    <Border Padding="8,2"
+                                            CornerRadius="10"
+                                            Background="{StaticResource ThemeControlMidBrush}">
+                                        <TextBlock Text="{Binding Charter, StringFormat='Charter: {0}'}" />
+                                    </Border>
+                                    <Border Padding="8,2"
+                                            CornerRadius="10"
+                                            Background="{StaticResource ThemeControlMidBrush}">
+                                        <TextBlock Text="{Binding FormattedTime, StringFormat='Length: {0}'}" />
+                                    </Border>
+                                    <Border Padding="8,2"
+                                            CornerRadius="10"
+                                            Background="{StaticResource ThemeControlMidBrush}"
+                                            IsVisible="{Binding HasVideoBackground}">
+                                        <TextBlock Text="Video" />
+                                    </Border>
+                                    <Border Padding="8,2"
+                                            CornerRadius="10"
+                                            BorderThickness="1"
+                                            BorderBrush="{StaticResource ThemeAccentBrush}"
+                                            Background="{StaticResource ThemeControlMidBrush}"
+                                            IsVisible="{Binding IsInLibrary}">
+                                        <TextBlock Text="{Binding #EncoreSongsListBox.((viewmodels:EncoreViewModel)DataContext).PageStrings.InLibrary}"
+                                                   Foreground="{StaticResource ThemeAccentBrush}"
+                                                   FontWeight="SemiBold" />
+                                    </Border>
+                                </WrapPanel>
+
+                                <TextBlock Grid.Row="2"
+                                           Grid.Column="1"
+                                           Margin="0,6,12,0"
+                                           Text="{Binding Genre, StringFormat='Genre: {0}'}"
+                                           Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+
+    </Grid>
+</UserControl>

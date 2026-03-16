@@ -53,6 +53,8 @@ public class ApiClientServiceTests
         Assert.Equal(3, song.GuitarString);
         Assert.Equal(2, song.BassString);
         Assert.Equal(1, song.VocalString);
+        Assert.Equal(LibrarySourceNames.RhythmVerse, song.SourceName);
+        Assert.Equal("rv-file-123", song.SourceId);
         Assert.Equal(1, sut.CurrentPage);
         Assert.Equal(2, sut.TotalResults);
         Assert.Equal(1, sut.TotalPages);
@@ -123,6 +125,51 @@ public class ApiClientServiceTests
         Assert.Equal(2, song.DrumString);
     }
 
+      [Fact]
+      public async Task GetSongFilesAsync_WhenLoadingNextPage_AppendsResultsInsteadOfClearing()
+      {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+          Content = new StringContent(BuildMappedSongResponseJson()),
+        })))
+        {
+          BaseAddress = new Uri("https://rhythmverse.co"),
+        };
+
+        var sut = CreateService(
+          configurationValues: new Dictionary<string, string?>
+          {
+            ["UseMockData"] = "False",
+            ["rhythmverseToken"] = "token-test",
+          },
+          httpClient,
+          loadEmbeddedMockData: () => null,
+          resolveMockDataPath: () => null,
+          isAndroid: false);
+
+        var firstPage = await sut.GetSongFilesAsync(
+          search: true,
+          searchString: string.Empty,
+          sort: "downloads",
+          order: "desc",
+          instrument: [],
+          authorText: string.Empty);
+
+        sut.CurrentPage = 2;
+
+        var secondPage = await sut.GetSongFilesAsync(
+          search: false,
+          searchString: string.Empty,
+          sort: "downloads",
+          order: "desc",
+          instrument: [],
+          authorText: string.Empty);
+
+        Assert.Same(firstPage, secondPage);
+        Assert.Equal(2, secondPage.Count);
+        Assert.Equal(2, sut.CurrentPage);
+      }
+
     private static ApiClientService CreateService(
         IReadOnlyDictionary<string, string?> configurationValues,
         HttpClient httpClient,
@@ -191,6 +238,7 @@ public class ApiClientServiceTests
                   "album_art": "/img/data-art.png"
                 },
                 "file": {
+                  "file_id": "rv-file-123",
                   "file_name": "data-song.zip",
                   "filename": "fallback-name.zip",
                   "size": 1234,

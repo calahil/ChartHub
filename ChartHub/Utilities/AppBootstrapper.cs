@@ -36,6 +36,25 @@ namespace ChartHub.Utilities
 
             try
             {
+                var removed = provider.GetRequiredService<LibraryCatalogService>()
+                    .RemoveMissingLocalFilesAsync()
+                    .GetAwaiter()
+                    .GetResult();
+                Logger.LogInfo("Bootstrap", "Catalog reconciliation completed", new Dictionary<string, object?>
+                {
+                    ["removedEntries"] = removed,
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("Bootstrap", "Catalog reconciliation failed", new Dictionary<string, object?>
+                {
+                    ["error"] = ex.Message,
+                });
+            }
+
+            try
+            {
                 Logger.LogInfo("Bootstrap", "Starting settings migration");
                 if (migrationActionOverride is not null)
                 {
@@ -122,6 +141,9 @@ namespace ChartHub.Utilities
 
             services.AddSingleton<IGoogleDriveClient, GoogleDriveClient>();
             services.AddSingleton<DownloadService>();
+            services.AddSingleton<EncoreApiService>();
+            services.AddSingleton<SharedDownloadQueue>();
+            services.AddSingleton(_ => new LibraryCatalogService(Path.Combine(configDir, "library-catalog.db")));
             services.AddSingleton<ITransferSourceResolver, TransferSourceResolver>();
             services.AddSingleton<ILocalDestinationWriter, LocalDestinationWriter>();
             services.AddSingleton<IGoogleDriveDestinationWriter, GoogleDriveDestinationWriter>();
@@ -131,9 +153,12 @@ namespace ChartHub.Utilities
             services.AddSingleton<InstallSongViewModel>();
             services.AddSingleton<SettingsViewModel>();
             services.AddSingleton<RhythmVerseViewModel>();
+            services.AddSingleton<EncoreViewModel>();
             services.AddSingleton<MainViewModel>(serviceProvider =>
                 new MainViewModel(
                     serviceProvider.GetRequiredService<RhythmVerseViewModel>(),
+                    serviceProvider.GetRequiredService<EncoreViewModel>(),
+                    serviceProvider.GetRequiredService<SharedDownloadQueue>(),
                     serviceProvider.GetRequiredService<DownloadViewModel>(),
                     serviceProvider.GetRequiredService<CloneHeroViewModel>(),
                     serviceProvider.GetRequiredService<InstallSongViewModel>(),

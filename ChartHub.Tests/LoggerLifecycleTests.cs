@@ -15,6 +15,7 @@ public class LoggerLifecycleTests
             var logDir = CreateTempLogDirectory();
             try
             {
+                Logger.Shutdown();
                 Logger.Initialize(logDir, new Dictionary<string, object?>
                 {
                     ["startupMode"] = "test",
@@ -47,6 +48,7 @@ public class LoggerLifecycleTests
             var logDir = CreateTempLogDirectory();
             try
             {
+                Logger.Shutdown();
                 var logPath = Path.Combine(logDir, "charthub.log");
                 var oversized = new string('X', 1_100_000);
                 File.WriteAllText(logPath, $"preexisting-marker\n{oversized}");
@@ -83,6 +85,7 @@ public class LoggerLifecycleTests
             var logDir = CreateTempLogDirectory();
             try
             {
+                Logger.Shutdown();
                 Logger.Initialize(logDir);
 
                 const int entryCount = 40;

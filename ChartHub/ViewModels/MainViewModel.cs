@@ -1,4 +1,8 @@
 ﻿using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Input;
+using ChartHub.Services;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using ChartHub.Utilities;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -7,14 +11,23 @@ namespace ChartHub.ViewModels
 {
     public class MainViewModel : INotifyPropertyChanged
     {
+        public enum SidePaneMode
+        {
+            Filters,
+            Downloads,
+        }
+
         public bool IsCompanionMode => OperatingSystem.IsAndroid();
         public bool IsDesktopMode => !OperatingSystem.IsAndroid();
 
         private RhythmVerseViewModel _rhythmVerseViewModel = null!;
+        private EncoreViewModel _encoreViewModel = null!;
         private DownloadViewModel _downloadViewModel = null!;
+        private SharedDownloadQueue _sharedDownloadQueue = new();
         private CloneHeroViewModel _cloneHeroViewModel = null!;
         private InstallSongViewModel _installSongViewModel = null!;
         private SettingsViewModel _settingsViewModel = null!;
+        private SidePaneMode _activeSidePaneMode = SidePaneMode.Filters;
 
         public RhythmVerseViewModel RhythmVerseViewModel
         {
@@ -22,6 +35,16 @@ namespace ChartHub.ViewModels
             set
             {
                 _rhythmVerseViewModel = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public EncoreViewModel EncoreViewModel
+        {
+            get => _encoreViewModel;
+            set
+            {
+                _encoreViewModel = value;
                 OnPropertyChanged();
             }
         }
@@ -35,6 +58,12 @@ namespace ChartHub.ViewModels
                 OnPropertyChanged();
             }
         }
+
+        public ObservableCollection<DownloadFile> SharedDownloads => _sharedDownloadQueue.Downloads;
+
+        public bool HasSharedDownloads => SharedDownloads.Count > 0;
+
+        public bool NoSharedDownloads => SharedDownloads.Count == 0;
 
         public CloneHeroViewModel CloneHeroViewModel
         {
@@ -100,6 +129,87 @@ namespace ChartHub.ViewModels
         }
 
         private bool _isSettingsTabVisible;
+        private int _selectedMainTabIndex;
+        private bool _isFilterPaneOpen;
+
+        public int SelectedMainTabIndex
+        {
+            get => _selectedMainTabIndex;
+            set
+            {
+                if (_selectedMainTabIndex == value)
+                    return;
+
+                _selectedMainTabIndex = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsRhythmVerseTabActive));
+                OnPropertyChanged(nameof(IsEncoreTabActive));
+                OnPropertyChanged(nameof(IsSourceFilterFallbackVisible));
+                OnPropertyChanged(nameof(ShowRhythmVerseFilters));
+                OnPropertyChanged(nameof(ShowEncoreFilters));
+                OnPropertyChanged(nameof(ShowFilterFallback));
+            }
+        }
+
+        public bool IsFilterPaneOpen
+        {
+            get => _isFilterPaneOpen;
+            set
+            {
+                if (_isFilterPaneOpen == value)
+                    return;
+
+                _isFilterPaneOpen = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsFilterModeActive));
+                OnPropertyChanged(nameof(IsDownloadModeActive));
+            }
+        }
+
+        public SidePaneMode ActiveSidePaneMode
+        {
+            get => _activeSidePaneMode;
+            set
+            {
+                if (_activeSidePaneMode == value)
+                    return;
+
+                _activeSidePaneMode = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsFiltersPaneVisible));
+                OnPropertyChanged(nameof(IsDownloadsPaneVisible));
+                OnPropertyChanged(nameof(ShowRhythmVerseFilters));
+                OnPropertyChanged(nameof(ShowEncoreFilters));
+                OnPropertyChanged(nameof(ShowFilterFallback));
+            }
+        }
+
+        public bool IsFiltersPaneVisible => ActiveSidePaneMode == SidePaneMode.Filters;
+
+        public bool IsDownloadsPaneVisible => ActiveSidePaneMode == SidePaneMode.Downloads;
+
+        public bool IsRhythmVerseTabActive => SelectedMainTabIndex == 0;
+
+        public bool IsEncoreTabActive => SelectedMainTabIndex == 1;
+
+        public bool IsSourceFilterFallbackVisible => !IsRhythmVerseTabActive && !IsEncoreTabActive;
+
+        public bool ShowRhythmVerseFilters => IsFiltersPaneVisible && IsRhythmVerseTabActive;
+
+        public bool ShowEncoreFilters => IsFiltersPaneVisible && IsEncoreTabActive;
+
+        public bool ShowFilterFallback => IsFiltersPaneVisible && IsSourceFilterFallbackVisible;
+
+        public bool IsFilterModeActive => IsFilterPaneOpen && IsFiltersPaneVisible;
+
+        public bool IsDownloadModeActive => IsFilterPaneOpen && IsDownloadsPaneVisible;
+
+        public IRelayCommand ShowFiltersPaneCommand { get; }
+
+        public IRelayCommand ShowDownloadsPaneCommand { get; }
+
+        public IRelayCommand<DownloadFile?> CancelSharedDownloadCommand { get; }
+
         public bool IsSettingsTabVisible
         {
             get => _isSettingsTabVisible;
@@ -112,16 +222,23 @@ namespace ChartHub.ViewModels
 
         public MainViewModel()
         {
+            ShowFiltersPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Filters));
+            ShowDownloadsPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Downloads));
+            CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         }
 
         public MainViewModel(
             RhythmVerseViewModel rhythmVerseViewModel,
+            EncoreViewModel encoreViewModel,
+            SharedDownloadQueue sharedDownloadQueue,
             DownloadViewModel downloadViewModel,
             CloneHeroViewModel cloneHeroViewModel,
             InstallSongViewModel installSongViewModel,
             SettingsViewModel settingsViewModel)
             : this(
                 rhythmVerseViewModel,
+                encoreViewModel,
+                sharedDownloadQueue,
                 downloadViewModel,
                 cloneHeroViewModel,
                 installSongViewModel,
@@ -133,6 +250,8 @@ namespace ChartHub.ViewModels
 
         internal MainViewModel(
             RhythmVerseViewModel rhythmVerseViewModel,
+            EncoreViewModel encoreViewModel,
+            SharedDownloadQueue sharedDownloadQueue,
             DownloadViewModel downloadViewModel,
             CloneHeroViewModel cloneHeroViewModel,
             InstallSongViewModel installSongViewModel,
@@ -141,10 +260,16 @@ namespace ChartHub.ViewModels
             bool isAndroid)
         {
             _rhythmVerseViewModel = rhythmVerseViewModel;
+            _encoreViewModel = encoreViewModel;
+            _sharedDownloadQueue = sharedDownloadQueue;
+            _sharedDownloadQueue.Downloads.CollectionChanged += SharedDownloads_CollectionChanged;
             _downloadViewModel = downloadViewModel;
             _cloneHeroViewModel = cloneHeroViewModel;
             _installSongViewModel = installSongViewModel;
             _settingsViewModel = settingsViewModel;
+            ShowFiltersPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Filters));
+            ShowDownloadsPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Downloads));
+            CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
             _isCloneHeroTabVisible = false;
             _isDownloadTabVisible = false;
             _isInstallSongTabVisible = false;
@@ -171,6 +296,33 @@ namespace ChartHub.ViewModels
 
             ObserveBackgroundTask(_downloadViewModel.GoogleWatcher.StartAsync(), "Google watcher startup");
             postToUi(() => IsDownloadTabVisible = true);
+        }
+
+        private static void CancelSharedDownload(DownloadFile? item)
+        {
+            item?.CancelAction?.Invoke();
+        }
+
+        private void TogglePane(SidePaneMode mode)
+        {
+            if (IsFilterPaneOpen && ActiveSidePaneMode == mode)
+            {
+                IsFilterPaneOpen = false;
+                OnPropertyChanged(nameof(IsFilterModeActive));
+                OnPropertyChanged(nameof(IsDownloadModeActive));
+                return;
+            }
+
+            ActiveSidePaneMode = mode;
+            IsFilterPaneOpen = true;
+            OnPropertyChanged(nameof(IsFilterModeActive));
+            OnPropertyChanged(nameof(IsDownloadModeActive));
+        }
+
+        private void SharedDownloads_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            OnPropertyChanged(nameof(HasSharedDownloads));
+            OnPropertyChanged(nameof(NoSharedDownloads));
         }
 
         private static void ObserveBackgroundTask(Task task, string context)

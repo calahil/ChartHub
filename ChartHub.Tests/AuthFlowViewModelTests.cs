@@ -61,8 +61,10 @@ public class AuthFlowViewModelTests
         var serviceProvider = new SingleServiceProvider(typeof(MainViewModel), mainViewModel);
         var sut = new AppShellViewModel(serviceProvider, driveClient);
 
-        Assert.IsType<AuthGateViewModel>(sut.CurrentViewModel);
+        var splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
         Assert.False(sut.IsSignedIn);
+
+        await splash.RunAsync();
 
         var authGate = Assert.IsType<AuthGateViewModel>(sut.CurrentViewModel);
         await authGate.SignInCommand.ExecuteAsync(null);

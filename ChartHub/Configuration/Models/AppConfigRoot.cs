@@ -9,4 +9,6 @@ public sealed class AppConfigRoot
     public RuntimeAppConfig Runtime { get; set; } = new();
 
     public GoogleAuthConfig GoogleAuth { get; set; } = new();
+
+    public EncoreUiStateConfig EncoreUi { get; set; } = new();
 }

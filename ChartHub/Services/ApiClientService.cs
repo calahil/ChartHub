@@ -192,7 +192,7 @@ namespace ChartHub.Services
 
                     if (DataItems == null)
                         DataItems = [];
-                    else
+                    else if (search)
                         DataItems.Clear();
 
 
@@ -376,6 +376,13 @@ namespace ChartHub.Services
                                         songView.DownloadLink = downloadUrl;
                                     }
 
+                                    songView.SourceName = LibrarySourceNames.RhythmVerse;
+                                    songView.SourceId = !string.IsNullOrWhiteSpace(songFile.FileId)
+                                        ? songFile.FileId
+                                        : (!string.IsNullOrWhiteSpace(songFile.FileName)
+                                            ? songFile.FileName
+                                            : songView.DownloadLink);
+
                                     songView.DrumString = GiveMeRatingsNow(song, "drums");
                                     songView.GuitarString = GiveMeRatingsNow(song, "guitar");
                                     songView.BassString = GiveMeRatingsNow(song, "bass");
@@ -395,6 +402,8 @@ namespace ChartHub.Services
                                 }
                             }
                         }
+
+                        HasMoreRecords = CurrentPage < TotalPages;
 
                     }
                     else

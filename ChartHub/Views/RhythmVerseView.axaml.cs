@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Controls.Primitives;
+using Avalonia.VisualTree;
 using ChartHub.Models;
 using ChartHub.ViewModels;
 
@@ -9,10 +11,19 @@ namespace ChartHub.Views;
 public partial class RhythmVerseView : UserControl
 {
     private RhythmVerseViewModel? _subscribedViewModel;
+    private ScrollViewer? _desktopScrollViewer;
+    private ScrollViewer? _mobileScrollViewer;
 
     public RhythmVerseView()
     {
         InitializeComponent();
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+
+        AttachScrollHandlers();
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -30,6 +41,8 @@ public partial class RhythmVerseView : UserControl
             _subscribedViewModel = viewModel;
             viewModel.PropertyChanged += ViewModel_PropertyChanged;
         }
+
+        AttachScrollHandlers();
     }
 
     private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -50,5 +63,39 @@ public partial class RhythmVerseView : UserControl
                 viewModel.CurrentPage--;
             }
         }
+    }
+
+    private void AttachScrollHandlers()
+    {
+        if (_desktopScrollViewer is not null)
+            _desktopScrollViewer.ScrollChanged -= SongsList_ScrollChanged;
+
+        if (_mobileScrollViewer is not null)
+            _mobileScrollViewer.ScrollChanged -= SongsList_ScrollChanged;
+
+        _desktopScrollViewer = SongsListBox?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        _mobileScrollViewer = MobileSongsListBox?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+
+        if (_desktopScrollViewer is not null)
+            _desktopScrollViewer.ScrollChanged += SongsList_ScrollChanged;
+
+        if (_mobileScrollViewer is not null)
+            _mobileScrollViewer.ScrollChanged += SongsList_ScrollChanged;
+    }
+
+    private async void SongsList_ScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (DataContext is not RhythmVerseViewModel viewModel)
+            return;
+
+        var scrollViewer = sender as ScrollViewer;
+        if (scrollViewer is null)
+            return;
+
+        var remaining = scrollViewer.Extent.Height - scrollViewer.Viewport.Height - scrollViewer.Offset.Y;
+        if (remaining > 200)
+            return;
+
+        await viewModel.LoadMoreAsync();
     }
 }

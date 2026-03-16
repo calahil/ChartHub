@@ -21,11 +21,15 @@ public class MainViewModelTests
         var cloneHeroViewModel = CreateCloneHeroViewModel(cloneHeroWatcher);
         var downloadViewModel = CreateDownloadViewModel(downloadWatcher, new FakeGoogleDriveClient(string.Empty));
         var rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
+        var encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
+        var sharedDownloadQueue = new SharedDownloadQueue();
         var installSongViewModel = CreateUninitialized<ViewModels.InstallSongViewModel>();
         var settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
 
         var sut = CreateMainViewModel(
             rhythmVerseViewModel,
+            encoreViewModel,
+            sharedDownloadQueue,
             downloadViewModel,
             cloneHeroViewModel,
             installSongViewModel,
@@ -34,6 +38,8 @@ public class MainViewModelTests
             isAndroid: false);
 
         Assert.Same(rhythmVerseViewModel, sut.RhythmVerseViewModel);
+        Assert.Same(encoreViewModel, sut.EncoreViewModel);
+        Assert.Same(sharedDownloadQueue.Downloads, sut.SharedDownloads);
         Assert.Same(downloadViewModel, sut.DownloadViewModel);
         Assert.Same(cloneHeroViewModel, sut.CloneHeroViewModel);
         Assert.Same(installSongViewModel, sut.InstallSongViewModel);
@@ -95,6 +101,8 @@ public class MainViewModelTests
 
     private static ViewModels.MainViewModel CreateMainViewModel(
         ViewModels.RhythmVerseViewModel rhythmVerseViewModel,
+        ViewModels.EncoreViewModel encoreViewModel,
+        SharedDownloadQueue sharedDownloadQueue,
         ViewModels.DownloadViewModel downloadViewModel,
         ViewModels.CloneHeroViewModel cloneHeroViewModel,
         ViewModels.InstallSongViewModel installSongViewModel,
@@ -107,6 +115,8 @@ public class MainViewModelTests
             binder: null,
             [
                 typeof(ViewModels.RhythmVerseViewModel),
+                typeof(ViewModels.EncoreViewModel),
+                typeof(SharedDownloadQueue),
                 typeof(ViewModels.DownloadViewModel),
                 typeof(ViewModels.CloneHeroViewModel),
                 typeof(ViewModels.InstallSongViewModel),
@@ -120,6 +130,8 @@ public class MainViewModelTests
 
         return (ViewModels.MainViewModel)constructor.Invoke([
             rhythmVerseViewModel,
+            encoreViewModel,
+            sharedDownloadQueue,
             downloadViewModel,
             cloneHeroViewModel,
             installSongViewModel,

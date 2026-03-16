@@ -78,6 +78,7 @@ namespace ChartHub.ViewModels
         public ICommand ShowDownloadsPaneCommand { get; }
 
         private readonly ITransferOrchestrator _transferOrchestrator;
+        private readonly LibraryCatalogService _libraryCatalog;
 
         private ApiClientService _apiClient;
         public ApiClientService ApiClient
@@ -297,6 +298,7 @@ namespace ChartHub.ViewModels
 
         public IAsyncRelayCommand RefreshButtonCommand { get; }
         public IAsyncRelayCommand<ViewSong?> DownloadFileCommand { get; }
+        public IAsyncRelayCommand LoadMoreCommand { get; }
         public IAsyncRelayCommand<ViewSong?> ViewCreatorCommand { get; }
         public IRelayCommand<DownloadFile?> CancelDownloadCommand { get; }
 
@@ -304,13 +306,18 @@ namespace ChartHub.ViewModels
 
         public RhythmVersePageStrings PageStrings { get; }
 
-        public RhythmVerseViewModel(IConfiguration configuration, ITransferOrchestrator transferOrchestrator)
+        public RhythmVerseViewModel(
+            IConfiguration configuration,
+            ITransferOrchestrator transferOrchestrator,
+            LibraryCatalogService libraryCatalog,
+            SharedDownloadQueue sharedDownloadQueue)
         {
             _transferOrchestrator = transferOrchestrator;
+            _libraryCatalog = libraryCatalog;
             PageStrings = new RhythmVersePageStrings();
             _apiClient = new ApiClientService(configuration);
             _dataItems = [];
-            _downloads = [];
+            _downloads = sharedDownloadQueue.Downloads;
             Filters = PageStrings.Filters;
             Orders = PageStrings.Orders;
             _selectedFilter = Filters[0];
@@ -323,6 +330,7 @@ namespace ChartHub.ViewModels
             NoResults = false;
             RefreshButtonCommand = new AsyncRelayCommand(RefreshButton);
             DownloadFileCommand = new AsyncRelayCommand<ViewSong?>(DownloadFile);
+            LoadMoreCommand = new AsyncRelayCommand(LoadMoreAsync);
             ViewCreatorCommand = new AsyncRelayCommand<ViewSong?>(ViewCreator);
             CancelDownloadCommand = new RelayCommand<DownloadFile?>(CancelDownload);
             _activePane = PaneMode.None;
@@ -356,7 +364,7 @@ namespace ChartHub.ViewModels
             _selectedInstruments = [Instruments[0]];
 
             _apiClient.PropertyChanged += ApiClient_PropertyChanged;
-            ObserveBackgroundTask(LoadDataAsync(false), "RhythmVerse initial load");
+            ObserveBackgroundTask(LoadDataAsync(true), "RhythmVerse initial load");
         }
 
         private static void ObserveBackgroundTask(Task task, string context)
@@ -390,7 +398,7 @@ namespace ChartHub.ViewModels
             IsLoading = false;
             IsPlaceholder = true;
             NoResults = false;
-            await LoadDataAsync(string.IsNullOrEmpty(SearchText) || string.IsNullOrEmpty(SearchAuthorText));
+            await LoadDataAsync(true);
         }
 
         public async Task DownloadFile(ViewSong? song)
@@ -404,6 +412,8 @@ namespace ChartHub.ViewModels
                 Path.GetTempPath(),
                 file.DownloadLink ?? string.Empty,
                 file.FileSize);
+            downloadItem.SourceName = "RhythmVerse";
+            downloadItem.CancelAction = () => CancelDownload(downloadItem);
 
             var cts = new CancellationTokenSource();
             _downloadTokens[downloadItem] = cts;
@@ -416,6 +426,19 @@ namespace ChartHub.ViewModels
                     ["error"] = result.Error,
                     ["status"] = downloadItem.Status,
                 });
+
+            if (result.Success && !string.IsNullOrWhiteSpace(file.SourceName) && !string.IsNullOrWhiteSpace(file.SourceId))
+            {
+                await _libraryCatalog.UpsertAsync(new LibraryCatalogEntry(
+                    file.SourceName,
+                    file.SourceId,
+                    file.Title,
+                    file.Artist,
+                    file.Author?.Shortname,
+                    result.FinalLocation,
+                    DateTimeOffset.UtcNow));
+                file.IsInLibrary = true;
+            }
 
             _downloadTokens.Remove(downloadItem);
             cts.Dispose();
@@ -440,7 +463,17 @@ namespace ChartHub.ViewModels
                 return;
 
             SearchAuthorText = file.Author.Shortname;
-            await LoadDataAsync(string.IsNullOrEmpty(SearchText) || string.IsNullOrEmpty(SearchAuthorText));
+            await LoadDataAsync(true);
+        }
+
+        public async Task LoadMoreAsync()
+        {
+            if (IsLoading || !ApiClient.HasMoreRecords)
+                return;
+
+            ApiClient.CurrentPage = (ApiClient.CurrentPage ?? 1) + 1;
+            OnPropertyChanged(nameof(CurrentPage));
+            await LoadDataAsync(false);
         }
 
         public async Task LoadDataAsync(bool search)
@@ -464,8 +497,8 @@ namespace ChartHub.ViewModels
                 var filter = Toolbox.ConvertFilter(SelectedFilter);
                 var order = Toolbox.GetSortOrder(filter, SelectedOrder);
                 var instrument = SelectedInstruments.ToList();
-                DataItems = [];
                 DataItems = await ApiClient.GetSongFilesAsync(search, SearchText.ToLower(), filter, order, instrument, SearchAuthorText);
+                await ApplyLibraryMembershipAsync(DataItems);
 
                 NoResults = DataItems.Count < 1;
             }
@@ -477,6 +510,23 @@ namespace ChartHub.ViewModels
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
+
+        private async Task ApplyLibraryMembershipAsync(IEnumerable<ViewSong> songs)
+        {
+            var sourceIds = songs
+                .Select(song => song.SourceId)
+                .Where(sourceId => !string.IsNullOrWhiteSpace(sourceId))
+                .Cast<string>()
+                .ToArray();
+
+            var membership = await _libraryCatalog.GetMembershipMapAsync(LibrarySourceNames.RhythmVerse, sourceIds);
+            foreach (var song in songs)
+            {
+                song.IsInLibrary = !string.IsNullOrWhiteSpace(song.SourceId)
+                    && membership.TryGetValue(song.SourceId, out var isPresent)
+                    && isPresent;
+            }
+        }
 
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {

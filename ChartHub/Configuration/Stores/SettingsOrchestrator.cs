@@ -90,6 +90,33 @@ public sealed class SettingsOrchestrator : ISettingsOrchestrator, IDisposable
                 AndroidClientId = source.GoogleAuth.AndroidClientId,
                 DesktopClientId = source.GoogleAuth.DesktopClientId,
             },
+            EncoreUi = new EncoreUiStateConfig
+            {
+                SearchText = source.EncoreUi.SearchText,
+                IsAdvancedVisible = source.EncoreUi.IsAdvancedVisible,
+                SelectedInstrument = source.EncoreUi.SelectedInstrument,
+                SelectedDifficulty = source.EncoreUi.SelectedDifficulty,
+                SelectedDrumType = source.EncoreUi.SelectedDrumType,
+                DrumsReviewed = source.EncoreUi.DrumsReviewed,
+                SelectedSort = source.EncoreUi.SelectedSort,
+                SelectedSortDirection = source.EncoreUi.SelectedSortDirection,
+                AdvancedName = source.EncoreUi.AdvancedName,
+                AdvancedArtist = source.EncoreUi.AdvancedArtist,
+                AdvancedAlbum = source.EncoreUi.AdvancedAlbum,
+                AdvancedGenre = source.EncoreUi.AdvancedGenre,
+                AdvancedYear = source.EncoreUi.AdvancedYear,
+                AdvancedCharter = source.EncoreUi.AdvancedCharter,
+                MinYear = source.EncoreUi.MinYear,
+                MaxYear = source.EncoreUi.MaxYear,
+                MinLength = source.EncoreUi.MinLength,
+                MaxLength = source.EncoreUi.MaxLength,
+                HasVideoBackground = source.EncoreUi.HasVideoBackground,
+                HasLyrics = source.EncoreUi.HasLyrics,
+                HasVocals = source.EncoreUi.HasVocals,
+                Has2xKick = source.EncoreUi.Has2xKick,
+                HasIssues = source.EncoreUi.HasIssues,
+                Modchart = source.EncoreUi.Modchart,
+            },
         };
     }
 
