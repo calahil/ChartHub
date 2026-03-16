@@ -3,10 +3,12 @@ using Google.Apis.Drive.v3;
 using Google.Apis.Services;
 using RhythmVerseClient.Models;
 using RhythmVerseClient.Services.Transfers;
+using RhythmVerseClient.Utilities;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Zip;
 using SharpCompress.Common;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace RhythmVerseClient.Services
 {
@@ -32,11 +34,12 @@ namespace RhythmVerseClient.Services
         Task<ObservableCollection<WatcherFile>> GetFileDataCollectionAsync(string directoryId);
     }
 
-    public class GoogleDriveClient : IGoogleDriveClient
+    public class GoogleDriveClient : IGoogleDriveClient, IAsyncDisposable
     {
         private DriveService? _driveService;
         private readonly IGoogleAuthProvider _authProvider;
         private CancellationTokenSource? _monitorCts;
+        private Task? _monitorTask;
         private static readonly string[] Scopes = [DriveService.Scope.DriveReadonly, DriveService.Scope.DriveFile];
         private static readonly string ApplicationName = "RhythmVerseClient";
         public string RhythmVerseFolderId { get; private set; } = string.Empty;
@@ -49,21 +52,48 @@ namespace RhythmVerseClient.Services
 
         public async Task InitializeAsync(CancellationToken cancellationToken = default)
         {
-            _driveService = await GetServiceAsync(cancellationToken);
-            RhythmVerseFolderId = await CreateDirectoryAsync("RhythmVerse");
-            _monitorCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            _ = MonitorDirectoryAsync(RhythmVerseFolderId, TimeSpan.FromSeconds(30), OnFileChanged, _monitorCts.Token);
+            var stopwatch = Stopwatch.StartNew();
+            Logger.LogInfo("Drive", "Google Drive initialization started");
+
+            await StopMonitoringAsync().ConfigureAwait(false);
+            try
+            {
+                _driveService = await GetServiceAsync(cancellationToken);
+                RhythmVerseFolderId = await CreateDirectoryAsync("RhythmVerse");
+                _monitorCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                _monitorTask = MonitorDirectoryAsync(RhythmVerseFolderId, TimeSpan.FromSeconds(30), OnFileChanged, _monitorCts.Token);
+
+                Logger.LogInfo("Drive", "Google Drive initialization completed", new Dictionary<string, object?>
+                {
+                    ["folderId"] = RhythmVerseFolderId,
+                    ["elapsedMs"] = stopwatch.ElapsedMilliseconds,
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Drive", "Google Drive initialization failed", ex, new Dictionary<string, object?>
+                {
+                    ["elapsedMs"] = stopwatch.ElapsedMilliseconds,
+                });
+                throw;
+            }
         }
 
         public async Task SignOutAsync(CancellationToken cancellationToken = default)
         {
-            _monitorCts?.Cancel();
-            _monitorCts = null;
+            Logger.LogInfo("Drive", "Google Drive sign-out started", new Dictionary<string, object?>
+            {
+                ["folderId"] = RhythmVerseFolderId,
+            });
+
+            await StopMonitoringAsync().ConfigureAwait(false);
             _driveService?.Dispose();
             _driveService = null;
             await _authProvider.SignOutAsync(_credential, cancellationToken);
             _credential = null;
             RhythmVerseFolderId = string.Empty;
+
+            Logger.LogInfo("Drive", "Google Drive sign-out completed");
         }
 
         public async Task<DriveService> GetServiceAsync(CancellationToken cancellationToken = default)
@@ -73,14 +103,24 @@ namespace RhythmVerseClient.Services
 
             if (_credential is null)
             {
+                Logger.LogInfo("Auth", "Attempting silent Google authorization");
                 _credential = await _authProvider.TryAuthorizeSilentAsync(Scopes, cancellationToken)
                     ?? await _authProvider.AuthorizeInteractiveAsync(Scopes, cancellationToken);
+                Logger.LogInfo("Auth", "Google authorization credential acquired", new Dictionary<string, object?>
+                {
+                    ["method"] = _credential is null ? "none" : "silent-or-interactive",
+                });
             }
 
             _driveService = new DriveService(new BaseClientService.Initializer()
             {
                 HttpClientInitializer = _credential,
                 ApplicationName = ApplicationName,
+            });
+
+            Logger.LogInfo("Drive", "Google Drive service client created", new Dictionary<string, object?>
+            {
+                ["applicationName"] = ApplicationName,
             });
 
             return _driveService;
@@ -90,11 +130,21 @@ namespace RhythmVerseClient.Services
         {
             if (changeType == "created")
             {
-                Console.WriteLine($"File created: {file.Name}");
+                RhythmVerseClient.Utilities.Logger.LogInfo("Drive", "Remote file created", new Dictionary<string, object?>
+                {
+                    ["changeType"] = changeType,
+                    ["driveFileId"] = file.Id,
+                    ["fileName"] = file.Name,
+                });
             }
             else if (changeType == "deleted")
             {
-                Console.WriteLine($"File deleted: {file.Name}");
+                RhythmVerseClient.Utilities.Logger.LogInfo("Drive", "Remote file deleted", new Dictionary<string, object?>
+                {
+                    ["changeType"] = changeType,
+                    ["driveFileId"] = file.Id,
+                    ["fileName"] = file.Name,
+                });
             }
         }
 
@@ -104,7 +154,7 @@ namespace RhythmVerseClient.Services
 
             while (!cancellationToken.IsCancellationRequested)
             {
-                var files = await ListFilesAsync(directoryId);
+                var files = await ListFilesAsync(directoryId).ConfigureAwait(false);
 
                 foreach (var file in files)
                 {
@@ -125,7 +175,37 @@ namespace RhythmVerseClient.Services
                     }
                 }
 
-                await Task.Delay(pollingInterval, cancellationToken);
+                await Task.Delay(pollingInterval, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        private async Task StopMonitoringAsync()
+        {
+            var monitorCts = _monitorCts;
+            var monitorTask = _monitorTask;
+
+            _monitorCts = null;
+            _monitorTask = null;
+
+            if (monitorCts is null)
+                return;
+
+            monitorCts.Cancel();
+            try
+            {
+                if (monitorTask is not null)
+                    await monitorTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                Logger.LogInfo("Drive", "Google Drive monitoring cancelled", new Dictionary<string, object?>
+                {
+                    ["folderId"] = RhythmVerseFolderId,
+                });
+            }
+            finally
+            {
+                monitorCts.Dispose();
             }
         }
 
@@ -145,7 +225,7 @@ namespace RhythmVerseClient.Services
             var request = _driveService!.Files.Create(fileMetadata);
             request.Fields = "id";
             var file = await request.ExecuteAsync();
-            return file.Id;
+            return file.Id ?? string.Empty;
         }
 
         public async Task<string> GetDirectoryIdAsync(string directoryName)
@@ -159,7 +239,7 @@ namespace RhythmVerseClient.Services
             var result = await request.ExecuteAsync();
             var folder = result.Files.FirstOrDefault();
 
-            return folder?.Id;
+            return folder?.Id ?? string.Empty;
         }
 
         public async Task<string> UploadFileAsync(string directoryId, string filePath, string? desiredFileName = null)
@@ -176,7 +256,7 @@ namespace RhythmVerseClient.Services
                 request.Fields = "id";
                 await request.UploadAsync();
                 var file = request.ResponseBody;
-                return file.Id;
+                return file?.Id ?? string.Empty;
             }
         }
 
@@ -410,6 +490,15 @@ namespace RhythmVerseClient.Services
                 _ => "application/unknown"
             };
             return mimeType;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await StopMonitoringAsync().ConfigureAwait(false);
+            _driveService?.Dispose();
+            _driveService = null;
+            _credential = null;
+            RhythmVerseFolderId = string.Empty;
         }
     }
 }

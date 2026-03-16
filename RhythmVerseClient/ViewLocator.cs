@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using RhythmVerseClient.ViewModels;
 using RhythmVerseClient.Views;
+using RhythmVerseClient.Utilities;
 using System;
 
 namespace RhythmVerseClient;
@@ -37,6 +38,11 @@ public class ViewLocator : IDataTemplate
             }
             catch (Exception ex)
             {
+                Logger.LogError("UI", "Failed to create view for view model", ex, new Dictionary<string, object?>
+                {
+                    ["viewName"] = name,
+                    ["viewModelType"] = data.GetType().FullName,
+                });
                 return new TextBlock { Text = $"Error creating view: {ex.Message}" };
             }
         }
@@ -51,6 +57,7 @@ public class ViewLocator : IDataTemplate
             or DownloadViewModel
             or CloneHeroViewModel
             or InstallSongViewModel
+            or SettingsViewModel
             or AppShellViewModel
             or AuthGateViewModel;
     }

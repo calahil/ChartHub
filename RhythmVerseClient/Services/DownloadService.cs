@@ -84,8 +84,10 @@ namespace RhythmVerseClient.Services
             var totalRead = 0L;
             var buffer = new byte[8192];
             var isMoreToRead = true;
+            var savePath = SafePathHelper.GetSafeFilePath(song.FilePath, song.DisplayName, "download.bin");
+            song.DisplayName = Path.GetFileName(savePath);
 
-            using var fileStream = new FileStream(Path.Combine(song.FilePath, song.DisplayName), FileMode.Create, FileAccess.Write, FileShare.None, buffer.Length, true);
+            using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None, buffer.Length, true);
             do
             {
                 var read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
@@ -161,7 +163,8 @@ namespace RhythmVerseClient.Services
             _driveService ??= await GetServiceAsync();
 
             var request = _driveService.Files.Get(fileId);
-            var savePath = Path.Combine(downloadFile.FilePath, downloadFile.DisplayName);
+            var savePath = SafePathHelper.GetSafeFilePath(downloadFile.FilePath, downloadFile.DisplayName, "download.bin");
+            downloadFile.DisplayName = Path.GetFileName(savePath);
 
             request.MediaDownloader.ChunkSize = 256 * 1024;
             request.MediaDownloader.ProgressChanged += progressEvent =>
@@ -193,11 +196,12 @@ namespace RhythmVerseClient.Services
             Directory.CreateDirectory(folderPath);
             var result = await GetFolderNameAsync(fileId);
 
-            string finalPath = Path.Combine(folderPath, result);
+            string finalPath = SafePathHelper.GetSafeFilePath(folderPath, result, "drive-folder");
 
             Directory.CreateDirectory(finalPath);
             await DownloadFilesInFolder(fileId, finalPath, cancellationToken);
-            var zipFile = Path.Combine(downloadFile.FilePath, downloadFile.DisplayName);
+            var zipFile = SafePathHelper.GetSafeFilePath(downloadFile.FilePath, downloadFile.DisplayName, "download.zip");
+            downloadFile.DisplayName = Path.GetFileName(zipFile);
             CreateZip(folderPath, zipFile);
 
             Directory.Delete(folderPath, true); // Cleanup the temporary folder
@@ -217,7 +221,7 @@ namespace RhythmVerseClient.Services
             {
                 if (file.MimeType == "application/vnd.google-apps.folder")
                 {
-                    string subFolderPath = Path.Combine(parentFolderPath, file.Name);
+                    string subFolderPath = SafePathHelper.GetSafeFilePath(parentFolderPath, file.Name, "folder");
                     Directory.CreateDirectory(subFolderPath);
                     await DownloadFilesInFolder(file.Id, subFolderPath, cancellationToken);
                 }
@@ -227,7 +231,7 @@ namespace RhythmVerseClient.Services
                     await _driveService.Files.Get(file.Id).DownloadAsync(stream, cancellationToken);
                     stream.Seek(0, SeekOrigin.Begin);
 
-                    string filePath = Path.Combine(parentFolderPath, file.Name);
+                    string filePath = SafePathHelper.GetSafeFilePath(parentFolderPath, file.Name, "download.bin");
                     using var fileStream = System.IO.File.Create(filePath);
                     stream.CopyTo(fileStream);
                 }
@@ -247,7 +251,10 @@ namespace RhythmVerseClient.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                Logger.LogError("Drive", "Failed to resolve Google Drive folder name", ex, new Dictionary<string, object?>
+                {
+                    ["folderId"] = folderId,
+                });
                 return string.Empty;
             }
         }

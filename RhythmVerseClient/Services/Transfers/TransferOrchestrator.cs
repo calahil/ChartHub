@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using RhythmVerseClient.Models;
 using RhythmVerseClient.Utilities;
 
@@ -25,6 +26,8 @@ public sealed class TransferOrchestrator(
         ObservableCollection<DownloadFile> downloads,
         CancellationToken cancellationToken = default)
     {
+        var transferId = CreateOperationId("trf");
+        var transferStopwatch = Stopwatch.StartNew();
         var destination = OperatingSystem.IsAndroid()
             ? TransferDestinationKind.GoogleDrive
             : TransferDestinationKind.LocalStorage;
@@ -50,25 +53,42 @@ public sealed class TransferOrchestrator(
 
         try
         {
-            downloadItem.Status = TransferStage.ResolvingSource.ToString();
+            Logger.LogInfo("Transfer", "Transfer queued", new Dictionary<string, object?>
+            {
+                ["transferId"] = transferId,
+                ["displayName"] = request.DisplayName,
+                ["sourceUrl"] = request.SourceUrl,
+                ["destination"] = request.Destination.ToString(),
+            });
+
+            SetStage(downloadItem, TransferStage.ResolvingSource, transferId, request.DisplayName, request.Destination);
             var source = await _sourceResolver.ResolveAsync(request.SourceUrl, cancellationToken);
 
             if (request.Destination == TransferDestinationKind.GoogleDrive)
             {
-                var directCopyResult = await TryCopyDriveFileAsync(request, source, downloadItem, cancellationToken);
+                var directCopyResult = await TryCopyDriveFileAsync(request, source, downloadItem, transferId, cancellationToken);
                 if (directCopyResult is not null)
+                {
+                    Logger.LogInfo("Transfer", "Transfer completed via direct Drive copy", new Dictionary<string, object?>
+                    {
+                        ["transferId"] = transferId,
+                        ["displayName"] = request.DisplayName,
+                        ["destination"] = request.Destination.ToString(),
+                        ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
+                    });
                     return directCopyResult;
+                }
             }
 
             if (source.Kind == TransferSourceKind.GoogleDriveFolder && !string.IsNullOrWhiteSpace(source.DriveId))
             {
-                downloadItem.Status = TransferStage.DownloadingFolder.ToString();
+                SetStage(downloadItem, TransferStage.DownloadingFolder, transferId, request.DisplayName, request.Destination);
                 downloadItem.DownloadProgress = 15;
                 downloadItem.DisplayName = EnsureZipName(downloadItem.DisplayName);
                 var folderZipPath = Path.Combine(downloadItem.FilePath, downloadItem.DisplayName);
                 var stageProgress = new Progress<TransferProgressUpdate>(update =>
                 {
-                    downloadItem.Status = update.Stage.ToString();
+                    SetStage(downloadItem, update.Stage, transferId, request.DisplayName, request.Destination);
                     if (update.ProgressPercent.HasValue)
                         downloadItem.DownloadProgress = Math.Max(downloadItem.DownloadProgress, update.ProgressPercent.Value);
                 });
@@ -83,7 +103,7 @@ public sealed class TransferOrchestrator(
             }
             else
             {
-                downloadItem.Status = TransferStage.Downloading.ToString();
+                SetStage(downloadItem, TransferStage.Downloading, transferId, request.DisplayName, request.Destination);
                 await _downloadService.DownloadFileAsync(downloadItem, cancellationToken);
             }
 
@@ -93,7 +113,7 @@ public sealed class TransferOrchestrator(
 
             if (request.Destination == TransferDestinationKind.LocalStorage)
             {
-                downloadItem.Status = TransferStage.MovingToDestination.ToString();
+                SetStage(downloadItem, TransferStage.MovingToDestination, transferId, request.DisplayName, request.Destination);
                 var localResult = await _localDestinationWriter.WriteFromTempAsync(
                     tempPath,
                     downloadItem.DisplayName,
@@ -101,12 +121,21 @@ public sealed class TransferOrchestrator(
 
                 downloadItem.DisplayName = localResult.FinalName;
                 downloadItem.FilePath = localResult.DestinationContainer;
-                downloadItem.Status = TransferStage.Completed.ToString();
+                SetStage(downloadItem, TransferStage.Completed, transferId, request.DisplayName, request.Destination);
+
+                Logger.LogInfo("Transfer", "Transfer completed to local storage", new Dictionary<string, object?>
+                {
+                    ["transferId"] = transferId,
+                    ["displayName"] = downloadItem.DisplayName,
+                    ["destination"] = request.Destination.ToString(),
+                    ["finalLocation"] = localResult.FinalLocation,
+                    ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
+                });
 
                 return new TransferResult(true, TransferStage.Completed, localResult.FinalLocation, null, downloadItem);
             }
 
-            downloadItem.Status = TransferStage.Uploading.ToString();
+            SetStage(downloadItem, TransferStage.Uploading, transferId, request.DisplayName, request.Destination);
             var driveResult = await _googleDriveDestinationWriter.WriteFromTempAsync(
                 tempPath,
                 downloadItem.DisplayName,
@@ -117,24 +146,49 @@ public sealed class TransferOrchestrator(
             downloadItem.FilePath = driveResult.DestinationContainer;
             downloadItem.Finished = true;
             downloadItem.DownloadProgress = 100;
-            downloadItem.Status = TransferStage.Completed.ToString();
+            SetStage(downloadItem, TransferStage.Completed, transferId, request.DisplayName, request.Destination);
+
+            Logger.LogInfo("Transfer", "Transfer completed to Google Drive", new Dictionary<string, object?>
+            {
+                ["transferId"] = transferId,
+                ["displayName"] = downloadItem.DisplayName,
+                ["destination"] = request.Destination.ToString(),
+                ["finalLocation"] = driveResult.FinalLocation,
+                ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
+            });
 
             return new TransferResult(true, TransferStage.Completed, driveResult.FinalLocation, null, downloadItem);
         }
         catch (OperationCanceledException)
         {
+            Logger.LogInfo("Transfer", "Transfer cancelled", new Dictionary<string, object?>
+            {
+                ["transferId"] = transferId,
+                ["displayName"] = downloadItem.DisplayName,
+                ["stage"] = downloadItem.Status,
+                ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
+            });
             downloadItem.Finished = true;
-            downloadItem.Status = TransferStage.Cancelled.ToString();
+            SetStage(downloadItem, TransferStage.Cancelled, transferId, request.DisplayName, request.Destination);
             downloadItem.ErrorMessage = "Transfer cancelled.";
             return new TransferResult(false, TransferStage.Cancelled, null, "Transfer cancelled.", downloadItem);
         }
         catch (Exception ex)
         {
-            Logger.LogMessage($"Transfer failed: {ex.Message}");
+            Logger.LogError("Transfer", "Transfer failed", ex, new Dictionary<string, object?>
+            {
+                ["transferId"] = transferId,
+                ["displayName"] = downloadItem.DisplayName,
+                ["stage"] = downloadItem.Status,
+                ["sourceUrl"] = request.SourceUrl,
+                ["destination"] = request.Destination.ToString(),
+                ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
+            });
             downloadItem.Finished = true;
-            downloadItem.Status = TransferStage.Failed.ToString();
-            downloadItem.ErrorMessage = ex.Message;
-            return new TransferResult(false, TransferStage.Failed, null, ex.Message, downloadItem);
+            SetStage(downloadItem, TransferStage.Failed, transferId, request.DisplayName, request.Destination);
+            const string userError = "Transfer failed. See logs for details.";
+            downloadItem.ErrorMessage = userError;
+            return new TransferResult(false, TransferStage.Failed, null, userError, downloadItem);
         }
     }
 
@@ -142,15 +196,17 @@ public sealed class TransferOrchestrator(
         TransferRequest request,
         ResolvedTransferSource source,
         DownloadFile downloadItem,
+        string transferId,
         CancellationToken cancellationToken)
     {
+        var copyStopwatch = Stopwatch.StartNew();
         if (source.Kind != TransferSourceKind.GoogleDriveFile || string.IsNullOrWhiteSpace(source.DriveId))
             return null;
         var sourceFileId = source.DriveId;
 
         try
         {
-            downloadItem.Status = TransferStage.CopyingInGoogleDrive.ToString();
+            SetStage(downloadItem, TransferStage.CopyingInGoogleDrive, transferId, request.DisplayName, request.Destination);
             var copyResult = await _googleDriveDestinationWriter.TryCopyDriveFileAsync(
                 sourceFileId,
                 request.DisplayName,
@@ -163,13 +219,35 @@ public sealed class TransferOrchestrator(
             downloadItem.FilePath = copyResult.DestinationContainer;
             downloadItem.DownloadProgress = 100;
             downloadItem.Finished = true;
-            downloadItem.Status = TransferStage.Completed.ToString();
+            SetStage(downloadItem, TransferStage.Completed, transferId, request.DisplayName, request.Destination);
+
+            Logger.LogInfo("Transfer", "Drive copy-first completed", new Dictionary<string, object?>
+            {
+                ["transferId"] = transferId,
+                ["displayName"] = downloadItem.DisplayName,
+                ["driveFileId"] = sourceFileId,
+                ["elapsedMs"] = copyStopwatch.ElapsedMilliseconds,
+            });
 
             return new TransferResult(true, TransferStage.Completed, copyResult.FinalLocation, null, downloadItem);
         }
         catch (Exception ex)
         {
-            Logger.LogMessage($"Drive copy-first fallback to download/upload: {ex.Message}");
+            Logger.LogWarning("Transfer", "Drive copy-first fell back to download/upload", new Dictionary<string, object?>
+            {
+                ["transferId"] = transferId,
+                ["displayName"] = request.DisplayName,
+                ["driveFileId"] = sourceFileId,
+                ["reason"] = ex.GetType().Name,
+                ["elapsedMs"] = copyStopwatch.ElapsedMilliseconds,
+            });
+            Logger.LogError("Transfer", "Drive copy-first failed before fallback", ex, new Dictionary<string, object?>
+            {
+                ["transferId"] = transferId,
+                ["displayName"] = request.DisplayName,
+                ["driveFileId"] = sourceFileId,
+                ["elapsedMs"] = copyStopwatch.ElapsedMilliseconds,
+            });
             return null;
         }
     }
@@ -178,21 +256,35 @@ public sealed class TransferOrchestrator(
         IEnumerable<WatcherFile> selectedCloudFiles,
         CancellationToken cancellationToken = default)
     {
+        var transferId = CreateOperationId("sync");
+        var selected = selectedCloudFiles.Where(file => !string.IsNullOrWhiteSpace(file.FilePath)).ToList();
+        var stopwatch = Stopwatch.StartNew();
+        Logger.LogInfo("Transfer", "Cloud-to-local selected download started", new Dictionary<string, object?>
+        {
+            ["transferId"] = transferId,
+            ["fileCount"] = selected.Count,
+        });
+
         await _googleDriveClient.InitializeAsync(cancellationToken);
         var downloaded = new List<string>();
 
-        foreach (var file in selectedCloudFiles)
+        foreach (var file in selected)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrWhiteSpace(file.FilePath))
-                continue;
-
             var localName = _localDestinationWriter.ResolveUniqueName(file.DisplayName);
 
             var localPath = Path.Combine(_settings.DownloadDir, localName);
             await _googleDriveClient.DownloadFileAsync(file.FilePath, localPath);
             downloaded.Add(localPath);
         }
+
+        Logger.LogInfo("Transfer", "Cloud-to-local selected download completed", new Dictionary<string, object?>
+        {
+            ["transferId"] = transferId,
+            ["requestedCount"] = selected.Count,
+            ["downloadedCount"] = downloaded.Count,
+            ["elapsedMs"] = stopwatch.ElapsedMilliseconds,
+        });
 
         return downloaded;
     }
@@ -201,16 +293,23 @@ public sealed class TransferOrchestrator(
         IEnumerable<WatcherFile> currentCloudFiles,
         CancellationToken cancellationToken = default)
     {
+        var transferId = CreateOperationId("sync");
+        var cloudFiles = currentCloudFiles.Where(file => !string.IsNullOrWhiteSpace(file.FilePath)).ToList();
+        var stopwatch = Stopwatch.StartNew();
+        Logger.LogInfo("Transfer", "Cloud-to-local additive sync started", new Dictionary<string, object?>
+        {
+            ["transferId"] = transferId,
+            ["cloudFileCount"] = cloudFiles.Count,
+        });
+
         await _googleDriveClient.InitializeAsync(cancellationToken);
         var downloaded = new List<string>();
 
-        foreach (var cloudFile in currentCloudFiles)
+        foreach (var cloudFile in cloudFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (string.IsNullOrWhiteSpace(cloudFile.FilePath))
-                continue;
-
-            var localPath = Path.Combine(_settings.DownloadDir, cloudFile.DisplayName);
+            var localName = _localDestinationWriter.ResolveUniqueName(cloudFile.DisplayName);
+            var localPath = Path.Combine(_settings.DownloadDir, localName);
             if (File.Exists(localPath))
                 continue;
 
@@ -218,7 +317,44 @@ public sealed class TransferOrchestrator(
             downloaded.Add(localPath);
         }
 
+        Logger.LogInfo("Transfer", "Cloud-to-local additive sync completed", new Dictionary<string, object?>
+        {
+            ["transferId"] = transferId,
+            ["cloudFileCount"] = cloudFiles.Count,
+            ["downloadedCount"] = downloaded.Count,
+            ["elapsedMs"] = stopwatch.ElapsedMilliseconds,
+        });
+
         return downloaded;
+    }
+
+    private static void SetStage(
+        DownloadFile downloadItem,
+        TransferStage stage,
+        string transferId,
+        string displayName,
+        TransferDestinationKind destination)
+    {
+        var previousStage = downloadItem.Status;
+        var nextStage = stage.ToString();
+        downloadItem.Status = nextStage;
+
+        if (string.Equals(previousStage, nextStage, StringComparison.Ordinal))
+            return;
+
+        Logger.LogInfo("Transfer", "Transfer stage changed", new Dictionary<string, object?>
+        {
+            ["transferId"] = transferId,
+            ["displayName"] = displayName,
+            ["destination"] = destination.ToString(),
+            ["previousStage"] = string.IsNullOrWhiteSpace(previousStage) ? "none" : previousStage,
+            ["stage"] = nextStage,
+        });
+    }
+
+    private static string CreateOperationId(string prefix)
+    {
+        return $"{prefix}-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}";
     }
 
     private static string EnsureZipName(string fileName)

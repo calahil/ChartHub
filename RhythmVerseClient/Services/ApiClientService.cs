@@ -15,6 +15,9 @@ namespace RhythmVerseClient.Services
     {
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _configuration;
+        private readonly Func<string?> _loadEmbeddedMockData;
+        private readonly Func<string?> _resolveMockDataPath;
+        private readonly Func<bool> _isAndroid;
         private readonly Dictionary<string, List<string>> dictionary = new()
         {
                 { "rb3", ["Rock Band 3", "rb3.png"] },
@@ -128,16 +131,39 @@ namespace RhythmVerseClient.Services
         }
 
         public ApiClientService(IConfiguration configuration)
+            : this(
+                configuration,
+                CreateHttpClient(configuration),
+                LoadMockDataFromEmbeddedResource,
+                ResolveMockDataPath,
+                () => OperatingSystem.IsAndroid())
+        {
+        }
+
+        internal ApiClientService(
+            IConfiguration configuration,
+            HttpClient httpClient,
+            Func<string?> loadEmbeddedMockData,
+            Func<string?> resolveMockDataPath,
+            Func<bool> isAndroid)
         {
             _configuration = configuration;
-            _httpClient = new HttpClient
+            _httpClient = httpClient;
+            _loadEmbeddedMockData = loadEmbeddedMockData;
+            _resolveMockDataPath = resolveMockDataPath;
+            _isAndroid = isAndroid;
+
+            if (_httpClient.BaseAddress is null)
             {
-                BaseAddress = new Uri(BaseUrl)
-            };
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
+                _httpClient.BaseAddress = new Uri(BaseUrl);
+            }
+
+            if (_httpClient.DefaultRequestHeaders.Authorization is null)
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
+            }
 
             _currentPage = 1;
-
         }
 
         public async Task<ObservableCollection<ViewSong>> GetSongFilesAsync(bool search, string searchString, string sort, string order, List<InstrumentItem> instrument, string authorText)
@@ -198,15 +224,15 @@ namespace RhythmVerseClient.Services
 
                     // On Android, prefer embedded mock payload to speed up UI testing.
                     var useMockData = string.Equals(_configuration["UseMockData"], "True", StringComparison.OrdinalIgnoreCase)
-                        || OperatingSystem.IsAndroid();
+                        || _isAndroid();
 
                     if (useMockData)
                     {
-                        responseBody = LoadMockDataFromEmbeddedResource() ?? string.Empty;
+                        responseBody = _loadEmbeddedMockData() ?? string.Empty;
 
                         if (string.IsNullOrEmpty(responseBody))
                         {
-                            var mockDataPath = ResolveMockDataPath();
+                            var mockDataPath = _resolveMockDataPath();
                             if (mockDataPath != null)
                             {
                                 responseBody = await File.ReadAllTextAsync(mockDataPath);
@@ -215,7 +241,7 @@ namespace RhythmVerseClient.Services
 
                         if (string.IsNullOrEmpty(responseBody))
                         {
-                            Logger.LogMessage("Mock data is enabled, but test.json was not found. Falling back to live API.");
+                            Logger.LogInfo("Api", "Mock data file was not found; falling back to live API");
                             HttpResponseMessage response = await _httpClient.PostAsync(endpoint, content);
                             response.EnsureSuccessStatusCode();
                             responseBody = await response.Content.ReadAsStringAsync();
@@ -249,53 +275,59 @@ namespace RhythmVerseClient.Services
                         {
                             if (song != null)
                             {
-                                var downloadUrl = song.File.DownloadUrl ?? string.Empty;
+                                var songFile = song.File;
+                                if (songFile is null)
+                                    continue;
+
+                                var downloadUrl = songFile.DownloadUrl ?? string.Empty;
                                 if (!downloadUrl.StartsWith("http://marketplace.xbox.com") && !downloadUrl.StartsWith("https://store.xbox.com/"))
                                 {
                                     var songView = new ViewSong();
+                                    var songData = song.Data.DataData;
 
-                                    if (song.Data.DataData != null)
+                                    if (songData != null)
                                     {
-                                        songView.Artist = song.File.FileArtist as string ?? song.Data.DataData.Artist ?? song.File.Filename ?? "Unknown";
-                                        songView.Title = song.File.FileTitle as string ?? song.Data.DataData.Title ?? song.File.Filename ?? "Unknown";
-                                        songView.Album = song.File.FileAlbum as string ?? song.Data.DataData.Album ?? song.File.Filename ?? "Unknown";
-                                        songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : song.Data.DataData.Downloads;
-                                        songView.Comments = (long)song.File.Comments;
+                                        songView.Artist = songFile.FileArtist as string ?? songData.Artist ?? songFile.Filename ?? "Unknown";
+                                        songView.Title = songFile.FileTitle as string ?? songData.Title ?? songFile.Filename ?? "Unknown";
+                                        songView.Album = songFile.FileAlbum as string ?? songData.Album ?? songFile.Filename ?? "Unknown";
+                                        songView.Downloads = songFile.Downloads != 0 ? songFile.Downloads : songData.Downloads;
+                                        songView.Comments = songFile.Comments ?? 0;
 
-                                        if (song.Data.DataData.SongLength > 0)
+                                        if (songData.SongLength > 0)
                                         {
-                                            songView.SongLength = song.Data.DataData.SongLength;
+                                            songView.SongLength = songData.SongLength;
                                         }
                                         else
                                         {
-                                            songView.SongLength = song.File.SongLength;
+                                            songView.SongLength = songFile.SongLength;
                                         }
-                                        songView.Genre = song.Data.DataData.Genre ?? song.File.FileGenre ?? "Music";
-                                        songView.Year = song.Data.DataData.Year.ToString() ?? song.File.FileYear.ToString() ?? "1955";
+                                        songView.Genre = songData.Genre ?? songFile.FileGenre ?? "Music";
+                                        songView.Year = songData.Year.ToString() ?? songFile.FileYear.ToString() ?? "1955";
                                     }
                                     else
                                     {
-                                        songView.Artist = song.File.FileArtist as string ?? song.File.Filename ?? "Unknown";
-                                        songView.Title = song.File.FileTitle as string ?? song.File.Filename ?? "Unknown";
-                                        songView.Album = song.File.FileAlbum as string ?? song.File.Filename ?? "Unknown";
-                                        songView.Downloads = song.File.Downloads != 0 ? song.File.Downloads : 0;
-                                        songView.Year = song.File.FileYear.ToString() ?? "1955";
-                                        songView.Genre = song.File.FileGenre ?? "Music";
+                                        songView.Artist = songFile.FileArtist as string ?? songFile.Filename ?? "Unknown";
+                                        songView.Title = songFile.FileTitle as string ?? songFile.Filename ?? "Unknown";
+                                        songView.Album = songFile.FileAlbum as string ?? songFile.Filename ?? "Unknown";
+                                        songView.Downloads = songFile.Downloads != 0 ? songFile.Downloads : 0;
+                                        songView.Comments = songFile.Comments ?? 0;
+                                        songView.Year = songFile.FileYear.ToString() ?? "1955";
+                                        songView.Genre = songFile.FileGenre ?? "Music";
 
-                                        if (song.File.SongLength > 0)
+                                        if (songFile.SongLength > 0)
                                         {
-                                            songView.SongLength = song.File.SongLength;
+                                            songView.SongLength = songFile.SongLength;
                                         }
                                         else
                                         {
-                                            songView.SongLength = song.File.FileSongLength as long?;
+                                            songView.SongLength = songFile.FileSongLength as long?;
                                         }
                                     }
-                                    songView.FileName = song.File.FileName ?? song.File.Filename ?? "missing";
-                                    songView.FileSize = song.File.Size;
+                                    songView.FileName = songFile.FileName ?? songFile.Filename ?? "missing";
+                                    songView.FileSize = songFile.Size;
 
-                                    string? apiAlbumArt = song.Data.DataData?.AlbumArt.String;
-                                    string? fileAlbumArt = song.File.AlbumArt;
+                                    string? apiAlbumArt = songData?.AlbumArt.String;
+                                    string? fileAlbumArt = songFile.AlbumArt;
                                     var image = !string.IsNullOrWhiteSpace(apiAlbumArt)
                                         ? apiAlbumArt
                                         : (!string.IsNullOrWhiteSpace(fileAlbumArt) ? fileAlbumArt : null);
@@ -374,7 +406,7 @@ namespace RhythmVerseClient.Services
 
                 catch (HttpRequestException e)
                 {
-                    Console.WriteLine($"Request error: {e.Message}");
+                    Logger.LogError("Api", "Request error while loading song data", e);
                     return [];
                 }
             }
@@ -382,10 +414,19 @@ namespace RhythmVerseClient.Services
 
             catch (Exception ex)
             {
-                // Handle exceptions
-                Logger.LogMessage($"An error occurred: {ex.Message}");
+                Logger.LogError("Api", "Unexpected error while loading song data", ex);
                 return [];
             }
+        }
+
+        private static HttpClient CreateHttpClient(IConfiguration configuration)
+        {
+            var httpClient = new HttpClient
+            {
+                BaseAddress = new Uri(BaseUrl)
+            };
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
+            return httpClient;
         }
 
         private static string? ResolveMockDataPath()
@@ -419,7 +460,7 @@ namespace RhythmVerseClient.Services
             }
             catch (Exception ex)
             {
-                Logger.LogMessage($"Failed to load mock data from embedded resource: {ex.Message}");
+                Logger.LogError("Api", "Failed to load mock data from embedded resource", ex);
                 return null;
             }
         }

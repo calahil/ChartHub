@@ -1,0 +1,79 @@
+using System.Text.Json;
+using RhythmVerseClient.Configuration.Stores;
+using RhythmVerseClient.Tests.TestInfrastructure;
+
+namespace RhythmVerseClient.Tests;
+
+[Trait(RhythmVerseClient.Tests.TestInfrastructure.TestCategories.Category, RhythmVerseClient.Tests.TestInfrastructure.TestCategories.IntegrationLite)]
+public class JsonAppConfigStoreTests
+{
+    [Fact]
+    public void Load_WhenConfigMissing_CreatesDefaultConfigFile()
+    {
+        using var temp = new TemporaryDirectoryFixture("json-config-missing");
+        var configPath = temp.GetPath("appsettings.json");
+
+        using var sut = new JsonAppConfigStore(configPath);
+        var config = sut.Load();
+
+        Assert.True(File.Exists(configPath));
+        Assert.Equal(2, config.ConfigVersion);
+        Assert.NotNull(config.Runtime);
+        Assert.NotNull(config.GoogleAuth);
+    }
+
+    [Fact]
+    public void Load_WhenLegacyFlatKeysPresent_MapsIntoRuntimeAndGoogleAuth()
+    {
+        using var temp = new TemporaryDirectoryFixture("json-config-legacy");
+        var configPath = temp.GetPath("appsettings.json");
+
+        var legacy = """
+        {
+          "ConfigVersion": 0,
+          "UseMockData": true,
+          "TempDirectory": "/tmp/legacy-temp",
+          "DownloadDirectory": "/tmp/legacy-downloads",
+          "GoogleDrive": {
+            "android_client_id": "android-id",
+            "desktop_client_id": "desktop-id"
+          }
+        }
+        """;
+        File.WriteAllText(configPath, legacy);
+
+        using var sut = new JsonAppConfigStore(configPath);
+        var config = sut.Load();
+
+        Assert.Equal(2, config.ConfigVersion);
+        Assert.True(config.Runtime.UseMockData);
+        Assert.Equal("/tmp/legacy-temp", config.Runtime.TempDirectory);
+        Assert.Equal("/tmp/legacy-downloads", config.Runtime.DownloadDirectory);
+        Assert.Equal("android-id", config.GoogleAuth.AndroidClientId);
+        Assert.Equal("desktop-id", config.GoogleAuth.DesktopClientId);
+    }
+
+    [Fact]
+    public async Task SaveAsync_WritesConfigAndCleansTemporaryFile()
+    {
+        using var temp = new TemporaryDirectoryFixture("json-config-save");
+        var configPath = temp.GetPath("appsettings.json");
+
+        using var sut = new JsonAppConfigStore(configPath);
+        var config = sut.Load();
+        config.Runtime.OutputDirectory = "/tmp/new-output";
+
+        await sut.SaveAsync(config);
+
+        Assert.True(File.Exists(configPath));
+        Assert.False(File.Exists(configPath + ".tmp"));
+
+        var text = File.ReadAllText(configPath);
+        using var doc = JsonDocument.Parse(text);
+        var output = doc.RootElement
+            .GetProperty("Runtime")
+            .GetProperty("OutputDirectory")
+            .GetString();
+        Assert.Equal("/tmp/new-output", output);
+    }
+}

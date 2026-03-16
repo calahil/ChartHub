@@ -131,7 +131,7 @@ namespace RhythmVerseClient.ViewModels
                     IsLoading = false;
                     IsPlaceholder = true;
                     NoResults = false;
-                    _ = Task.Run(() => LoadDataAsync(false));
+                    ObserveBackgroundTask(LoadDataAsync(false), "RhythmVerse page load");
                 }
             }
         }
@@ -356,7 +356,19 @@ namespace RhythmVerseClient.ViewModels
             _selectedInstruments = [Instruments[0]];
 
             _apiClient.PropertyChanged += ApiClient_PropertyChanged;
-            _ = Task.Run(() => LoadDataAsync(false));
+            ObserveBackgroundTask(LoadDataAsync(false), "RhythmVerse initial load");
+        }
+
+        private static void ObserveBackgroundTask(Task task, string context)
+        {
+            _ = task.ContinueWith(t =>
+            {
+                var ex = t.Exception?.GetBaseException();
+                if (ex is not null)
+                {
+                    Logger.LogError("App", $"{context} failed", ex);
+                }
+            }, TaskContinuationOptions.OnlyOnFaulted);
         }
 
         private void ApiClient_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -398,7 +410,12 @@ namespace RhythmVerseClient.ViewModels
 
             var result = await _transferOrchestrator.QueueSongDownloadAsync(file, downloadItem, Downloads, cts.Token);
             if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
-                Logger.LogMessage($"Song transfer failed: {result.Error}");
+                Logger.LogWarning("Transfer", "Song transfer reported failure", new Dictionary<string, object?>
+                {
+                    ["displayName"] = downloadItem.DisplayName,
+                    ["error"] = result.Error,
+                    ["status"] = downloadItem.Status,
+                });
 
             _downloadTokens.Remove(downloadItem);
             cts.Dispose();

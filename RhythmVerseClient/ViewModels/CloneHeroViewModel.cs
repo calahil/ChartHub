@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 
 namespace RhythmVerseClient.ViewModels
 {
-    public class CloneHeroViewModel : INotifyPropertyChanged
+    public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly AppGlobalSettings globalSettings;
 
@@ -58,6 +58,12 @@ namespace RhythmVerseClient.ViewModels
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public void Dispose()
+        {
+            if (CloneHeroWatcher is IDisposable disposableWatcher)
+                disposableWatcher.Dispose();
         }
     }
 }

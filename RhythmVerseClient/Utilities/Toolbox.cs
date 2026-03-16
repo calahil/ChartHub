@@ -1,6 +1,5 @@
 ﻿using Avalonia.Data.Converters;
 using RhythmVerseClient.Models;
-using SettingsManager;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Rar;
 using SharpCompress.Archives.SevenZip;

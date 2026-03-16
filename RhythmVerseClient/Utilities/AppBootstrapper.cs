@@ -3,10 +3,13 @@ using System.Text.Json.Nodes;
 using Google.Apis.Drive.v3;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using RhythmVerseClient.Configuration.Interfaces;
+using RhythmVerseClient.Configuration.Migration;
+using RhythmVerseClient.Configuration.Models;
+using RhythmVerseClient.Configuration.Stores;
 using RhythmVerseClient.Services;
 using RhythmVerseClient.Services.Transfers;
 using RhythmVerseClient.ViewModels;
-using SettingsManager;
 
 namespace RhythmVerseClient.Utilities
 {
@@ -18,16 +21,53 @@ namespace RhythmVerseClient.Utilities
     {
         public static IServiceProvider CreateServiceProvider()
         {
-            var services = new ServiceCollection();
-            ConfigureServices(services);
-
-            return services.BuildServiceProvider();
+            return CreateServiceProvider(configDirOverride: null, migrationActionOverride: null);
         }
 
-        private static void ConfigureServices(IServiceCollection services)
+        internal static IServiceProvider CreateServiceProvider(
+            string? configDirOverride,
+            Func<IServiceProvider, Task>? migrationActionOverride)
         {
-            var configDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RhythmVerseClient");
+            var services = new ServiceCollection();
+            Logger.LogInfo("Bootstrap", "Configuring service collection");
+            ConfigureServices(services, configDirOverride);
+            var provider = services.BuildServiceProvider();
+            Logger.LogInfo("Bootstrap", "Service provider created");
+
+            try
+            {
+                Logger.LogInfo("Bootstrap", "Starting settings migration");
+                if (migrationActionOverride is not null)
+                {
+                    migrationActionOverride(provider).GetAwaiter().GetResult();
+                }
+                else
+                {
+                    provider.GetRequiredService<SettingsMigrationService>()
+                        .MigrateLegacySecretsAsync()
+                        .GetAwaiter()
+                        .GetResult();
+                }
+                Logger.LogInfo("Bootstrap", "Settings migration completed");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Bootstrap", "Settings migration failed during bootstrap", ex);
+            }
+
+            return provider;
+        }
+
+        private static void ConfigureServices(IServiceCollection services, string? configDirOverride)
+        {
+            var configDir = string.IsNullOrWhiteSpace(configDirOverride)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RhythmVerseClient")
+                : configDirOverride;
             FileTools.CreateDirectoryIfNotExists(configDir);
+            Logger.LogInfo("Bootstrap", "Using application config directory", new Dictionary<string, object?>
+            {
+                ["configDir"] = configDir,
+            });
 
             // Build configuration with user secrets
             var configBuilder = new ConfigurationBuilder()
@@ -37,6 +77,16 @@ namespace RhythmVerseClient.Utilities
 
             var config = configBuilder.Build();
             services.AddSingleton<IConfiguration>(config);
+
+            var configPath = Path.Combine(configDir, "appsettings.json");
+            services.AddSingleton<IAppConfigStore>(_ => new JsonAppConfigStore(configPath));
+            services.AddSingleton<ISecretStore>(_ =>
+                OperatingSystem.IsAndroid()
+                    ? new AndroidSecretStore(configDir)
+                    : new DesktopSecretStore(configDir));
+            services.AddSingleton<IConfigValidator, DefaultConfigValidator>();
+            services.AddSingleton<ISettingsOrchestrator, SettingsOrchestrator>();
+            services.AddSingleton<SettingsMigrationService>();
 
             var settingsFileName = "appsettings.json";
             var sourceFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, settingsFileName);
@@ -51,35 +101,17 @@ namespace RhythmVerseClient.Utilities
                 else
                 {
                     // Android does not always bundle appsettings.json as a plain file path.
-                    var defaultSettings = new AppSettings(
-                        useMockData: false,
-                        tempDirectory: "first_install",
-                        downloadDirectory: "first_install",
-                        stagingDirectory: "first_install",
-                        outputDirectory: "first_install",
-                        cloneHeroSongDirectory: "first_install",
-                        cloneHeroDataDirectory: "first_install");
-
-                    var defaultJson = JsonSerializer.Serialize(defaultSettings, JsonCerealOptions.Instance);
+                    var defaultConfig = new AppConfigRoot();
+                    var defaultJson = JsonSerializer.Serialize(defaultConfig, new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        PropertyNamingPolicy = null,
+                    });
                     File.WriteAllText(destinationFilePath, defaultJson);
                 }
             }
 
             SyncGoogleDriveConfig(sourceFilePath, destinationFilePath);
-
-            string json = File.ReadAllText(destinationFilePath);
-
-            AppSettings settings = JsonSerializer.Deserialize<AppSettings>(json, JsonCerealOptions.Instance)
-                    ?? throw new JsonException("Failed to deserialize settings.");
-
-            services.AddSingleton(settings);
-
-            services.AddSingleton<ISettingsManager<AppSettings>>(serviceProvider =>
-            {
-                var settingsFilePath = Path.Combine(configDir, settingsFileName);
-                var appSettings = serviceProvider.GetRequiredService<AppSettings>();
-                return new SettingsManager<AppSettings>(settingsFilePath, appSettings);
-            });
 
             services.AddSingleton<AppGlobalSettings>();
 
@@ -97,13 +129,15 @@ namespace RhythmVerseClient.Utilities
             services.AddSingleton<DownloadViewModel>();
             services.AddSingleton<CloneHeroViewModel>();
             services.AddSingleton<InstallSongViewModel>();
+            services.AddSingleton<SettingsViewModel>();
             services.AddSingleton<RhythmVerseViewModel>();
             services.AddSingleton<MainViewModel>(serviceProvider =>
                 new MainViewModel(
                     serviceProvider.GetRequiredService<RhythmVerseViewModel>(),
                     serviceProvider.GetRequiredService<DownloadViewModel>(),
                     serviceProvider.GetRequiredService<CloneHeroViewModel>(),
-                    serviceProvider.GetRequiredService<InstallSongViewModel>()
+                    serviceProvider.GetRequiredService<InstallSongViewModel>(),
+                    serviceProvider.GetRequiredService<SettingsViewModel>()
                 )
             );
             services.AddSingleton<DriveService>();

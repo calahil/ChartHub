@@ -1,4 +1,5 @@
 ﻿using Avalonia.Threading;
+using RhythmVerseClient.Utilities;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -9,10 +10,11 @@ namespace RhythmVerseClient.ViewModels
         public bool IsCompanionMode => OperatingSystem.IsAndroid();
         public bool IsDesktopMode => !OperatingSystem.IsAndroid();
 
-        private RhythmVerseViewModel _rhythmVerseViewModel;
-        private DownloadViewModel _downloadViewModel;
-        private CloneHeroViewModel _cloneHeroViewModel;
-        private InstallSongViewModel _installSongViewModel;
+        private RhythmVerseViewModel _rhythmVerseViewModel = null!;
+        private DownloadViewModel _downloadViewModel = null!;
+        private CloneHeroViewModel _cloneHeroViewModel = null!;
+        private InstallSongViewModel _installSongViewModel = null!;
+        private SettingsViewModel _settingsViewModel = null!;
 
         public RhythmVerseViewModel RhythmVerseViewModel
         {
@@ -54,6 +56,16 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        public SettingsViewModel SettingsViewModel
+        {
+            get => _settingsViewModel;
+            set
+            {
+                _settingsViewModel = value;
+                OnPropertyChanged();
+            }
+        }
+
         private bool _isDownloadTabVisible;
         public bool IsDownloadTabVisible
         {
@@ -87,44 +99,90 @@ namespace RhythmVerseClient.ViewModels
             }
         }
 
+        private bool _isSettingsTabVisible;
+        public bool IsSettingsTabVisible
+        {
+            get => _isSettingsTabVisible;
+            set
+            {
+                _isSettingsTabVisible = value;
+                OnPropertyChanged();
+            }
+        }
+
         public MainViewModel()
         {
         }
 
-        public MainViewModel(RhythmVerseViewModel rhythmVerseViewModel, DownloadViewModel downloadViewModel, CloneHeroViewModel cloneHeroViewModel, InstallSongViewModel installSongViewModel)
+        public MainViewModel(
+            RhythmVerseViewModel rhythmVerseViewModel,
+            DownloadViewModel downloadViewModel,
+            CloneHeroViewModel cloneHeroViewModel,
+            InstallSongViewModel installSongViewModel,
+            SettingsViewModel settingsViewModel)
+            : this(
+                rhythmVerseViewModel,
+                downloadViewModel,
+                cloneHeroViewModel,
+                installSongViewModel,
+                settingsViewModel,
+                action => Dispatcher.UIThread.Post(action),
+                OperatingSystem.IsAndroid())
+        {
+        }
+
+        internal MainViewModel(
+            RhythmVerseViewModel rhythmVerseViewModel,
+            DownloadViewModel downloadViewModel,
+            CloneHeroViewModel cloneHeroViewModel,
+            InstallSongViewModel installSongViewModel,
+            SettingsViewModel settingsViewModel,
+            Action<Action> postToUi,
+            bool isAndroid)
         {
             _rhythmVerseViewModel = rhythmVerseViewModel;
             _downloadViewModel = downloadViewModel;
             _cloneHeroViewModel = cloneHeroViewModel;
             _installSongViewModel = installSongViewModel;
+            _settingsViewModel = settingsViewModel;
             _isCloneHeroTabVisible = false;
             _isDownloadTabVisible = false;
             _isInstallSongTabVisible = false;
+            _isSettingsTabVisible = true;
 
-            var supportsCloneHero = !OperatingSystem.IsAndroid();
-            var supportsDesktopInstallPipeline = !OperatingSystem.IsAndroid();
+            var supportsCloneHero = !isAndroid;
+            var supportsDesktopInstallPipeline = !isAndroid;
 
             if (supportsCloneHero)
             {
-                _ = Task.Run(() => {
-                    _cloneHeroViewModel.CloneHeroWatcher.LoadItems();
-                    Dispatcher.UIThread.Post(() => IsCloneHeroTabVisible = true);
-                    });
+                _cloneHeroViewModel.CloneHeroWatcher.LoadItems();
+                postToUi(() => IsCloneHeroTabVisible = true);
             }
 
             if (supportsDesktopInstallPipeline)
             {
-                Dispatcher.UIThread.Post(() => IsInstallSongTabVisible = true);
+                postToUi(() => IsInstallSongTabVisible = true);
             }
 
-            _ = Task.Run(() => {
-                if (!OperatingSystem.IsAndroid())
+            if (!isAndroid)
+            {
+                _downloadViewModel.DownloadWatcher.LoadItems();
+            }
+
+            ObserveBackgroundTask(_downloadViewModel.GoogleWatcher.StartAsync(), "Google watcher startup");
+            postToUi(() => IsDownloadTabVisible = true);
+        }
+
+        private static void ObserveBackgroundTask(Task task, string context)
+        {
+            _ = task.ContinueWith(t =>
+            {
+                var ex = t.Exception?.GetBaseException();
+                if (ex is not null)
                 {
-                    _downloadViewModel.DownloadWatcher.LoadItems();
+                    Logger.LogError("App", $"{context} failed", ex);
                 }
-                _ = _downloadViewModel.GoogleWatcher.StartAsync();
-                Dispatcher.UIThread.Post(() => IsDownloadTabVisible = true);
-                });
+            }, TaskContinuationOptions.OnlyOnFaulted);
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;

@@ -8,6 +8,8 @@ namespace RhythmVerseClient.Views;
 
 public partial class RhythmVerseView : UserControl
 {
+    private RhythmVerseViewModel? _subscribedViewModel;
+
     public RhythmVerseView()
     {
         InitializeComponent();
@@ -16,9 +18,16 @@ public partial class RhythmVerseView : UserControl
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
-        // Subscribe to ViewModel property changes if needed
+
+        if (_subscribedViewModel is not null)
+        {
+            _subscribedViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+            _subscribedViewModel = null;
+        }
+
         if (DataContext is RhythmVerseViewModel viewModel)
         {
+            _subscribedViewModel = viewModel;
             viewModel.PropertyChanged += ViewModel_PropertyChanged;
         }
     }

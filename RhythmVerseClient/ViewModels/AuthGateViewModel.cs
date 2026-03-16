@@ -64,19 +64,32 @@ public class AuthGateViewModel : INotifyPropertyChanged
         if (IsBusy)
             return;
 
+        var authSessionId = $"auth-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}";
+
         IsBusy = true;
         ErrorMessage = null;
         StatusMessage = "Opening Google sign-in...";
+        Logger.LogInfo("Auth", "Interactive Google Drive sign-in started", new Dictionary<string, object?>
+        {
+            ["authSessionId"] = authSessionId,
+        });
 
         try
         {
             await _googleDriveClient.InitializeAsync();
+            Logger.LogInfo("Auth", "Google Drive sign-in completed successfully", new Dictionary<string, object?>
+            {
+                ["authSessionId"] = authSessionId,
+            });
             StatusMessage = "Google Drive connected.";
             await _onAuthenticatedAsync();
         }
         catch (Exception ex)
         {
-            Logger.LogMessage($"Google authentication failed: {ex.Message}");
+            Logger.LogError("Auth", "Google authentication failed", ex, new Dictionary<string, object?>
+            {
+                ["authSessionId"] = authSessionId,
+            });
             ErrorMessage = ex.Message.StartsWith("Google sign-in failed", StringComparison.OrdinalIgnoreCase)
                 ? ex.Message
                 : $"Google sign-in failed: {ex.Message}";

@@ -3,6 +3,7 @@ using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Util.Store;
 using Microsoft.Extensions.Configuration;
+using RhythmVerseClient.Configuration.Interfaces;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;  // used for JsonDocument only
@@ -19,12 +20,14 @@ public interface IGoogleAuthProvider
     Task SignOutAsync(UserCredential? credential, CancellationToken cancellationToken = default);
 }
 
-public sealed class DesktopGoogleAuthProvider(IConfiguration configuration) : IGoogleAuthProvider
+public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISecretStore secretStore) : IGoogleAuthProvider
 {
     private readonly IConfiguration _configuration = configuration;
-    private readonly string _credentialStorePath = Path.Combine(
+    private readonly ISecretStore _secretStore = secretStore;
+    private readonly string _legacyCredentialStorePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.Personal),
         ".credentials/drive-dotnet-maui.json");
+    private const string DataStorePrefix = "google-oauth-desktop";
 
     public async Task<UserCredential> AuthorizeInteractiveAsync(IEnumerable<string> scopes, CancellationToken cancellationToken = default)
     {
@@ -34,17 +37,14 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration) : IG
             scopes,
             "user",
             cancellationToken,
-            new FileDataStore(_credentialStorePath, true));
+            CreateTokenDataStore());
     }
 
     public async Task<UserCredential?> TryAuthorizeSilentAsync(IEnumerable<string> scopes, CancellationToken cancellationToken = default)
     {
-        if (!HasCachedCredentials())
-            return null;
-
         try
         {
-            return await AuthorizeInteractiveAsync(scopes, cancellationToken);
+            return await LoadCachedCredentialAsync(scopes, cancellationToken);
         }
         catch
         {
@@ -66,14 +66,8 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration) : IG
             }
         }
 
-        if (Directory.Exists(_credentialStorePath))
-        {
-            Directory.Delete(_credentialStorePath, true);
-            return;
-        }
-
-        if (File.Exists(_credentialStorePath))
-            File.Delete(_credentialStorePath);
+        await CreateTokenDataStore().ClearAsync().ConfigureAwait(false);
+        DeleteLegacyCredentialStore();
     }
 
     private GoogleAuthorizationCodeFlow.Initializer BuildFlowInitializer(IEnumerable<string> scopes)
@@ -97,12 +91,62 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration) : IG
         };
     }
 
-    private bool HasCachedCredentials()
+    private IDataStore CreateTokenDataStore()
     {
-        if (Directory.Exists(_credentialStorePath))
-            return Directory.EnumerateFiles(_credentialStorePath, "*", SearchOption.AllDirectories).Any();
+        return new GoogleAuthTokenDataStore(_secretStore, DataStorePrefix);
+    }
 
-        return File.Exists(_credentialStorePath);
+    private async Task<UserCredential?> LoadCachedCredentialAsync(
+        IEnumerable<string> scopes,
+        CancellationToken cancellationToken)
+    {
+        var initializer = BuildFlowInitializer(scopes);
+        initializer.DataStore = CreateTokenDataStore();
+        var flow = new GoogleAuthorizationCodeFlow(initializer);
+
+        var token = await flow.LoadTokenAsync("user", cancellationToken).ConfigureAwait(false);
+        if (token is null)
+            token = await LoadLegacyTokenAsync(flow, cancellationToken).ConfigureAwait(false);
+
+        if (token is null)
+            return null;
+
+        var credential = new UserCredential(flow, "user", token);
+        if (token.IsStale)
+            await credential.RefreshTokenAsync(cancellationToken).ConfigureAwait(false);
+
+        return credential;
+    }
+
+    private async Task<TokenResponse?> LoadLegacyTokenAsync(
+        GoogleAuthorizationCodeFlow currentFlow,
+        CancellationToken cancellationToken)
+    {
+        if (!Directory.Exists(_legacyCredentialStorePath) && !File.Exists(_legacyCredentialStorePath))
+            return null;
+
+        var legacyInitializer = BuildFlowInitializer(currentFlow.Scopes);
+        legacyInitializer.DataStore = new FileDataStore(_legacyCredentialStorePath, true);
+        var legacyFlow = new GoogleAuthorizationCodeFlow(legacyInitializer);
+        var legacyToken = await legacyFlow.LoadTokenAsync("user", cancellationToken).ConfigureAwait(false);
+        if (legacyToken is null)
+            return null;
+
+        await currentFlow.DataStore.StoreAsync("user", legacyToken).ConfigureAwait(false);
+        DeleteLegacyCredentialStore();
+        return legacyToken;
+    }
+
+    private void DeleteLegacyCredentialStore()
+    {
+        if (Directory.Exists(_legacyCredentialStorePath))
+        {
+            Directory.Delete(_legacyCredentialStorePath, true);
+            return;
+        }
+
+        if (File.Exists(_legacyCredentialStorePath))
+            File.Delete(_legacyCredentialStorePath);
     }
 
     private string? ResolveDesktopClientId()
@@ -130,11 +174,13 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration) : IG
 /// Android Google auth provider using native Google Sign-In (Android OAuth client)
 /// without browser custom redirect URI handling.
 /// </summary>
-public sealed class AndroidGoogleAuthProvider(IConfiguration configuration) : IGoogleAuthProvider
+public sealed class AndroidGoogleAuthProvider(IConfiguration configuration, ISecretStore secretStore) : IGoogleAuthProvider
 {
     private readonly IConfiguration _configuration = configuration;
+    private readonly ISecretStore _secretStore = secretStore;
     private static readonly Uri DefaultAuthUri = new("https://accounts.google.com/o/oauth2/v2/auth");
     private static readonly Uri DefaultTokenUri = new("https://oauth2.googleapis.com/token");
+    private const string DataStorePrefix = "google-oauth-android";
 
     internal const string FallbackAndroidClientId = "32662681450-gk9vocigkqomedf3vkk1fjtu20slobo1.apps.googleusercontent.com";
 
@@ -205,7 +251,7 @@ public sealed class AndroidGoogleAuthProvider(IConfiguration configuration) : IG
             codeVerifier,
             cancellationToken);
 
-        return CreateCredentialFromTokenResponse(token, scopes);
+        return await CreateCredentialFromTokenResponseAsync(token, scopes).ConfigureAwait(false);
 #else
         throw new PlatformNotSupportedException(
             "AndroidGoogleAuthProvider is only supported on the Android target.");
@@ -226,7 +272,7 @@ public sealed class AndroidGoogleAuthProvider(IConfiguration configuration) : IG
             if (token is null)
                 return null;
 
-            return CreateCredentialFromTokenResponse(token, scopes);
+            return await CreateCredentialFromTokenResponseAsync(token, scopes).ConfigureAwait(false);
         }
         catch
         {
@@ -246,24 +292,25 @@ public sealed class AndroidGoogleAuthProvider(IConfiguration configuration) : IG
         }
 
         var path = GetCredentialStorePath();
-        if (Directory.Exists(path))
-            Directory.Delete(path, recursive: true);
-        else if (File.Exists(path))
-            File.Delete(path);
+        await CreateTokenDataStore().ClearAsync().ConfigureAwait(false);
+        DeleteLegacyCredentialStore(path);
 
 #if ANDROID
         await Task.CompletedTask;
 #endif
     }
 
-    private UserCredential CreateCredentialFromTokenResponse(TokenResponse token, IEnumerable<string> scopes)
+    private async Task<UserCredential> CreateCredentialFromTokenResponseAsync(TokenResponse token, IEnumerable<string> scopes)
     {
         var initializer = BuildFlowInitializer(scopes);
-        initializer.DataStore = new FileDataStore(GetCredentialStorePath(), fullPath: true);
+        initializer.DataStore = CreateTokenDataStore();
         var flow = new GoogleAuthorizationCodeFlow(initializer);
+        await flow.DataStore.StoreAsync("user", token).ConfigureAwait(false);
 
         return new UserCredential(flow, "user", token);
     }
+
+    private IDataStore CreateTokenDataStore() => new GoogleAuthTokenDataStore(_secretStore, DataStorePrefix);
 
     private string BuildAuthorizationUri(
         string clientId,
@@ -348,9 +395,12 @@ public sealed class AndroidGoogleAuthProvider(IConfiguration configuration) : IG
     private async Task<TokenResponse?> LoadCachedTokenAsync(IEnumerable<string> scopes, CancellationToken cancellationToken)
     {
         var initializer = BuildFlowInitializer(scopes);
-        initializer.DataStore = new FileDataStore(GetCredentialStorePath(), fullPath: true);
+        initializer.DataStore = CreateTokenDataStore();
         var flow = new GoogleAuthorizationCodeFlow(initializer);
         var token = await flow.LoadTokenAsync("user", cancellationToken);
+        if (token is null)
+            token = await LoadLegacyTokenAsync(flow, cancellationToken).ConfigureAwait(false);
+
         if (token is null)
             return null;
 
@@ -359,6 +409,34 @@ public sealed class AndroidGoogleAuthProvider(IConfiguration configuration) : IG
             await credential.RefreshTokenAsync(cancellationToken);
 
         return credential.Token;
+    }
+
+    private async Task<TokenResponse?> LoadLegacyTokenAsync(
+        GoogleAuthorizationCodeFlow currentFlow,
+        CancellationToken cancellationToken)
+    {
+        var legacyPath = GetCredentialStorePath();
+        if (!Directory.Exists(legacyPath) && !File.Exists(legacyPath))
+            return null;
+
+        var legacyInitializer = BuildFlowInitializer(currentFlow.Scopes);
+        legacyInitializer.DataStore = new FileDataStore(legacyPath, fullPath: true);
+        var legacyFlow = new GoogleAuthorizationCodeFlow(legacyInitializer);
+        var legacyToken = await legacyFlow.LoadTokenAsync("user", cancellationToken).ConfigureAwait(false);
+        if (legacyToken is null)
+            return null;
+
+        await currentFlow.DataStore.StoreAsync("user", legacyToken).ConfigureAwait(false);
+        DeleteLegacyCredentialStore(legacyPath);
+        return legacyToken;
+    }
+
+    private static void DeleteLegacyCredentialStore(string path)
+    {
+        if (Directory.Exists(path))
+            Directory.Delete(path, recursive: true);
+        else if (File.Exists(path))
+            File.Delete(path);
     }
 
 #if ANDROID

@@ -261,6 +261,11 @@
                     IsVisible="{Binding IsInstallSongTabVisible}">
                 <ContentControl Content="{Binding InstallSongViewModel}" />
             </TabItem>
+            <TabItem Header="Settings"
+                    FontSize="16"
+                    IsVisible="{Binding IsSettingsTabVisible}">
+                <ContentControl Content="{Binding SettingsViewModel}" />
+            </TabItem>
         </TabControl>
     </SplitView>
 

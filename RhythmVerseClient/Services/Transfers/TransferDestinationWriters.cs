@@ -1,3 +1,5 @@
+using RhythmVerseClient.Utilities;
+
 namespace RhythmVerseClient.Services.Transfers;
 
 public sealed record DestinationWriteResult(
@@ -34,6 +36,8 @@ internal static class NameConflictResolver
 {
     public static string ResolveUniqueName(string originalName, Func<string, bool> exists)
     {
+        originalName = SafePathHelper.SanitizeFileName(originalName, "download.bin");
+
         if (!exists(originalName))
             return originalName;
 

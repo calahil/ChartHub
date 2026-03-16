@@ -94,9 +94,17 @@ namespace RhythmVerseClient.ViewModels
                     using var archive = FileTools.OpenArchive(song.FilePath);
                     foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
                     {
-                        entry.WriteToDirectory(globalSettings.OutputDir, new ExtractionOptions
+                        var destinationPath = SafePathHelper.GetSafeArchiveExtractionPath(
+                            globalSettings.OutputDir,
+                            entry.Key,
+                            "archive-entry");
+                        var destinationDirectory = Path.GetDirectoryName(destinationPath);
+                        if (!string.IsNullOrWhiteSpace(destinationDirectory))
+                            Directory.CreateDirectory(destinationDirectory);
+
+                        entry.WriteToFile(destinationPath, new ExtractionOptions
                         {
-                            ExtractFullPath = true,
+                            ExtractFullPath = false,
                             Overwrite = true
                         });
                         var progress = progressIncrement / totalFiles;
@@ -131,7 +139,10 @@ namespace RhythmVerseClient.ViewModels
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogMessage($"An error occurred: {ex.Message}");
+                    Logger.LogError("Install", "Failed to delete processed song after install", ex, new Dictionary<string, object?>
+                    {
+                        ["songPath"] = song,
+                    });
                 }
             }
 

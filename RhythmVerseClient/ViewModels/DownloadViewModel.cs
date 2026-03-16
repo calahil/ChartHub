@@ -10,7 +10,7 @@ using System.Windows.Input;
 
 namespace RhythmVerseClient.ViewModels
 {
-    public class DownloadViewModel : INotifyPropertyChanged
+    public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     {
         private readonly AppGlobalSettings globalSettings;
         public bool IsCompanionMode => OperatingSystem.IsAndroid();
@@ -170,7 +170,15 @@ namespace RhythmVerseClient.ViewModels
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"File {file.FilePath} does not exist: {ex.Message}");
+                        Logger.LogWarning("Transfer", "Local file could not be inspected before upload", new Dictionary<string, object?>
+                        {
+                            ["filePath"] = file.FilePath,
+                            ["reason"] = ex.GetType().Name,
+                        });
+                        Logger.LogError("Transfer", "Local file inspection failed before upload", ex, new Dictionary<string, object?>
+                        {
+                            ["filePath"] = file.FilePath,
+                        });
                         continue;
                     }
                     try
@@ -179,7 +187,11 @@ namespace RhythmVerseClient.ViewModels
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Failed to upload {file.FilePath}: {ex.Message}");
+                        Logger.LogError("Transfer", "Failed to upload local file to Google Drive", ex, new Dictionary<string, object?>
+                        {
+                            ["filePath"] = file.FilePath,
+                            ["folderId"] = _googleDrive.RhythmVerseFolderId,
+                        });
                     }
                 }
 
@@ -256,6 +268,23 @@ namespace RhythmVerseClient.ViewModels
         protected void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            DownloadFiles.CollectionChanged -= DownloadFiles_CollectionChanged;
+            GoogleFiles.CollectionChanged -= GoogleFiles_CollectionChanged;
+
+            foreach (var file in DownloadFiles)
+                file.PropertyChanged -= ItemPropertyChanged;
+
+            foreach (var file in GoogleFiles)
+                file.PropertyChanged -= ItemPropertyChanged;
+
+            if (DownloadWatcher is IDisposable disposableWatcher)
+                disposableWatcher.Dispose();
+
+            await GoogleWatcher.DisposeAsync();
         }
 
     }

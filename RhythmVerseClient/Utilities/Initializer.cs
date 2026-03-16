@@ -1,4 +1,7 @@
-﻿using SettingsManager;
+﻿using RhythmVerseClient.Configuration.Interfaces;
+using RhythmVerseClient.Configuration.Models;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace RhythmVerseClient.Utilities
 {
@@ -18,7 +21,7 @@ namespace RhythmVerseClient.Utilities
 
     }
 
-    public class AppGlobalSettings
+    public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
     {
         private static string GetDefaultCloneHeroDataDirectory()
         {
@@ -30,96 +33,150 @@ namespace RhythmVerseClient.Utilities
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".clonehero");
         }
 
-        private readonly ISettingsManager<AppSettings> _settingsManager;
-        private readonly AppSettings _appSettings;
+        private readonly ISettingsOrchestrator _settingsOrchestrator;
+        private readonly SemaphoreSlim _updateLock = new(1, 1);
+
+        private RuntimeAppConfig Runtime => _settingsOrchestrator.Current.Runtime;
 
         public bool UseMockData
         {
-            get => _appSettings.UseMockData;
-            set { _appSettings.UseMockData = value; _settingsManager.Save(); }
+            get => Runtime.UseMockData;
+            set => QueueConfigUpdate(config => config.Runtime.UseMockData = value);
         }
+
         public string TempDir
         {
-            get => _appSettings.TempDirectory ?? String.Empty;
-            set { _appSettings.TempDirectory = value; _settingsManager.Save(); }
+            get => Runtime.TempDirectory;
+            set => QueueConfigUpdate(config => config.Runtime.TempDirectory = value);
         }
 
         public string StagingDir
         {
-            get => _appSettings.StagingDirectory ?? String.Empty;
-            set { _appSettings.StagingDirectory = value; _settingsManager.Save(); }
+            get => Runtime.StagingDirectory;
+            set => QueueConfigUpdate(config => config.Runtime.StagingDirectory = value);
         }
 
         public string DownloadDir
         {
-            get => _appSettings.DownloadDirectory ?? String.Empty;
-            set { _appSettings.DownloadDirectory = value; _settingsManager.Save(); }
+            get => Runtime.DownloadDirectory;
+            set => QueueConfigUpdate(config => config.Runtime.DownloadDirectory = value);
         }
 
         public string OutputDir
         {
-            get => _appSettings.OutputDirectory ?? String.Empty;
-            set { _appSettings.OutputDirectory = value; _settingsManager.Save(); }
+            get => Runtime.OutputDirectory;
+            set => QueueConfigUpdate(config => config.Runtime.OutputDirectory = value);
         }
 
         public string CloneHeroDataDir
         {
-            get => _appSettings.CloneHeroDataDirectory ?? String.Empty;
-            set { _appSettings.CloneHeroDataDirectory = value; _settingsManager.Save(); }
+            get => Runtime.CloneHeroDataDirectory;
+            set => QueueConfigUpdate(config => config.Runtime.CloneHeroDataDirectory = value);
         }
 
         public string CloneHeroSongsDir
         {
-            get => _appSettings.CloneHeroSongDirectory ?? String.Empty;
-            set { _appSettings.CloneHeroSongDirectory = value; _settingsManager.Save(); }
+            get => Runtime.CloneHeroSongDirectory;
+            set => QueueConfigUpdate(config => config.Runtime.CloneHeroSongDirectory = value);
         }
 
-        public AppGlobalSettings(ISettingsManager<AppSettings> settingsManager)
+        public AppGlobalSettings(ISettingsOrchestrator settingsOrchestrator)
         {
-            _settingsManager = settingsManager;
+            _settingsOrchestrator = settingsOrchestrator;
+            _settingsOrchestrator.SettingsChanged += OnSettingsChanged;
+            EnsureDefaults();
+        }
 
-            _appSettings = settingsManager.Settings;
+        private void OnSettingsChanged(AppConfigRoot _)
+        {
+            RaiseAllSettingsChanged();
+        }
 
-            if (TempDir == "first_install" || TempDir == String.Empty)
+        private void EnsureDefaults()
+        {
+            var tempDir = Normalize(Runtime.TempDirectory, Path.Combine(Path.GetTempPath(), "RhythmVerseClient"));
+            var downloadDir = Normalize(Runtime.DownloadDirectory, Path.Combine(tempDir, "Downloads"));
+            var stagingDir = Normalize(Runtime.StagingDirectory, Path.Combine(tempDir, "Staging"));
+            var outputDir = Normalize(Runtime.OutputDirectory, Path.Combine(tempDir, "Output"));
+            var cloneHeroDataDir = Normalize(Runtime.CloneHeroDataDirectory, GetDefaultCloneHeroDataDirectory());
+            var cloneHeroSongsDir = Normalize(Runtime.CloneHeroSongDirectory, Path.Combine(cloneHeroDataDir, "Songs"));
+
+            FileTools.CreateDirectoryIfNotExists(tempDir);
+            FileTools.CreateDirectoryIfNotExists(downloadDir);
+            FileTools.CreateDirectoryIfNotExists(stagingDir);
+            FileTools.CreateDirectoryIfNotExists(outputDir);
+            FileTools.CreateDirectoryIfNotExists(cloneHeroDataDir);
+            FileTools.CreateDirectoryIfNotExists(cloneHeroSongsDir);
+
+            QueueConfigUpdate(config =>
             {
-                TempDir = Path.Combine(Path.GetTempPath(), "RhythmVerseClient");
-            }
+                config.Runtime.TempDirectory = tempDir;
+                config.Runtime.DownloadDirectory = downloadDir;
+                config.Runtime.StagingDirectory = stagingDir;
+                config.Runtime.OutputDirectory = outputDir;
+                config.Runtime.CloneHeroDataDirectory = cloneHeroDataDir;
+                config.Runtime.CloneHeroSongDirectory = cloneHeroSongsDir;
+            });
+        }
 
-            FileTools.CreateDirectoryIfNotExists(TempDir);
+        private static string Normalize(string? value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value) || value == "first_install"
+                ? fallback
+                : value;
+        }
 
-            if (DownloadDir == "first_install" || DownloadDir == String.Empty)
+        private void QueueConfigUpdate(Action<AppConfigRoot> update)
+        {
+            _ = Task.Run(async () =>
             {
-                DownloadDir = Path.Combine(TempDir, "Downloads");
-            }
+                await _updateLock.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    var result = await _settingsOrchestrator.UpdateAsync(update).ConfigureAwait(false);
+                    if (!result.IsValid)
+                    {
+                        var errors = string.Join("; ", result.Failures.Select(f => $"{f.Key}: {f.Message}"));
+                        Logger.LogWarning("Config", "Invalid settings update ignored", new Dictionary<string, object?>
+                        {
+                            ["fieldKeys"] = string.Join(",", result.Failures.Select(f => f.Key)),
+                            ["details"] = errors,
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Config", "Failed to update settings asynchronously", ex);
+                }
+                finally
+                {
+                    _updateLock.Release();
+                }
+            });
+        }
 
-            FileTools.CreateDirectoryIfNotExists(DownloadDir);
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-            if (StagingDir == "first_install" || StagingDir == String.Empty)
-            {
-                StagingDir = Path.Combine(TempDir, "Staging");
-            }
+        private void RaiseAllSettingsChanged()
+        {
+            OnPropertyChanged(nameof(UseMockData));
+            OnPropertyChanged(nameof(TempDir));
+            OnPropertyChanged(nameof(StagingDir));
+            OnPropertyChanged(nameof(DownloadDir));
+            OnPropertyChanged(nameof(OutputDir));
+            OnPropertyChanged(nameof(CloneHeroDataDir));
+            OnPropertyChanged(nameof(CloneHeroSongsDir));
+        }
 
-            FileTools.CreateDirectoryIfNotExists(StagingDir);
+        private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
-            if (OutputDir == "first_install" || OutputDir == String.Empty)
-            {
-                OutputDir = Path.Combine(TempDir, "Output");
-            }
-
-            FileTools.CreateDirectoryIfNotExists(OutputDir);
-
-            if (CloneHeroDataDir == "first_install" || CloneHeroDataDir == String.Empty)
-            {
-                CloneHeroDataDir = GetDefaultCloneHeroDataDirectory();
-            }
-
-            FileTools.CreateDirectoryIfNotExists(CloneHeroDataDir);
-
-            if (CloneHeroSongsDir == "first_install" || CloneHeroSongsDir == String.Empty)
-            {
-                CloneHeroSongsDir = Path.Combine(CloneHeroDataDir, "Songs");
-            }
-            FileTools.CreateDirectoryIfNotExists(CloneHeroSongsDir);
+        public void Dispose()
+        {
+            _settingsOrchestrator.SettingsChanged -= OnSettingsChanged;
+            _updateLock.Dispose();
         }
 
 

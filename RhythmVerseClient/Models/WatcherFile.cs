@@ -28,7 +28,6 @@ namespace RhythmVerseClient.Models
         private string _displayName = displayName;
         private string _filePath = filePath;
         private WatcherFileType _fileType = watcherFileType;
-        private string _fileSize = FileTools.ConvertFileSize(sizeBytes);
         private long _sizeBytes = sizeBytes;
         private double _downloadProgress = 0;
 
@@ -86,15 +85,7 @@ namespace RhythmVerseClient.Models
 
         public string FileSize
         {
-            get => _fileSize;
-            set
-            {
-                if (_fileSize != value)
-                {
-                    _fileSize = value;
-                    OnPropertyChanged(nameof(FileSize));
-                }
-            }
+            get => FileTools.ConvertFileSize(_sizeBytes);
         }
 
         public string FilePath
@@ -115,8 +106,12 @@ namespace RhythmVerseClient.Models
             get => _sizeBytes;
             set
             {
+                if (_sizeBytes == value)
+                    return;
+
                 _sizeBytes = value;
                 OnPropertyChanged(nameof(SizeBytes));
+                OnPropertyChanged(nameof(FileSize));
             }
         }
 
