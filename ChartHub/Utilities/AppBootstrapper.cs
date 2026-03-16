@@ -34,12 +34,27 @@ namespace ChartHub.Utilities
             var provider = services.BuildServiceProvider();
             Logger.LogInfo("Bootstrap", "Service provider created");
 
+            if (OperatingSystem.IsAndroid())
+            {
+                _ = Task.Run(async () => await RunPostBuildInitializationAsync(provider, migrationActionOverride));
+            }
+            else
+            {
+                RunPostBuildInitializationAsync(provider, migrationActionOverride).GetAwaiter().GetResult();
+            }
+
+            return provider;
+        }
+
+        private static async Task RunPostBuildInitializationAsync(
+            IServiceProvider provider,
+            Func<IServiceProvider, Task>? migrationActionOverride)
+        {
             try
             {
-                var removed = provider.GetRequiredService<LibraryCatalogService>()
+                var removed = await provider.GetRequiredService<LibraryCatalogService>()
                     .RemoveMissingLocalFilesAsync()
-                    .GetAwaiter()
-                    .GetResult();
+                    .ConfigureAwait(false);
                 Logger.LogInfo("Bootstrap", "Catalog reconciliation completed", new Dictionary<string, object?>
                 {
                     ["removedEntries"] = removed,
@@ -58,14 +73,13 @@ namespace ChartHub.Utilities
                 Logger.LogInfo("Bootstrap", "Starting settings migration");
                 if (migrationActionOverride is not null)
                 {
-                    migrationActionOverride(provider).GetAwaiter().GetResult();
+                    await migrationActionOverride(provider).ConfigureAwait(false);
                 }
                 else
                 {
-                    provider.GetRequiredService<SettingsMigrationService>()
+                    await provider.GetRequiredService<SettingsMigrationService>()
                         .MigrateLegacySecretsAsync()
-                        .GetAwaiter()
-                        .GetResult();
+                        .ConfigureAwait(false);
                 }
                 Logger.LogInfo("Bootstrap", "Settings migration completed");
             }
@@ -73,8 +87,6 @@ namespace ChartHub.Utilities
             {
                 Logger.LogError("Bootstrap", "Settings migration failed during bootstrap", ex);
             }
-
-            return provider;
         }
 
         private static void ConfigureServices(IServiceCollection services, string? configDirOverride)
@@ -90,7 +102,7 @@ namespace ChartHub.Utilities
 
             // Build configuration with user secrets
             var configBuilder = new ConfigurationBuilder()
-                .AddJsonFile(Path.Combine(configDir, "appsettings.json"), optional: true)
+                .AddJsonFile(Path.Combine(configDir, "appsettings.json"), optional: true, reloadOnChange: true)
                 .AddUserSecrets<UserSecretsAnchor>(optional: true)
                 .AddEnvironmentVariables();
 

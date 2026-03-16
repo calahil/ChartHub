@@ -20,11 +20,11 @@
         </UserControl.Resources>
         <Grid RowDefinitions="*" ColumnDefinitions="*">
                 <Grid>
-                                <Grid RowDefinitions="Auto,*"
-                                        ColumnDefinitions="*"
-                                        IsVisible="{Binding IsDesktopMode}"
-                                        HorizontalAlignment="Stretch"
-                                        VerticalAlignment="Stretch">
+                        <Grid RowDefinitions="Auto,*"
+                              ColumnDefinitions="*"
+                              IsVisible="{Binding IsDesktopMode}"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch">
                                 <!-- Search and Filter Bar -->
                                 <Grid Grid.Row="0"
                                       Margin="0,10,10,0"
@@ -34,36 +34,20 @@
                                                  Watermark="{Binding PageStrings.SearchText}"
                                                  VerticalAlignment="Top"
                                                  Text="{Binding SearchText}" />
-                                        <ButtonSpinner Grid.Column="2"
-                                                       Height="20"
-                                                       Width="130"
-                                                       Spin="Button_Spin"
-                                                       VerticalAlignment="Top"
-                                                       ButtonSpinnerLocation="Left" >
-                                                <TextBox Text="{Binding CurrentPage}"
-                                                         VerticalAlignment="Top"
-                                                         HorizontalAlignment="Center" />
-                                        </ButtonSpinner>
-                                        <TextBlock Grid.Column="3"
-                                                   Text="{Binding PageStrings.PageSeparator}"
-                                                   VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="4"
-                                                   Text="{Binding TotalPages}"
-                                                   VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="5"
+                                        <TextBlock Grid.Column="2"
                                                    Text="{Binding PageStrings.Total}"
                                                    VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="6"
+                                        <TextBlock Grid.Column="3"
                                                    Text="{Binding TotalResults}"
                                                    VerticalAlignment="Center" />
-                                        <Button Grid.Column="8"
+                                        <Button Grid.Column="4"
                                                 Height="36"
                                                 VerticalContentAlignment="Bottom"
                                                 HorizontalContentAlignment="Center"
                                                 Command="{Binding RefreshButtonCommand}"
                                                 HorizontalAlignment="Center"
                                                 VerticalAlignment="Center">
-                                                      <Image Source="{Binding PageStrings.Refresh, Converter={StaticResource AssetPathToImageConverter}}"
+                                                <Image Source="{Binding PageStrings.Refresh, Converter={StaticResource AssetPathToImageConverter}}"
                                                        Width="{StaticResource IconSizeDense}"
                                                        Height="{StaticResource IconSizeDense}" />
                                         </Button>
@@ -110,14 +94,19 @@
                                                          SelectionMode="Single"
                                                          SelectedItem="{Binding SelectedFile}"
                                                          Background="{StaticResource ListBoxBackground}"
+                                                         BorderThickness="1"
+                                                         BorderBrush="{StaticResource ThemeBorderMidBrush}"
                                                          VerticalAlignment="Stretch"
                                                          x:Name="SongsListBox"
                                                          ScrollViewer.VerticalScrollBarVisibility="Auto">
                                                         <ListBox.ItemTemplate>
                                                                 <DataTemplate>
-                                                                        <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                                        <Border Margin="0,0,0,8"
+                                                                                Padding="12"
+                                                                                CornerRadius="8"
                                                                                 BorderThickness="1"
-                                                                                CornerRadius="5">
+                                                                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                                                Background="{StaticResource ThemeControlLowBrush}">
                                                                                 <Grid RowDefinitions="8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8"
                                                                                       ColumnDefinitions="128, 2.5*, 2.2*, 2*, 2*">
                                                                                         <!-- Album Art -->
@@ -180,23 +169,23 @@
                                                                                                       Grid.Column="1"
                                                                                                       Grid.RowDefinitions="*"
                                                                                                       Grid.ColumnDefinitions="Auto, Auto, *, Auto, Auto">
-                                                                                                                      <Image Grid.Row="0"
-                                                                                                                              Grid.Column="0"
-                                                                                                                              Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Releases, Converter={StaticResource AssetPathToImageConverter}}"
-                                                                                                                              Width="{StaticResource IconSizeInline}"
-                                                                                                                              Height="{StaticResource IconSizeInline}"
-                                                                                                                              HorizontalAlignment="Right" />
+                                                                                                        <Image Grid.Row="0"
+                                                                                                               Grid.Column="0"
+                                                                                                               Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Releases, Converter={StaticResource AssetPathToImageConverter}}"
+                                                                                                               Width="{StaticResource IconSizeInline}"
+                                                                                                               Height="{StaticResource IconSizeInline}"
+                                                                                                               HorizontalAlignment="Right" />
                                                                                                         <TextBlock Grid.Row="0"
                                                                                                                    Grid.Column="1"
                                                                                                                    HorizontalAlignment="Left"
                                                                                                                    Text="{Binding Author.Releases}"
                                                                                                                    Foreground="{StaticResource ThemeForegroundBrush}" />
-                                                                                                                      <Image Grid.Row="0"
-                                                                                                                              Grid.Column="3"
-                                                                                                                              Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Roles, Converter={StaticResource AssetPathToImageConverter}}"
-                                                                                                                              Width="{StaticResource IconSizeInline}"
-                                                                                                                              Height="{StaticResource IconSizeInline}"
-                                                                                                                              HorizontalAlignment="Right" />
+                                                                                                        <Image Grid.Row="0"
+                                                                                                               Grid.Column="3"
+                                                                                                               Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Roles, Converter={StaticResource AssetPathToImageConverter}}"
+                                                                                                               Width="{StaticResource IconSizeInline}"
+                                                                                                               Height="{StaticResource IconSizeInline}"
+                                                                                                               HorizontalAlignment="Right" />
                                                                                                         <TextBlock Grid.Row="0"
                                                                                                                    Grid.Column="4"
                                                                                                                    HorizontalAlignment="Left"
@@ -224,7 +213,7 @@
                                                                                                         Command="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
                                                                                                         CommandParameter="{Binding}">
                                                                                                         <Button.Content>
-                                                                                                                                <Image Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.ShowDownloads, Converter={StaticResource AssetPathToImageConverter}}"
+                                                                                                                <Image Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.ShowDownloads, Converter={StaticResource AssetPathToImageConverter}}"
                                                                                                                        Width="{StaticResource IconSizeDense}"
                                                                                                                        Height="{StaticResource IconSizeDense}" />
                                                                                                         </Button.Content>
@@ -232,22 +221,22 @@
                                                                                                 <Grid Grid.Row="1"
                                                                                                       Grid.Column="1"
                                                                                                       Grid.RowDefinitions="*"
-                                                                                                                                        Grid.ColumnDefinitions="Auto, Auto, *, Auto, Auto, *, Auto">
-                                                                                                                      <Image Grid.Row="0"
-                                                                                                                              Grid.Column="0"
-                                                                                                                              Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Downloads, Converter={StaticResource AssetPathToImageConverter}}"
-                                                                                                                              Width="{StaticResource IconSizeInline}"
-                                                                                                                              Height="{StaticResource IconSizeInline}" />
+                                                                                                      Grid.ColumnDefinitions="Auto, Auto, *, Auto, Auto, *, Auto">
+                                                                                                        <Image Grid.Row="0"
+                                                                                                               Grid.Column="0"
+                                                                                                               Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Downloads, Converter={StaticResource AssetPathToImageConverter}}"
+                                                                                                               Width="{StaticResource IconSizeInline}"
+                                                                                                               Height="{StaticResource IconSizeInline}" />
                                                                                                         <TextBlock Grid.Row="0"
                                                                                                                    Grid.Column="1"
                                                                                                                    Text="{Binding Downloads}"
                                                                                                                    HorizontalAlignment="Right"
                                                                                                                    Foreground="{StaticResource ThemeForegroundBrush}" />
-                                                                                                                      <Image Grid.Row="0"
-                                                                                                                              Grid.Column="3"
-                                                                                                                              Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Comments, Converter={StaticResource AssetPathToImageConverter}}"
-                                                                                                                              Width="{StaticResource IconSizeInline}"
-                                                                                                                              Height="{StaticResource IconSizeInline}" />
+                                                                                                        <Image Grid.Row="0"
+                                                                                                               Grid.Column="3"
+                                                                                                               Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Comments, Converter={StaticResource AssetPathToImageConverter}}"
+                                                                                                               Width="{StaticResource IconSizeInline}"
+                                                                                                               Height="{StaticResource IconSizeInline}" />
                                                                                                         <TextBlock Grid.Row="0"
                                                                                                                    Grid.Column="4"
                                                                                                                    Text="{Binding Comments}"
@@ -280,129 +269,129 @@
                                 </Grid>
                         </Grid>
 
-                <Grid IsVisible="{Binding IsCompanionMode}"
-                      RowDefinitions="Auto,*"
-                      Margin="10">
-                        <Grid Grid.Row="0"
-                              ColumnDefinitions="*,Auto">
-                                <TextBox Grid.Column="0"
-                                         Watermark="{Binding PageStrings.SearchText}"
-                                         Text="{Binding SearchText}"
-                                         Margin="0,0,8,0" />
-                                <Button Grid.Column="1"
-                                        Command="{Binding RefreshButtonCommand}">
-                                             <Image Source="{Binding PageStrings.Refresh, Converter={StaticResource AssetPathToImageConverter}}"
-                                               Width="{StaticResource IconSizeDense}"
-                                               Height="{StaticResource IconSizeDense}" />
-                                </Button>
-                        </Grid>
+                        <Grid IsVisible="{Binding IsCompanionMode}"
+                              RowDefinitions="Auto,*"
+                              Margin="10">
+                                <Grid Grid.Row="0"
+                                      ColumnDefinitions="*,Auto">
+                                        <TextBox Grid.Column="0"
+                                                 Watermark="{Binding PageStrings.SearchText}"
+                                                 Text="{Binding SearchText}"
+                                                 Margin="0,0,8,0" />
+                                        <Button Grid.Column="1"
+                                                Command="{Binding RefreshButtonCommand}">
+                                                <Image Source="{Binding PageStrings.Refresh, Converter={StaticResource AssetPathToImageConverter}}"
+                                                       Width="{StaticResource IconSizeDense}"
+                                                       Height="{StaticResource IconSizeDense}" />
+                                        </Button>
+                                </Grid>
 
-                        <Grid Grid.Row="1"
-                              Margin="0,10,0,0">
-                                <Grid IsVisible="{Binding IsPlaceholder}">
-                                        <Grid RowDefinitions="Auto,Auto"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center">
-                                                <ProgressBar Grid.Row="0"
-                                                             IsIndeterminate="True"
-                                                             Width="200"
-                                                             Height="30" />
-                                                <TextBlock Grid.Row="1"
-                                                           Text="{Binding PageStrings.LoadingResults}"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           Margin="0,20,0,0" />
+                                <Grid Grid.Row="1"
+                                      Margin="0,10,0,0">
+                                        <Grid IsVisible="{Binding IsPlaceholder}">
+                                                <Grid RowDefinitions="Auto,Auto"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center">
+                                                        <ProgressBar Grid.Row="0"
+                                                                     IsIndeterminate="True"
+                                                                     Width="200"
+                                                                     Height="30" />
+                                                        <TextBlock Grid.Row="1"
+                                                                   Text="{Binding PageStrings.LoadingResults}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   Margin="0,20,0,0" />
+                                                </Grid>
                                         </Grid>
-                                </Grid>
 
-                                <Grid IsVisible="{Binding NoResults}">
-                                        <TextBlock Text="{Binding PageStrings.NoResults}"
-                                                   VerticalAlignment="Center"
-                                                   HorizontalAlignment="Center"/>
-                                </Grid>
+                                        <Grid IsVisible="{Binding NoResults}">
+                                                <TextBlock Text="{Binding PageStrings.NoResults}"
+                                                           VerticalAlignment="Center"
+                                                           HorizontalAlignment="Center"/>
+                                        </Grid>
 
-                                <Border IsVisible="{Binding HasResults}"
-                                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                                        BorderThickness="1"
-                                        Padding="8">
-                                        <ListBox ItemsSource="{Binding DataItems}"
-                                                 SelectionMode="Single"
-                                                 SelectedItem="{Binding SelectedFile}"
-                                                 Background="{StaticResource ListBoxBackground}"
-                                                 x:Name="MobileSongsListBox"
-                                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
-                                                <ListBox.ItemTemplate>
-                                                        <DataTemplate>
-                                                                <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                                                                        BorderThickness="1"
-                                                                        CornerRadius="5"
-                                                                        Padding="8"
-                                                                        Margin="0,0,0,6">
-                                                                        <Grid RowDefinitions="Auto,Auto,Auto,Auto"
-                                                                              ColumnDefinitions="48,*,Auto">
-                                                                                <Image asyncImage:ImageLoader.Source="{Binding AlbumArt, Converter={StaticResource SafeImageUrlConverter}, ConverterParameter=album}"
-                                                                                       Grid.Row="0"
-                                                                                       Grid.Column="0"
-                                                                                       VerticalAlignment="Stretch"
-                                                                                       HorizontalAlignment="Stretch" />
+                                        <Border IsVisible="{Binding HasResults}"
+                                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                BorderThickness="1"
+                                                Padding="8">
+                                                <ListBox ItemsSource="{Binding DataItems}"
+                                                         SelectionMode="Single"
+                                                         SelectedItem="{Binding SelectedFile}"
+                                                         Background="{StaticResource ListBoxBackground}"
+                                                         x:Name="MobileSongsListBox"
+                                                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                                        <ListBox.ItemTemplate>
+                                                                <DataTemplate>
+                                                                        <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                                                BorderThickness="1"
+                                                                                CornerRadius="5"
+                                                                                Padding="8"
+                                                                                Margin="0,0,0,6">
+                                                                                <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+                                                                                      ColumnDefinitions="48,*,Auto">
+                                                                                        <Image asyncImage:ImageLoader.Source="{Binding AlbumArt, Converter={StaticResource SafeImageUrlConverter}, ConverterParameter=album}"
+                                                                                               Grid.Row="0"
+                                                                                               Grid.Column="0"
+                                                                                               VerticalAlignment="Stretch"
+                                                                                               HorizontalAlignment="Stretch" />
 
-                                                                                <!-- Song Info -->
-                                                                                <Grid Grid.Row="0"
-                                                                                      Grid.Column="1">
-                                                                                        <controls:SongInfoControl Song="{Binding}"
-                                                                                                                  SongStrings="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings}"
-                                                                                                                  IsDesktopMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsDesktopMode}"
-                                                                                                                  IsCompanionMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsCompanionMode}"/>
+                                                                                        <!-- Song Info -->
+                                                                                        <Grid Grid.Row="0"
+                                                                                              Grid.Column="1">
+                                                                                                <controls:SongInfoControl Song="{Binding}"
+                                                                                                                          SongStrings="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings}"
+                                                                                                                          IsDesktopMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsDesktopMode}"
+                                                                                                                          IsCompanionMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsCompanionMode}"/>
+                                                                                        </Grid>
+                                                                                        <!-- Instrument Info -->
+                                                                                        <Grid Grid.Row="1"
+                                                                                              Grid.Column="0"
+                                                                                              Grid.ColumnSpan="3">
+                                                                                                <controls:SongRatingControl Song="{Binding}"
+                                                                                                                            HorizontalAlignment="Stretch"
+                                                                                                                            GlyphWidth="16"
+                                                                                                                            GlyphFontSize="14"
+                                                                                                                            IsCompanionMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsCompanionMode}"
+                                                                                                                            IsDesktopMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsDesktopMode}" />
+                                                                                        </Grid>
+                                                                                        <Button Grid.Row="0"
+                                                                                                Grid.Column="2"
+                                                                                                VerticalAlignment="Top"
+                                                                                                HorizontalAlignment="Center"
+                                                                                                Width="32"
+                                                                                                Command="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
+                                                                                                CommandParameter="{Binding}">
+                                                                                                <Button.Content>
+                                                                                                        <Image Source="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.ShowDownloads, Converter={StaticResource AssetPathToImageConverter}}"
+                                                                                                               Width="{StaticResource IconSizeDense}"
+                                                                                                               Height="{StaticResource IconSizeDense}" />
+                                                                                                </Button.Content>
+                                                                                        </Button>
+
+                                                                                        <Border Grid.Row="2"
+                                                                                                Grid.Column="0"
+                                                                                                Grid.ColumnSpan="3"
+                                                                                                Margin="0,6,0,0"
+                                                                                                HorizontalAlignment="Left"
+                                                                                                Padding="8,2"
+                                                                                                CornerRadius="10"
+                                                                                                BorderThickness="1"
+                                                                                                BorderBrush="{StaticResource ThemeAccentBrush}"
+                                                                                                Background="{StaticResource ThemeControlMidBrush}"
+                                                                                                IsVisible="{Binding IsInLibrary}">
+                                                                                                <TextBlock Text="In Library"
+                                                                                                           FontSize="11"
+                                                                                                           FontWeight="SemiBold"
+                                                                                                           Foreground="{StaticResource ThemeAccentBrush}" />
+                                                                                        </Border>
                                                                                 </Grid>
-                                                                                <!-- Instrument Info -->
-                                                                                <Grid Grid.Row="1"
-                                                                                      Grid.Column="0"
-                                                                                      Grid.ColumnSpan="3">
-                                                                                        <controls:SongRatingControl Song="{Binding}"
-                                                                                                                    HorizontalAlignment="Stretch"
-                                                                                                                    GlyphWidth="16"
-                                                                                                                    GlyphFontSize="14"
-                                                                                                                    IsCompanionMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsCompanionMode}"
-                                                                                                                    IsDesktopMode="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsDesktopMode}" />
-                                                                                </Grid>
-                                                                                <Button Grid.Row="0"
-                                                                                        Grid.Column="2"
-                                                                                        VerticalAlignment="Top"
-                                                                                        HorizontalAlignment="Center"
-                                                                                        Width="32"
-                                                                                        Command="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
-                                                                                        CommandParameter="{Binding}">
-                                                                                        <Button.Content>
-                                                                                                             <Image Source="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.ShowDownloads, Converter={StaticResource AssetPathToImageConverter}}"
-                                                                                                       Width="{StaticResource IconSizeDense}"
-                                                                                                       Height="{StaticResource IconSizeDense}" />
-                                                                                        </Button.Content>
-                                                                                </Button>
-
-                                                                                <Border Grid.Row="2"
-                                                                                        Grid.Column="0"
-                                                                                        Grid.ColumnSpan="3"
-                                                                                        Margin="0,6,0,0"
-                                                                                        HorizontalAlignment="Left"
-                                                                                        Padding="8,2"
-                                                                                        CornerRadius="10"
-                                                                                        BorderThickness="1"
-                                                                                        BorderBrush="{StaticResource ThemeAccentBrush}"
-                                                                                        Background="{StaticResource ThemeControlMidBrush}"
-                                                                                        IsVisible="{Binding IsInLibrary}">
-                                                                                        <TextBlock Text="In Library"
-                                                                                                   FontSize="11"
-                                                                                                   FontWeight="SemiBold"
-                                                                                                   Foreground="{StaticResource ThemeAccentBrush}" />
-                                                                                </Border>
-                                                                        </Grid>
-                                                                </Border>
-                                                        </DataTemplate>
-                                                </ListBox.ItemTemplate>
-                                        </ListBox>
-                                </Border>
+                                                                        </Border>
+                                                                </DataTemplate>
+                                                        </ListBox.ItemTemplate>
+                                                </ListBox>
+                                        </Border>
+                                </Grid>
                         </Grid>
-                </Grid>
                 </Grid>
         </Grid>
 </UserControl>

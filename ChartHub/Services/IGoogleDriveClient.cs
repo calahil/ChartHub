@@ -29,6 +29,7 @@ namespace ChartHub.Services
         Task MonitorDirectoryAsync(string directoryId, TimeSpan pollingInterval, Action<Google.Apis.Drive.v3.Data.File, string> onFileChanged, CancellationToken cancellationToken = default);
         public string ChartHubFolderId { get; }
 
+        Task<bool> TryInitializeSilentAsync(CancellationToken cancellationToken = default);
         Task InitializeAsync(CancellationToken cancellationToken = default);
         Task SignOutAsync(CancellationToken cancellationToken = default);
         Task<ObservableCollection<WatcherFile>> GetFileDataCollectionAsync(string directoryId);
@@ -52,31 +53,12 @@ namespace ChartHub.Services
 
         public async Task InitializeAsync(CancellationToken cancellationToken = default)
         {
-            var stopwatch = Stopwatch.StartNew();
-            Logger.LogInfo("Drive", "Google Drive initialization started");
+            await InitializeCoreAsync(allowInteractiveFallback: true, cancellationToken).ConfigureAwait(false);
+        }
 
-            await StopMonitoringAsync().ConfigureAwait(false);
-            try
-            {
-                _driveService = await GetServiceAsync(cancellationToken);
-                ChartHubFolderId = await CreateDirectoryAsync("ChartHub");
-                _monitorCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                _monitorTask = MonitorDirectoryAsync(ChartHubFolderId, TimeSpan.FromSeconds(30), OnFileChanged, _monitorCts.Token);
-
-                Logger.LogInfo("Drive", "Google Drive initialization completed", new Dictionary<string, object?>
-                {
-                    ["folderId"] = ChartHubFolderId,
-                    ["elapsedMs"] = stopwatch.ElapsedMilliseconds,
-                });
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Drive", "Google Drive initialization failed", ex, new Dictionary<string, object?>
-                {
-                    ["elapsedMs"] = stopwatch.ElapsedMilliseconds,
-                });
-                throw;
-            }
+        public async Task<bool> TryInitializeSilentAsync(CancellationToken cancellationToken = default)
+        {
+            return await InitializeCoreAsync(allowInteractiveFallback: false, cancellationToken).ConfigureAwait(false);
         }
 
         public async Task SignOutAsync(CancellationToken cancellationToken = default)
@@ -124,6 +106,85 @@ namespace ChartHub.Services
             });
 
             return _driveService;
+        }
+
+        private async Task<bool> InitializeCoreAsync(bool allowInteractiveFallback, CancellationToken cancellationToken)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            Logger.LogInfo("Drive", "Google Drive initialization started", new Dictionary<string, object?>
+            {
+                ["allowInteractiveFallback"] = allowInteractiveFallback,
+            });
+
+            await StopMonitoringAsync().ConfigureAwait(false);
+            try
+            {
+                _driveService?.Dispose();
+                _driveService = null;
+
+                if (_credential is null)
+                {
+                    Logger.LogInfo("Auth", "Attempting silent Google authorization");
+                    _credential = await _authProvider.TryAuthorizeSilentAsync(Scopes, cancellationToken).ConfigureAwait(false);
+
+                    if (_credential is null)
+                    {
+                        if (!allowInteractiveFallback)
+                        {
+                            Logger.LogInfo("Auth", "Silent Google authorization unavailable");
+                            return false;
+                        }
+
+                        _credential = await _authProvider.AuthorizeInteractiveAsync(Scopes, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+
+                _driveService = new DriveService(new BaseClientService.Initializer
+                {
+                    HttpClientInitializer = _credential,
+                    ApplicationName = ApplicationName,
+                });
+
+                Logger.LogInfo("Drive", "Google Drive service client created", new Dictionary<string, object?>
+                {
+                    ["applicationName"] = ApplicationName,
+                });
+
+                ChartHubFolderId = await CreateDirectoryAsync("ChartHub").ConfigureAwait(false);
+                _monitorCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                _monitorTask = MonitorDirectoryAsync(ChartHubFolderId, TimeSpan.FromSeconds(30), OnFileChanged, _monitorCts.Token);
+
+                Logger.LogInfo("Drive", "Google Drive initialization completed", new Dictionary<string, object?>
+                {
+                    ["folderId"] = ChartHubFolderId,
+                    ["elapsedMs"] = stopwatch.ElapsedMilliseconds,
+                    ["allowInteractiveFallback"] = allowInteractiveFallback,
+                });
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _driveService?.Dispose();
+                _driveService = null;
+                ChartHubFolderId = string.Empty;
+
+                if (allowInteractiveFallback)
+                {
+                    Logger.LogError("Drive", "Google Drive initialization failed", ex, new Dictionary<string, object?>
+                    {
+                        ["elapsedMs"] = stopwatch.ElapsedMilliseconds,
+                    });
+                    throw;
+                }
+
+                Logger.LogWarning("Drive", "Silent Google Drive initialization failed", new Dictionary<string, object?>
+                {
+                    ["elapsedMs"] = stopwatch.ElapsedMilliseconds,
+                    ["error"] = ex.Message,
+                });
+                return false;
+            }
         }
 
         private void OnFileChanged(Google.Apis.Drive.v3.Data.File file, string changeType)

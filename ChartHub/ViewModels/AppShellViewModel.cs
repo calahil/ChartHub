@@ -44,7 +44,19 @@ public class AppShellViewModel : INotifyPropertyChanged
         _serviceProvider = serviceProvider;
         _googleDriveClient = googleDriveClient;
         SignOutCommand = new AsyncRelayCommand(SignOutAsync);
-        CurrentViewModel = new SplashViewModel(ShowAuthGateAsync);
+        CurrentViewModel = new SplashViewModel(HandlePostSplashAsync);
+    }
+
+    private async Task HandlePostSplashAsync()
+    {
+        var silentlyInitialized = await _googleDriveClient.TryInitializeSilentAsync();
+        if (silentlyInitialized)
+        {
+            await SwitchToMainAsync();
+            return;
+        }
+
+        await ShowAuthGateAsync();
     }
 
     private Task ShowAuthGateAsync()

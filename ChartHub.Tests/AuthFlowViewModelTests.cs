@@ -56,7 +56,10 @@ public class AuthFlowViewModelTests
     [Fact]
     public async Task AppShellViewModel_SignInThenSignOut_TransitionsBetweenGateAndMain()
     {
-        var driveClient = new FakeGoogleDriveClient();
+        var driveClient = new FakeGoogleDriveClient
+        {
+            TryInitializeSilentResult = false,
+        };
         var mainViewModel = new MainViewModel();
         var serviceProvider = new SingleServiceProvider(typeof(MainViewModel), mainViewModel);
         var sut = new AppShellViewModel(serviceProvider, driveClient);
@@ -79,6 +82,26 @@ public class AuthFlowViewModelTests
         Assert.IsType<AuthGateViewModel>(sut.CurrentViewModel);
     }
 
+    [Fact]
+    public async Task AppShellViewModel_WhenSilentSignInSucceeds_SkipsAuthGate()
+    {
+        var driveClient = new FakeGoogleDriveClient
+        {
+            TryInitializeSilentResult = true,
+        };
+        var mainViewModel = new MainViewModel();
+        var serviceProvider = new SingleServiceProvider(typeof(MainViewModel), mainViewModel);
+        var sut = new AppShellViewModel(serviceProvider, driveClient);
+
+        var splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
+        await splash.RunAsync();
+
+        Assert.Equal(1, driveClient.TryInitializeSilentCallCount);
+        Assert.Equal(0, driveClient.InitializeCallCount);
+        Assert.True(sut.IsSignedIn);
+        Assert.Same(mainViewModel, sut.CurrentViewModel);
+    }
+
     private sealed class SingleServiceProvider(Type serviceType, object instance) : IServiceProvider
     {
         private readonly Type _serviceType = serviceType;
@@ -93,8 +116,10 @@ public class AuthFlowViewModelTests
     private sealed class FakeGoogleDriveClient : IGoogleDriveClient
     {
         public Exception? InitializeException { get; set; }
+        public bool TryInitializeSilentResult { get; set; }
 
         public int InitializeCallCount { get; private set; }
+        public int TryInitializeSilentCallCount { get; private set; }
         public int SignOutCallCount { get; private set; }
 
         public string ChartHubFolderId => "folder-test";
@@ -109,6 +134,12 @@ public class AuthFlowViewModelTests
         public Task<IList<Google.Apis.Drive.v3.Data.File>> ListFilesAsync(string directoryId) => Task.FromResult<IList<Google.Apis.Drive.v3.Data.File>>(new List<Google.Apis.Drive.v3.Data.File>());
         public Task MonitorDirectoryAsync(string directoryId, TimeSpan pollingInterval, Action<Google.Apis.Drive.v3.Data.File, string> onFileChanged, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ObservableCollection<WatcherFile>> GetFileDataCollectionAsync(string directoryId) => Task.FromResult(new ObservableCollection<WatcherFile>());
+
+        public Task<bool> TryInitializeSilentAsync(CancellationToken cancellationToken = default)
+        {
+            TryInitializeSilentCallCount++;
+            return Task.FromResult(TryInitializeSilentResult);
+        }
 
         public Task InitializeAsync(CancellationToken cancellationToken = default)
         {

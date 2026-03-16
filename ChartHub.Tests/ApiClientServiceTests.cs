@@ -63,6 +63,38 @@ public class ApiClientServiceTests
     }
 
     [Fact]
+    public async Task GetSongFilesAsync_WhenRuntimeUseMockDataTrue_UsesMockPayload()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler((_, _) =>
+            throw new InvalidOperationException("HTTP fallback should not be used when Runtime:UseMockData is enabled.")))
+        {
+            BaseAddress = new Uri("https://rhythmverse.co"),
+        };
+
+        var sut = CreateService(
+            configurationValues: new Dictionary<string, string?>
+            {
+                ["Runtime:UseMockData"] = "True",
+                ["rhythmverseToken"] = "token-test",
+            },
+            httpClient,
+            loadEmbeddedMockData: () => BuildMappedSongResponseJson(),
+            resolveMockDataPath: () => null,
+            isAndroid: false);
+
+        var results = await sut.GetSongFilesAsync(
+            search: false,
+            searchString: string.Empty,
+            sort: "downloads",
+            order: "desc",
+            instrument: [],
+            authorText: string.Empty);
+
+        var song = Assert.Single(results);
+        Assert.Equal("File Artist", song.Artist);
+    }
+
+    [Fact]
     public async Task GetSongFilesAsync_WhenMockDataUnavailable_FallsBackToLiveApi_AndMapsFileFields()
     {
         HttpRequestMessage? capturedRequest = null;

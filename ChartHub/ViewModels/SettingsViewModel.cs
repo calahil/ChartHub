@@ -205,6 +205,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private string _statusMessage = "";
     private bool _hasPendingRestartSettings;
     private bool _isSaving;
+    private bool _showDeveloperSettings;
 
     public ObservableCollection<SettingsFieldViewModel> Fields { get; } = [];
     public ObservableCollection<SecretFieldViewModel> Secrets { get; } = [];
@@ -214,6 +215,28 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public IAsyncRelayCommand<SecretFieldViewModel?> SaveSecretCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> ClearSecretCommand { get; }
     public string SecretStorageBackend { get; }
+
+#if DEBUG
+    public bool IsDeveloperBuild => true;
+#else
+    public bool IsDeveloperBuild => false;
+#endif
+
+    public bool ShowDeveloperSettings
+    {
+        get => _showDeveloperSettings;
+        set
+        {
+            if (_showDeveloperSettings == value)
+                return;
+
+            _showDeveloperSettings = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsSecretsPanelVisible));
+        }
+    }
+
+    public bool IsSecretsPanelVisible => IsDeveloperBuild && ShowDeveloperSettings;
 
     public string StatusMessage
     {
@@ -254,6 +277,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     {
         _settings = settings;
         _secretStore = secretStore;
+        _showDeveloperSettings = false;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
         ReloadCommand = new RelayCommand(Reload);
@@ -262,9 +286,11 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         SecretStorageBackend = ResolveSecretStorageBackend(secretStore);
 
         RebuildFieldsFrom(_settings.Current);
-        BuildSecrets();
+        if (IsDeveloperBuild)
+            BuildSecrets();
         _settings.SettingsChanged += OnSettingsChanged;
-        _ = RefreshSecretStateAsync();
+        if (IsDeveloperBuild)
+            _ = RefreshSecretStateAsync();
     }
 
     private static string ResolveSecretStorageBackend(ISecretStore secretStore)

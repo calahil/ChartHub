@@ -58,7 +58,6 @@ namespace ChartHub.Services
                 OnPropertyChanged();
             }
         }
-
         public long? RecordsPerPage { get; } = 25;
 
 
@@ -163,6 +162,7 @@ namespace ChartHub.Services
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
             }
 
+            DataItems = new ObservableCollection<ViewSong>();
             _currentPage = 1;
         }
 
@@ -223,8 +223,7 @@ namespace ChartHub.Services
                     string responseBody;
 
                     // On Android, prefer embedded mock payload to speed up UI testing.
-                    var useMockData = string.Equals(_configuration["UseMockData"], "True", StringComparison.OrdinalIgnoreCase)
-                        || _isAndroid();
+                    var useMockData = IsMockDataEnabled(_configuration) || _isAndroid();
 
                     if (useMockData)
                     {
@@ -437,7 +436,25 @@ namespace ChartHub.Services
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
             return httpClient;
         }
+        private static bool IsMockDataEnabled(IConfiguration configuration)
+        {
+            var candidates = new[]
+            {
+                configuration["Runtime:UseMockData"],
+                configuration["UseMockData"],
+            };
 
+            foreach (var candidate in candidates)
+            {
+                if (bool.TryParse(candidate, out var enabled) && enabled)
+                    return true;
+
+                if (string.Equals(candidate, "1", StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
+        }
         private static string? ResolveMockDataPath()
         {
             // Support launches from IDE and from built output directories.

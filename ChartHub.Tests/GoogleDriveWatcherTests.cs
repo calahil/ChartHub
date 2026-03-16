@@ -116,6 +116,7 @@ public class GoogleDriveWatcherTests
         public Task DownloadFileAsync(string fileId, string saveToPath) => Task.CompletedTask;
         public Task DeleteFileAsync(string fileId) => Task.CompletedTask;
         public Task MonitorDirectoryAsync(string directoryId, TimeSpan pollingInterval, Action<Google.Apis.Drive.v3.Data.File, string> onFileChanged, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<bool> TryInitializeSilentAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
         public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ObservableCollection<WatcherFile>> GetFileDataCollectionAsync(string directoryId) => Task.FromResult(new ObservableCollection<WatcherFile>());
