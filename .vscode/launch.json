@@ -2,13 +2,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Desktop: Debug RhythmVerseClient",
+            "name": "Desktop: Debug ChartHub",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/RhythmVerseClient/bin/Debug/net10.0/RhythmVerseClient.dll",
+            "program": "${workspaceFolder}/ChartHub/bin/Debug/net10.0/ChartHub.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/RhythmVerseClient",
+            "cwd": "${workspaceFolder}/ChartHub",
             "stopAtEntry": false,
             "console": "internalConsole",
             "internalConsoleOptions": "openOnSessionStart"
@@ -17,19 +17,19 @@
             "name": "Android: Start Emulator",
             "type": "node-terminal",
             "request": "launch",
-            "command": "${env:HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/rhythmverse-emulator.log 2>&1 &"
+            "command": "${env:HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/charthub-emulator.log 2>&1 &"
         },
         {
             "name": "Android: Install To Emulator (emulator-5554)",
             "type": "node-terminal",
             "request": "launch",
-            "command": "if ! ${HOME}/Android/Sdk/platform-tools/adb devices | grep -q '^emulator-5554\\s'; then ${HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/rhythmverse-emulator.log 2>&1 & fi; ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 wait-for-device; until [ \"$(${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')\" = \"1\" ]; do sleep 2; done; until ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd package list packages >/dev/null 2>&1; do sleep 2; done; dotnet build ${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:Device=emulator-5554 -p:RuntimeIdentifier=android-x64 -p:EmbedAssembliesIntoApk=true -p:AndroidSdkDirectory=${HOME}/Android/Sdk"
+            "command": "if ! ${HOME}/Android/Sdk/platform-tools/adb devices | grep -q '^emulator-5554\\s'; then ${HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/charthub-emulator.log 2>&1 & fi; ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 wait-for-device; until [ \"$(${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')\" = \"1\" ]; do sleep 2; done; until ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd package list packages >/dev/null 2>&1; do sleep 2; done; dotnet build ${workspaceFolder}/ChartHub/ChartHub.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:Device=emulator-5554 -p:RuntimeIdentifier=android-x64 -p:EmbedAssembliesIntoApk=true -p:AndroidSdkDirectory=${HOME}/Android/Sdk"
         },
         {
             "name": "Android: Install To Phone (R5CY10G7DWP)",
             "type": "node-terminal",
             "request": "launch",
-            "command": "dotnet build ${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:Device=R5CY10G7DWP -p:RuntimeIdentifier=android-arm64 -p:AndroidSdkDirectory=$HOME/Android/Sdk"
+            "command": "dotnet build ${workspaceFolder}/ChartHub/ChartHub.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:Device=R5CY10G7DWP -p:RuntimeIdentifier=android-arm64 -p:AndroidSdkDirectory=$HOME/Android/Sdk"
         }
     ]
 }

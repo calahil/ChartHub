@@ -1,0 +1,272 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+         xmlns:Views="using:ChartHub.Views"
+         xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
+         xmlns:utilities="clr-namespace:ChartHub.Utilities"
+         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+         x:Class="ChartHub.Views.MainView"
+         x:Name="MainViewRoot"
+         x:DataType="viewmodels:MainViewModel">
+
+    <UserControl.Resources>
+        <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+    </UserControl.Resources>
+
+    <SplitView IsPaneOpen="{Binding RhythmVerseViewModel.isPaneOpen}"
+               OpenPaneLength="380"
+               PanePlacement="Right"
+               DisplayMode="CompactOverlay">
+        <SplitView.Pane>
+            <Grid Grid.ColumnDefinitions="48,*">
+                <Grid Grid.Column="0"
+                      Grid.RowDefinitions="Auto,Auto"
+                      Background="{StaticResource ThemeBackgroundBrush}">
+                    <Button Grid.Column="0"
+                            Grid.Row="0"
+                            Margin="10,0,0,0"
+                            Command="{Binding RhythmVerseViewModel.ShowDownloadsPaneCommand}"
+                            HorizontalAlignment="Right">
+                        <Image Source="{Binding RhythmVerseViewModel.PageStrings.ShowDownloads, Converter={StaticResource AssetPathToImageConverter}}"
+                               Width="{StaticResource IconSizeDense}"
+                               Height="{StaticResource IconSizeDense}" />
+                    </Button>
+                    <Button Grid.Column="0"
+                            Grid.Row="1"
+                            HorizontalAlignment="Right"
+                            Margin="10,0,0,0"
+                            Command="{Binding RhythmVerseViewModel.ShowFilterPaneCommand}">
+                        <Image Source="{Binding RhythmVerseViewModel.PageStrings.ShowFilters, Converter={StaticResource AssetPathToImageConverter}}"
+                               Width="{StaticResource IconSizeDense}"
+                               Height="{StaticResource IconSizeDense}" />
+                    </Button>
+                </Grid>
+
+                <Border IsVisible="{Binding RhythmVerseViewModel.IsFiltersPaneVisible}"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Grid.Column="1"
+                        BorderThickness="1"
+                        Padding="10">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="15"
+                                    Background="{StaticResource ListBoxBackground}">
+                            <TextBlock Text="{Binding RhythmVerseViewModel.PageStrings.FilterTitle}"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource ThemeForegroundBrush}" />
+
+                            <StackPanel Spacing="5">
+                                <Image Source="{Binding RhythmVerseViewModel.PageStrings.SortBy, Converter={StaticResource AssetPathToImageConverter}}"
+                                       Width="{StaticResource IconSizeDefault}"
+                                       Height="{StaticResource IconSizeDefault}"
+                                       HorizontalAlignment="Left" />
+                                <ComboBox ItemsSource="{Binding RhythmVerseViewModel.Filters}"
+                                          SelectedItem="{Binding RhythmVerseViewModel.SelectedFilter}" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="5">
+                                <Image Source="{Binding RhythmVerseViewModel.PageStrings.Order, Converter={StaticResource AssetPathToImageConverter}}"
+                                       Width="{StaticResource IconSizeDefault}"
+                                       Height="{StaticResource IconSizeDefault}"
+                                       HorizontalAlignment="Left" />
+                                <ComboBox ItemsSource="{Binding RhythmVerseViewModel.Orders}"
+                                          SelectedItem="{Binding RhythmVerseViewModel.SelectedOrder}" />
+                            </StackPanel>
+
+                            <StackPanel Spacing="5">
+                                <Image Source="{Binding RhythmVerseViewModel.PageStrings.Instrument, Converter={StaticResource AssetPathToImageConverter}}"
+                                       Width="{StaticResource IconSizeDefault}"
+                                       Height="{StaticResource IconSizeDefault}"
+                                       HorizontalAlignment="Left" />
+                                <ListBox ItemsSource="{Binding RhythmVerseViewModel.Instruments}"
+                                         SelectedItems="{Binding RhythmVerseViewModel.SelectedInstruments}"
+                                         SelectionMode="Multiple,Toggle">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       Foreground="{StaticResource ThemeForegroundBrush}" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+
+                            <Button Command="{Binding RhythmVerseViewModel.RefreshButtonCommand}">
+                                <Image Source="{Binding RhythmVerseViewModel.PageStrings.ApplyFilter, Converter={StaticResource AssetPathToImageConverter}}"
+                                       Width="{StaticResource IconSizeDefault}"
+                                       Height="{StaticResource IconSizeDefault}" />
+                            </Button>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+                <Border IsVisible="{Binding RhythmVerseViewModel.IsDownloadsPaneVisible}"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Grid.Column="1"
+                        BorderThickness="1"
+                        Padding="10">
+                    <ListBox ItemsSource="{Binding RhythmVerseViewModel.Downloads}"
+                             Background="{StaticResource ListBoxBackground}"
+                             BorderThickness="0"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Border IsVisible="{Binding #MainViewRoot.DataContext.IsDesktopMode}"
+                                            Margin="0,0,0,8"
+                                            Padding="12"
+                                            BorderThickness="1"
+                                            BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                            CornerRadius="8"
+                                            Background="{StaticResource ThemeControlLowBrush}">
+                                        <Grid RowDefinitions="Auto,Auto,Auto"
+                                              ColumnDefinitions="*,Auto">
+                                            <StackPanel Grid.Row="0"
+                                                        Grid.Column="0"
+                                                Spacing="6">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            <Border HorizontalAlignment="Left"
+                                                Padding="8,2"
+                                                CornerRadius="10"
+                                                BorderThickness="1"
+                                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                Background="{StaticResource ThemeControlMidBrush}">
+                                                <TextBlock Text="{Binding Status}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                            </Border>
+                                            </StackPanel>
+                                            <Button Grid.Row="0"
+                                                    Grid.Column="1"
+                                                    Content="Cancel"
+                                                    Margin="8,0,0,0"
+                                                MinHeight="34"
+                                                Padding="12,6"
+                                                    Command="{Binding #MainViewRoot.DataContext.RhythmVerseViewModel.CancelDownloadCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    IsEnabled="{Binding CanCancel}"
+                                                    IsVisible="{Binding CanCancel}" />
+
+                                            <ProgressBar Grid.Row="1"
+                                                         Grid.ColumnSpan="2"
+                                                         Margin="0,8,0,0"
+                                                         Height="16"
+                                                         Maximum="100"
+                                                         Value="{Binding DownloadProgress}" />
+
+                                                                                        <Grid Grid.Row="2"
+                                                                                                    Grid.ColumnSpan="2"
+                                                                                                    Margin="0,8,0,0"
+                                                                                                    ColumnDefinitions="Auto,*">
+                                                                                                <TextBlock Grid.Column="0"
+                                                                                                                     Text="{Binding DownloadProgress, StringFormat='{}{0:F0}%'}"
+                                                                                                                     FontSize="11"
+                                                                                                                     Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                                                                <TextBlock Grid.Column="1"
+                                                                                                                     Margin="10,0,0,0"
+                                                                                                                     Text="{Binding ErrorMessage}"
+                                                                                                                     TextWrapping="Wrap"
+                                                                                                                     Foreground="{StaticResource SemanticError}" />
+                                                                                        </Grid>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border IsVisible="{Binding #MainViewRoot.DataContext.IsCompanionMode}"
+                                            Margin="0,0,0,8"
+                                                                                        Padding="10"
+                                            BorderThickness="1"
+                                            BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                            CornerRadius="8"
+                                            Background="{StaticResource ThemeControlLowBrush}">
+                                                                                <Grid RowDefinitions="Auto,Auto,Auto"
+                                              ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Row="0"
+                                                       Grid.Column="0"
+                                                       Text="{Binding DisplayName}"
+                                                       FontWeight="SemiBold"
+                                                                                                             MaxLines="2"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <Button Grid.Row="0"
+                                                    Grid.Column="1"
+                                                                                                        Content="Stop"
+                                                    Margin="8,0,0,0"
+                                                                                                        MinHeight="38"
+                                                                                                        MinWidth="64"
+                                                                                                        Padding="10,6"
+                                                    Command="{Binding #MainViewRoot.DataContext.RhythmVerseViewModel.CancelDownloadCommand}"
+                                                    CommandParameter="{Binding}"
+                                                    IsEnabled="{Binding CanCancel}"
+                                                    IsVisible="{Binding CanCancel}" />
+
+                                                                                        <Grid Grid.Row="1"
+                                                                                                    Grid.ColumnSpan="2"
+                                                                                                    Margin="0,6,0,0"
+                                                                                                    ColumnDefinitions="Auto,*">
+                                                                                                <Border Grid.Column="0"
+                                                                                                                HorizontalAlignment="Left"
+                                                                                                                Padding="7,2"
+                                                                                                                CornerRadius="9"
+                                                                                                                BorderThickness="1"
+                                                                                                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                                                                                Background="{StaticResource ThemeControlMidBrush}">
+                                                                                                        <TextBlock Text="{Binding Status}"
+                                                                                                                             FontSize="10"
+                                                                                                                             FontWeight="SemiBold"
+                                                                                                                             Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                                                                </Border>
+                                                                                                <TextBlock Grid.Column="1"
+                                                                                                                     Margin="10,0,0,0"
+                                                                                                                     VerticalAlignment="Center"
+                                                                                                                     Text="{Binding DownloadProgress, StringFormat='{}{0:F0}%'}"
+                                                                                                                     FontSize="11"
+                                                                                                                     Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                                                        </Grid>
+
+                                                                                        <ProgressBar Grid.Row="2"
+                                                         Grid.ColumnSpan="2"
+                                                         Margin="0,6,0,0"
+                                                                                                                 Height="16"
+                                                         Maximum="100"
+                                                         Value="{Binding DownloadProgress}" />
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+            </Grid>
+        </SplitView.Pane>
+
+        <TabControl>
+            <TabItem Header="RhythmVerse"
+                    FontSize="16">
+                <ContentControl Content="{Binding RhythmVerseViewModel}" />
+            </TabItem>
+            <TabItem Header="Download"
+                    FontSize="16"
+                    IsVisible="{Binding IsDownloadTabVisible}">
+                <ContentControl Content="{Binding DownloadViewModel}" />
+            </TabItem>
+            <TabItem Header="CloneHero"
+                    FontSize="16"
+                    IsVisible="{Binding IsCloneHeroTabVisible}">
+                <ContentControl Content="{Binding CloneHeroViewModel}" />
+            </TabItem>
+            <TabItem Header="Install Song"
+                    FontSize="16"
+                    IsVisible="{Binding IsInstallSongTabVisible}">
+                <ContentControl Content="{Binding InstallSongViewModel}" />
+            </TabItem>
+            <TabItem Header="Settings"
+                    FontSize="16"
+                    IsVisible="{Binding IsSettingsTabVisible}">
+                <ContentControl Content="{Binding SettingsViewModel}" />
+            </TabItem>
+        </TabControl>
+    </SplitView>
+
+</UserControl>

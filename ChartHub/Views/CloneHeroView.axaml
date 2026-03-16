@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="ChartHub.Views.CloneHeroView">
+
+    <Grid RowDefinitions="*" Margin="10">
+        <!-- DataGrid -->
+        <DataGrid ItemsSource="{Binding DataItems}"
+                  SelectedItem="{Binding SelectedFile}"
+                  CanUserSortColumns="True"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="False">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="{Binding PageStrings.Select}" Binding="{Binding Checked}" Width="80" />
+                <DataGridTextColumn Header="{Binding PageStrings.DisplayName}" Binding="{Binding DisplayName}" />
+                <DataGridTextColumn Header="{Binding PageStrings.FileType}" Binding="{Binding FileType}" Width="120" />
+                <DataGridTextColumn Header="{Binding PageStrings.FileSize}" Binding="{Binding FileSize}" Width="120" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+
+</UserControl>

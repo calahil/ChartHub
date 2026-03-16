@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
+             mc:Ignorable="d"
+             d:DesignWidth="560"
+             d:DesignHeight="400"
+             x:Class="ChartHub.Views.SplashView"
+             x:DataType="viewmodels:SplashViewModel">
+
+    <Grid Background="{DynamicResource ThemeBackgroundBrush}">
+        <StackPanel HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="16">
+
+            <!-- Accent bar -->
+            <Border Width="64"
+                    Height="6"
+                    CornerRadius="3"
+                    Background="{DynamicResource ThemeAccentBrush}"
+                    HorizontalAlignment="Center" />
+
+            <!-- App name -->
+            <TextBlock Text="ChartHub"
+                       FontSize="48"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"
+                       Foreground="{DynamicResource ThemeForegroundBrush}" />
+
+            <!-- Tagline -->
+            <TextBlock Text="Your rhythm game chart manager"
+                       FontSize="16"
+                       HorizontalAlignment="Center"
+                       Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+
+        </StackPanel>
+    </Grid>
+
+</UserControl>

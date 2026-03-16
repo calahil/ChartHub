@@ -1,0 +1,170 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ============================================================ -->
+  <!--   Catppuccin Macchiato — Semantic Tokens                     -->
+  <!--   Maps Avalonia's built-in theme resource keys to the        -->
+  <!--   Macchiato palette so every default control picks up the    -->
+  <!--   colour automatically.                                      -->
+  <!-- ============================================================ -->
+
+  <!-- Must include the palette first -->
+  <ResourceDictionary.MergedDictionaries>
+    <ResourceInclude Source="avares://ChartHub/Themes/CatppuccinMacchiato/Palette.axaml"/>
+  </ResourceDictionary.MergedDictionaries>
+
+  <!-- ── Application chrome ──────────────────────────────────── -->
+  <SolidColorBrush x:Key="ThemeBackgroundBrush"        Color="{StaticResource MacchiatoBase}"/>
+  <SolidColorBrush x:Key="ThemeBorderLowBrush"         Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="ThemeBorderMidBrush"         Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="ThemeBorderHighBrush"        Color="{StaticResource MacchiatoSurface2}"/>
+
+  <!-- ── Foreground / text ────────────────────────────────────── -->
+  <SolidColorBrush x:Key="ThemeForegroundBrush"        Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="ThemeForegroundLowBrush"     Color="{StaticResource MacchiatoSubtext0}"/>
+
+  <!-- ── Accent (Mauve is the "signature" Macchiato accent) ───── -->
+  <Color x:Key="SystemAccentColor">#C6A0F6</Color>
+  <SolidColorBrush x:Key="ThemeAccentBrush"            Color="{StaticResource MacchiatoMauve}"/>
+  <SolidColorBrush x:Key="ThemeAccentBrush2"           Color="{StaticResource MacchiatoLavender}"/>
+  <SolidColorBrush x:Key="ThemeAccentBrush3"           Color="{StaticResource MacchiatoBlue}"/>
+  <SolidColorBrush x:Key="ThemeAccentBrush4"           Color="{StaticResource MacchiatoSapphire}"/>
+
+  <!-- ── Controls ─────────────────────────────────────────────── -->
+  <SolidColorBrush x:Key="ThemeControlLowBrush"        Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="ThemeControlMidBrush"        Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="ThemeControlHighBrush"       Color="{StaticResource MacchiatoSurface2}"/>
+  <SolidColorBrush x:Key="ThemeControlHighlightLow"    Color="{StaticResource MacchiatoOverlay0}"/>
+  <SolidColorBrush x:Key="ThemeControlHighlightMid"    Color="{StaticResource MacchiatoOverlay1}"/>
+  <SolidColorBrush x:Key="ThemeControlHighlightHigh"   Color="{StaticResource MacchiatoOverlay2}"/>
+
+  <!-- ── Button ───────────────────────────────────────────────── -->
+  <SolidColorBrush x:Key="ButtonBackground"            Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="ButtonBackgroundPressed"     Color="{StaticResource MacchiatoSurface2}"/>
+  <SolidColorBrush x:Key="ButtonBackgroundDisabled"    Color="{StaticResource MacchiatoMantle}"/>
+  <SolidColorBrush x:Key="ButtonForeground"            Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="ButtonForegroundPressed"     Color="{StaticResource MacchiatoSubtext1}"/>
+  <SolidColorBrush x:Key="ButtonForegroundDisabled"    Color="{StaticResource MacchiatoOverlay0}"/>
+  <SolidColorBrush x:Key="ButtonBorderBrush"           Color="{StaticResource MacchiatoSurface2}"/>
+  <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{StaticResource MacchiatoMauve}"/>
+  <SolidColorBrush x:Key="ButtonBorderBrushPressed"    Color="{StaticResource MacchiatoMauve}"/>
+  <SolidColorBrush x:Key="ButtonBorderBrushDisabled"   Color="{StaticResource MacchiatoSurface0}"/>
+
+  <!-- ── TextBox ──────────────────────────────────────────────── -->
+  <SolidColorBrush x:Key="TextControlBackground"              Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="TextControlBackgroundPointerOver"   Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="TextControlBackgroundFocused"       Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="TextControlBackgroundDisabled"      Color="{StaticResource MacchiatoMantle}"/>
+  <SolidColorBrush x:Key="TextControlForeground"              Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="TextControlForegroundPointerOver"   Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="TextControlForegroundFocused"       Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="TextControlForegroundDisabled"      Color="{StaticResource MacchiatoOverlay0}"/>
+  <SolidColorBrush x:Key="TextControlBorderBrush"             Color="{StaticResource MacchiatoSurface2}"/>
+  <SolidColorBrush x:Key="TextControlBorderBrushPointerOver"  Color="{StaticResource MacchiatoOverlay1}"/>
+  <SolidColorBrush x:Key="TextControlBorderBrushFocused"      Color="{StaticResource MacchiatoMauve}"/>
+  <SolidColorBrush x:Key="TextControlBorderBrushDisabled"     Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="TextControlPlaceholderForeground"   Color="{StaticResource MacchiatoOverlay1}"/>
+
+  <!-- ── CheckBox / RadioButton ───────────────────────────────── -->
+  <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked"            Color="{StaticResource MacchiatoMauve}"/>
+  <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillCheckedPointerOver" Color="{StaticResource MacchiatoLavender}"/>
+  <SolidColorBrush x:Key="CheckBoxCheckBackgroundFillUnchecked"          Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeChecked"          Color="{StaticResource MacchiatoMauve}"/>
+  <SolidColorBrush x:Key="CheckBoxCheckBackgroundStrokeUnchecked"        Color="{StaticResource MacchiatoSurface2}"/>
+  <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked"           Color="{StaticResource MacchiatoCrust}"/>
+  <SolidColorBrush x:Key="CheckBoxForeground"                            Color="{StaticResource MacchiatoText}"/>
+
+  <!-- ── ComboBox ─────────────────────────────────────────────── -->
+  <SolidColorBrush x:Key="ComboBoxBackground"                  Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver"       Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="ComboBoxBackgroundPressed"           Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="ComboBoxBackgroundDisabled"          Color="{StaticResource MacchiatoMantle}"/>
+  <SolidColorBrush x:Key="ComboBoxBorderBrush"                 Color="{StaticResource MacchiatoSurface2}"/>
+  <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver"      Color="{StaticResource MacchiatoOverlay1}"/>
+  <SolidColorBrush x:Key="ComboBoxBorderBrushPressed"          Color="{StaticResource MacchiatoMauve}"/>
+  <SolidColorBrush x:Key="ComboBoxForeground"                  Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="ComboBoxForegroundDisabled"          Color="{StaticResource MacchiatoOverlay0}"/>
+  <SolidColorBrush x:Key="ComboBoxDropDownBackground"          Color="{StaticResource MacchiatoMantle}"/>
+  <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush"         Color="{StaticResource MacchiatoSurface1}"/>
+
+  <!-- ── ListBox / ListBoxItem ────────────────────────────────── -->
+  <SolidColorBrush x:Key="ListBoxBackground"                   Color="{StaticResource MacchiatoMantle}"/>
+  <SolidColorBrush x:Key="ListBoxBorderBrush"                  Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="ListBoxItemForeground"               Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="ListBoxItemBackground"               Color="Transparent"/>
+  <SolidColorBrush x:Key="ListBoxItemBackgroundPointerOver"    Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="ListBoxItemBackgroundSelected"       Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="ListBoxItemBackgroundSelectedPointerOver" Color="{StaticResource MacchiatoSurface2}"/>
+  <SolidColorBrush x:Key="ListBoxItemBackgroundSelectedInactive" Color="{StaticResource MacchiatoSurface0}"/>
+
+  <!-- ── ScrollBar ────────────────────────────────────────────── -->
+  <SolidColorBrush x:Key="ScrollBarThumbBackground"            Color="{StaticResource MacchiatoSurface2}"/>
+  <SolidColorBrush x:Key="ScrollBarThumbBackgroundPointerOver" Color="{StaticResource MacchiatoOverlay0}"/>
+  <SolidColorBrush x:Key="ScrollBarThumbBackgroundPressed"     Color="{StaticResource MacchiatoOverlay1}"/>
+
+  <!-- ── Slider ───────────────────────────────────────────────── -->
+  <SolidColorBrush x:Key="SliderThumbBackground"               Color="{StaticResource MacchiatoMauve}"/>
+  <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver"    Color="{StaticResource MacchiatoLavender}"/>
+  <SolidColorBrush x:Key="SliderThumbBackgroundPressed"        Color="{StaticResource MacchiatoBlue}"/>
+  <SolidColorBrush x:Key="SliderTrackValueFill"                Color="{StaticResource MacchiatoMauve}"/>
+
+  <!-- ── ProgressBar ──────────────────────────────────────────── -->
+  <SolidColorBrush x:Key="ProgressBarBackground"               Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="ProgressBarForeground"               Color="{StaticResource MacchiatoMauve}"/>
+
+  <!-- ── ToolTip ───────────────────────────────────────────────  -->
+  <SolidColorBrush x:Key="ToolTipBackground"                   Color="{StaticResource MacchiatoMantle}"/>
+  <SolidColorBrush x:Key="ToolTipBorderBrush"                  Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="ToolTipForeground"                   Color="{StaticResource MacchiatoText}"/>
+
+  <!-- ── Menu ─────────────────────────────────────────────────── -->
+  <SolidColorBrush x:Key="MenuFlyoutPresenterBackground"       Color="{StaticResource MacchiatoMantle}"/>
+  <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush"      Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="MenuItemForeground"                  Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="MenuItemBackgroundPointerOver"       Color="{StaticResource MacchiatoSurface0}"/>
+
+  <!-- ── TabControl ───────────────────────────────────────────── -->
+  <SolidColorBrush x:Key="TabControlBackground"                Color="{StaticResource MacchiatoBase}"/>
+  <SolidColorBrush x:Key="TabItemBackground"                   Color="{StaticResource MacchiatoMantle}"/>
+  <SolidColorBrush x:Key="TabItemBackgroundSelected"           Color="{StaticResource MacchiatoBase}"/>
+  <SolidColorBrush x:Key="TabItemHeaderForeground"             Color="{StaticResource MacchiatoSubtext1}"/>
+  <SolidColorBrush x:Key="TabItemHeaderForegroundSelected"     Color="{StaticResource MacchiatoMauve}"/>
+  <SolidColorBrush x:Key="TabItemHeaderForegroundPointerOver"  Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="TabItemBorderBrush"                  Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="TabItemBorderBrushSelected"          Color="{StaticResource MacchiatoMauve}"/>
+
+  <!-- ── TreeView ─────────────────────────────────────────────── -->
+  <SolidColorBrush x:Key="TreeViewBackground"                  Color="{StaticResource MacchiatoMantle}"/>
+  <SolidColorBrush x:Key="TreeViewItemBackgroundSelected"      Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver"   Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="TreeViewItemForeground"              Color="{StaticResource MacchiatoText}"/>
+  <SolidColorBrush x:Key="TreeViewItemForegroundSelected"      Color="{StaticResource MacchiatoMauve}"/>
+
+  <!-- ── DataGrid ─────────────────────────────────────────────── -->
+  <SolidColorBrush x:Key="DataGridBackground"                        Color="{StaticResource MacchiatoMantle}"/>
+  <SolidColorBrush x:Key="DataGridGridLinesBrush"                    Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="DataGridRowBackground"                     Color="Transparent"/>
+  <SolidColorBrush x:Key="DataGridRowBackgroundPointerOver"          Color="{StaticResource MacchiatoSurface0}"/>
+  <SolidColorBrush x:Key="DataGridRowBackgroundSelected"             Color="{StaticResource MacchiatoSurface1}"/>
+  <SolidColorBrush x:Key="DataGridColumnHeaderBackground"            Color="{StaticResource MacchiatoCrust}"/>
+  <SolidColorBrush x:Key="DataGridColumnHeaderForeground"            Color="{StaticResource MacchiatoSubtext1}"/>
+  <SolidColorBrush x:Key="DataGridColumnHeaderBorderBrush"           Color="{StaticResource MacchiatoSurface1}"/>
+
+  <!-- ── Semantic helpers (use these in your own AXAML) ────────  -->
+  <SolidColorBrush x:Key="SemanticSuccess"   Color="{StaticResource MacchiatoGreen}"/>
+  <SolidColorBrush x:Key="SemanticWarning"   Color="{StaticResource MacchiatoYellow}"/>
+  <SolidColorBrush x:Key="SemanticError"     Color="{StaticResource MacchiatoRed}"/>
+  <SolidColorBrush x:Key="SemanticInfo"      Color="{StaticResource MacchiatoBlue}"/>
+  <SolidColorBrush x:Key="SemanticLink"      Color="{StaticResource MacchiatoSapphire}"/>
+
+  <!-- ── Icon size tokens (Material 24dp grid) ──────────────── -->
+  <x:Double x:Key="IconSizeInline">16</x:Double>
+  <x:Double x:Key="IconSizeInlineCompact">12</x:Double>
+  <x:Double x:Key="IconSizeDense">18</x:Double>
+  <x:Double x:Key="IconSizeDefault">24</x:Double>
+  <x:Double x:Key="IconSizeProminent">32</x:Double>
+  <x:Double x:Key="IconTouchTargetSize">48</x:Double>
+
+</ResourceDictionary>

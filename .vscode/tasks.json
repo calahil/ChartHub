@@ -7,7 +7,7 @@
             "type": "shell",
             "args": [
                 "build",
-                "${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj"
+                "${workspaceFolder}/ChartHub/ChartHub.csproj"
             ],
             "problemMatcher": "$msCompile",
             "group": {
@@ -21,7 +21,7 @@
             "type": "shell",
             "args": [
                 "build",
-                "${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj",
+                "${workspaceFolder}/ChartHub/ChartHub.csproj",
                 "-p:EnableAndroid=true",
                 "-f",
                 "net10.0-android",
@@ -37,7 +37,7 @@
             "args": [
                 "run",
                 "--project",
-                "${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj"
+                "${workspaceFolder}/ChartHub/ChartHub.csproj"
             ],
             "group": {
                 "kind": "test",
@@ -50,7 +50,7 @@
             "type": "shell",
             "args": [
                 "build",
-                "${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj",
+                "${workspaceFolder}/ChartHub/ChartHub.csproj",
                 "-t:Install",
                 "-p:EnableAndroid=true",
                 "-f",
@@ -102,7 +102,7 @@
             "type": "shell",
             "args": [
                 "-lc",
-                "if ! ${HOME}/Android/Sdk/platform-tools/adb devices | grep -q '^emulator-5554\\s'; then ${HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/rhythmverse-emulator.log 2>&1 & fi; ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 wait-for-device; until [ \"$(${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')\" = \"1\" ]; do sleep 2; done; until ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd package list packages >/dev/null 2>&1; do sleep 2; done; dotnet build ${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:Device=emulator-5554 -p:RuntimeIdentifier=android-x64 -p:EmbedAssembliesIntoApk=true -p:AndroidSdkDirectory=${HOME}/Android/Sdk"
+                "if ! ${HOME}/Android/Sdk/platform-tools/adb devices | grep -q '^emulator-5554\\s'; then ${HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/charthub-emulator.log 2>&1 & fi; ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 wait-for-device; until [ \"$(${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')\" = \"1\" ]; do sleep 2; done; until ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd package list packages >/dev/null 2>&1; do sleep 2; done; dotnet build ${workspaceFolder}/ChartHub/ChartHub.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:Device=emulator-5554 -p:RuntimeIdentifier=android-x64 -p:EmbedAssembliesIntoApk=true -p:AndroidSdkDirectory=${HOME}/Android/Sdk"
             ],
             "problemMatcher": "$msCompile",
             "group": "test"
@@ -113,7 +113,7 @@
             "type": "shell",
             "args": [
                 "build",
-                "${workspaceFolder}/RhythmVerseClient/RhythmVerseClient.csproj",
+                "${workspaceFolder}/ChartHub/ChartHub.csproj",
                 "-t:Install",
                 "-p:EnableAndroid=true",
                 "-f",
@@ -131,7 +131,7 @@
             "type": "shell",
             "args": [
                 "-lc",
-                "${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 logcat -c; ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell monkey -p com.calahilstudios.rhythmverseclient -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true; sleep 4; ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 logcat -d | rg -n 'FATAL EXCEPTION|AndroidRuntime|Unhandled Exception|com\\.calahilstudios\\.rhythmverseclient' -i | tail -200"
+                "${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 logcat -c; ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell monkey -p com.calahilstudios.charthub -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true; sleep 4; ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 logcat -d | rg -n 'FATAL EXCEPTION|AndroidRuntime|Unhandled Exception|com\\.calahilstudios\\.charthub' -i | tail -200"
             ],
             "problemMatcher": []
         }
