@@ -67,7 +67,7 @@
         public string Difficulty { get; } = "Difficulty:";
         public string SearchText { get; } = "Search text...";
         public string PageSeparator { get; } = " / ";
-        public string Total { get; } = " |  Total: ";
+        public string Total { get; } = "Total: ";
         public string Results { get; } = " Results: ";
         public string Refresh { get; } = "avares://ChartHub/Resources/Svg/refresh_24dp.svg";
         public string Artist { get; } = "avares://ChartHub/Resources/Svg/artist_24dp.svg";
