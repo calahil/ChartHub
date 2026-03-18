@@ -224,6 +224,12 @@ namespace ChartHub.Utilities
 
         public async Task<Bitmap?> ProvideImageAsync(string url)
         {
+            // Handle avares:// URIs directly via Avalonia's embedded asset system.
+            if (url.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))
+            {
+                return TryLoadAvaresResource(url);
+            }
+
             // Some desktop hosts reject the default async-loader requests for plain HTTP links.
             // Try a direct image fetch first for HTTP(S) URLs.
             var directNetworkBitmap = await TryLoadNetworkBitmapAsync(url);
@@ -327,6 +333,12 @@ namespace ChartHub.Utilities
                 return null;
             }
 
+            // Fallback URLs from DetermineFallback are avares:// resources — load them directly.
+            if (fallbackUrl.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))
+            {
+                return TryLoadAvaresResource(fallbackUrl);
+            }
+
             try
             {
                 return await _innerLoader.ProvideImageAsync(fallbackUrl);
@@ -377,6 +389,24 @@ namespace ChartHub.Utilities
             }
         }
 
+        private static Bitmap? TryLoadAvaresResource(string url)
+        {
+            try
+            {
+                if (Uri.TryCreate(url, UriKind.Absolute, out var uri) && AssetLoader.Exists(uri))
+                {
+                    using var stream = AssetLoader.Open(uri);
+                    return new Bitmap(stream);
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private string DetermineFallback(string originalUrl)
         {
             // Detect fallback type based on URL pattern
@@ -384,10 +414,13 @@ namespace ChartHub.Utilities
             {
                 return _avatarFallback;
             }
-            else if (originalUrl.Contains("album") || originalUrl.Contains("cover") || originalUrl.Contains("art"))
+
+            if (originalUrl.Contains("album") || originalUrl.Contains("cover") || originalUrl.Contains("art")
+                || originalUrl.Contains("files.enchor.us", StringComparison.OrdinalIgnoreCase))
             {
                 return _albumFallback;
             }
+
             return _genericFallback;
         }
 

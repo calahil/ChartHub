@@ -191,6 +191,64 @@ public class EncoreViewModelTests
         Assert.Equal("321", transfer.LastSong.SourceId);
     }
 
+    [Fact]
+    public async Task RefreshAsync_WithAlbumArtMd5_SetsAlbumArtUrlToFilesEnchorUs()
+    {
+        using var temp = new TemporaryDirectoryFixture("encore-vm-albumart-url");
+        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        const string md5 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+        const string albumArtMd5 = "ffffffffffffffffffffffffffffffff";
+
+        var handler = new RecordingHttpHandler(BuildEncoreResponseJson(
+            chartId: 456,
+            md5: md5,
+            songOverrides: $$"""
+                                    "name": "Art Song",
+                                    "artist": "Art Artist",
+                                    "album": "Art Album",
+                                    "genre": "Pop",
+                                    "year": "2023",
+                                    "charter": "Art Charter",
+                                    "applicationUsername": "artuser",
+                                    "albumArtMd5": "{{albumArtMd5}}",
+                                    "song_length": 180000,
+            """));
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.enchor.us"),
+        };
+
+        var api = CreateApiService(catalog, httpClient);
+        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), catalog, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+
+        await sut.RefreshAsync();
+
+        var song = Assert.Single(sut.DataItems);
+        Assert.Equal($"https://files.enchor.us/{albumArtMd5}", song.AlbumArtUrl);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_WithNullAlbumArtMd5_SetsAlbumArtUrlToNoAlbumArtFallback()
+    {
+        using var temp = new TemporaryDirectoryFixture("encore-vm-albumart-null");
+        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        const string md5 = "aaaabbbbccccddddeeeeffffaaaabbbb";
+
+        var handler = new RecordingHttpHandler(BuildEncoreResponseJson(chartId: 789, md5: md5));
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.enchor.us"),
+        };
+
+        var api = CreateApiService(catalog, httpClient);
+        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), catalog, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+
+        await sut.RefreshAsync();
+
+        var song = Assert.Single(sut.DataItems);
+        Assert.Equal("avares://ChartHub/Resources/Images/noalbumart.png", song.AlbumArtUrl);
+    }
+
     private sealed class RecordingHttpHandler : HttpMessageHandler
     {
         private static readonly string EmptyResponseJson = """
