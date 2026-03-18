@@ -86,7 +86,7 @@
                                         Margin="18,18,0,40"
                                         CornerRadius="10"
                                         Background="{StaticResource ThemeControlMidBrush}">
-                                    <Image asyncImage:ImageLoader.Source="{Binding AlbumArtUrl}"
+                                    <Image asyncImage:ImageLoader.Source="{Binding AlbumArtUrl, Converter={StaticResource SafeImageUrlConverter}, ConverterParameter=album}"
                                            VerticalAlignment="Center"
                                            HorizontalAlignment="Stretch" />
                                 </Border>
