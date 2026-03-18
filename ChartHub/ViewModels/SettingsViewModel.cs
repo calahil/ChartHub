@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Metadata;
@@ -203,6 +204,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private readonly ISettingsOrchestrator _settings;
     private readonly ISecretStore _secretStore;
     private readonly ICloudStorageAccountService _cloudAccountService;
+    private readonly Action<Action> _postToUi;
 
     private string _statusMessage = "";
     private bool _hasPendingRestartSettings;
@@ -364,10 +366,16 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         .ToList();
 
     public SettingsViewModel(ISettingsOrchestrator settings, ISecretStore secretStore, ICloudStorageAccountService cloudAccountService)
+        : this(settings, secretStore, cloudAccountService, action => Dispatcher.UIThread.Post(action))
+    {
+    }
+
+    internal SettingsViewModel(ISettingsOrchestrator settings, ISecretStore secretStore, ICloudStorageAccountService cloudAccountService, Action<Action> postToUi)
     {
         _settings = settings;
         _secretStore = secretStore;
         _cloudAccountService = cloudAccountService;
+        _postToUi = postToUi;
         _showDeveloperSettings = false;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
@@ -500,7 +508,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     private void OnSettingsChanged(AppConfigRoot config)
     {
-        RebuildFieldsFrom(config);
+        _postToUi(() => RebuildFieldsFrom(config));
     }
 
     private void RebuildFieldsFrom(AppConfigRoot config)
