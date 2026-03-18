@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
+using System.Linq;
 using ChartHub.Models;
 using ChartHub.Utilities;
 
@@ -152,12 +153,13 @@ public sealed class EncoreApiService : INotifyPropertyChanged
         var mapped = songs.Select(MapSong).ToList();
         var membership = await _libraryCatalog.GetMembershipMapAsync(
             LibrarySourceNames.Encore,
-            mapped.Select(song => song.SourceId),
+            mapped.SelectMany(song => song.GetCatalogSourceIds()),
             cancellationToken).ConfigureAwait(false);
 
         foreach (var song in mapped)
         {
-            song.IsInLibrary = membership.TryGetValue(song.SourceId, out var isPresent) && isPresent;
+            song.IsInLibrary = song.GetCatalogSourceIds()
+                .Any(sourceId => membership.TryGetValue(sourceId, out var isPresent) && isPresent);
             DataItems.Add(song);
         }
 
@@ -168,30 +170,46 @@ public sealed class EncoreApiService : INotifyPropertyChanged
 
     private EncoreSong MapSong(EncoreSongDto song)
     {
+        var sourceId = song.ChartId > 0 ? song.ChartId.ToString() : song.Md5;
+        var charter = !string.IsNullOrWhiteSpace(song.Charter)
+            ? song.Charter
+            : (!string.IsNullOrWhiteSpace(song.ApplicationUsername) ? song.ApplicationUsername : "Unknown Charter");
+
         return new EncoreSong
         {
             ChartId = song.ChartId,
             SongId = song.SongId,
             GroupId = song.GroupId,
             Md5 = song.Md5,
+            ChartHash = song.ChartHash ?? string.Empty,
+            VersionGroupId = song.VersionGroupId,
+            ApplicationUsername = song.ApplicationUsername ?? string.Empty,
             Name = song.Name ?? "Unknown Song",
             Artist = song.Artist ?? "Unknown Artist",
             Album = song.Album ?? "Unknown Album",
             Genre = song.Genre ?? "Unknown Genre",
             Year = song.Year ?? string.Empty,
-            Charter = song.Charter ?? "Unknown Charter",
+            Charter = charter,
             AlbumArtUrl = GetAlbumArtUrl(song.AlbumArtMd5),
             DownloadUrl = GetDownloadUrl(song.Md5),
             SongLengthMs = song.SongLength,
-            FormattedTime = Toolbox.ConvertSecondstoText(song.SongLength),
+            PreviewStartTimeMs = song.PreviewStartTime,
+            FormattedTime = Toolbox.ConvertMillisecondsToText(song.SongLength),
+            BandDifficulty = song.DiffBand,
             GuitarDifficulty = song.DiffGuitar,
+            GuitarCoopDifficulty = song.DiffGuitarCoop,
+            RhythmDifficulty = song.DiffRhythm,
             DrumsDifficulty = song.DiffDrums,
+            RealDrumsDifficulty = song.DiffDrumsReal,
             BassDifficulty = song.DiffBass,
+            GuitarGhlDifficulty = song.DiffGuitarGhl,
+            BassGhlDifficulty = song.DiffBassGhl,
             VocalsDifficulty = song.DiffVocals,
             KeysDifficulty = song.DiffKeys,
             HasVideoBackground = song.HasVideoBackground,
+            Modchart = song.Modchart,
             SourceName = LibrarySourceNames.Encore,
-            SourceId = song.Md5,
+            SourceId = sourceId,
         };
     }
 

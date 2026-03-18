@@ -10,6 +10,7 @@ using ChartHub.Configuration.Metadata;
 using ChartHub.Configuration.Models;
 using ChartHub.Configuration.Secrets;
 using ChartHub.Configuration.Stores;
+using ChartHub.Services;
 using ChartHub.Utilities;
 
 namespace ChartHub.ViewModels;
@@ -201,11 +202,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly ISettingsOrchestrator _settings;
     private readonly ISecretStore _secretStore;
+    private readonly ICloudStorageAccountService _cloudAccountService;
 
     private string _statusMessage = "";
     private bool _hasPendingRestartSettings;
     private bool _isSaving;
     private bool _showDeveloperSettings;
+    private bool _isCloudAccountLinked;
+    private bool _isCloudAccountBusy;
+    private string _cloudAccountStatusMessage = string.Empty;
+    private string? _cloudAccountErrorMessage;
+    private AuthGateViewModel? _cloudAuthGateViewModel;
 
     public ObservableCollection<SettingsFieldViewModel> Fields { get; } = [];
     public ObservableCollection<SecretFieldViewModel> Secrets { get; } = [];
@@ -214,7 +221,90 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public IRelayCommand ReloadCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> SaveSecretCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> ClearSecretCommand { get; }
+    public IAsyncRelayCommand LinkCloudAccountCommand { get; }
+    public IAsyncRelayCommand UnlinkCloudAccountCommand { get; }
+    public IRelayCommand DismissCloudAuthGateCommand { get; }
     public string SecretStorageBackend { get; }
+    public string CloudProviderId => _cloudAccountService.ProviderId;
+    public string CloudProviderDisplayName => _cloudAccountService.ProviderDisplayName;
+
+    public bool IsCloudAccountLinked
+    {
+        get => _isCloudAccountLinked;
+        private set
+        {
+            if (_isCloudAccountLinked == value)
+                return;
+
+            _isCloudAccountLinked = value;
+            OnPropertyChanged();
+            LinkCloudAccountCommand.NotifyCanExecuteChanged();
+            UnlinkCloudAccountCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public bool IsCloudAccountBusy
+    {
+        get => _isCloudAccountBusy;
+        private set
+        {
+            if (_isCloudAccountBusy == value)
+                return;
+
+            _isCloudAccountBusy = value;
+            OnPropertyChanged();
+            LinkCloudAccountCommand.NotifyCanExecuteChanged();
+            UnlinkCloudAccountCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public string CloudAccountStatusMessage
+    {
+        get => _cloudAccountStatusMessage;
+        private set
+        {
+            if (_cloudAccountStatusMessage == value)
+                return;
+
+            _cloudAccountStatusMessage = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string? CloudAccountErrorMessage
+    {
+        get => _cloudAccountErrorMessage;
+        private set
+        {
+            if (_cloudAccountErrorMessage == value)
+                return;
+
+            _cloudAccountErrorMessage = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasCloudAccountError));
+        }
+    }
+
+    public bool HasCloudAccountError => !string.IsNullOrWhiteSpace(CloudAccountErrorMessage);
+
+    public AuthGateViewModel? CloudAuthGateViewModel
+    {
+        get => _cloudAuthGateViewModel;
+        private set
+        {
+            if (ReferenceEquals(_cloudAuthGateViewModel, value))
+                return;
+
+            _cloudAuthGateViewModel = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsCloudAuthGateVisible));
+            LinkCloudAccountCommand.NotifyCanExecuteChanged();
+            UnlinkCloudAccountCommand.NotifyCanExecuteChanged();
+            DismissCloudAuthGateCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public bool IsCloudAuthGateVisible => CloudAuthGateViewModel is not null;
 
 #if DEBUG
     public bool IsDeveloperBuild => true;
@@ -273,24 +363,128 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         .Select(g => $"{g.Key}: {g.Count()} issue{(g.Count() == 1 ? string.Empty : "s")}")
         .ToList();
 
-    public SettingsViewModel(ISettingsOrchestrator settings, ISecretStore secretStore)
+    public SettingsViewModel(ISettingsOrchestrator settings, ISecretStore secretStore, ICloudStorageAccountService cloudAccountService)
     {
         _settings = settings;
         _secretStore = secretStore;
+        _cloudAccountService = cloudAccountService;
         _showDeveloperSettings = false;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
         ReloadCommand = new RelayCommand(Reload);
         SaveSecretCommand = new AsyncRelayCommand<SecretFieldViewModel?>(SaveSecretAsync);
         ClearSecretCommand = new AsyncRelayCommand<SecretFieldViewModel?>(ClearSecretAsync);
+        LinkCloudAccountCommand = new AsyncRelayCommand(LinkCloudAccountAsync, CanLinkCloudAccount);
+        UnlinkCloudAccountCommand = new AsyncRelayCommand(UnlinkCloudAccountAsync, CanUnlinkCloudAccount);
+        DismissCloudAuthGateCommand = new RelayCommand(DismissCloudAuthGate, CanDismissCloudAuthGate);
         SecretStorageBackend = ResolveSecretStorageBackend(secretStore);
+        CloudAccountStatusMessage = $"{CloudProviderDisplayName} is not linked.";
 
         RebuildFieldsFrom(_settings.Current);
         if (IsDeveloperBuild)
             BuildSecrets();
         _settings.SettingsChanged += OnSettingsChanged;
+        _ = RefreshCloudAccountStateAsync();
         if (IsDeveloperBuild)
             _ = RefreshSecretStateAsync();
+    }
+
+    private bool CanLinkCloudAccount() => !IsCloudAccountBusy && !IsCloudAccountLinked && !IsCloudAuthGateVisible;
+
+    private bool CanUnlinkCloudAccount() => !IsCloudAccountBusy && IsCloudAccountLinked && !IsCloudAuthGateVisible;
+
+    private bool CanDismissCloudAuthGate() => IsCloudAuthGateVisible;
+
+    private async Task RefreshCloudAccountStateAsync(CancellationToken cancellationToken = default)
+    {
+        IsCloudAccountBusy = true;
+        CloudAccountErrorMessage = null;
+
+        try
+        {
+            var linked = await _cloudAccountService.TryRestoreSessionAsync(cancellationToken);
+            IsCloudAccountLinked = linked;
+            if (linked)
+                CloudAuthGateViewModel = null;
+            CloudAccountStatusMessage = linked
+                ? $"{CloudProviderDisplayName} linked."
+                : $"{CloudProviderDisplayName} is not linked.";
+        }
+        catch (Exception ex)
+        {
+            IsCloudAccountLinked = false;
+            CloudAccountErrorMessage = ex.Message;
+            CloudAccountStatusMessage = $"Unable to check {CloudProviderDisplayName} account status.";
+            Logger.LogError("Auth", "Failed to refresh cloud account state", ex, new Dictionary<string, object?>
+            {
+                ["providerId"] = CloudProviderId,
+            });
+        }
+        finally
+        {
+            IsCloudAccountBusy = false;
+        }
+    }
+
+    private async Task LinkCloudAccountAsync()
+    {
+        if (!CanLinkCloudAccount())
+            return;
+
+        CloudAccountErrorMessage = null;
+        CloudAccountStatusMessage = $"Awaiting {CloudProviderDisplayName} sign-in...";
+        CloudAuthGateViewModel = new AuthGateViewModel(_cloudAccountService, OnCloudAccountAuthenticatedAsync);
+        await Task.CompletedTask;
+    }
+
+    private async Task UnlinkCloudAccountAsync()
+    {
+        if (!CanUnlinkCloudAccount())
+            return;
+
+        IsCloudAccountBusy = true;
+        CloudAccountErrorMessage = null;
+        CloudAccountStatusMessage = $"Unlinking {CloudProviderDisplayName}...";
+
+        try
+        {
+            await _cloudAccountService.UnlinkAsync();
+            IsCloudAccountLinked = false;
+            CloudAuthGateViewModel = null;
+            CloudAccountStatusMessage = $"{CloudProviderDisplayName} is not linked.";
+        }
+        catch (Exception ex)
+        {
+            CloudAccountErrorMessage = ex.Message;
+            CloudAccountStatusMessage = $"Failed to unlink {CloudProviderDisplayName}.";
+            Logger.LogError("Auth", "Failed to unlink cloud account", ex, new Dictionary<string, object?>
+            {
+                ["providerId"] = CloudProviderId,
+            });
+        }
+        finally
+        {
+            IsCloudAccountBusy = false;
+        }
+    }
+
+    private Task OnCloudAccountAuthenticatedAsync()
+    {
+        IsCloudAccountLinked = true;
+        CloudAccountErrorMessage = null;
+        CloudAccountStatusMessage = $"{CloudProviderDisplayName} linked.";
+        CloudAuthGateViewModel = null;
+        return Task.CompletedTask;
+    }
+
+    private void DismissCloudAuthGate()
+    {
+        if (!IsCloudAuthGateVisible)
+            return;
+
+        CloudAuthGateViewModel = null;
+        if (!IsCloudAccountLinked)
+            CloudAccountStatusMessage = $"{CloudProviderDisplayName} is not linked.";
     }
 
     private static string ResolveSecretStorageBackend(ISecretStore secretStore)

@@ -1,8 +1,5 @@
-using System.Collections.ObjectModel;
 using Microsoft.Extensions.DependencyInjection;
-using ChartHub.Models;
 using ChartHub.Services;
-using ChartHub.Services.Transfers;
 using ChartHub.ViewModels;
 
 namespace ChartHub.Tests;
@@ -13,9 +10,12 @@ public class AuthFlowViewModelTests
     [Fact]
     public async Task AuthGateViewModel_SuccessfulSignIn_InvokesAuthenticatedCallback()
     {
-        var driveClient = new FakeGoogleDriveClient();
+        var cloudAccountService = new FakeCloudStorageAccountService
+        {
+            ProviderDisplayName = "Google Drive",
+        };
         var callbackCount = 0;
-        var sut = new AuthGateViewModel(driveClient, () =>
+        var sut = new AuthGateViewModel(cloudAccountService, () =>
         {
             callbackCount++;
             return Task.CompletedTask;
@@ -23,7 +23,7 @@ public class AuthFlowViewModelTests
 
         await sut.SignInCommand.ExecuteAsync(null);
 
-        Assert.Equal(1, driveClient.InitializeCallCount);
+        Assert.Equal(1, cloudAccountService.LinkCallCount);
         Assert.Equal(1, callbackCount);
         Assert.False(sut.IsBusy);
         Assert.Null(sut.ErrorMessage);
@@ -31,14 +31,31 @@ public class AuthFlowViewModelTests
     }
 
     [Fact]
+    public void AuthGateViewModel_UsesProviderDisplayNameInUserFacingCopy()
+    {
+        var cloudAccountService = new FakeCloudStorageAccountService
+        {
+            ProviderDisplayName = "Acme Cloud",
+        };
+
+        var sut = new AuthGateViewModel(cloudAccountService, () => Task.CompletedTask);
+
+        Assert.Equal("Acme Cloud", sut.ProviderDisplayName);
+        Assert.Equal("Sign in with Acme Cloud to use cloud storage as your sync backend.", sut.DescriptionText);
+        Assert.Equal("Sign In With Acme Cloud", sut.SignInButtonText);
+        Assert.Equal("Sign in to Acme Cloud to enable synced storage.", sut.StatusMessage);
+    }
+
+    [Fact]
     public async Task AuthGateViewModel_FailedSignIn_SetsUserFacingErrorAndResetsBusy()
     {
-        var driveClient = new FakeGoogleDriveClient
+        var cloudAccountService = new FakeCloudStorageAccountService
         {
-            InitializeException = new InvalidOperationException("network unavailable"),
+            LinkException = new InvalidOperationException("network unavailable"),
+            ProviderDisplayName = "Google Drive",
         };
         var callbackCount = 0;
-        var sut = new AuthGateViewModel(driveClient, () =>
+        var sut = new AuthGateViewModel(cloudAccountService, () =>
         {
             callbackCount++;
             return Task.CompletedTask;
@@ -46,60 +63,85 @@ public class AuthFlowViewModelTests
 
         await sut.SignInCommand.ExecuteAsync(null);
 
-        Assert.Equal(1, driveClient.InitializeCallCount);
+        Assert.Equal(1, cloudAccountService.LinkCallCount);
         Assert.Equal(0, callbackCount);
         Assert.False(sut.IsBusy);
-        Assert.Equal("Google sign-in failed: network unavailable", sut.ErrorMessage);
+        Assert.Equal("Cloud sign-in failed: network unavailable", sut.ErrorMessage);
         Assert.Equal("Sign in to Google Drive to enable synced storage.", sut.StatusMessage);
     }
 
     [Fact]
-    public async Task AppShellViewModel_SignInThenSignOut_TransitionsBetweenGateAndMain()
+    public async Task AppShellViewModel_WhenSilentSignInFails_ShowsMainShellWithoutAuthGate()
     {
-        var driveClient = new FakeGoogleDriveClient
+        var cloudAccountService = new FakeCloudStorageAccountService
         {
-            TryInitializeSilentResult = false,
+            TryRestoreSessionResult = false,
         };
         var mainViewModel = new MainViewModel();
         var serviceProvider = new SingleServiceProvider(typeof(MainViewModel), mainViewModel);
-        var sut = new AppShellViewModel(serviceProvider, driveClient);
+        var sut = new AppShellViewModel(serviceProvider, cloudAccountService);
 
         var splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
         Assert.False(sut.IsSignedIn);
 
         await splash.RunAsync();
 
-        var authGate = Assert.IsType<AuthGateViewModel>(sut.CurrentViewModel);
-        await authGate.SignInCommand.ExecuteAsync(null);
-
-        Assert.True(sut.IsSignedIn);
-        Assert.Same(mainViewModel, sut.CurrentViewModel);
-
-        await sut.SignOutCommand.ExecuteAsync(null);
-
-        Assert.Equal(1, driveClient.SignOutCallCount);
+        Assert.Equal(1, cloudAccountService.TryRestoreSessionCallCount);
         Assert.False(sut.IsSignedIn);
-        Assert.IsType<AuthGateViewModel>(sut.CurrentViewModel);
+        Assert.Same(mainViewModel, sut.CurrentViewModel);
     }
 
     [Fact]
     public async Task AppShellViewModel_WhenSilentSignInSucceeds_SkipsAuthGate()
     {
-        var driveClient = new FakeGoogleDriveClient
+        var cloudAccountService = new FakeCloudStorageAccountService
         {
-            TryInitializeSilentResult = true,
+            TryRestoreSessionResult = true,
         };
         var mainViewModel = new MainViewModel();
         var serviceProvider = new SingleServiceProvider(typeof(MainViewModel), mainViewModel);
-        var sut = new AppShellViewModel(serviceProvider, driveClient);
+        var sut = new AppShellViewModel(serviceProvider, cloudAccountService);
 
         var splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
         await splash.RunAsync();
 
-        Assert.Equal(1, driveClient.TryInitializeSilentCallCount);
-        Assert.Equal(0, driveClient.InitializeCallCount);
+        Assert.Equal(1, cloudAccountService.TryRestoreSessionCallCount);
         Assert.True(sut.IsSignedIn);
         Assert.Same(mainViewModel, sut.CurrentViewModel);
+    }
+
+    private sealed class FakeCloudStorageAccountService : ICloudStorageAccountService
+    {
+        public bool TryRestoreSessionResult { get; set; }
+        public Exception? LinkException { get; set; }
+
+        public int TryRestoreSessionCallCount { get; private set; }
+        public int LinkCallCount { get; private set; }
+        public int UnlinkCallCount { get; private set; }
+
+        public string ProviderId => "test-provider";
+        public string ProviderDisplayName { get; set; } = "Test Provider";
+
+        public Task<bool> TryRestoreSessionAsync(CancellationToken cancellationToken = default)
+        {
+            TryRestoreSessionCallCount++;
+            return Task.FromResult(TryRestoreSessionResult);
+        }
+
+        public Task LinkAsync(CancellationToken cancellationToken = default)
+        {
+            LinkCallCount++;
+            if (LinkException is not null)
+                throw LinkException;
+
+            return Task.CompletedTask;
+        }
+
+        public Task UnlinkAsync(CancellationToken cancellationToken = default)
+        {
+            UnlinkCallCount++;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class SingleServiceProvider(Type serviceType, object instance) : IServiceProvider
@@ -113,47 +155,4 @@ public class AuthFlowViewModelTests
         }
     }
 
-    private sealed class FakeGoogleDriveClient : IGoogleDriveClient
-    {
-        public Exception? InitializeException { get; set; }
-        public bool TryInitializeSilentResult { get; set; }
-
-        public int InitializeCallCount { get; private set; }
-        public int TryInitializeSilentCallCount { get; private set; }
-        public int SignOutCallCount { get; private set; }
-
-        public string ChartHubFolderId => "folder-test";
-
-        public Task<string> CreateDirectoryAsync(string directoryName) => Task.FromResult("folder-test");
-        public Task<string> GetDirectoryIdAsync(string directoryName) => Task.FromResult("folder-test");
-        public Task<string> UploadFileAsync(string directoryId, string filePath, string? desiredFileName = null) => Task.FromResult("file-test");
-        public Task<string> CopyFileIntoFolderAsync(string sourceFileId, string destinationFolderId, string desiredFileName) => Task.FromResult("copy-test");
-        public Task DownloadFolderAsZipAsync(string folderId, string zipFilePath, IProgress<TransferProgressUpdate>? stageProgress = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task DownloadFileAsync(string fileId, string saveToPath) => Task.CompletedTask;
-        public Task DeleteFileAsync(string fileId) => Task.CompletedTask;
-        public Task<IList<Google.Apis.Drive.v3.Data.File>> ListFilesAsync(string directoryId) => Task.FromResult<IList<Google.Apis.Drive.v3.Data.File>>(new List<Google.Apis.Drive.v3.Data.File>());
-        public Task MonitorDirectoryAsync(string directoryId, TimeSpan pollingInterval, Action<Google.Apis.Drive.v3.Data.File, string> onFileChanged, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<ObservableCollection<WatcherFile>> GetFileDataCollectionAsync(string directoryId) => Task.FromResult(new ObservableCollection<WatcherFile>());
-
-        public Task<bool> TryInitializeSilentAsync(CancellationToken cancellationToken = default)
-        {
-            TryInitializeSilentCallCount++;
-            return Task.FromResult(TryInitializeSilentResult);
-        }
-
-        public Task InitializeAsync(CancellationToken cancellationToken = default)
-        {
-            InitializeCallCount++;
-            if (InitializeException is not null)
-                throw InitializeException;
-
-            return Task.CompletedTask;
-        }
-
-        public Task SignOutAsync(CancellationToken cancellationToken = default)
-        {
-            SignOutCallCount++;
-            return Task.CompletedTask;
-        }
-    }
 }

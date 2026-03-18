@@ -25,6 +25,24 @@ namespace ChartHub.ViewModels
         public IAsyncRelayCommand DownloadCloudToLocal { get; }
         public IAsyncRelayCommand SyncCloudToLocal { get; }
 
+        private string _cloudConnectionHint = string.Empty;
+        public string CloudConnectionHint
+        {
+            get => _cloudConnectionHint;
+            private set
+            {
+                if (_cloudConnectionHint == value)
+                    return;
+
+                _cloudConnectionHint = value;
+                OnPropertyChanged(nameof(CloudConnectionHint));
+                OnPropertyChanged(nameof(HasCloudConnectionHint));
+            }
+        }
+
+        public bool HasCloudConnectionHint => !string.IsNullOrWhiteSpace(CloudConnectionHint);
+        public bool IsCloudConnected => !string.IsNullOrWhiteSpace(_googleDrive.ChartHubFolderId);
+
         private bool _isAnyChecked;
         public bool IsAnyChecked
         {
@@ -109,15 +127,16 @@ namespace ChartHub.ViewModels
             GoogleWatcher = new GoogleDriveWatcher(_googleDrive);
             CheckAllCommand = new RelayCommand(CheckAllItemsCommand);
             InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
-            UploadCloud = new AsyncRelayCommand(UploadCloudCommand);
-            DownloadCloudToLocal = new AsyncRelayCommand(DownloadCloudToLocalCommand);
-            SyncCloudToLocal = new AsyncRelayCommand(SyncCloudToLocalCommand);
+            UploadCloud = new AsyncRelayCommand(UploadCloudCommand, CanUploadCloud);
+            DownloadCloudToLocal = new AsyncRelayCommand(DownloadCloudToLocalCommand, CanDownloadCloudToLocal);
+            SyncCloudToLocal = new AsyncRelayCommand(SyncCloudToLocalCommand, CanSyncCloudToLocal);
             DownloadFiles = DownloadWatcher.Data;
             GoogleFiles = GoogleWatcher.Data;
             _pageStrings = new DownloadPageStrings();
 
             DownloadFiles.CollectionChanged += DownloadFiles_CollectionChanged;
             GoogleFiles.CollectionChanged += GoogleFiles_CollectionChanged;
+            RefreshCloudConnectionState();
         }
 
         private void DownloadFiles_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -134,6 +153,7 @@ namespace ChartHub.ViewModels
             {
                 IsAnyChecked = AnyItemChecked();
                 IsAnyCloudChecked = AnyCloudItemChecked();
+                NotifyCloudCommandStateChanged();
             }
         }
 
@@ -153,10 +173,11 @@ namespace ChartHub.ViewModels
         public async Task UploadCloudCommand()
         {
             List<string> items = [];
-            if (string.IsNullOrWhiteSpace(_googleDrive.ChartHubFolderId))
-            {
-                throw new InvalidOperationException("Google Drive is not initialized.");
-            }
+            if (!EnsureCloudConnected())
+                return;
+
+            CloudConnectionHint = string.Empty;
+
             foreach (WatcherFile file in DownloadFiles)
             {
                 if (file.Checked)
@@ -200,6 +221,9 @@ namespace ChartHub.ViewModels
 
         public async Task DownloadCloudToLocalCommand()
         {
+            if (!EnsureCloudConnected())
+                return;
+
             var selected = GoogleFiles.Where(file => file.Checked).ToList();
             if (selected.Count == 0)
                 return;
@@ -210,8 +234,39 @@ namespace ChartHub.ViewModels
 
         public async Task SyncCloudToLocalCommand()
         {
+            if (!EnsureCloudConnected())
+                return;
+
             await _transferOrchestrator.SyncCloudToLocalAdditiveAsync(GoogleFiles);
             DownloadWatcher.LoadItems();
+        }
+
+        private bool CanUploadCloud() => IsCloudConnected && IsAnyChecked;
+
+        private bool CanDownloadCloudToLocal() => IsCloudConnected && IsAnyCloudChecked;
+
+        private bool CanSyncCloudToLocal() => IsCloudConnected;
+
+        private bool EnsureCloudConnected()
+        {
+            RefreshCloudConnectionState();
+            return IsCloudConnected;
+        }
+
+        private void RefreshCloudConnectionState()
+        {
+            CloudConnectionHint = IsCloudConnected
+                ? string.Empty
+                : "Cloud storage is not linked. Open Settings and link a cloud account.";
+            OnPropertyChanged(nameof(IsCloudConnected));
+            NotifyCloudCommandStateChanged();
+        }
+
+        private void NotifyCloudCommandStateChanged()
+        {
+            UploadCloud.NotifyCanExecuteChanged();
+            DownloadCloudToLocal.NotifyCanExecuteChanged();
+            SyncCloudToLocal.NotifyCanExecuteChanged();
         }
 
         public async Task InstallSongsCommand()

@@ -14,6 +14,8 @@ namespace ChartHub.ViewModels;
 
 public sealed class EncoreViewModel : INotifyPropertyChanged
 {
+    public bool IsCompanionMode => OperatingSystem.IsAndroid();
+    public bool IsDesktopMode => !OperatingSystem.IsAndroid();
     private readonly EncoreApiService _apiService;
     private readonly ITransferOrchestrator _transferOrchestrator;
     private readonly LibraryCatalogService _libraryCatalog;
@@ -538,19 +540,7 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             return;
 
         var fileName = BuildEncoreFileName(selected);
-        var proxySong = new ViewSong
-        {
-            Title = selected.Name,
-            Artist = selected.Artist,
-            Album = selected.Album,
-            Year = selected.Year,
-            Genre = selected.Genre,
-            FileName = fileName,
-            DownloadLink = selected.DownloadUrl,
-            SourceName = selected.SourceName,
-            SourceId = selected.SourceId,
-            IsInLibrary = selected.IsInLibrary,
-        };
+        var proxySong = selected.ToViewSong(fileName);
 
         var downloadItem = new DownloadFile(
             fileName,
@@ -566,14 +556,18 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
         var result = await _transferOrchestrator.QueueSongDownloadAsync(proxySong, downloadItem, Downloads, cts.Token);
         if (result.Success)
         {
-            await _libraryCatalog.UpsertAsync(new LibraryCatalogEntry(
-                selected.SourceName,
-                selected.SourceId,
-                selected.Name,
-                selected.Artist,
-                selected.Charter,
-                result.FinalLocation,
-                DateTimeOffset.UtcNow));
+            foreach (var sourceId in selected.GetCatalogSourceIds().Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                await _libraryCatalog.UpsertAsync(new LibraryCatalogEntry(
+                    selected.SourceName,
+                    sourceId,
+                    selected.Name,
+                    selected.Artist,
+                    selected.Charter,
+                    result.FinalLocation,
+                    DateTimeOffset.UtcNow));
+            }
+
             selected.IsInLibrary = true;
         }
         else if (!string.IsNullOrWhiteSpace(result.Error))

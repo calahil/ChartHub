@@ -236,7 +236,7 @@
                                                                                                         Command="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
                                                                                                         CommandParameter="{Binding}">
                                                                                                         <Button.Content>
-                                                                                                                <Image Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.ShowDownloads, Converter={StaticResource AssetPathToImageConverter}}"
+                                                                                                                <Image Source="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Download, Converter={StaticResource AssetPathToImageConverter}}"
                                                                                                                        Width="{StaticResource IconSizeDense}"
                                                                                                                        Height="{StaticResource IconSizeDense}" />
                                                                                                         </Button.Content>
@@ -406,7 +406,7 @@
                                                                                                 Command="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
                                                                                                 CommandParameter="{Binding}">
                                                                                                 <Button.Content>
-                                                                                                        <Image Source="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.ShowDownloads, Converter={StaticResource AssetPathToImageConverter}}"
+                                                                                                        <Image Source="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Download, Converter={StaticResource AssetPathToImageConverter}}"
                                                                                                                Width="{StaticResource IconSizeDense}"
                                                                                                                Height="{StaticResource IconSizeDense}" />
                                                                                                 </Button.Content>

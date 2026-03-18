@@ -8,7 +8,7 @@ namespace ChartHub.ViewModels;
 
 public class AuthGateViewModel : INotifyPropertyChanged
 {
-    private readonly IGoogleDriveClient _googleDriveClient;
+    private readonly ICloudStorageAccountService _cloudAccountService;
     private readonly Func<Task> _onAuthenticatedAsync;
 
     private bool _isBusy;
@@ -26,7 +26,7 @@ public class AuthGateViewModel : INotifyPropertyChanged
         }
     }
 
-    private string _statusMessage = "Sign in to Google Drive to enable synced storage.";
+    private string _statusMessage;
     public string StatusMessage
     {
         get => _statusMessage;
@@ -50,10 +50,17 @@ public class AuthGateViewModel : INotifyPropertyChanged
 
     public IAsyncRelayCommand SignInCommand { get; }
 
-    public AuthGateViewModel(IGoogleDriveClient googleDriveClient, Func<Task> onAuthenticatedAsync)
+    public string ProviderDisplayName => _cloudAccountService.ProviderDisplayName;
+
+    public string DescriptionText => $"Sign in with {ProviderDisplayName} to use cloud storage as your sync backend.";
+
+    public string SignInButtonText => $"Sign In With {ProviderDisplayName}";
+
+    public AuthGateViewModel(ICloudStorageAccountService cloudAccountService, Func<Task> onAuthenticatedAsync)
     {
-        _googleDriveClient = googleDriveClient;
+        _cloudAccountService = cloudAccountService;
         _onAuthenticatedAsync = onAuthenticatedAsync;
+        _statusMessage = $"Sign in to {ProviderDisplayName} to enable synced storage.";
         SignInCommand = new AsyncRelayCommand(SignInAsync, CanSignIn);
     }
 
@@ -68,32 +75,35 @@ public class AuthGateViewModel : INotifyPropertyChanged
 
         IsBusy = true;
         ErrorMessage = null;
-        StatusMessage = "Opening Google sign-in...";
-        Logger.LogInfo("Auth", "Interactive Google Drive sign-in started", new Dictionary<string, object?>
+        StatusMessage = $"Opening {ProviderDisplayName} sign-in...";
+        Logger.LogInfo("Auth", "Interactive cloud sign-in started", new Dictionary<string, object?>
         {
             ["authSessionId"] = authSessionId,
+            ["providerId"] = _cloudAccountService.ProviderId,
         });
 
         try
         {
-            await _googleDriveClient.InitializeAsync();
-            Logger.LogInfo("Auth", "Google Drive sign-in completed successfully", new Dictionary<string, object?>
+            await _cloudAccountService.LinkAsync();
+            Logger.LogInfo("Auth", "Cloud sign-in completed successfully", new Dictionary<string, object?>
             {
                 ["authSessionId"] = authSessionId,
+                ["providerId"] = _cloudAccountService.ProviderId,
             });
-            StatusMessage = "Google Drive connected.";
+            StatusMessage = $"{ProviderDisplayName} connected.";
             await _onAuthenticatedAsync();
         }
         catch (Exception ex)
         {
-            Logger.LogError("Auth", "Google authentication failed", ex, new Dictionary<string, object?>
+            Logger.LogError("Auth", "Cloud authentication failed", ex, new Dictionary<string, object?>
             {
                 ["authSessionId"] = authSessionId,
+                ["providerId"] = _cloudAccountService.ProviderId,
             });
-            ErrorMessage = ex.Message.StartsWith("Google sign-in failed", StringComparison.OrdinalIgnoreCase)
+            ErrorMessage = ex.Message.StartsWith("Cloud sign-in failed", StringComparison.OrdinalIgnoreCase)
                 ? ex.Message
-                : $"Google sign-in failed: {ex.Message}";
-            StatusMessage = "Sign in to Google Drive to enable synced storage.";
+                : $"Cloud sign-in failed: {ex.Message}";
+            StatusMessage = $"Sign in to {ProviderDisplayName} to enable synced storage.";
         }
         finally
         {

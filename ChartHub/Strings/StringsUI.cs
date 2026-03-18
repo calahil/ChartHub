@@ -52,23 +52,8 @@
 
     }
 
-    public class RhythmVersePageStrings : StringsUI
+    public class SongSourcePageStrings : StringsUI
     {
-        public string Title { get; } = "RhythmVerse";
-        public string FilterTitle { get; } = "Filters";
-        public List<string> Filters { get; } = new List<string> { "Artist", "Downloads", "Song Length", "Title" };
-        public List<string> Orders { get; } = new List<string> { "Ascending", "Descending" };
-        public string ApplyFilter { get; } = "avares://ChartHub/Resources/Svg/check_24dp.svg";
-        public string ShowFilters { get; } = "avares://ChartHub/Resources/Svg/filter_alt_24dp.svg";
-        public string ShowDownloads { get; } = "avares://ChartHub/Resources/Svg/download_24dp.svg";
-        public string SortBy { get; } = "avares://ChartHub/Resources/Svg/sort_by_alpha_24dp.svg";
-        public string Order { get; } = "avares://ChartHub/Resources/Svg/sort_24dp.svg";
-        public string Instrument { get; } = "avares://ChartHub/Resources/Svg/joystick_24dp.svg";
-        public string Difficulty { get; } = "Difficulty:";
-        public string SearchText { get; } = "Search text...";
-        public string PageSeparator { get; } = " / ";
-        public string Total { get; } = "Total: ";
-        public string Results { get; } = " Results: ";
         public string Refresh { get; } = "avares://ChartHub/Resources/Svg/refresh_24dp.svg";
         public string Artist { get; } = "avares://ChartHub/Resources/Svg/artist_24dp.svg";
         public string Album { get; } = "avares://ChartHub/Resources/Svg/album_24dp.svg";
@@ -82,23 +67,38 @@
         public string Comments { get; } = "avares://ChartHub/Resources/Svg/comment_24dp.svg";
         public string NoResults { get; } = "No Results...  So empty";
         public string LoadingResults { get; } = "Loading Results...";
-
+        public List<string> SortColumns { get; } = ["name", "artist", "album", "genre", "year", "charter", "length", "modifiedTime"];
+        public List<string> SortDirections { get; } = ["asc", "desc"];
+        public virtual string Title { get; } = "Song Source";
+        public virtual string SearchText { get; } = "Song Source Search...";
+        public string InLibrary { get; } = "In Library";
     }
 
-    public class EncorePageStrings : StringsUI
+    public class RhythmVersePageStrings : SongSourcePageStrings
     {
-        public string Title { get; } = "Chorus Encore";
-        public string SearchText { get; } = "Search Encore charts...";
-        public string Refresh { get; } = "avares://ChartHub/Resources/Svg/refresh_24dp.svg";
+        public string ApplyFilter { get; } = "avares://ChartHub/Resources/Svg/check_24dp.svg";
+        public string ShowFilters { get; } = "avares://ChartHub/Resources/Svg/filter_alt_24dp.svg";
+        public string Download { get; } = "avares://ChartHub/Resources/Svg/download_24dp.svg";
+        public string SortBy { get; } = "avares://ChartHub/Resources/Svg/sort_by_alpha_24dp.svg";
+        public string Order { get; } = "avares://ChartHub/Resources/Svg/sort_24dp.svg";
+        public string Instrument { get; } = "avares://ChartHub/Resources/Svg/joystick_24dp.svg";
+        public override string Title { get; } = "RhythmVerse";
+        public string FilterTitle { get; } = "Filters";
+        public List<string> Filters { get; } = new List<string> { "Artist", "Downloads", "Song Length", "Title" };
+        public List<string> Orders { get; } = new List<string> { "Ascending", "Descending" };
+        public string Difficulty { get; } = "Difficulty:";
+        public override string SearchText { get; } = "Search RhythmVerse charts...";
+        public string Total { get; } = "Total: ";
+    }
+
+    public class EncorePageStrings : SongSourcePageStrings
+    {
+        public override string Title { get; } = "Chorus Encore";
+        public override string SearchText { get; } = "Search Encore charts...";
         public string ToggleAdvanced { get; } = "avares://ChartHub/Resources/Svg/filter_alt_24dp.svg";
         public string Download { get; } = "avares://ChartHub/Resources/Svg/download_24dp.svg";
         public string SortBy { get; } = "avares://ChartHub/Resources/Svg/sort_by_alpha_24dp.svg";
         public string Order { get; } = "avares://ChartHub/Resources/Svg/sort_24dp.svg";
         public string Instrument { get; } = "avares://ChartHub/Resources/Svg/joystick_24dp.svg";
-        public string NoResults { get; } = "No Encore results found.";
-        public string LoadingResults { get; } = "Loading Encore results...";
-        public string InLibrary { get; } = "In Library";
-        public List<string> SortColumns { get; } = ["name", "artist", "album", "genre", "year", "charter", "length", "modifiedTime"];
-        public List<string> SortDirections { get; } = ["asc", "desc"];
     }
 }

@@ -1,6 +1,7 @@
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Configuration.Secrets;
+using ChartHub.Services;
 using ChartHub.ViewModels;
 using ChartHub.Tests.TestInfrastructure;
 
@@ -15,9 +16,10 @@ public class SettingsViewModelTests
         using var temp = new TemporaryDirectoryFixture("settings-vm-fields");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
         await secrets.SetAsync(SecretKeys.GoogleRefreshToken, "stored-refresh-token");
 
-        using var sut = new SettingsViewModel(orchestrator, secrets);
+        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         Assert.Equal(9, sut.Fields.Count);
@@ -35,8 +37,9 @@ public class SettingsViewModelTests
         using var temp = new TemporaryDirectoryFixture("settings-vm-validation");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = new SettingsViewModel(orchestrator, secrets);
+        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         var field = Assert.Single(sut.Fields, item => item.Key == "Runtime.DownloadDirectory");
@@ -54,8 +57,9 @@ public class SettingsViewModelTests
         using var temp = new TemporaryDirectoryFixture("settings-vm-save");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = new SettingsViewModel(orchestrator, secrets);
+        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         var androidClientField = Assert.Single(sut.Fields, item => item.Key == "GoogleAuth.AndroidClientId");
@@ -75,8 +79,9 @@ public class SettingsViewModelTests
         using var temp = new TemporaryDirectoryFixture("settings-vm-secrets");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = new SettingsViewModel(orchestrator, secrets);
+        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         var secret = Assert.Single(sut.Secrets, item => item.Key == SecretKeys.GoogleDesktopClientSecret);
@@ -94,6 +99,91 @@ public class SettingsViewModelTests
         Assert.False(secret.HasStoredValue);
         Assert.Equal("Cleared secret: Google Desktop Client Secret", sut.StatusMessage);
         Assert.Null(await secrets.GetAsync(SecretKeys.GoogleDesktopClientSecret));
+    }
+
+    [Fact]
+    public async Task CloudAccountCommands_LinkAndUnlink_UpdateStateAndCallService()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-cloud-account");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService
+        {
+            TryRestoreSessionResult = false,
+        };
+
+        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
+        await Task.Yield();
+
+        Assert.False(sut.IsCloudAccountLinked);
+        Assert.Equal("Google Drive", sut.CloudProviderDisplayName);
+        Assert.Equal("google-drive", sut.CloudProviderId);
+        Assert.Equal("Google Drive is not linked.", sut.CloudAccountStatusMessage);
+
+        await sut.LinkCloudAccountCommand.ExecuteAsync(null);
+
+        Assert.True(sut.IsCloudAuthGateVisible);
+        Assert.NotNull(sut.CloudAuthGateViewModel);
+        Assert.Equal(0, cloudAccount.LinkCallCount);
+
+        await sut.CloudAuthGateViewModel!.SignInCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, cloudAccount.LinkCallCount);
+        Assert.True(sut.IsCloudAccountLinked);
+        Assert.Equal("Google Drive linked.", sut.CloudAccountStatusMessage);
+        Assert.False(sut.IsCloudAuthGateVisible);
+
+        await sut.UnlinkCloudAccountCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, cloudAccount.UnlinkCallCount);
+        Assert.False(sut.IsCloudAccountLinked);
+        Assert.Equal("Google Drive is not linked.", sut.CloudAccountStatusMessage);
+    }
+
+    [Fact]
+    public async Task CloudAccountCommands_WhenAuthGateDismissed_RemainsUnlinkedWithoutCallingLink()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-cloud-dismiss");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService
+        {
+            TryRestoreSessionResult = false,
+        };
+
+        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
+        await Task.Yield();
+
+        await sut.LinkCloudAccountCommand.ExecuteAsync(null);
+
+        Assert.True(sut.IsCloudAuthGateVisible);
+        Assert.Equal(0, cloudAccount.LinkCallCount);
+
+        sut.DismissCloudAuthGateCommand.Execute(null);
+
+        Assert.False(sut.IsCloudAuthGateVisible);
+        Assert.False(sut.IsCloudAccountLinked);
+        Assert.Equal(0, cloudAccount.LinkCallCount);
+        Assert.Equal("Google Drive is not linked.", sut.CloudAccountStatusMessage);
+    }
+
+    [Fact]
+    public async Task Constructor_WhenCloudAlreadyLinked_SetsLinkedStatusAndNoHintError()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-cloud-linked");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService
+        {
+            TryRestoreSessionResult = true,
+        };
+
+        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
+        await Task.Yield();
+
+        Assert.True(sut.IsCloudAccountLinked);
+        Assert.Equal("Google Drive linked.", sut.CloudAccountStatusMessage);
+        Assert.False(sut.HasCloudAccountError);
     }
 
     private static AppConfigRoot CreateConfig(string rootPath)
@@ -185,6 +275,40 @@ public class SettingsViewModelTests
         public Task<bool> ContainsAsync(string key, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(_values.ContainsKey(key));
+        }
+    }
+
+    private sealed class FakeCloudStorageAccountService : ICloudStorageAccountService
+    {
+        public bool TryRestoreSessionResult { get; set; }
+        public Exception? TryRestoreSessionException { get; set; }
+
+        public int TryRestoreSessionCallCount { get; private set; }
+        public int LinkCallCount { get; private set; }
+        public int UnlinkCallCount { get; private set; }
+
+        public string ProviderId => "google-drive";
+        public string ProviderDisplayName => "Google Drive";
+
+        public Task<bool> TryRestoreSessionAsync(CancellationToken cancellationToken = default)
+        {
+            TryRestoreSessionCallCount++;
+            if (TryRestoreSessionException is not null)
+                throw TryRestoreSessionException;
+
+            return Task.FromResult(TryRestoreSessionResult);
+        }
+
+        public Task LinkAsync(CancellationToken cancellationToken = default)
+        {
+            LinkCallCount++;
+            return Task.CompletedTask;
+        }
+
+        public Task UnlinkAsync(CancellationToken cancellationToken = default)
+        {
+            UnlinkCallCount++;
+            return Task.CompletedTask;
         }
     }
 }

@@ -28,7 +28,7 @@
                             Margin="10,0,0,0"
                             Command="{Binding ShowDownloadsPaneCommand}"
                             HorizontalAlignment="Right">
-                        <Image Source="{Binding RhythmVerseViewModel.PageStrings.ShowDownloads, Converter={StaticResource AssetPathToImageConverter}}"
+                        <Image Source="{Binding RhythmVerseViewModel.PageStrings.Downloads, Converter={StaticResource AssetPathToImageConverter}}"
                                Width="{StaticResource IconSizeDense}"
                                Height="{StaticResource IconSizeDense}" />
                     </Button>

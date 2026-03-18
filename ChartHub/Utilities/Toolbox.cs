@@ -35,6 +35,17 @@ namespace ChartHub.Utilities
             }
         }
 
+        public static string ConvertMillisecondsToText(long? input)
+        {
+            if (input != null)
+            {
+                var totalSeconds = input.Value / 1000;
+                return ConvertSecondstoText(totalSeconds);
+            }
+
+            return "00:00";
+        }
+
         public static string GetSortOrder(string filter, string order)
         {
             bool isStringField = filter.Equals("Artist", StringComparison.OrdinalIgnoreCase) ||

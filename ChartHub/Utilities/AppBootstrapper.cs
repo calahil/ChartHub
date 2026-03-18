@@ -152,6 +152,7 @@ namespace ChartHub.Utilities
                 services.AddSingleton<IGoogleAuthProvider, DesktopGoogleAuthProvider>();
 
             services.AddSingleton<IGoogleDriveClient, GoogleDriveClient>();
+            services.AddSingleton<ICloudStorageAccountService, GoogleCloudStorageAccountService>();
             services.AddSingleton<DownloadService>();
             services.AddSingleton<EncoreApiService>();
             services.AddSingleton<SharedDownloadQueue>();

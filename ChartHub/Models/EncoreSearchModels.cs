@@ -211,11 +211,32 @@ public sealed class EncoreSongDto
     [JsonPropertyName("md5")]
     public string Md5 { get; set; } = string.Empty;
 
+    [JsonPropertyName("chartHash")]
+    public string? ChartHash { get; set; }
+
+    [JsonPropertyName("versionGroupId")]
+    public int VersionGroupId { get; set; }
+
+    [JsonPropertyName("applicationUsername")]
+    public string? ApplicationUsername { get; set; }
+
     [JsonPropertyName("song_length")]
     public long? SongLength { get; set; }
 
+    [JsonPropertyName("preview_start_time")]
+    public long? PreviewStartTime { get; set; }
+
+    [JsonPropertyName("diff_band")]
+    public int? DiffBand { get; set; }
+
     [JsonPropertyName("diff_guitar")]
     public int? DiffGuitar { get; set; }
+
+    [JsonPropertyName("diff_guitar_coop")]
+    public int? DiffGuitarCoop { get; set; }
+
+    [JsonPropertyName("diff_rhythm")]
+    public int? DiffRhythm { get; set; }
 
     [JsonPropertyName("diff_bass")]
     public int? DiffBass { get; set; }
@@ -223,12 +244,24 @@ public sealed class EncoreSongDto
     [JsonPropertyName("diff_drums")]
     public int? DiffDrums { get; set; }
 
+    [JsonPropertyName("diff_drums_real")]
+    public int? DiffDrumsReal { get; set; }
+
     [JsonPropertyName("diff_vocals")]
     public int? DiffVocals { get; set; }
 
     [JsonPropertyName("diff_keys")]
     public int? DiffKeys { get; set; }
 
+    [JsonPropertyName("diff_guitarghl")]
+    public int? DiffGuitarGhl { get; set; }
+
+    [JsonPropertyName("diff_bassghl")]
+    public int? DiffBassGhl { get; set; }
+
     [JsonPropertyName("hasVideoBackground")]
     public bool HasVideoBackground { get; set; }
+
+    [JsonPropertyName("modchart")]
+    public bool? Modchart { get; set; }
 }

@@ -10,17 +10,6 @@
              x:DataType="viewmodels:AppShellViewModel">
     <DockPanel Margin="{Binding RootMargin}"
                Background="{DynamicResource ThemeBackgroundBrush}">
-        <Button DockPanel.Dock="Top"
-                Content="Sign Out"
-                Command="{Binding SignOutCommand}"
-                IsVisible="{Binding IsSignedIn}"
-                HorizontalAlignment="Right"
-                Margin="8,4"
-                Padding="12,6"
-                Background="{DynamicResource ThemeBackgroundBrush}"
-                Foreground="{DynamicResource ThemeForegroundBrush}"
-                BorderBrush="{DynamicResource ThemeBorderMidBrush}"
-                BorderThickness="1" />
         <ContentControl Content="{Binding CurrentViewModel}" />
     </DockPanel>
 </UserControl>

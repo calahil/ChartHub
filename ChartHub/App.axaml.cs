@@ -33,8 +33,8 @@ namespace ChartHub
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
             ServiceProvider ??= AppBootstrapper.CreateServiceProvider();
             AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
-            var googleDriveClient = ServiceProvider.GetRequiredService<IGoogleDriveClient>();
-            var shellViewModel = new AppShellViewModel(ServiceProvider, googleDriveClient);
+            var cloudAccountService = ServiceProvider.GetRequiredService<ICloudStorageAccountService>();
+            var shellViewModel = new AppShellViewModel(ServiceProvider, cloudAccountService);
             Logger.LogInfo("App", "Framework initialization completed");
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)

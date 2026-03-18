@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 using System.Collections.Generic;
 
 namespace ChartHub.Controls;
@@ -75,6 +76,12 @@ public partial class StarRatingControl : UserControl
         UpdateStars();
     }
 
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        UpdateStars();
+    }
+
     // ── Property change handling ──────────────────────────────────────────
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -93,6 +100,12 @@ public partial class StarRatingControl : UserControl
 
     private void UpdateStars()
     {
+        // Avoid mutating item containers while the control is being detached.
+        if (StarsHost is null || VisualRoot is null)
+        {
+            return;
+        }
+
         var slots = new List<StarSlot>(TotalStars);
 
         for (int i = 1; i <= TotalStars; i++)

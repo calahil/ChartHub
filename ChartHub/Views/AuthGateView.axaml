@@ -30,7 +30,7 @@
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource ThemeForegroundBrush}" />
 
-                    <TextBlock Text="Sign in with Google to use Drive as your storage backend."
+                    <TextBlock Text="{Binding DescriptionText}"
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource ThemeForegroundLowBrush}" />
 
@@ -42,7 +42,7 @@
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource SemanticError}" />
 
-                    <Button Content="Sign In With Google"
+                        <Button Content="{Binding SignInButtonText}"
                             Command="{Binding SignInCommand}"
                             HorizontalAlignment="Stretch"
                             MinHeight="44"

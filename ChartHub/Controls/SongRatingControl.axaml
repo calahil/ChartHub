@@ -5,192 +5,196 @@
              x:Class="ChartHub.Controls.SongRatingControl">
 
        <StackPanel>
-              <Grid x:Name="SongRatingGrid"
-                    IsVisible="{Binding IsDesktopMode, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                    ColumnDefinitions="*,3*"
-                    RowDefinitions="*, *, *, *, *">
-                     <!-- Drum Rating -->
-                     <Border Padding="8,2"
-                             Grid.Row="0"
-                             Grid.Column="0"
-                             Margin="0,0,8,8"
-                             CornerRadius="10"
-                             Background="{StaticResource ThemeControlMidBrush}">
+              <StackPanel x:Name="EncoreRatings">
+
+                     <Grid x:Name="SongRatingGrid"
+                           IsVisible="{Binding IsDesktopMode, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                           ColumnDefinitions="*,3*"
+                           RowDefinitions="*, *, *, *, *">
+                            <!-- Drum Rating -->
+                            <Border Padding="8,2"
+                                    Grid.Row="0"
+                                    Grid.Column="0"
+                                    Margin="0,0,8,8"
+                                    CornerRadius="10"
+                                    Background="{StaticResource ThemeControlMidBrush}">
+                                   <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/drums_small.png"
+                                          Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
+                            </Border>
+                            <Border Padding="8,2"
+                                    Grid.Row="0"
+                                    Grid.Column="1"
+                                    Margin="0,0,8,8"
+                                    CornerRadius="10"
+                                    Background="{StaticResource ThemeControlMidBrush}">
+                                   <controls:StarRatingControl Rating="{Binding DrumString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               FontWeight="Bold"
+                                                               Foreground="{StaticResource ThemeAccentBrush}"/>
+                            </Border>
+                            <!-- Guitar Rating -->
+                            <Border Padding="8,2"
+                                    Grid.Row="1"
+                                    Grid.Column="0"
+                                    Margin="0,0,8,8"
+                                    CornerRadius="10"
+                                    Background="{StaticResource ThemeControlMidBrush}">
+                                   <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/guitar_small.png"
+                                          Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
+                            </Border>
+                            <Border Padding="8,2"
+                                    Grid.Row="1"
+                                    Grid.Column="1"
+                                    Margin="0,0,8,8"
+                                    CornerRadius="10"
+                                    Background="{StaticResource ThemeControlMidBrush}">
+                                   <controls:StarRatingControl Rating="{Binding GuitarString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               FontWeight="Bold"
+                                                               Foreground="{StaticResource ThemeAccentBrush}"/>
+                            </Border>
+                            <!-- Keyboard Rating -->
+                            <Border Padding="8,2"
+                                    Grid.Row="2"
+                                    Grid.Column="0"
+                                    Margin="0,0,8,8"
+                                    CornerRadius="10"
+                                    Background="{StaticResource ThemeControlMidBrush}">
+                                   <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/keys_small.png"
+                                          Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
+                            </Border>
+                            <Border Padding="8,2"
+                                    Grid.Row="2"
+                                    Grid.Column="1"
+                                    Margin="0,0,8,8"
+                                    CornerRadius="10"
+                                    Background="{StaticResource ThemeControlMidBrush}">
+                                   <controls:StarRatingControl Rating="{Binding KeysString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               FontWeight="Bold"
+                                                               Foreground="{StaticResource ThemeAccentBrush}"/>
+                            </Border>
+                            <!-- Bass Rating -->
+                            <Border Padding="8,2"
+                                    Grid.Row="3"
+                                    Grid.Column="0"
+                                    Margin="0,0,8,8"
+                                    CornerRadius="10"
+                                    Background="{StaticResource ThemeControlMidBrush}">
+                                   <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/bass_small.png"
+                                          Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
+                            </Border>
+                            <Border Padding="8,2"
+                                    Grid.Row="3"
+                                    Grid.Column="1"
+                                    Margin="0,0,8,8"
+                                    CornerRadius="10"
+                                    Background="{StaticResource ThemeControlMidBrush}">
+                                   <controls:StarRatingControl Rating="{Binding BassString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               FontWeight="Bold"
+                                                               Foreground="{StaticResource ThemeAccentBrush}"/>
+                            </Border>
+                            <!-- Vocals Rating -->
+                            <Border Padding="8,2"
+                                    Grid.Row="4"
+                                    Grid.Column="0"
+                                    Margin="0,0,8,8"
+                                    CornerRadius="10"
+                                    Background="{StaticResource ThemeControlMidBrush}">
+                                   <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/vocals_small.png"
+                                          Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
+                            </Border>
+                            <Border Padding="8,2"
+                                    Grid.Row="4"
+                                    Grid.Column="1"
+                                    Margin="0,0,8,8"
+                                    CornerRadius="10"
+                                    Background="{StaticResource ThemeControlMidBrush}">
+                                   <controls:StarRatingControl Rating="{Binding VocalString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                               FontWeight="Bold"
+                                                               Foreground="{StaticResource ThemeAccentBrush}"/>
+                            </Border>
+                     </Grid>
+                     <Grid x:Name="SongRatingMinGrid"
+                           IsVisible="{Binding IsCompanionMode, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                           ColumnDefinitions="Auto,Auto,*,Auto"
+                           RowDefinitions="*, *, *">
+                            <!-- Drum Rating -->
                             <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/drums_small.png"
+                                   Grid.Row="0"
+                                   Grid.Column="0"
+                                   VerticalAlignment="Top"
                                    Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
-                     </Border>
-                     <Border Padding="8,2"
-                             Grid.Row="0"
-                             Grid.Column="1"
-                             Margin="0,0,8,8"
-                             CornerRadius="10"
-                             Background="{StaticResource ThemeControlMidBrush}">
-                            <controls:StarRatingControl Rating="{Binding DrumString}"
+                            <controls:StarRatingControl Rating="{Binding DrumString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                         GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                         FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                        Grid.Row="0"
+                                                        Grid.Column="1"
                                                         FontWeight="Bold"
                                                         Foreground="{StaticResource ThemeAccentBrush}"/>
-                     </Border>
-                     <!-- Guitar Rating -->
-                     <Border Padding="8,2"
-                             Grid.Row="1"
-                             Grid.Column="0"
-                             Margin="0,0,8,8"
-                             CornerRadius="10"
-                             Background="{StaticResource ThemeControlMidBrush}">
+                            <!-- Guitar Rating -->
                             <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/guitar_small.png"
+                                   Grid.Row="0"
+                                   Grid.Column="2"
+                                   VerticalAlignment="Top"
+                                   HorizontalAlignment="Right"
                                    Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
-                     </Border>
-                     <Border Padding="8,2"
-                             Grid.Row="1"
-                             Grid.Column="1"
-                             Margin="0,0,8,8"
-                             CornerRadius="10"
-                             Background="{StaticResource ThemeControlMidBrush}">
-                            <controls:StarRatingControl Rating="{Binding GuitarString}"
+                            <controls:StarRatingControl Rating="{Binding GuitarString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                         GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                         FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                        Grid.Row="0"
+                                                        Grid.Column="3"
                                                         FontWeight="Bold"
                                                         Foreground="{StaticResource ThemeAccentBrush}"/>
-                     </Border>
-                     <!-- Keyboard Rating -->
-                     <Border Padding="8,2"
-                             Grid.Row="2"
-                             Grid.Column="0"
-                             Margin="0,0,8,8"
-                             CornerRadius="10"
-                             Background="{StaticResource ThemeControlMidBrush}">
+                            <!-- Keyboard Rating -->
                             <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/keys_small.png"
+                                   Grid.Row="1"
+                                   Grid.Column="0"
+                                   VerticalAlignment="Top"
+                                   HorizontalAlignment="Right"
                                    Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
-                     </Border>
-                     <Border Padding="8,2"
-                             Grid.Row="2"
-                             Grid.Column="1"
-                             Margin="0,0,8,8"
-                             CornerRadius="10"
-                             Background="{StaticResource ThemeControlMidBrush}">
-                            <controls:StarRatingControl Rating="{Binding KeysString}"
+                            <controls:StarRatingControl Rating="{Binding KeysString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                         GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                         FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                        FontWeight="Bold"
-                                                        Foreground="{StaticResource ThemeAccentBrush}"/>
-                     </Border>
-                     <!-- Bass Rating -->
-                     <Border Padding="8,2"
-                             Grid.Row="3"
-                             Grid.Column="0"
-                             Margin="0,0,8,8"
-                             CornerRadius="10"
-                             Background="{StaticResource ThemeControlMidBrush}">
+                                                        Grid.Row="1"
+                                                        Grid.Column="1"
+                                                        FontWeight="Bold" />
+                            <!-- Bass Rating -->
                             <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/bass_small.png"
+                                   Grid.Row="1"
+                                   Grid.Column="2"
+                                   VerticalAlignment="Top"
+                                   HorizontalAlignment="Right"
                                    Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
-                     </Border>
-                     <Border Padding="8,2"
-                             Grid.Row="3"
-                             Grid.Column="1"
-                             Margin="0,0,8,8"
-                             CornerRadius="10"
-                             Background="{StaticResource ThemeControlMidBrush}">
-                            <controls:StarRatingControl Rating="{Binding BassString}"
+                            <controls:StarRatingControl Rating="{Binding BassString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                         GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                         FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                        Grid.Row="1"
+                                                        Grid.Column="3"
                                                         FontWeight="Bold"
                                                         Foreground="{StaticResource ThemeAccentBrush}"/>
-                     </Border>
-                     <!-- Vocals Rating -->
-                     <Border Padding="8,2"
-                             Grid.Row="4"
-                             Grid.Column="0"
-                             Margin="0,0,8,8"
-                             CornerRadius="10"
-                             Background="{StaticResource ThemeControlMidBrush}">
+                            <!-- Vocals Rating -->
                             <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/vocals_small.png"
+                                   Grid.Row="2"
+                                   Grid.Column="0"
+                                   VerticalAlignment="Top"
                                    Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
-                     </Border>
-                     <Border Padding="8,2"
-                             Grid.Row="4"
-                             Grid.Column="1"
-                             Margin="0,0,8,8"
-                             CornerRadius="10"
-                             Background="{StaticResource ThemeControlMidBrush}">
-                            <controls:StarRatingControl Rating="{Binding VocalString}"
+                            <controls:StarRatingControl Rating="{Binding VocalString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                         GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                         FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
+                                                        Grid.Row="2"
+                                                        Grid.Column="1"
                                                         FontWeight="Bold"
                                                         Foreground="{StaticResource ThemeAccentBrush}"/>
-                     </Border>
-              </Grid>
-              <Grid x:Name="SongRatingMinGrid"
-                    IsVisible="{Binding IsCompanionMode, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                    ColumnDefinitions="Auto,Auto,*,Auto"
-                    RowDefinitions="*, *, *">
-                     <!-- Drum Rating -->
-                     <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/drums_small.png"
-                            Grid.Row="0"
-                            Grid.Column="0"
-                            VerticalAlignment="Top"
-                            Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
-                     <controls:StarRatingControl Rating="{Binding DrumString}"
-                                                 GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 Grid.Row="0"
-                                                 Grid.Column="1"
-                                                 FontWeight="Bold"
-                                                 Foreground="{StaticResource ThemeAccentBrush}"/>
-                     <!-- Guitar Rating -->
-                     <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/guitar_small.png"
-                            Grid.Row="0"
-                            Grid.Column="2"
-                            VerticalAlignment="Top"
-                            HorizontalAlignment="Right"
-                            Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
-                     <controls:StarRatingControl Rating="{Binding GuitarString}"
-                                                 GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 Grid.Row="0"
-                                                 Grid.Column="3"
-                                                 FontWeight="Bold"
-                                                 Foreground="{StaticResource ThemeAccentBrush}"/>
-                     <!-- Keyboard Rating -->
-                     <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/keys_small.png"
-                            Grid.Row="1"
-                            Grid.Column="0"
-                            VerticalAlignment="Top"
-                            HorizontalAlignment="Right"
-                            Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
-                     <controls:StarRatingControl Rating="{Binding KeysString}"
-                                                 GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 Grid.Row="1"
-                                                 Grid.Column="1"
-                                                 FontWeight="Bold" />
-                     <!-- Bass Rating -->
-                     <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/bass_small.png"
-                            Grid.Row="1"
-                            Grid.Column="2"
-                            VerticalAlignment="Top"
-                            HorizontalAlignment="Right"
-                            Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
-                     <controls:StarRatingControl Rating="{Binding BassString}"
-                                                 GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 Grid.Row="1"
-                                                 Grid.Column="3"
-                                                 FontWeight="Bold"
-                                                 Foreground="{StaticResource ThemeAccentBrush}"/>
-                     <!-- Vocals Rating -->
-                     <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/vocals_small.png"
-                            Grid.Row="2"
-                            Grid.Column="0"
-                            VerticalAlignment="Top"
-                            Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
-                     <controls:StarRatingControl Rating="{Binding VocalString}"
-                                                 GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 FontSize="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                                 Grid.Row="2"
-                                                 Grid.Column="1"
-                                                 FontWeight="Bold"
-                                                 Foreground="{StaticResource ThemeAccentBrush}"/>
-              </Grid>
+                     </Grid>
+              </StackPanel>
+              
        </StackPanel>
 </UserControl>

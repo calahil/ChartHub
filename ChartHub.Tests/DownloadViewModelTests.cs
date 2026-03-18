@@ -101,6 +101,34 @@ public class DownloadViewModelTests
         }
     }
 
+    [Fact]
+    public async Task CloudCommands_WhenCloudNotLinked_DoNotThrowAndDoNotInvokeTransfers()
+    {
+        using var temp = new TemporaryDirectoryFixture("download-vm-cloud-unlinked");
+        using var settings = CreateSettings(temp.RootPath);
+        var transfer = new TransferOrchestratorSpy();
+        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient { ChartHubFolderId = string.Empty }, transfer);
+
+        try
+        {
+            sut.DownloadFiles.Add(CreateWatcherFile("alpha.zip", temp.GetPath("alpha.zip"), checkedState: true));
+            sut.GoogleFiles.Add(CreateWatcherFile("beta.zip", "drive-file-b", checkedState: true));
+
+            await sut.UploadCloud.ExecuteAsync(null);
+            await sut.DownloadCloudToLocal.ExecuteAsync(null);
+            await sut.SyncCloudToLocal.ExecuteAsync(null);
+
+            Assert.False(sut.IsCloudConnected);
+            Assert.True(sut.HasCloudConnectionHint);
+            Assert.Equal(0, transfer.DownloadSelectedCallCount);
+            Assert.Equal(0, transfer.SyncCallCount);
+        }
+        finally
+        {
+            await sut.DisposeAsync();
+        }
+    }
+
     private static WatcherFile CreateWatcherFile(string displayName, string filePath, bool checkedState = false)
     {
         return new WatcherFile(displayName, filePath, WatcherFileType.Zip, "icon.png", 100)
@@ -156,7 +184,7 @@ public class DownloadViewModelTests
 
     private sealed class FakeGoogleDriveClient : IGoogleDriveClient
     {
-        public string ChartHubFolderId => "folder-test";
+        public string ChartHubFolderId { get; set; } = "folder-test";
 
         public Task<string> CreateDirectoryAsync(string directoryName) => Task.FromResult("folder-test");
         public Task<string> GetDirectoryIdAsync(string directoryName) => Task.FromResult("folder-test");
