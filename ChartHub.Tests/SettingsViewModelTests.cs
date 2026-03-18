@@ -1,3 +1,4 @@
+using System.Reflection;
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Configuration.Secrets;
@@ -19,7 +20,7 @@ public class SettingsViewModelTests
         var cloudAccount = new FakeCloudStorageAccountService();
         await secrets.SetAsync(SecretKeys.GoogleRefreshToken, "stored-refresh-token");
 
-        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
+        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         Assert.Equal(9, sut.Fields.Count);
@@ -39,7 +40,7 @@ public class SettingsViewModelTests
         var secrets = new InMemorySecretStore();
         var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
+        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         var field = Assert.Single(sut.Fields, item => item.Key == "Runtime.DownloadDirectory");
@@ -59,7 +60,7 @@ public class SettingsViewModelTests
         var secrets = new InMemorySecretStore();
         var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
+        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         var androidClientField = Assert.Single(sut.Fields, item => item.Key == "GoogleAuth.AndroidClientId");
@@ -81,7 +82,7 @@ public class SettingsViewModelTests
         var secrets = new InMemorySecretStore();
         var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
+        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         var secret = Assert.Single(sut.Secrets, item => item.Key == SecretKeys.GoogleDesktopClientSecret);
@@ -112,7 +113,7 @@ public class SettingsViewModelTests
             TryRestoreSessionResult = false,
         };
 
-        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
+        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         Assert.False(sut.IsCloudAccountLinked);
@@ -151,7 +152,7 @@ public class SettingsViewModelTests
             TryRestoreSessionResult = false,
         };
 
-        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
+        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         await sut.LinkCloudAccountCommand.ExecuteAsync(null);
@@ -178,7 +179,7 @@ public class SettingsViewModelTests
             TryRestoreSessionResult = true,
         };
 
-        using var sut = new SettingsViewModel(orchestrator, secrets, cloudAccount);
+        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         Assert.True(sut.IsCloudAccountLinked);
@@ -220,6 +221,24 @@ public class SettingsViewModelTests
                 DesktopClientId = "desktop-client",
             },
         };
+    }
+
+    private static SettingsViewModel CreateSettingsViewModel(ISettingsOrchestrator orchestrator, ISecretStore secrets, ICloudStorageAccountService cloudAccount)
+    {
+        var constructor = typeof(SettingsViewModel).GetConstructor(
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            [
+                typeof(ISettingsOrchestrator),
+                typeof(ISecretStore),
+                typeof(ICloudStorageAccountService),
+                typeof(Action<Action>),
+            ],
+            modifiers: null);
+
+        Assert.NotNull(constructor);
+
+        return (SettingsViewModel)constructor.Invoke([orchestrator, secrets, cloudAccount, (Action<Action>)(action => action())]);
     }
 
     private sealed class FakeSettingsOrchestrator : ISettingsOrchestrator

@@ -2,6 +2,7 @@
 using ChartHub.Configuration.Models;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Avalonia.Threading;
 
 namespace ChartHub.Utilities
 {
@@ -89,7 +90,7 @@ namespace ChartHub.Utilities
 
         private void OnSettingsChanged(AppConfigRoot _)
         {
-            RaiseAllSettingsChanged();
+            Dispatcher.UIThread.Post(RaiseAllSettingsChanged);
         }
 
         private void EnsureDefaults()
