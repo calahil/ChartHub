@@ -137,7 +137,7 @@ public sealed class EncoreApiService : INotifyPropertyChanged
     {
         return string.IsNullOrWhiteSpace(albumArtMd5)
             ? "avares://ChartHub/Resources/Images/noalbumart.png"
-            : $"{FilesBaseUrl}/{albumArtMd5}";
+            : $"{FilesBaseUrl}/{albumArtMd5}.jpg";
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
