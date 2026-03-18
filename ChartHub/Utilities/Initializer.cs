@@ -12,7 +12,7 @@ namespace ChartHub.Utilities
 
         public static async Task InitializeAsync()
         {
-            var TempDir = Path.Combine(Path.GetTempPath(), "ChartHub");
+            var TempDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChartHub");
             var DownloadDir = Path.Combine(TempDir, "Downloads");
             var StagingDir = Path.Combine(TempDir, "Staging");
             var OutputDir = Path.Combine(TempDir, "Output");
@@ -95,7 +95,7 @@ namespace ChartHub.Utilities
 
         private void EnsureDefaults()
         {
-            var tempDir = Normalize(Runtime.TempDirectory, Path.Combine(Path.GetTempPath(), "ChartHub"));
+            var tempDir = Normalize(Runtime.TempDirectory, Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChartHub"));
             var downloadDir = Normalize(Runtime.DownloadDirectory, Path.Combine(tempDir, "Downloads"));
             var stagingDir = Normalize(Runtime.StagingDirectory, Path.Combine(tempDir, "Staging"));
             var outputDir = Normalize(Runtime.OutputDirectory, Path.Combine(tempDir, "Output"));

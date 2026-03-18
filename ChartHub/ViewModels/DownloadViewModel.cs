@@ -7,9 +7,13 @@ using ChartHub.Utilities;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Input;
+using Avalonia.Controls;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace ChartHub.ViewModels
 {
+    public sealed record NavigateToTabMessage(int TabIndex);
+
     public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     {
         private readonly AppGlobalSettings globalSettings;
@@ -293,10 +297,7 @@ namespace ChartHub.ViewModels
                 await Task.Delay(100);
             }
 
-            // TODO: Convert UI tab navigation to Avalonia
-            // var mainPage = Application.Current?.MainPage as MainPage;
-            // mainPage?.FocusOnTab(3);
-
+            WeakReferenceMessenger.Default.Send(new NavigateToTabMessage(4));
         }
 
         public void CheckAllItems(bool isChecked)

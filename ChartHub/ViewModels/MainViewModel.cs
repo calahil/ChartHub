@@ -1,11 +1,13 @@
 ﻿using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using ChartHub.Services;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using ChartHub.Utilities;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using ChartHub.Strings;
 
 namespace ChartHub.ViewModels
 {
@@ -28,6 +30,7 @@ namespace ChartHub.ViewModels
         private InstallSongViewModel _installSongViewModel = null!;
         private SettingsViewModel _settingsViewModel = null!;
         private SidePaneMode _activeSidePaneMode = SidePaneMode.Filters;
+        private MainViewPageStrings _pageStrings = new MainViewPageStrings();
 
         public RhythmVerseViewModel RhythmVerseViewModel
         {
@@ -124,6 +127,16 @@ namespace ChartHub.ViewModels
             set
             {
                 _isInstallSongTabVisible = value;
+                OnPropertyChanged();
+            }
+        }
+
+        public MainViewPageStrings PageStrings
+        {
+            get => _pageStrings;
+            set
+            {
+                _pageStrings = value;
                 OnPropertyChanged();
             }
         }
@@ -270,6 +283,8 @@ namespace ChartHub.ViewModels
             ShowFiltersPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Filters));
             ShowDownloadsPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Downloads));
             CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
+            WeakReferenceMessenger.Default.Register<NavigateToTabMessage>(this, (_, msg) =>
+                postToUi(() => SelectedMainTabIndex = msg.TabIndex));
             _isCloneHeroTabVisible = false;
             _isDownloadTabVisible = false;
             _isInstallSongTabVisible = false;

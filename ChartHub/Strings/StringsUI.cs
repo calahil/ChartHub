@@ -13,6 +13,18 @@
 
     }
 
+    public class MainViewPageStrings : StringsUI
+    {
+        public string Home { get; } = "Home";
+        public string CloneHero { get; } = "Clone Hero";
+        public string RhythmVerse { get; } = "RhythmVerse";
+        public string Encore { get; } = "Encore";
+        public string Downloads { get; } = "Downloads";
+        public string InstallSongs { get; } = "Install Songs";
+        public string Settings { get; } = "Settings";
+        public string Cancel { get; } = "avares://ChartHub/Resources/Svg/cancel_24dp.svg";
+    }
+
     public class InstallPageStrings : StringsUI
     {
         public string Title { get; } = "Install Songs Page";
