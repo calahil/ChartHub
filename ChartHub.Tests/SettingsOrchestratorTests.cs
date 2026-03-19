@@ -20,13 +20,16 @@ public class SettingsOrchestratorTests
         var result = await sut.UpdateAsync(config =>
         {
             config.Runtime.DownloadDirectory = "/tmp/downloads";
+            config.Runtime.SyncApiAuthToken = "updated-sync-token";
         });
 
         Assert.True(result.IsValid);
         Assert.Equal(1, store.SaveCallCount);
         Assert.Equal("/tmp/downloads", sut.Current.Runtime.DownloadDirectory);
+        Assert.Equal("updated-sync-token", sut.Current.Runtime.SyncApiAuthToken);
         Assert.NotNull(observed);
         Assert.Equal("/tmp/downloads", observed!.Runtime.DownloadDirectory);
+        Assert.Equal("updated-sync-token", observed.Runtime.SyncApiAuthToken);
     }
 
     [Fact]
@@ -147,6 +150,7 @@ public class SettingsOrchestratorTests
                     OutputDirectory = source.Runtime.OutputDirectory,
                     CloneHeroDataDirectory = source.Runtime.CloneHeroDataDirectory,
                     CloneHeroSongDirectory = source.Runtime.CloneHeroSongDirectory,
+                    SyncApiAuthToken = source.Runtime.SyncApiAuthToken,
                 },
                 GoogleAuth = new GoogleAuthConfig
                 {

@@ -388,3 +388,4 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+INGESTION_REWORK_TASK_PLAN.md

@@ -157,13 +157,17 @@ namespace ChartHub.Utilities
             services.AddSingleton<EncoreApiService>();
             services.AddSingleton<SharedDownloadQueue>();
             services.AddSingleton(_ => new LibraryCatalogService(Path.Combine(configDir, "library-catalog.db")));
+            services.AddSingleton(_ => new SongIngestionCatalogService(Path.Combine(configDir, "library-catalog.db")));
+            services.AddSingleton<SongIngestionStateMachine>();
+            services.AddSingleton<ISongInstallService, SongInstallService>();
+            services.AddSingleton<IDesktopPathOpener, DesktopPathOpener>();
             services.AddSingleton<ITransferSourceResolver, TransferSourceResolver>();
             services.AddSingleton<ILocalDestinationWriter, LocalDestinationWriter>();
             services.AddSingleton<IGoogleDriveDestinationWriter, GoogleDriveDestinationWriter>();
             services.AddSingleton<ITransferOrchestrator, TransferOrchestrator>();
+            services.AddSingleton<IIngestionSyncApiHost, IngestionSyncApiHost>();
             services.AddSingleton<DownloadViewModel>();
             services.AddSingleton<CloneHeroViewModel>();
-            services.AddSingleton<InstallSongViewModel>();
             services.AddSingleton<SettingsViewModel>();
             services.AddSingleton<RhythmVerseViewModel>();
             services.AddSingleton<EncoreViewModel>();
@@ -174,7 +178,6 @@ namespace ChartHub.Utilities
                     serviceProvider.GetRequiredService<SharedDownloadQueue>(),
                     serviceProvider.GetRequiredService<DownloadViewModel>(),
                     serviceProvider.GetRequiredService<CloneHeroViewModel>(),
-                    serviceProvider.GetRequiredService<InstallSongViewModel>(),
                     serviceProvider.GetRequiredService<SettingsViewModel>()
                 )
             );

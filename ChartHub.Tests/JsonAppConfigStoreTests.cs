@@ -34,6 +34,7 @@ public class JsonAppConfigStoreTests
           "UseMockData": true,
           "TempDirectory": "/tmp/legacy-temp",
           "DownloadDirectory": "/tmp/legacy-downloads",
+                    "SyncApiAuthToken": "legacy-sync-token",
           "GoogleDrive": {
             "android_client_id": "android-id",
             "desktop_client_id": "desktop-id"
@@ -49,6 +50,7 @@ public class JsonAppConfigStoreTests
         Assert.True(config.Runtime.UseMockData);
         Assert.Equal("/tmp/legacy-temp", config.Runtime.TempDirectory);
         Assert.Equal("/tmp/legacy-downloads", config.Runtime.DownloadDirectory);
+        Assert.Equal("legacy-sync-token", config.Runtime.SyncApiAuthToken);
         Assert.Equal("android-id", config.GoogleAuth.AndroidClientId);
         Assert.Equal("desktop-id", config.GoogleAuth.DesktopClientId);
     }

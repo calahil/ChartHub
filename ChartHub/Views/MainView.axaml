@@ -349,11 +349,6 @@
                      IsVisible="{Binding IsCloneHeroTabVisible}">
                 <ContentControl Content="{Binding CloneHeroViewModel}" />
             </TabItem>
-            <TabItem Header="{Binding PageStrings.InstallSongs}"
-                     FontSize="16"
-                     IsVisible="{Binding IsInstallSongTabVisible}">
-                <ContentControl Content="{Binding InstallSongViewModel}" />
-            </TabItem>
             <TabItem Header="{Binding PageStrings.Settings}"
                      FontSize="16"
                      IsVisible="{Binding IsSettingsTabVisible}">

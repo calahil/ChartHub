@@ -1,6 +1,5 @@
 ﻿using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
-using CommunityToolkit.Mvvm.Messaging;
 using ChartHub.Services;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
@@ -27,7 +26,6 @@ namespace ChartHub.ViewModels
         private DownloadViewModel _downloadViewModel = null!;
         private SharedDownloadQueue _sharedDownloadQueue = new();
         private CloneHeroViewModel _cloneHeroViewModel = null!;
-        private InstallSongViewModel _installSongViewModel = null!;
         private SettingsViewModel _settingsViewModel = null!;
         private SidePaneMode _activeSidePaneMode = SidePaneMode.Filters;
         private MainViewPageStrings _pageStrings = new MainViewPageStrings();
@@ -78,16 +76,6 @@ namespace ChartHub.ViewModels
             }
         }
 
-        public InstallSongViewModel InstallSongViewModel
-        {
-            get => _installSongViewModel;
-            set
-            {
-                _installSongViewModel = value;
-                OnPropertyChanged();
-            }
-        }
-
         public SettingsViewModel SettingsViewModel
         {
             get => _settingsViewModel;
@@ -116,17 +104,6 @@ namespace ChartHub.ViewModels
             set
             {
                 _isCloneHeroTabVisible = value;
-                OnPropertyChanged();
-            }
-        }
-
-        private bool _isInstallSongTabVisible;
-        public bool IsInstallSongTabVisible
-        {
-            get => _isInstallSongTabVisible;
-            set
-            {
-                _isInstallSongTabVisible = value;
                 OnPropertyChanged();
             }
         }
@@ -246,7 +223,6 @@ namespace ChartHub.ViewModels
             SharedDownloadQueue sharedDownloadQueue,
             DownloadViewModel downloadViewModel,
             CloneHeroViewModel cloneHeroViewModel,
-            InstallSongViewModel installSongViewModel,
             SettingsViewModel settingsViewModel)
             : this(
                 rhythmVerseViewModel,
@@ -254,7 +230,6 @@ namespace ChartHub.ViewModels
                 sharedDownloadQueue,
                 downloadViewModel,
                 cloneHeroViewModel,
-                installSongViewModel,
                 settingsViewModel,
                 action => Dispatcher.UIThread.Post(action),
                 OperatingSystem.IsAndroid())
@@ -267,7 +242,6 @@ namespace ChartHub.ViewModels
             SharedDownloadQueue sharedDownloadQueue,
             DownloadViewModel downloadViewModel,
             CloneHeroViewModel cloneHeroViewModel,
-            InstallSongViewModel installSongViewModel,
             SettingsViewModel settingsViewModel,
             Action<Action> postToUi,
             bool isAndroid)
@@ -278,30 +252,21 @@ namespace ChartHub.ViewModels
             _sharedDownloadQueue.Downloads.CollectionChanged += SharedDownloads_CollectionChanged;
             _downloadViewModel = downloadViewModel;
             _cloneHeroViewModel = cloneHeroViewModel;
-            _installSongViewModel = installSongViewModel;
             _settingsViewModel = settingsViewModel;
+            _settingsViewModel.PropertyChanged += SettingsViewModel_PropertyChanged;
             ShowFiltersPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Filters));
             ShowDownloadsPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Downloads));
             CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
-            WeakReferenceMessenger.Default.Register<NavigateToTabMessage>(this, (_, msg) =>
-                postToUi(() => SelectedMainTabIndex = msg.TabIndex));
             _isCloneHeroTabVisible = false;
             _isDownloadTabVisible = false;
-            _isInstallSongTabVisible = false;
             _isSettingsTabVisible = true;
 
             var supportsCloneHero = !isAndroid;
-            var supportsDesktopInstallPipeline = !isAndroid;
 
             if (supportsCloneHero)
             {
                 _cloneHeroViewModel.CloneHeroWatcher.LoadItems();
                 postToUi(() => IsCloneHeroTabVisible = true);
-            }
-
-            if (supportsDesktopInstallPipeline)
-            {
-                postToUi(() => IsInstallSongTabVisible = true);
             }
 
             if (!isAndroid)
@@ -311,6 +276,16 @@ namespace ChartHub.ViewModels
 
             ObserveBackgroundTask(_downloadViewModel.GoogleWatcher.StartAsync(), "Google watcher startup");
             postToUi(() => IsDownloadTabVisible = true);
+        }
+
+        private void SettingsViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(SettingsViewModel.IsCloudAccountLinked))
+                return;
+
+            ObserveBackgroundTask(
+                _downloadViewModel.HandleCloudAccountStateChangedAsync(_settingsViewModel.IsCloudAccountLinked),
+                "Google watcher refresh after cloud account state change");
         }
 
         private static void CancelSharedDownload(DownloadFile? item)

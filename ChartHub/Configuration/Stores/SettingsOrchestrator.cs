@@ -84,6 +84,8 @@ public sealed class SettingsOrchestrator : ISettingsOrchestrator, IDisposable
                 OutputDirectory = source.Runtime.OutputDirectory,
                 CloneHeroDataDirectory = source.Runtime.CloneHeroDataDirectory,
                 CloneHeroSongDirectory = source.Runtime.CloneHeroSongDirectory,
+                SyncApiAuthToken = source.Runtime.SyncApiAuthToken,
+                AllowSyncApiStateOverride = source.Runtime.AllowSyncApiStateOverride,
             },
             GoogleAuth = new GoogleAuthConfig
             {

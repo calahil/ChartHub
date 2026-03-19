@@ -34,8 +34,11 @@ namespace ChartHub
             ServiceProvider ??= AppBootstrapper.CreateServiceProvider();
             AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
             var cloudAccountService = ServiceProvider.GetRequiredService<ICloudStorageAccountService>();
+            var ingestionSyncApiHost = ServiceProvider.GetRequiredService<IIngestionSyncApiHost>();
             var shellViewModel = new AppShellViewModel(ServiceProvider, cloudAccountService);
             Logger.LogInfo("App", "Framework initialization completed");
+
+            ObserveBackgroundTask(ingestionSyncApiHost.StartAsync(), "Ingestion sync API startup");
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
             {
@@ -93,6 +96,18 @@ namespace ChartHub
         private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
         {
             Logger.LogError("App", "Unobserved task exception", e.Exception);
+        }
+
+        private static void ObserveBackgroundTask(Task task, string context)
+        {
+            _ = task.ContinueWith(t =>
+            {
+                var ex = t.Exception?.GetBaseException();
+                if (ex is not null)
+                {
+                    Logger.LogError("App", $"{context} failed", ex);
+                }
+            }, TaskContinuationOptions.OnlyOnFaulted);
         }
 
         private static void DisposeApplicationResourcesOnce()

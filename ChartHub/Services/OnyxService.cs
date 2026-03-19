@@ -32,11 +32,11 @@ namespace ChartHub.Services
 
             globalSettings = settings;
             _runOnyx = runOnyx;
-            TempPath = Path.Combine(globalSettings.TempDir,
-                Guid.NewGuid().ToString()
-            );
             DestPath = globalSettings.OutputDir;
             StagingPath = globalSettings.StagingDir;
+            TempPath = Path.Combine(StagingPath,
+                Guid.NewGuid().ToString()
+            );
             Directory.CreateDirectory(TempPath);
             var importPath = Path.Combine(TempPath, Path.GetFileName(songPath));
             try

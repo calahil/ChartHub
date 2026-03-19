@@ -1,6 +1,7 @@
 ﻿using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using System.ComponentModel;
+using System.Security.Cryptography;
 using System.Runtime.CompilerServices;
 using Avalonia.Threading;
 
@@ -81,6 +82,18 @@ namespace ChartHub.Utilities
             set => QueueConfigUpdate(config => config.Runtime.CloneHeroSongDirectory = value);
         }
 
+        public string SyncApiAuthToken
+        {
+            get => Runtime.SyncApiAuthToken;
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiAuthToken = value);
+        }
+
+        public bool AllowSyncApiStateOverride
+        {
+            get => Runtime.AllowSyncApiStateOverride;
+            set => QueueConfigUpdate(config => config.Runtime.AllowSyncApiStateOverride = value);
+        }
+
         public AppGlobalSettings(ISettingsOrchestrator settingsOrchestrator)
         {
             _settingsOrchestrator = settingsOrchestrator;
@@ -101,6 +114,9 @@ namespace ChartHub.Utilities
             var outputDir = Normalize(Runtime.OutputDirectory, Path.Combine(tempDir, "Output"));
             var cloneHeroDataDir = Normalize(Runtime.CloneHeroDataDirectory, GetDefaultCloneHeroDataDirectory());
             var cloneHeroSongsDir = Normalize(Runtime.CloneHeroSongDirectory, Path.Combine(cloneHeroDataDir, "Songs"));
+            var syncApiAuthToken = string.IsNullOrWhiteSpace(Runtime.SyncApiAuthToken)
+                ? GenerateSyncApiToken()
+                : Runtime.SyncApiAuthToken;
 
             FileTools.CreateDirectoryIfNotExists(tempDir);
             FileTools.CreateDirectoryIfNotExists(downloadDir);
@@ -117,7 +133,15 @@ namespace ChartHub.Utilities
                 config.Runtime.OutputDirectory = outputDir;
                 config.Runtime.CloneHeroDataDirectory = cloneHeroDataDir;
                 config.Runtime.CloneHeroSongDirectory = cloneHeroSongsDir;
+                config.Runtime.SyncApiAuthToken = syncApiAuthToken;
             });
+        }
+
+        private static string GenerateSyncApiToken()
+        {
+            Span<byte> bytes = stackalloc byte[32];
+            RandomNumberGenerator.Fill(bytes);
+            return Convert.ToHexString(bytes);
         }
 
         private static string Normalize(string? value, string fallback)
@@ -167,6 +191,8 @@ namespace ChartHub.Utilities
             OnPropertyChanged(nameof(OutputDir));
             OnPropertyChanged(nameof(CloneHeroDataDir));
             OnPropertyChanged(nameof(CloneHeroSongsDir));
+            OnPropertyChanged(nameof(SyncApiAuthToken));
+            OnPropertyChanged(nameof(AllowSyncApiStateOverride));
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

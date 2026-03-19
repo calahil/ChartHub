@@ -49,4 +49,16 @@ public sealed class RuntimeAppConfig
     [SettingHotReloadable(false)]
     [SettingRequiresRestart]
     public string CloneHeroDataDirectory { get; set; } = "first_install";
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Loopback Sync API Token")]
+    [SettingEditor(SettingEditorKind.Text)]
+    [SettingHotReloadable(true)]
+    public string SyncApiAuthToken { get; set; } = string.Empty;
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Allow Event State Override")]
+    [SettingEditor(SettingEditorKind.Toggle)]
+    [SettingHotReloadable(true)]
+    public bool AllowSyncApiStateOverride { get; set; }
 }

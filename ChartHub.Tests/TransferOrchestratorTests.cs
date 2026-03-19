@@ -198,7 +198,9 @@ public class TransferOrchestratorTests
             googleDriveClient ?? new GoogleDriveClientStub(),
             resolver,
             localDestinationWriter ?? new LocalDestinationWriterStub(),
-            googleDriveDestinationWriter ?? new GoogleDriveDestinationWriterStub());
+            googleDriveDestinationWriter ?? new GoogleDriveDestinationWriterStub(),
+            new SongIngestionCatalogService(Path.Combine(rootPath, "library-catalog.db")),
+            new SongIngestionStateMachine());
     }
 
     private static async Task<TransferResult?> InvokeTryCopyDriveFileAsync(
@@ -210,7 +212,7 @@ public class TransferOrchestratorTests
         var method = typeof(TransferOrchestrator).GetMethod("TryCopyDriveFileAsync", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
 
-        var task = method!.Invoke(sut, [request, source, downloadItem, "trf-test", CancellationToken.None]) as Task<TransferResult?>;
+        var task = method!.Invoke(sut, [request, source, downloadItem, "trf-test", 0L, 0L, IngestionState.Queued, CancellationToken.None]) as Task<TransferResult?>;
         Assert.NotNull(task);
 
         return await task!;

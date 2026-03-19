@@ -172,6 +172,12 @@ public sealed class JsonAppConfigStore : IAppConfigStore
         if (rootNode["CloneHeroDataDirectory"] is not null)
             config.Runtime.CloneHeroDataDirectory = ReadString(rootNode, "CloneHeroDataDirectory");
 
+        if (rootNode["SyncApiAuthToken"] is not null)
+            config.Runtime.SyncApiAuthToken = rootNode["SyncApiAuthToken"]?.GetValue<string>() ?? config.Runtime.SyncApiAuthToken;
+
+        if (rootNode["AllowSyncApiStateOverride"] is not null)
+            config.Runtime.AllowSyncApiStateOverride = rootNode["AllowSyncApiStateOverride"]?.GetValue<bool>() ?? config.Runtime.AllowSyncApiStateOverride;
+
         if (rootNode["GoogleDrive"] is JsonObject googleDrive)
         {
             if (googleDrive["android_client_id"] is not null)

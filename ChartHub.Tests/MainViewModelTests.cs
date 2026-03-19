@@ -23,7 +23,6 @@ public class MainViewModelTests
         var rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
         var encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
         var sharedDownloadQueue = new SharedDownloadQueue();
-        var installSongViewModel = CreateUninitialized<ViewModels.InstallSongViewModel>();
         var settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
 
         var sut = CreateMainViewModel(
@@ -32,7 +31,6 @@ public class MainViewModelTests
             sharedDownloadQueue,
             downloadViewModel,
             cloneHeroViewModel,
-            installSongViewModel,
             settingsViewModel,
             action => action(),
             isAndroid: false);
@@ -42,13 +40,11 @@ public class MainViewModelTests
         Assert.Same(sharedDownloadQueue.Downloads, sut.SharedDownloads);
         Assert.Same(downloadViewModel, sut.DownloadViewModel);
         Assert.Same(cloneHeroViewModel, sut.CloneHeroViewModel);
-        Assert.Same(installSongViewModel, sut.InstallSongViewModel);
         Assert.Same(settingsViewModel, sut.SettingsViewModel);
         Assert.Equal(1, cloneHeroWatcher.LoadItemsCallCount);
         Assert.Equal(1, downloadWatcher.LoadItemsCallCount);
         Assert.True(sut.IsSettingsTabVisible);
         Assert.True(sut.IsCloneHeroTabVisible);
-        Assert.True(sut.IsInstallSongTabVisible);
         Assert.True(sut.IsDownloadTabVisible);
     }
 
@@ -105,7 +101,6 @@ public class MainViewModelTests
         SharedDownloadQueue sharedDownloadQueue,
         ViewModels.DownloadViewModel downloadViewModel,
         ViewModels.CloneHeroViewModel cloneHeroViewModel,
-        ViewModels.InstallSongViewModel installSongViewModel,
         ViewModels.SettingsViewModel settingsViewModel,
         Action<Action> postToUi,
         bool isAndroid)
@@ -119,7 +114,6 @@ public class MainViewModelTests
                 typeof(SharedDownloadQueue),
                 typeof(ViewModels.DownloadViewModel),
                 typeof(ViewModels.CloneHeroViewModel),
-                typeof(ViewModels.InstallSongViewModel),
                 typeof(ViewModels.SettingsViewModel),
                 typeof(Action<Action>),
                 typeof(bool),
@@ -134,7 +128,6 @@ public class MainViewModelTests
             sharedDownloadQueue,
             downloadViewModel,
             cloneHeroViewModel,
-            installSongViewModel,
             settingsViewModel,
             postToUi,
             isAndroid,

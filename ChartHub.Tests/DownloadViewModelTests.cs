@@ -18,7 +18,7 @@ public class DownloadViewModelTests
         using var temp = new TemporaryDirectoryFixture("download-vm-checks");
         using var settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
-        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer);
+        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
 
         try
         {
@@ -51,7 +51,7 @@ public class DownloadViewModelTests
         using var temp = new TemporaryDirectoryFixture("download-vm-cloud-local");
         using var settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
-        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer);
+        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
         var refreshWatcher = new ResourceWatcherStub(temp.GetPath("downloads"), sut.DownloadFiles);
 
         try
@@ -79,7 +79,7 @@ public class DownloadViewModelTests
         using var temp = new TemporaryDirectoryFixture("download-vm-sync");
         using var settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
-        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer);
+        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
         var refreshWatcher = new ResourceWatcherStub(temp.GetPath("downloads"), sut.DownloadFiles);
 
         try
@@ -107,7 +107,7 @@ public class DownloadViewModelTests
         using var temp = new TemporaryDirectoryFixture("download-vm-cloud-unlinked");
         using var settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
-        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient { ChartHubFolderId = string.Empty }, transfer);
+        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient { ChartHubFolderId = string.Empty }, transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
 
         try
         {
@@ -120,8 +120,37 @@ public class DownloadViewModelTests
 
             Assert.False(sut.IsCloudConnected);
             Assert.True(sut.HasCloudConnectionHint);
+            Assert.Equal("Google Drive is not linked. Open Settings and link your Google account.", sut.CloudConnectionHint);
             Assert.Equal(0, transfer.DownloadSelectedCallCount);
             Assert.Equal(0, transfer.SyncCallCount);
+        }
+        finally
+        {
+            await sut.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task HandleCloudAccountStateChangedAsync_OnUnlink_ClearsCloudFilesAndShowsHint()
+    {
+        using var temp = new TemporaryDirectoryFixture("download-vm-cloud-link-state");
+        using var settings = CreateSettings(temp.RootPath);
+        var transfer = new TransferOrchestratorSpy();
+        var driveClient = new FakeGoogleDriveClient { ChartHubFolderId = "folder-test" };
+        var sut = new ViewModels.DownloadViewModel(settings, driveClient, transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
+
+        try
+        {
+            sut.GoogleFiles.Add(CreateWatcherFile("alpha.zip", "drive-file-a", checkedState: true));
+            Assert.Single(sut.GoogleFiles);
+
+            driveClient.ChartHubFolderId = string.Empty;
+            await sut.HandleCloudAccountStateChangedAsync(isLinked: false);
+
+            Assert.Empty(sut.GoogleFiles);
+            Assert.False(sut.IsCloudConnected);
+            Assert.True(sut.HasCloudConnectionHint);
+            Assert.Equal("Google Drive is not linked. Open Settings and link your Google account.", sut.CloudConnectionHint);
         }
         finally
         {
@@ -199,6 +228,14 @@ public class DownloadViewModelTests
         public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ObservableCollection<WatcherFile>> GetFileDataCollectionAsync(string directoryId) => Task.FromResult(new ObservableCollection<WatcherFile>());
+    }
+
+    private sealed class SongInstallServiceStub : ISongInstallService
+    {
+        public Task<IReadOnlyList<string>> InstallSelectedDownloadsAsync(IEnumerable<string> selectedFilePaths, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<string>>([]);
+        }
     }
 
     private sealed class ResourceWatcherStub : IResourceWatcher
