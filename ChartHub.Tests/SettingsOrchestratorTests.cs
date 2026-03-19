@@ -151,6 +151,8 @@ public class SettingsOrchestratorTests
                     CloneHeroDataDirectory = source.Runtime.CloneHeroDataDirectory,
                     CloneHeroSongDirectory = source.Runtime.CloneHeroSongDirectory,
                     SyncApiAuthToken = source.Runtime.SyncApiAuthToken,
+                    AllowSyncApiStateOverride = source.Runtime.AllowSyncApiStateOverride,
+                    InstallLogExpanded = source.Runtime.InstallLogExpanded,
                 },
                 GoogleAuth = new GoogleAuthConfig
                 {

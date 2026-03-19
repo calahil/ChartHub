@@ -11,26 +11,38 @@ namespace ChartHub.Tests;
 public class OnyxServiceTests
 {
     [Fact]
-    public void Constructor_WhenImportSucceeds_CallsImportThenBuildWithCorrectArgs()
+    public async Task InstallAsync_WhenImportSucceeds_UsesStagingAndOutputAndMovesFinalDirectory()
     {
         using var temp = new TemporaryDirectoryFixture("onyx-success");
         var settings = CreateSettings(temp.RootPath);
-        var songPath = "/songs/my-song.zip";
+        var songPath = Path.Combine(settings.DownloadDir, "my-song.con");
+        File.WriteAllText(songPath, "dummy");
 
         var capturedCalls = new List<string[]>();
 
-        _ = CreateService(settings, songPath, args =>
+        var sut = CreateService(settings, async (args, cancellationToken) =>
         {
             capturedCalls.Add(args);
 
-            // On import call: create importPath dir and write a valid song.yml
             if (args[0] == "import")
             {
                 var importPath = args[3];
                 Directory.CreateDirectory(importPath);
-                WriteMinimalSongYaml(Path.Combine(importPath, "song.yml"), settings.OutputDir);
+                WriteMinimalSongYaml(Path.Combine(importPath, "song.yml"));
+                await Task.CompletedTask;
+                return;
+            }
+
+            if (args[0] == "build")
+            {
+                var buildPath = args[5];
+                var builtSongDir = Path.Combine(buildPath, "Built Song");
+                Directory.CreateDirectory(builtSongDir);
+                File.WriteAllText(Path.Combine(builtSongDir, "notes.chart"), "chart-data");
             }
         });
+
+        var result = await sut.InstallAsync(songPath, "rhythmverse");
 
         Assert.Equal(2, capturedCalls.Count);
 
@@ -38,7 +50,7 @@ public class OnyxServiceTests
         Assert.Equal("import", importArgs[0]);
         Assert.Equal(songPath, importArgs[1]);
         Assert.Equal("--to", importArgs[2]);
-        Assert.Equal(Path.GetFileName(songPath), Path.GetFileName(importArgs[3]));
+        Assert.StartsWith(settings.StagingDir, importArgs[3], StringComparison.Ordinal);
 
         var buildArgs = capturedCalls[1];
         Assert.Equal("build", buildArgs[0]);
@@ -46,46 +58,77 @@ public class OnyxServiceTests
         Assert.Equal("--target", buildArgs[2]);
         Assert.Equal("ps", buildArgs[3]);
         Assert.Equal("--to", buildArgs[4]);
-        Assert.Equal(settings.OutputDir, buildArgs[5]);
+        Assert.StartsWith(settings.OutputDir, buildArgs[5], StringComparison.Ordinal);
+
+        Assert.StartsWith(settings.CloneHeroSongsDir, result.FinalInstallDirectory, StringComparison.Ordinal);
+        Assert.Contains("__rhythmverse", result.FinalInstallDirectory, StringComparison.Ordinal);
+        Assert.True(Directory.Exists(result.FinalInstallDirectory));
+        Assert.True(File.Exists(Path.Combine(result.FinalInstallDirectory, "notes.chart")));
     }
 
     [Fact]
-    public void Constructor_WhenSongYmlAbsentAfterImport_EarlyReturnsWithoutBuild()
+    public async Task InstallAsync_WhenSongYmlAbsentAfterImport_ThrowsWithoutBuild()
     {
         using var temp = new TemporaryDirectoryFixture("onyx-no-yml");
         var settings = CreateSettings(temp.RootPath);
-        var songPath = "/songs/my-song.zip";
+        var songPath = Path.Combine(settings.DownloadDir, "my-song.con");
+        File.WriteAllText(songPath, "dummy");
 
         var capturedCalls = new List<string[]>();
 
-        _ = CreateService(settings, songPath, args =>
+        var sut = CreateService(settings, (args, cancellationToken) =>
         {
             capturedCalls.Add(args);
-            // import stub: creates the directory but NOT the song.yml
             if (args[0] == "import")
                 Directory.CreateDirectory(args[3]);
+
+            return Task.CompletedTask;
         });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => sut.InstallAsync(songPath, "rhythmverse"));
 
         Assert.Single(capturedCalls);
         Assert.Equal("import", capturedCalls[0][0]);
+        Assert.Contains("song.yml", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Constructor_WhenRunOnyxThrows_ExceptionPropagates()
+    public async Task InstallAsync_WhenRunOnyxThrows_ExceptionPropagates()
     {
         using var temp = new TemporaryDirectoryFixture("onyx-fail");
         var settings = CreateSettings(temp.RootPath);
-        var songPath = "/songs/broken.zip";
+        var songPath = Path.Combine(settings.DownloadDir, "broken.con");
+        File.WriteAllText(songPath, "dummy");
 
-        var ex = Assert.Throws<System.Reflection.TargetInvocationException>(() =>
+        var sut = CreateService(settings, (args, cancellationToken) =>
+            throw new InvalidOperationException("Onyx exited with code 1: import failed"));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => sut.InstallAsync(songPath, "rhythmverse"));
+        Assert.Contains("import failed", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InstallAsync_WhenCancelled_ReportsCancelledStageAndThrowsOperationCanceled()
+    {
+        using var temp = new TemporaryDirectoryFixture("onyx-cancel");
+        var settings = CreateSettings(temp.RootPath);
+        var songPath = Path.Combine(settings.DownloadDir, "cancel.con");
+        File.WriteAllText(songPath, "dummy");
+
+        var progressUpdates = new List<InstallProgressUpdate>();
+        var progress = new Progress<InstallProgressUpdate>(update => progressUpdates.Add(update));
+        var cts = new CancellationTokenSource();
+
+        var sut = CreateService(settings, async (args, cancellationToken) =>
         {
-            _ = CreateService(settings, songPath, _ =>
-                throw new InvalidOperationException("Onyx exited with code 1: import failed"));
+            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
         });
 
-        Assert.NotNull(ex.InnerException);
-        var inner = Assert.IsType<InvalidOperationException>(ex.InnerException);
-        Assert.Contains("import failed", inner.Message, StringComparison.Ordinal);
+        var installTask = sut.InstallAsync(songPath, "rhythmverse", progress, cts.Token);
+        cts.CancelAfter(TimeSpan.FromMilliseconds(100));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => installTask);
+        Assert.Contains(progressUpdates, update => update.Stage == InstallStage.Cancelled);
     }
 
     private static AppGlobalSettings CreateSettings(string rootPath)
@@ -114,20 +157,20 @@ public class OnyxServiceTests
         return new AppGlobalSettings(new FakeSettingsOrchestrator(config));
     }
 
-    private static OnyxService CreateService(AppGlobalSettings settings, string songPath, Action<string[]> runOnyx)
+    private static OnyxService CreateService(AppGlobalSettings settings, Func<string[], CancellationToken, Task> runOnyx)
     {
         var constructor = typeof(OnyxService).GetConstructor(
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
             binder: null,
-            [typeof(AppGlobalSettings), typeof(string), typeof(Action<string[]>)],
+            [typeof(AppGlobalSettings), typeof(Func<string[], CancellationToken, Task>)],
             modifiers: null);
 
         Assert.NotNull(constructor);
 
-        return (OnyxService)constructor.Invoke([settings, songPath, runOnyx]);
+        return (OnyxService)constructor.Invoke([settings, runOnyx]);
     }
 
-    private static void WriteMinimalSongYaml(string path, string outputDir)
+    private static void WriteMinimalSongYaml(string path)
     {
         File.WriteAllText(path, """
             targets:

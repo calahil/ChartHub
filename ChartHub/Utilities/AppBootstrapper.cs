@@ -159,6 +159,7 @@ namespace ChartHub.Utilities
             services.AddSingleton(_ => new LibraryCatalogService(Path.Combine(configDir, "library-catalog.db")));
             services.AddSingleton(_ => new SongIngestionCatalogService(Path.Combine(configDir, "library-catalog.db")));
             services.AddSingleton<SongIngestionStateMachine>();
+            services.AddSingleton<IOnyxPipelineService, OnyxService>();
             services.AddSingleton<ISongInstallService, SongInstallService>();
             services.AddSingleton<IDesktopPathOpener, DesktopPathOpener>();
             services.AddSingleton<ITransferSourceResolver, TransferSourceResolver>();

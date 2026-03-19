@@ -9,31 +9,52 @@ namespace ChartHub.Services;
 public interface ISongInstallService
 {
     Task<IReadOnlyList<string>> InstallSelectedDownloadsAsync(
-    IEnumerable<string> selectedFilePaths,
+        IEnumerable<string> selectedFilePaths,
+        IProgress<InstallProgressUpdate>? progress = null,
         CancellationToken cancellationToken = default);
 }
 
 public sealed class SongInstallService(
     AppGlobalSettings settings,
     SongIngestionCatalogService ingestionCatalog,
-    SongIngestionStateMachine ingestionStateMachine) : ISongInstallService
+    SongIngestionStateMachine ingestionStateMachine,
+    IOnyxPipelineService onyxPipelineService) : ISongInstallService
 {
     private readonly AppGlobalSettings _settings = settings;
     private readonly SongIngestionCatalogService _ingestionCatalog = ingestionCatalog;
     private readonly SongIngestionStateMachine _ingestionStateMachine = ingestionStateMachine;
+    private readonly IOnyxPipelineService _onyxPipelineService = onyxPipelineService;
 
     public async Task<IReadOnlyList<string>> InstallSelectedDownloadsAsync(
         IEnumerable<string> selectedFilePaths,
+        IProgress<InstallProgressUpdate>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var installedDirectories = new List<string>();
+        var files = selectedFilePaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-        foreach (var filePath in selectedFilePaths.Where(path => !string.IsNullOrWhiteSpace(path)))
+        var installedDirectories = new List<string>();
+        if (files.Count == 0)
+            return installedDirectories;
+
+        for (var index = 0; index < files.Count; index++)
         {
+            var filePath = files[index];
             cancellationToken.ThrowIfCancellationRequested();
 
             if (!File.Exists(filePath))
                 continue;
+
+            var overallStart = index * 100d / files.Count;
+            var overallEnd = (index + 1) * 100d / files.Count;
+            var itemName = Path.GetFileName(filePath);
+            progress?.Report(new InstallProgressUpdate(
+                InstallStage.Preparing,
+                $"Preparing install for {itemName}",
+                overallStart,
+                itemName));
 
             var ingestion = await _ingestionCatalog.GetLatestIngestionByAssetLocationAsync(filePath, cancellationToken);
             var sourceSuffix = NormalizeSourceSuffix(ingestion?.Source);
@@ -54,7 +75,8 @@ public sealed class SongInstallService(
 
             try
             {
-                var fileInstalledDirs = await InstallFileAsync(filePath, sourceSuffix, cancellationToken);
+                var itemProgress = new ScaledInstallProgress(progress, overallStart, overallEnd, itemName);
+                var fileInstalledDirs = await InstallFileAsync(filePath, sourceSuffix, itemProgress, cancellationToken);
                 installedDirectories.AddRange(fileInstalledDirs);
 
                 if (ingestion is not null && attempt is not null)
@@ -83,6 +105,20 @@ public sealed class SongInstallService(
                 }
 
                 File.Delete(filePath);
+                progress?.Report(new InstallProgressUpdate(
+                    InstallStage.Completed,
+                    $"Installed {itemName}",
+                    overallEnd,
+                    itemName));
+            }
+            catch (OperationCanceledException)
+            {
+                progress?.Report(new InstallProgressUpdate(
+                    InstallStage.Cancelled,
+                    $"Install cancelled while processing {itemName}",
+                    null,
+                    itemName));
+                throw;
             }
             catch (Exception ex)
             {
@@ -102,13 +138,30 @@ public sealed class SongInstallService(
                         ex.Message,
                         cancellationToken);
                 }
+
+                progress?.Report(new InstallProgressUpdate(
+                    InstallStage.Failed,
+                    $"Failed to install {itemName}: {ex.Message}",
+                    null,
+                    itemName,
+                    ex.Message));
             }
         }
+
+        progress?.Report(new InstallProgressUpdate(
+            InstallStage.Completed,
+            "Install session finished",
+            100,
+            files.Count == 1 ? Path.GetFileName(files[0]) : $"{files.Count} items"));
 
         return installedDirectories;
     }
 
-    private async Task<List<string>> InstallFileAsync(string filePath, string sourceSuffix, CancellationToken cancellationToken)
+    private async Task<List<string>> InstallFileAsync(
+        string filePath,
+        string sourceSuffix,
+        IProgress<InstallProgressUpdate>? progress,
+        CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(_settings.CloneHeroSongsDir);
         Directory.CreateDirectory(_settings.OutputDir);
@@ -118,66 +171,59 @@ public sealed class SongInstallService(
 
         if (extension is ".zip" or ".rar" or ".7z")
         {
-            var sanitizedName = SafePathHelper.SanitizeFileName(Path.GetFileNameWithoutExtension(filePath), "song");
-            var targetDir = ResolveUniqueDirectory(Path.Combine(_settings.CloneHeroSongsDir, $"{sanitizedName}__{sourceSuffix}"));
-            Directory.CreateDirectory(targetDir);
-
-            using var archive = FileTools.OpenArchive(filePath);
-            foreach (var entry in archive.Entries.Where(entry => !entry.IsDirectory))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var destinationPath = SafePathHelper.GetSafeArchiveExtractionPath(targetDir, entry.Key, "archive-entry");
-                var destinationDirectory = Path.GetDirectoryName(destinationPath);
-                if (!string.IsNullOrWhiteSpace(destinationDirectory))
-                    Directory.CreateDirectory(destinationDirectory);
-
-                entry.WriteToFile(destinationPath, new ExtractionOptions
-                {
-                    ExtractFullPath = false,
-                    Overwrite = true,
-                });
-            }
-
-            installedDirs.Add(targetDir);
+            installedDirs.Add(await InstallArchiveFileAsync(filePath, sourceSuffix, progress, cancellationToken));
             return installedDirs;
         }
 
-        var beforeDirs = Directory.GetDirectories(_settings.OutputDir).ToHashSet(StringComparer.Ordinal);
-        _ = new OnyxService(_settings, filePath);
-        var afterDirs = Directory.GetDirectories(_settings.OutputDir);
-
-        var newOutputDirs = afterDirs
-            .Where(directory => !beforeDirs.Contains(directory))
-            .ToList();
-
-        foreach (var outputDir in newOutputDirs)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var baseName = SafePathHelper.SanitizeFileName(Path.GetFileName(outputDir), "song");
-            var destinationDir = ResolveUniqueDirectory(Path.Combine(_settings.CloneHeroSongsDir, $"{baseName}__{sourceSuffix}"));
-            Directory.Move(outputDir, destinationDir);
-            installedDirs.Add(destinationDir);
-        }
-
-        if (installedDirs.Count == 0)
-        {
-            var fallbackBase = SafePathHelper.SanitizeFileName(Path.GetFileNameWithoutExtension(filePath), "song");
-            var fallbackDestination = ResolveUniqueDirectory(Path.Combine(_settings.CloneHeroSongsDir, $"{fallbackBase}__{sourceSuffix}"));
-            Directory.CreateDirectory(fallbackDestination);
-
-            var rootFiles = Directory.GetFiles(_settings.OutputDir);
-            foreach (var rootFile in rootFiles)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var destinationFile = Path.Combine(fallbackDestination, Path.GetFileName(rootFile));
-                File.Move(rootFile, destinationFile, overwrite: true);
-            }
-
-            if (Directory.GetFiles(fallbackDestination, "*", SearchOption.AllDirectories).Length > 0)
-                installedDirs.Add(fallbackDestination);
-        }
+        var onyxResult = await _onyxPipelineService.InstallAsync(filePath, sourceSuffix, progress, cancellationToken);
+        installedDirs.Add(onyxResult.FinalInstallDirectory);
 
         return installedDirs;
+    }
+
+    private async Task<string> InstallArchiveFileAsync(
+        string filePath,
+        string sourceSuffix,
+        IProgress<InstallProgressUpdate>? progress,
+        CancellationToken cancellationToken)
+    {
+        var sanitizedName = SafePathHelper.SanitizeFileName(Path.GetFileNameWithoutExtension(filePath), "song");
+        var targetDir = ResolveUniqueDirectory(Path.Combine(_settings.CloneHeroSongsDir, $"{sanitizedName}__{sourceSuffix}"));
+        Directory.CreateDirectory(targetDir);
+
+        using var archive = FileTools.OpenArchive(filePath);
+        var entries = archive.Entries.Where(entry => !entry.IsDirectory).ToList();
+        for (var index = 0; index < entries.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var entry = entries[index];
+            var progressValue = entries.Count == 0 ? 50 : 10 + ((index + 1) * 70d / entries.Count);
+            progress?.Report(new InstallProgressUpdate(
+                InstallStage.ExtractingArchive,
+                $"Extracting {entry.Key}",
+                progressValue,
+                Path.GetFileName(filePath),
+                entry.Key));
+
+            var destinationPath = SafePathHelper.GetSafeArchiveExtractionPath(targetDir, entry.Key, "archive-entry");
+            var destinationDirectory = Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrWhiteSpace(destinationDirectory))
+                Directory.CreateDirectory(destinationDirectory);
+
+            await Task.Run(() => entry.WriteToFile(destinationPath, new ExtractionOptions
+            {
+                ExtractFullPath = false,
+                Overwrite = true,
+            }), cancellationToken);
+        }
+
+        progress?.Report(new InstallProgressUpdate(
+            InstallStage.Completed,
+            $"Archive install completed for {Path.GetFileName(filePath)}",
+            100,
+            Path.GetFileName(filePath)));
+
+        return targetDir;
     }
 
     private async Task WriteManifestAsync(long ingestionId, long attemptId, string installDir, CancellationToken cancellationToken)
@@ -282,6 +328,41 @@ public sealed class SongInstallService(
                 return candidate;
 
             counter++;
+        }
+    }
+
+    private sealed class ScaledInstallProgress : IProgress<InstallProgressUpdate>
+    {
+        private readonly IProgress<InstallProgressUpdate>? _inner;
+        private readonly double _startPercent;
+        private readonly double _endPercent;
+        private readonly string _currentItemName;
+
+        public ScaledInstallProgress(IProgress<InstallProgressUpdate>? inner, double startPercent, double endPercent, string currentItemName)
+        {
+            _inner = inner;
+            _startPercent = startPercent;
+            _endPercent = endPercent;
+            _currentItemName = currentItemName;
+        }
+
+        public void Report(InstallProgressUpdate value)
+        {
+            if (_inner is null)
+                return;
+
+            double? scaledPercent = null;
+            if (value.ProgressPercent.HasValue)
+            {
+                var normalized = Math.Clamp(value.ProgressPercent.Value, 0, 100);
+                scaledPercent = _startPercent + ((_endPercent - _startPercent) * (normalized / 100d));
+            }
+
+            _inner.Report(value with
+            {
+                ProgressPercent = scaledPercent,
+                CurrentItemName = string.IsNullOrWhiteSpace(value.CurrentItemName) ? _currentItemName : value.CurrentItemName,
+            });
         }
     }
 }

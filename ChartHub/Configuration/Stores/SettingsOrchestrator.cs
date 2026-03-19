@@ -86,6 +86,7 @@ public sealed class SettingsOrchestrator : ISettingsOrchestrator, IDisposable
                 CloneHeroSongDirectory = source.Runtime.CloneHeroSongDirectory,
                 SyncApiAuthToken = source.Runtime.SyncApiAuthToken,
                 AllowSyncApiStateOverride = source.Runtime.AllowSyncApiStateOverride,
+                InstallLogExpanded = source.Runtime.InstallLogExpanded,
             },
             GoogleAuth = new GoogleAuthConfig
             {

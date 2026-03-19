@@ -178,6 +178,9 @@ public sealed class JsonAppConfigStore : IAppConfigStore
         if (rootNode["AllowSyncApiStateOverride"] is not null)
             config.Runtime.AllowSyncApiStateOverride = rootNode["AllowSyncApiStateOverride"]?.GetValue<bool>() ?? config.Runtime.AllowSyncApiStateOverride;
 
+        if (rootNode["InstallLogExpanded"] is not null)
+            config.Runtime.InstallLogExpanded = rootNode["InstallLogExpanded"]?.GetValue<bool>() ?? config.Runtime.InstallLogExpanded;
+
         if (rootNode["GoogleDrive"] is JsonObject googleDrive)
         {
             if (googleDrive["android_client_id"] is not null)

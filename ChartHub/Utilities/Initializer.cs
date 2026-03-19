@@ -94,6 +94,12 @@ namespace ChartHub.Utilities
             set => QueueConfigUpdate(config => config.Runtime.AllowSyncApiStateOverride = value);
         }
 
+        public bool InstallLogExpanded
+        {
+            get => Runtime.InstallLogExpanded;
+            set => QueueConfigUpdate(config => config.Runtime.InstallLogExpanded = value);
+        }
+
         public AppGlobalSettings(ISettingsOrchestrator settingsOrchestrator)
         {
             _settingsOrchestrator = settingsOrchestrator;
@@ -193,6 +199,7 @@ namespace ChartHub.Utilities
             OnPropertyChanged(nameof(CloneHeroSongsDir));
             OnPropertyChanged(nameof(SyncApiAuthToken));
             OnPropertyChanged(nameof(AllowSyncApiStateOverride));
+            OnPropertyChanged(nameof(InstallLogExpanded));
         }
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

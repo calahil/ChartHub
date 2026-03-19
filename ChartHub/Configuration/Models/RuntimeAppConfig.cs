@@ -61,4 +61,10 @@ public sealed class RuntimeAppConfig
     [SettingEditor(SettingEditorKind.Toggle)]
     [SettingHotReloadable(true)]
     public bool AllowSyncApiStateOverride { get; set; }
+
+    [SettingGroup("UI")]
+    [SettingDisplay("Expand Install Log By Default")]
+    [SettingEditor(SettingEditorKind.Toggle)]
+    [SettingHotReloadable(true)]
+    public bool InstallLogExpanded { get; set; } = true;
 }

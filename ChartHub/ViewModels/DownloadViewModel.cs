@@ -7,6 +7,7 @@ using ChartHub.Utilities;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Text;
 using System.Windows.Input;
 
 namespace ChartHub.ViewModels
@@ -25,6 +26,10 @@ namespace ChartHub.ViewModels
         public IAsyncRelayCommand UploadCloud { get; }
         public IAsyncRelayCommand DownloadCloudToLocal { get; }
         public IAsyncRelayCommand SyncCloudToLocal { get; }
+        public ICommand CancelInstallCommand { get; }
+        public ICommand ClearInstallLogCommand { get; }
+        public ICommand ToggleInstallLogCommand { get; }
+        public ICommand DismissInstallPanelCommand { get; }
 
         private string _cloudConnectionHint = string.Empty;
         public string CloudConnectionHint
@@ -43,6 +48,148 @@ namespace ChartHub.ViewModels
 
         public bool HasCloudConnectionHint => !string.IsNullOrWhiteSpace(CloudConnectionHint);
         public bool IsCloudConnected => !string.IsNullOrWhiteSpace(_googleDrive.ChartHubFolderId);
+
+        private bool _isInstallPanelVisible;
+        public bool IsInstallPanelVisible
+        {
+            get => _isInstallPanelVisible;
+            private set
+            {
+                if (_isInstallPanelVisible == value)
+                    return;
+
+                _isInstallPanelVisible = value;
+                OnPropertyChanged(nameof(IsInstallPanelVisible));
+            }
+        }
+
+        public bool IsInstallIdle => !IsInstallActive;
+
+        private bool _isInstallActive;
+        public bool IsInstallActive
+        {
+            get => _isInstallActive;
+            private set
+            {
+                if (_isInstallActive == value)
+                    return;
+
+                _isInstallActive = value;
+                OnPropertyChanged(nameof(IsInstallActive));
+                OnPropertyChanged(nameof(IsInstallIdle));
+                _dismissInstallPanelCommand?.NotifyCanExecuteChanged();
+                UpdateInstallPanelVisibility();
+            }
+        }
+
+        private bool _isInstallProgressIndeterminate;
+        public bool IsInstallProgressIndeterminate
+        {
+            get => _isInstallProgressIndeterminate;
+            private set
+            {
+                if (_isInstallProgressIndeterminate == value)
+                    return;
+
+                _isInstallProgressIndeterminate = value;
+                OnPropertyChanged(nameof(IsInstallProgressIndeterminate));
+            }
+        }
+
+        private double _installProgressValue;
+        public double InstallProgressValue
+        {
+            get => _installProgressValue;
+            private set
+            {
+                if (Math.Abs(_installProgressValue - value) < 0.001)
+                    return;
+
+                _installProgressValue = value;
+                OnPropertyChanged(nameof(InstallProgressValue));
+            }
+        }
+
+        private string _installStageText = string.Empty;
+        public string InstallStageText
+        {
+            get => _installStageText;
+            private set
+            {
+                if (_installStageText == value)
+                    return;
+
+                _installStageText = value;
+                OnPropertyChanged(nameof(InstallStageText));
+            }
+        }
+
+        private string _installCurrentItemName = string.Empty;
+        public string InstallCurrentItemName
+        {
+            get => _installCurrentItemName;
+            private set
+            {
+                if (_installCurrentItemName == value)
+                    return;
+
+                _installCurrentItemName = value;
+                OnPropertyChanged(nameof(InstallCurrentItemName));
+            }
+        }
+
+        private string _installLogText = string.Empty;
+        public string InstallLogText
+        {
+            get => _installLogText;
+            private set
+            {
+                if (_installLogText == value)
+                    return;
+
+                _installLogText = value;
+                OnPropertyChanged(nameof(InstallLogText));
+                _clearInstallLogCommand?.NotifyCanExecuteChanged();
+                UpdateInstallPanelVisibility();
+            }
+        }
+
+        private string _installSummaryText = string.Empty;
+        public string InstallSummaryText
+        {
+            get => _installSummaryText;
+            private set
+            {
+                if (_installSummaryText == value)
+                    return;
+
+                _installSummaryText = value;
+                OnPropertyChanged(nameof(InstallSummaryText));
+                OnPropertyChanged(nameof(HasInstallSummary));
+                _dismissInstallPanelCommand?.NotifyCanExecuteChanged();
+                UpdateInstallPanelVisibility();
+            }
+        }
+
+        public bool HasInstallSummary => !string.IsNullOrWhiteSpace(InstallSummaryText);
+
+        private bool _isInstallLogExpanded = true;
+        public bool IsInstallLogExpanded
+        {
+            get => _isInstallLogExpanded;
+            private set
+            {
+                if (_isInstallLogExpanded == value)
+                    return;
+
+                _isInstallLogExpanded = value;
+                globalSettings.InstallLogExpanded = value;
+                OnPropertyChanged(nameof(IsInstallLogExpanded));
+                OnPropertyChanged(nameof(InstallLogToggleText));
+            }
+        }
+
+        public string InstallLogToggleText => IsInstallLogExpanded ? "Collapse Log" : "Expand Log";
 
         private bool _isAnyChecked;
         public bool IsAnyChecked
@@ -184,6 +331,12 @@ namespace ChartHub.ViewModels
         private readonly SongIngestionCatalogService _ingestionCatalog;
         private readonly CancellationTokenSource _queueRefreshCts = new();
         private Task? _queueRefreshTask;
+        private CancellationTokenSource? _installCts;
+        private readonly StringBuilder _installLogBuilder = new();
+        private readonly RelayCommand _cancelInstallCommand;
+        private readonly RelayCommand _clearInstallLogCommand;
+        private readonly RelayCommand _toggleInstallLogCommand;
+        private readonly RelayCommand _dismissInstallPanelCommand;
 
         public DownloadViewModel(
             AppGlobalSettings settings,
@@ -206,10 +359,19 @@ namespace ChartHub.ViewModels
             UploadCloud = new AsyncRelayCommand(UploadCloudCommand, CanUploadCloud);
             DownloadCloudToLocal = new AsyncRelayCommand(DownloadCloudToLocalCommand, CanDownloadCloudToLocal);
             SyncCloudToLocal = new AsyncRelayCommand(SyncCloudToLocalCommand, CanSyncCloudToLocal);
+            _cancelInstallCommand = new RelayCommand(CancelInstall, CanCancelInstall);
+            CancelInstallCommand = _cancelInstallCommand;
+            _clearInstallLogCommand = new RelayCommand(ClearInstallLog, CanClearInstallLog);
+            ClearInstallLogCommand = _clearInstallLogCommand;
+            _toggleInstallLogCommand = new RelayCommand(ToggleInstallLog);
+            ToggleInstallLogCommand = _toggleInstallLogCommand;
+            _dismissInstallPanelCommand = new RelayCommand(DismissInstallPanel, CanDismissInstallPanel);
+            DismissInstallPanelCommand = _dismissInstallPanelCommand;
             DownloadFiles = DownloadWatcher.Data;
             GoogleFiles = GoogleWatcher.Data;
             IngestionQueue = [];
             _pageStrings = new DownloadPageStrings();
+            _isInstallLogExpanded = globalSettings.InstallLogExpanded;
 
             DownloadFiles.CollectionChanged += DownloadFiles_CollectionChanged;
             GoogleFiles.CollectionChanged += GoogleFiles_CollectionChanged;
@@ -414,6 +576,40 @@ namespace ChartHub.ViewModels
             SyncCloudToLocal.NotifyCanExecuteChanged();
         }
 
+        private bool CanCancelInstall() => IsInstallActive;
+
+        private void CancelInstall()
+        {
+            _installCts?.Cancel();
+        }
+
+        private bool CanClearInstallLog() => !string.IsNullOrWhiteSpace(InstallLogText);
+
+        private void ClearInstallLog()
+        {
+            _installLogBuilder.Clear();
+            InstallLogText = string.Empty;
+        }
+
+        private void ToggleInstallLog()
+        {
+            IsInstallLogExpanded = !IsInstallLogExpanded;
+        }
+
+        private bool CanDismissInstallPanel() => !IsInstallActive && (HasInstallSummary || !string.IsNullOrWhiteSpace(InstallLogText));
+
+        private void DismissInstallPanel()
+        {
+            _installLogBuilder.Clear();
+            InstallLogText = string.Empty;
+            InstallSummaryText = string.Empty;
+            InstallCurrentItemName = string.Empty;
+            InstallStageText = string.Empty;
+            InstallProgressValue = 0;
+            IsInstallProgressIndeterminate = false;
+            UpdateInstallPanelVisibility();
+        }
+
         public async Task InstallSongsCommand()
         {
             var selectedQueuePaths = IngestionQueue
@@ -437,16 +633,108 @@ namespace ChartHub.ViewModels
             if (selectedPaths.Count == 0)
                 return;
 
-            await _songInstallService.InstallSelectedDownloadsAsync(selectedPaths);
+            _installCts?.Dispose();
+            _installCts = new CancellationTokenSource();
+            ResetInstallPanel();
+            IsInstallActive = true;
+            InstallStageText = selectedPaths.Count == 1 ? "Starting install" : $"Starting install for {selectedPaths.Count} items";
+            InstallCurrentItemName = selectedPaths.Count == 1 ? Path.GetFileName(selectedPaths[0]) : $"{selectedPaths.Count} selected items";
+            _cancelInstallCommand.NotifyCanExecuteChanged();
 
-            foreach (var item in DownloadFiles.Where(file => file.Checked))
-                item.Checked = false;
+            var progress = new Progress<InstallProgressUpdate>(ApplyInstallProgress);
 
-            foreach (var queueItem in IngestionQueue.Where(item => item.Checked))
-                queueItem.Checked = false;
+            try
+            {
+                var installedPaths = await _songInstallService.InstallSelectedDownloadsAsync(selectedPaths, progress, _installCts.Token);
+                var installedCount = installedPaths.Count;
+                InstallSummaryText = installedCount == 1
+                    ? "Installed 1 item successfully."
+                    : $"Installed {installedCount} items successfully.";
 
-            DownloadWatcher.LoadItems();
-            await RefreshIngestionQueueAsync();
+                foreach (var item in DownloadFiles.Where(file => file.Checked))
+                    item.Checked = false;
+
+                foreach (var queueItem in IngestionQueue.Where(item => item.Checked))
+                    queueItem.Checked = false;
+            }
+            catch (OperationCanceledException)
+            {
+                ApplyInstallProgress(new InstallProgressUpdate(
+                    InstallStage.Cancelled,
+                    "Install cancelled",
+                    InstallProgressValue,
+                    InstallCurrentItemName,
+                    "Install cancelled by user."));
+                InstallSummaryText = "Install cancelled.";
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Install", "Install songs command failed", ex);
+                ApplyInstallProgress(new InstallProgressUpdate(
+                    InstallStage.Failed,
+                    "Install failed",
+                    InstallProgressValue,
+                    InstallCurrentItemName,
+                    ex.Message));
+                InstallSummaryText = "Install failed. Check the log for details.";
+            }
+            finally
+            {
+                IsInstallActive = false;
+                _cancelInstallCommand.NotifyCanExecuteChanged();
+                _dismissInstallPanelCommand.NotifyCanExecuteChanged();
+                _installCts.Dispose();
+                _installCts = null;
+
+                DownloadWatcher.LoadItems();
+                await RefreshIngestionQueueAsync();
+            }
+        }
+
+        private void ResetInstallPanel()
+        {
+            _installLogBuilder.Clear();
+            InstallLogText = string.Empty;
+            InstallSummaryText = string.Empty;
+            InstallProgressValue = 0;
+            InstallStageText = string.Empty;
+            InstallCurrentItemName = string.Empty;
+            IsInstallProgressIndeterminate = false;
+        }
+
+        private void UpdateInstallPanelVisibility()
+        {
+            IsInstallPanelVisible = IsInstallActive || HasInstallSummary || !string.IsNullOrWhiteSpace(InstallLogText);
+        }
+
+        private void ApplyInstallProgress(InstallProgressUpdate update)
+        {
+            InstallStageText = update.Message;
+            if (!string.IsNullOrWhiteSpace(update.CurrentItemName))
+                InstallCurrentItemName = update.CurrentItemName;
+
+            if (update.ProgressPercent.HasValue)
+                InstallProgressValue = Math.Clamp(update.ProgressPercent.Value, 0, 100);
+
+            IsInstallProgressIndeterminate = update.IsIndeterminate;
+
+            if (!string.IsNullOrWhiteSpace(update.Message))
+                AppendInstallLog($"[{update.Stage}] {update.Message}");
+
+            if (!string.IsNullOrWhiteSpace(update.LogLine))
+                AppendInstallLog(update.LogLine);
+        }
+
+        private void AppendInstallLog(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                return;
+
+            if (_installLogBuilder.Length > 0)
+                _installLogBuilder.AppendLine();
+
+            _installLogBuilder.Append(line);
+            InstallLogText = _installLogBuilder.ToString();
         }
 
         public void CheckAllItems(bool isChecked)
@@ -478,6 +766,8 @@ namespace ChartHub.ViewModels
 
         public async ValueTask DisposeAsync()
         {
+            _installCts?.Cancel();
+            _installCts?.Dispose();
             DownloadFiles.CollectionChanged -= DownloadFiles_CollectionChanged;
             GoogleFiles.CollectionChanged -= GoogleFiles_CollectionChanged;
             IngestionQueue.CollectionChanged -= IngestionQueue_CollectionChanged;

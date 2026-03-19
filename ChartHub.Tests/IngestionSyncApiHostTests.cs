@@ -646,7 +646,7 @@ public class IngestionSyncApiHostTests
         var catalog = new SongIngestionCatalogService(Path.Combine(rootPath, "library-catalog.db"));
         var stateMachine = new SongIngestionStateMachine();
 
-        var installer = new SongInstallService(settings, catalog, stateMachine);
+        var installer = new SongInstallService(settings, catalog, stateMachine, new OnyxService(settings));
         return new IngestionSyncApiHost(catalog, stateMachine, settings, installer, opener ?? new FakeDesktopPathOpener());
     }
 

@@ -158,6 +158,102 @@ public class DownloadViewModelTests
         }
     }
 
+    [Fact]
+    public async Task ToggleInstallLogCommand_TogglesExpandedStateAndLabel()
+    {
+        using var temp = new TemporaryDirectoryFixture("download-vm-log-toggle");
+        using var settings = CreateSettings(temp.RootPath);
+        var transfer = new TransferOrchestratorSpy();
+        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
+
+        try
+        {
+            Assert.True(sut.IsInstallLogExpanded);
+            Assert.Equal("Collapse Log", sut.InstallLogToggleText);
+
+            sut.ToggleInstallLogCommand.Execute(null);
+
+            Assert.False(sut.IsInstallLogExpanded);
+            Assert.Equal("Expand Log", sut.InstallLogToggleText);
+
+            sut.ToggleInstallLogCommand.Execute(null);
+
+            Assert.True(sut.IsInstallLogExpanded);
+            Assert.Equal("Collapse Log", sut.InstallLogToggleText);
+        }
+        finally
+        {
+            await sut.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task InstallSongsCommand_SetsSummary_AndDismissHidesPanel()
+    {
+        using var temp = new TemporaryDirectoryFixture("download-vm-install-summary");
+        using var settings = CreateSettings(temp.RootPath);
+        var transfer = new TransferOrchestratorSpy();
+        var selectedFilePath = temp.GetPath("song-a.zip");
+        await File.WriteAllTextAsync(selectedFilePath, "zip");
+        var installStub = new SongInstallServiceStub
+        {
+            ResultPaths = [Path.Combine(temp.RootPath, "CloneHero", "Songs", "Song A")],
+        };
+        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, installStub, new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
+
+        try
+        {
+            sut.DownloadFiles.Add(CreateWatcherFile("song-a.zip", selectedFilePath, checkedState: true));
+
+            await sut.InstallSongsCommand();
+
+            Assert.Equal("Installed 1 item successfully.", sut.InstallSummaryText);
+            Assert.True(sut.HasInstallSummary);
+            Assert.True(sut.IsInstallPanelVisible);
+            Assert.False(sut.IsInstallActive);
+
+            sut.DismissInstallPanelCommand.Execute(null);
+
+            Assert.False(sut.IsInstallPanelVisible);
+            Assert.False(sut.HasInstallSummary);
+            Assert.Equal(string.Empty, sut.InstallLogText);
+        }
+        finally
+        {
+            await sut.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task InstallSongsCommand_OnCancellation_SetsCancelledSummary()
+    {
+        using var temp = new TemporaryDirectoryFixture("download-vm-install-cancel");
+        using var settings = CreateSettings(temp.RootPath);
+        var transfer = new TransferOrchestratorSpy();
+        var selectedFilePath = temp.GetPath("song-cancel.zip");
+        await File.WriteAllTextAsync(selectedFilePath, "zip");
+        var installStub = new SongInstallServiceStub
+        {
+            ThrowOnInstall = new OperationCanceledException(),
+        };
+        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, installStub, new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
+
+        try
+        {
+            sut.DownloadFiles.Add(CreateWatcherFile("song-cancel.zip", selectedFilePath, checkedState: true));
+
+            await sut.InstallSongsCommand();
+
+            Assert.Equal("Install cancelled.", sut.InstallSummaryText);
+            Assert.True(sut.IsInstallPanelVisible);
+            Assert.False(sut.IsInstallActive);
+        }
+        finally
+        {
+            await sut.DisposeAsync();
+        }
+    }
+
     private static WatcherFile CreateWatcherFile(string displayName, string filePath, bool checkedState = false)
     {
         return new WatcherFile(displayName, filePath, WatcherFileType.Zip, "icon.png", 100)
@@ -232,9 +328,15 @@ public class DownloadViewModelTests
 
     private sealed class SongInstallServiceStub : ISongInstallService
     {
-        public Task<IReadOnlyList<string>> InstallSelectedDownloadsAsync(IEnumerable<string> selectedFilePaths, CancellationToken cancellationToken = default)
+        public IReadOnlyList<string> ResultPaths { get; set; } = [];
+        public Exception? ThrowOnInstall { get; set; }
+
+        public Task<IReadOnlyList<string>> InstallSelectedDownloadsAsync(IEnumerable<string> selectedFilePaths, IProgress<InstallProgressUpdate>? progress = null, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult<IReadOnlyList<string>>([]);
+            if (ThrowOnInstall is not null)
+                throw ThrowOnInstall;
+
+            return Task.FromResult(ResultPaths);
         }
     }
 

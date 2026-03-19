@@ -407,7 +407,7 @@ public sealed class IngestionSyncApiHost(
                 return;
             }
 
-            var installedDirectories = await _songInstallService.InstallSelectedDownloadsAsync([downloadablePath], cancellationToken);
+            var installedDirectories = await _songInstallService.InstallSelectedDownloadsAsync([downloadablePath], cancellationToken: cancellationToken);
             if (installedDirectories.Count == 0)
             {
                 await WriteErrorAsync(response, HttpStatusCode.Conflict, "Install action completed with no installed output");
