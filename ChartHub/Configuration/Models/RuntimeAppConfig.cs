@@ -62,6 +62,12 @@ public sealed class RuntimeAppConfig
     [SettingHotReloadable(true)]
     public bool AllowSyncApiStateOverride { get; set; }
 
+    [SettingGroup("Transfers")]
+    [SettingDisplay("Transfer Concurrency Cap")]
+    [SettingEditor(SettingEditorKind.Number)]
+    [SettingHotReloadable(true)]
+    public int TransferOrchestratorConcurrencyCap { get; set; } = 2;
+
     [SettingGroup("UI")]
     [SettingDisplay("Expand Install Log By Default")]
     [SettingEditor(SettingEditorKind.Toggle)]

@@ -94,6 +94,12 @@ namespace ChartHub.Utilities
             set => QueueConfigUpdate(config => config.Runtime.AllowSyncApiStateOverride = value);
         }
 
+        public int TransferOrchestratorConcurrencyCap
+        {
+            get => Runtime.TransferOrchestratorConcurrencyCap;
+            set => QueueConfigUpdate(config => config.Runtime.TransferOrchestratorConcurrencyCap = Math.Clamp(value, 1, 8));
+        }
+
         public bool InstallLogExpanded
         {
             get => Runtime.InstallLogExpanded;
@@ -123,6 +129,7 @@ namespace ChartHub.Utilities
             var syncApiAuthToken = string.IsNullOrWhiteSpace(Runtime.SyncApiAuthToken)
                 ? GenerateSyncApiToken()
                 : Runtime.SyncApiAuthToken;
+            var transferConcurrencyCap = Math.Clamp(Runtime.TransferOrchestratorConcurrencyCap, 1, 8);
 
             FileTools.CreateDirectoryIfNotExists(tempDir);
             FileTools.CreateDirectoryIfNotExists(downloadDir);
@@ -140,6 +147,7 @@ namespace ChartHub.Utilities
                 config.Runtime.CloneHeroDataDirectory = cloneHeroDataDir;
                 config.Runtime.CloneHeroSongDirectory = cloneHeroSongsDir;
                 config.Runtime.SyncApiAuthToken = syncApiAuthToken;
+                config.Runtime.TransferOrchestratorConcurrencyCap = transferConcurrencyCap;
             });
         }
 
@@ -199,6 +207,7 @@ namespace ChartHub.Utilities
             OnPropertyChanged(nameof(CloneHeroSongsDir));
             OnPropertyChanged(nameof(SyncApiAuthToken));
             OnPropertyChanged(nameof(AllowSyncApiStateOverride));
+            OnPropertyChanged(nameof(TransferOrchestratorConcurrencyCap));
             OnPropertyChanged(nameof(InstallLogExpanded));
         }
 

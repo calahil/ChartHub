@@ -120,11 +120,14 @@
                          x:Name="InstallLogTextBox"
                      Margin="0,8,0,0"
                          MinHeight="140"
+                         MaxHeight="260"
                          Text="{Binding InstallLogText}"
                      IsVisible="{Binding IsInstallLogExpanded}"
                          IsReadOnly="True"
                          AcceptsReturn="True"
-                         TextWrapping="Wrap" />
+                         TextWrapping="Wrap"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
             </Grid>
         </Border>
 
