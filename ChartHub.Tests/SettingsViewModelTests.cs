@@ -23,9 +23,10 @@ public class SettingsViewModelTests
         using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
-        Assert.Equal(9, sut.Fields.Count);
+        Assert.Equal(13, sut.Fields.Count);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.UseMockData" && field.IsToggleEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.DownloadDirectory" && field.IsDirectoryPicker);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.TransferOrchestratorConcurrencyCap" && field.IsNumberEditor);
         Assert.Contains(sut.Fields, field => field.Key == "GoogleAuth.AndroidClientId" && field.IsTextEditor);
         Assert.Contains(sut.Fields, field => field.IsGroupHeaderVisible);
         Assert.Equal(3, sut.Secrets.Count);
@@ -72,6 +73,51 @@ public class SettingsViewModelTests
         Assert.Equal(1, orchestrator.UpdateCallCount);
         Assert.Equal("android-client-updated", orchestrator.Current.GoogleAuth.AndroidClientId);
         Assert.Equal("Settings saved.", sut.StatusMessage);
+    }
+
+    [Fact]
+    public async Task SaveCommand_WithNonHotReloadableChanges_PersistsAndRunsReloadFlow()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-save-reload");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
+
+        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        await Task.Yield();
+
+        var tempDirectoryField = Assert.Single(sut.Fields, item => item.Key == "Runtime.TempDirectory");
+        tempDirectoryField.StringValue = Path.Combine(temp.RootPath, "Temp-New");
+
+        Assert.True(sut.HasPendingRestartSettings);
+        await sut.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, orchestrator.UpdateCallCount);
+        Assert.Equal(1, orchestrator.ReloadCallCount);
+        Assert.Equal("Settings saved and reloaded from current configuration.", sut.StatusMessage);
+        Assert.False(sut.HasPendingRestartSettings);
+    }
+
+    [Fact]
+    public async Task HasPendingRestartSettings_OnlyTrueWhenNonHotReloadableFieldIsDirty()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-reload-indicator");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
+
+        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        await Task.Yield();
+
+        Assert.False(sut.HasPendingRestartSettings);
+
+        var hotReloadableField = Assert.Single(sut.Fields, item => item.Key == "GoogleAuth.AndroidClientId");
+        hotReloadableField.StringValue = "android-client-changed";
+        Assert.False(sut.HasPendingRestartSettings);
+
+        var nonHotField = Assert.Single(sut.Fields, item => item.Key == "Runtime.StagingDirectory");
+        nonHotField.StringValue = Path.Combine(temp.RootPath, "Staging-New");
+        Assert.True(sut.HasPendingRestartSettings);
     }
 
     [Fact]
@@ -246,6 +292,7 @@ public class SettingsViewModelTests
         public AppConfigRoot Current { get; private set; }
 
         public int UpdateCallCount { get; private set; }
+        public int ReloadCallCount { get; private set; }
 
         public event Action<AppConfigRoot>? SettingsChanged;
 
@@ -264,6 +311,7 @@ public class SettingsViewModelTests
 
         public Task ReloadAsync(CancellationToken cancellationToken = default)
         {
+            ReloadCallCount++;
             SettingsChanged?.Invoke(Current);
             return Task.CompletedTask;
         }

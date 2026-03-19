@@ -39,7 +39,7 @@ namespace ChartHub.Services
             else if (song.Url.StartsWith("https://www.mediafire.com") || song.Url.StartsWith("http://www.mediafire.com"))
             {
                 song.Status = "ResolvingMediaFire";
-                HttpResponseMessage response = await _httpClient.GetAsync(finalUrl, cancellationToken);
+                using var response = await _httpClient.GetAsync(finalUrl, cancellationToken);
                 response.EnsureSuccessStatusCode();
 
                 string content = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -74,7 +74,7 @@ namespace ChartHub.Services
 
         private async Task DownloadAsync(DownloadFile song, CancellationToken cancellationToken)
         {
-            var response = await _httpClient.GetAsync(song.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var response = await _httpClient.GetAsync(song.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var totalBytes = response.Content.Headers.ContentLength ?? -1L;
@@ -227,7 +227,7 @@ namespace ChartHub.Services
                 }
                 else
                 {
-                    var stream = new MemoryStream();
+                    using var stream = new MemoryStream();
                     await _driveService.Files.Get(file.Id).DownloadAsync(stream, cancellationToken);
                     stream.Seek(0, SeekOrigin.Begin);
 

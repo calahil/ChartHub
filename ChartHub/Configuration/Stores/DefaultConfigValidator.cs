@@ -15,6 +15,13 @@ public sealed class DefaultConfigValidator : IConfigValidator
         ValidateDirectoryPath(failures, "Runtime.OutputDirectory", config.Runtime.OutputDirectory, "Output directory");
         ValidateDirectoryPath(failures, "Runtime.CloneHeroDataDirectory", config.Runtime.CloneHeroDataDirectory, "Clone Hero data directory");
         ValidateDirectoryPath(failures, "Runtime.CloneHeroSongDirectory", config.Runtime.CloneHeroSongDirectory, "Clone Hero song directory");
+        ValidateIntRange(
+            failures,
+            "Runtime.TransferOrchestratorConcurrencyCap",
+            config.Runtime.TransferOrchestratorConcurrencyCap,
+            min: 1,
+            max: 8,
+            label: "Transfer orchestrator concurrency cap");
 
         return failures.Count == 0 ? ConfigValidationResult.Success : new ConfigValidationResult(failures);
     }
@@ -52,5 +59,17 @@ public sealed class DefaultConfigValidator : IConfigValidator
             return;
 
         failures.Add(new ConfigValidationFailure(key, $"{label} is invalid; parent folder does not exist."));
+    }
+
+    private static void ValidateIntRange(
+        List<ConfigValidationFailure> failures,
+        string key,
+        int value,
+        int min,
+        int max,
+        string label)
+    {
+        if (value < min || value > max)
+            failures.Add(new ConfigValidationFailure(key, $"{label} must be between {min} and {max}."));
     }
 }

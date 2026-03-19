@@ -39,6 +39,7 @@ namespace ChartHub.Services
     {
         private DriveService? _driveService;
         private readonly IGoogleAuthProvider _authProvider;
+        private readonly SemaphoreSlim _serviceInitLock = new(1, 1);
         private CancellationTokenSource? _monitorCts;
         private Task? _monitorTask;
         private static readonly string[] Scopes = [DriveService.Scope.DriveReadonly, DriveService.Scope.DriveFile];
@@ -68,12 +69,20 @@ namespace ChartHub.Services
                 ["folderId"] = ChartHubFolderId,
             });
 
-            await StopMonitoringAsync().ConfigureAwait(false);
-            _driveService?.Dispose();
-            _driveService = null;
-            await _authProvider.SignOutAsync(_credential, cancellationToken);
-            _credential = null;
-            ChartHubFolderId = string.Empty;
+            await _serviceInitLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await StopMonitoringAsync().ConfigureAwait(false);
+                _driveService?.Dispose();
+                _driveService = null;
+                await _authProvider.SignOutAsync(_credential, cancellationToken).ConfigureAwait(false);
+                _credential = null;
+                ChartHubFolderId = string.Empty;
+            }
+            finally
+            {
+                _serviceInitLock.Release();
+            }
 
             Logger.LogInfo("Drive", "Google Drive sign-out completed");
         }
@@ -83,29 +92,36 @@ namespace ChartHub.Services
             if (_driveService is not null)
                 return _driveService;
 
-            if (_credential is null)
+            await _serviceInitLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                Logger.LogInfo("Auth", "Attempting silent Google authorization");
-                _credential = await _authProvider.TryAuthorizeSilentAsync(Scopes, cancellationToken)
-                    ?? await _authProvider.AuthorizeInteractiveAsync(Scopes, cancellationToken);
-                Logger.LogInfo("Auth", "Google authorization credential acquired", new Dictionary<string, object?>
+                if (_driveService is not null)
+                    return _driveService;
+
+                if (_credential is null)
                 {
-                    ["method"] = _credential is null ? "none" : "silent-or-interactive",
+                    Logger.LogInfo("Auth", "Attempting silent Google authorization");
+                    _credential = await _authProvider.TryAuthorizeSilentAsync(Scopes, cancellationToken).ConfigureAwait(false)
+                        ?? await _authProvider.AuthorizeInteractiveAsync(Scopes, cancellationToken).ConfigureAwait(false);
+                    Logger.LogInfo("Auth", "Google authorization credential acquired", new Dictionary<string, object?>
+                    {
+                        ["method"] = _credential is null ? "none" : "silent-or-interactive",
+                    });
+                }
+
+                _driveService = CreateDriveService(_credential!);
+
+                Logger.LogInfo("Drive", "Google Drive service client created", new Dictionary<string, object?>
+                {
+                    ["applicationName"] = ApplicationName,
                 });
+
+                return _driveService;
             }
-
-            _driveService = new DriveService(new BaseClientService.Initializer()
+            finally
             {
-                HttpClientInitializer = _credential,
-                ApplicationName = ApplicationName,
-            });
-
-            Logger.LogInfo("Drive", "Google Drive service client created", new Dictionary<string, object?>
-            {
-                ["applicationName"] = ApplicationName,
-            });
-
-            return _driveService;
+                _serviceInitLock.Release();
+            }
         }
 
         private async Task<bool> InitializeCoreAsync(bool allowInteractiveFallback, CancellationToken cancellationToken)
@@ -116,9 +132,10 @@ namespace ChartHub.Services
                 ["allowInteractiveFallback"] = allowInteractiveFallback,
             });
 
-            await StopMonitoringAsync().ConfigureAwait(false);
+            await _serviceInitLock.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
+                await StopMonitoringAsync().ConfigureAwait(false);
                 _driveService?.Dispose();
                 _driveService = null;
 
@@ -139,11 +156,7 @@ namespace ChartHub.Services
                     }
                 }
 
-                _driveService = new DriveService(new BaseClientService.Initializer
-                {
-                    HttpClientInitializer = _credential,
-                    ApplicationName = ApplicationName,
-                });
+                _driveService = CreateDriveService(_credential!);
 
                 Logger.LogInfo("Drive", "Google Drive service client created", new Dictionary<string, object?>
                 {
@@ -185,6 +198,19 @@ namespace ChartHub.Services
                 });
                 return false;
             }
+            finally
+            {
+                _serviceInitLock.Release();
+            }
+        }
+
+        private static DriveService CreateDriveService(UserCredential credential)
+        {
+            return new DriveService(new BaseClientService.Initializer
+            {
+                HttpClientInitializer = credential,
+                ApplicationName = ApplicationName,
+            });
         }
 
         private void OnFileChanged(Google.Apis.Drive.v3.Data.File file, string changeType)
@@ -343,6 +369,7 @@ namespace ChartHub.Services
             using (var stream = new MemoryStream())
             {
                 await request.DownloadAsync(stream);
+                stream.Position = 0;
                 using (var fileStream = new FileStream(saveToPath, FileMode.Create, FileAccess.Write))
                 {
                     stream.WriteTo(fileStream);
@@ -555,11 +582,20 @@ namespace ChartHub.Services
 
         public async ValueTask DisposeAsync()
         {
-            await StopMonitoringAsync().ConfigureAwait(false);
-            _driveService?.Dispose();
-            _driveService = null;
-            _credential = null;
-            ChartHubFolderId = string.Empty;
+            await _serviceInitLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await StopMonitoringAsync().ConfigureAwait(false);
+                _driveService?.Dispose();
+                _driveService = null;
+                _credential = null;
+                ChartHubFolderId = string.Empty;
+            }
+            finally
+            {
+                _serviceInitLock.Release();
+                _serviceInitLock.Dispose();
+            }
         }
     }
 }

@@ -220,7 +220,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public ObservableCollection<SecretFieldViewModel> Secrets { get; } = [];
 
     public AsyncRelayCommand SaveCommand { get; }
-    public IRelayCommand ReloadCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> SaveSecretCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> ClearSecretCommand { get; }
     public IAsyncRelayCommand LinkCloudAccountCommand { get; }
@@ -379,7 +378,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         _showDeveloperSettings = false;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
-        ReloadCommand = new RelayCommand(Reload);
         SaveSecretCommand = new AsyncRelayCommand<SecretFieldViewModel?>(SaveSecretAsync);
         ClearSecretCommand = new AsyncRelayCommand<SecretFieldViewModel?>(ClearSecretAsync);
         LinkCloudAccountCommand = new AsyncRelayCommand(LinkCloudAccountAsync, CanLinkCloudAccount);
@@ -539,7 +537,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             Fields.Add(field);
         }
 
-        HasPendingRestartSettings = Fields.Any(f => f.RequiresRestart);
+        HasPendingRestartSettings = Fields.Any(FieldRequiresReloadAfterSave);
         RefreshSaveState();
     }
 
@@ -780,7 +778,16 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 ["fieldCount"] = Fields.Count,
                 ["elapsedMs"] = saveStopwatch.ElapsedMilliseconds,
             });
-            StatusMessage = "Settings saved.";
+
+            if (Fields.Any(FieldRequiresReloadAfterSave))
+            {
+                await _settings.ReloadAsync();
+                StatusMessage = "Settings saved and reloaded from current configuration.";
+            }
+            else
+            {
+                StatusMessage = "Settings saved.";
+            }
         }
         catch (Exception ex)
         {
@@ -805,9 +812,43 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     private void RefreshSaveState()
     {
+        HasPendingRestartSettings = Fields.Any(FieldRequiresReloadAfterSave);
         OnPropertyChanged(nameof(HasValidationErrors));
         OnPropertyChanged(nameof(ValidationIssueSummaries));
         SaveCommand.NotifyCanExecuteChanged();
+    }
+
+    private static bool FieldRequiresReloadAfterSave(SettingsFieldViewModel field)
+    {
+        return !field.IsHotReloadable && FieldHasPendingChange(field);
+    }
+
+    private static bool FieldHasPendingChange(SettingsFieldViewModel field)
+    {
+        var currentValue = field.Property.GetValue(field.SectionRef);
+
+        if (field.Property.PropertyType == typeof(bool))
+            return (currentValue is bool currentBool ? currentBool : false) != field.BoolValue;
+
+        if (field.EditorKind == SettingEditorKind.Number)
+        {
+            var draft = field.NumberValue;
+            var current = ToDouble(currentValue);
+            return Math.Abs(draft - current) > double.Epsilon;
+        }
+
+        if (field.EditorKind == SettingEditorKind.Dropdown)
+        {
+            var draftOption = string.IsNullOrWhiteSpace(field.SelectedOption)
+                ? field.Options.FirstOrDefault() ?? string.Empty
+                : field.SelectedOption;
+            var currentOption = currentValue?.ToString() ?? string.Empty;
+            return !string.Equals(draftOption, currentOption, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var draftText = field.StringValue ?? string.Empty;
+        var currentText = currentValue?.ToString() ?? string.Empty;
+        return !string.Equals(draftText, currentText, StringComparison.Ordinal);
     }
 
     private static string? ValidateDraftField(SettingsFieldViewModel field)
@@ -895,32 +936,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 : field.SelectedOption;
             var parsed = Enum.Parse(field.Property.PropertyType, option, ignoreCase: true);
             field.Property.SetValue(section, parsed);
-        }
-    }
-
-    private void Reload()
-    {
-        var reloadStopwatch = Stopwatch.StartNew();
-        Logger.LogInfo("Config", "Settings reload started");
-
-        try
-        {
-            RebuildFieldsFrom(_settings.Current);
-            _ = RefreshSecretStateAsync();
-            Logger.LogInfo("Config", "Settings reload completed", new Dictionary<string, object?>
-            {
-                ["fieldCount"] = Fields.Count,
-                ["elapsedMs"] = reloadStopwatch.ElapsedMilliseconds,
-            });
-            StatusMessage = "Settings reloaded from current configuration.";
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError("Config", "Settings reload failed", ex, new Dictionary<string, object?>
-            {
-                ["elapsedMs"] = reloadStopwatch.ElapsedMilliseconds,
-            });
-            StatusMessage = "Settings reload failed. See logs for details.";
         }
     }
 

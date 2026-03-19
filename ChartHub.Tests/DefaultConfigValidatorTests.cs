@@ -97,6 +97,32 @@ public class DefaultConfigValidatorTests
         Assert.True(result.IsValid);
     }
 
+    [Fact]
+    public void Validate_WhenTransferConcurrencyCapBelowMinimum_ReturnsFailure()
+    {
+        var config = CreateConfigTemplate();
+        config.Runtime.TransferOrchestratorConcurrencyCap = 0;
+
+        var sut = new DefaultConfigValidator();
+        var result = sut.Validate(config);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Failures, failure => failure.Key == "Runtime.TransferOrchestratorConcurrencyCap");
+    }
+
+    [Fact]
+    public void Validate_WhenTransferConcurrencyCapAboveMaximum_ReturnsFailure()
+    {
+        var config = CreateConfigTemplate();
+        config.Runtime.TransferOrchestratorConcurrencyCap = 99;
+
+        var sut = new DefaultConfigValidator();
+        var result = sut.Validate(config);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Failures, failure => failure.Key == "Runtime.TransferOrchestratorConcurrencyCap");
+    }
+
     private static AppConfigRoot CreateConfigTemplate()
     {
         return new AppConfigRoot

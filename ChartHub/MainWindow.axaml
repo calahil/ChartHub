@@ -3,7 +3,7 @@
         xmlns:views="using:ChartHub.Views"
         x:Class="ChartHub.MainWindow"
         Title="ChartHub"
-        Width="1200" Height="800"
+        WindowState="Maximized"
         WindowStartupLocation="CenterScreen">
     <views:AppShellView />
 </Window>

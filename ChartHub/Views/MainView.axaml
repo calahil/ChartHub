@@ -18,7 +18,7 @@
                OpenPaneLength="380"
                CompactPaneLength="48"
                PanePlacement="Right"
-               DisplayMode="CompactOverlay">
+               DisplayMode="CompactInline">
         <SplitView.Pane>
             <Grid ColumnDefinitions="48,*">
                 <Grid Grid.Column="0"

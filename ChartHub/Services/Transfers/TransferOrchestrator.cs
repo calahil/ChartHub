@@ -16,6 +16,9 @@ public sealed class TransferOrchestrator(
     SongIngestionCatalogService ingestionCatalog,
     SongIngestionStateMachine ingestionStateMachine) : ITransferOrchestrator
 {
+    private const int MinSongDownloadConcurrency = 1;
+    private const int MaxSongDownloadConcurrency = 8;
+
     private readonly AppGlobalSettings _settings = settings;
     private readonly DownloadService _downloadService = downloadService;
     private readonly IGoogleDriveClient _googleDriveClient = googleDriveClient;
@@ -25,6 +28,11 @@ public sealed class TransferOrchestrator(
     private readonly SongIngestionCatalogService _ingestionCatalog = ingestionCatalog;
     private readonly SongIngestionStateMachine _ingestionStateMachine = ingestionStateMachine;
     private static readonly TimeSpan DownloadRetryDelay = TimeSpan.FromSeconds(2);
+    private readonly object _songDownloadConcurrencySync = new();
+    private SemaphoreSlim _songDownloadConcurrencyGate = new(
+        NormalizeSongDownloadConcurrency(settings.TransferOrchestratorConcurrencyCap),
+        NormalizeSongDownloadConcurrency(settings.TransferOrchestratorConcurrencyCap));
+    private int _songDownloadConcurrencyLimit = NormalizeSongDownloadConcurrency(settings.TransferOrchestratorConcurrencyCap);
 
     public async Task<TransferResult> QueueSongDownloadAsync(
         ViewSong song,
@@ -57,35 +65,40 @@ public sealed class TransferOrchestrator(
         if (!downloads.Contains(downloadItem))
             downloads.Add(downloadItem);
 
-        var sourceName = NormalizeSourceName(song.SourceName);
-        var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
-            sourceName,
-            song.SourceId,
-            request.SourceUrl,
-            cancellationToken);
-        var attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
-        var ingestionState = ingestion.CurrentState;
-
-        if (ingestionState != IngestionState.Queued)
-        {
-            ingestionState = await TransitionIngestionStateAsync(
-                ingestion.Id,
-                attempt.Id,
-                ingestionState,
-                IngestionState.Queued,
-                BuildTransitionDetails(transferId, "Attempt reset to queued", 0),
-                cancellationToken);
-        }
+        var songDownloadGate = GetSongDownloadConcurrencyGate();
+        await songDownloadGate.WaitAsync(cancellationToken);
 
         try
         {
-            Logger.LogInfo("Transfer", "Transfer queued", new Dictionary<string, object?>
+            var sourceName = NormalizeSourceName(song.SourceName);
+            var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
+                sourceName,
+                song.SourceId,
+                request.SourceUrl,
+                cancellationToken);
+            var attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
+            var ingestionState = ingestion.CurrentState;
+
+            if (ingestionState != IngestionState.Queued)
             {
-                ["transferId"] = transferId,
-                ["displayName"] = request.DisplayName,
-                ["sourceUrl"] = request.SourceUrl,
-                ["destination"] = request.Destination.ToString(),
-            });
+                ingestionState = await TransitionIngestionStateAsync(
+                    ingestion.Id,
+                    attempt.Id,
+                    ingestionState,
+                    IngestionState.Queued,
+                    BuildTransitionDetails(transferId, "Attempt reset to queued", 0),
+                    cancellationToken);
+            }
+
+            try
+            {
+                Logger.LogInfo("Transfer", "Transfer queued", new Dictionary<string, object?>
+                {
+                    ["transferId"] = transferId,
+                    ["displayName"] = request.DisplayName,
+                    ["sourceUrl"] = request.SourceUrl,
+                    ["destination"] = request.Destination.ToString(),
+                });
 
             ingestionState = await SetStageAsync(
                 downloadItem,
@@ -314,52 +327,90 @@ public sealed class TransferOrchestrator(
             });
 
             return new TransferResult(true, TransferStage.Completed, driveResult.FinalLocation, null, downloadItem);
-        }
-        catch (OperationCanceledException)
-        {
-            Logger.LogInfo("Transfer", "Transfer cancelled", new Dictionary<string, object?>
+            }
+            catch (OperationCanceledException)
             {
-                ["transferId"] = transferId,
-                ["displayName"] = downloadItem.DisplayName,
-                ["stage"] = downloadItem.Status,
-                ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
-            });
-            downloadItem.Finished = true;
-            SetStage(downloadItem, TransferStage.Cancelled, transferId, request.DisplayName, request.Destination);
-            await TransitionIngestionStateAsync(
-                ingestion.Id,
-                attempt.Id,
-                ingestionState,
-                IngestionState.Cancelled,
-                BuildTransitionDetails(transferId, "Transfer cancelled", 0),
-                cancellationToken);
-            downloadItem.ErrorMessage = "Transfer cancelled.";
-            return new TransferResult(false, TransferStage.Cancelled, null, "Transfer cancelled.", downloadItem);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError("Transfer", "Transfer failed", ex, new Dictionary<string, object?>
+                Logger.LogInfo("Transfer", "Transfer cancelled", new Dictionary<string, object?>
+                {
+                    ["transferId"] = transferId,
+                    ["displayName"] = downloadItem.DisplayName,
+                    ["stage"] = downloadItem.Status,
+                    ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
+                });
+                downloadItem.Finished = true;
+                SetStage(downloadItem, TransferStage.Cancelled, transferId, request.DisplayName, request.Destination);
+                await TransitionIngestionStateAsync(
+                    ingestion.Id,
+                    attempt.Id,
+                    ingestionState,
+                    IngestionState.Cancelled,
+                    BuildTransitionDetails(transferId, "Transfer cancelled", 0),
+                    cancellationToken);
+                downloadItem.ErrorMessage = "Transfer cancelled.";
+                return new TransferResult(false, TransferStage.Cancelled, null, "Transfer cancelled.", downloadItem);
+            }
+            catch (Exception ex)
             {
-                ["transferId"] = transferId,
-                ["displayName"] = downloadItem.DisplayName,
-                ["stage"] = downloadItem.Status,
-                ["sourceUrl"] = request.SourceUrl,
-                ["destination"] = request.Destination.ToString(),
-                ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
-            });
-            downloadItem.Finished = true;
-            SetStage(downloadItem, TransferStage.Failed, transferId, request.DisplayName, request.Destination);
-            await TransitionIngestionStateAsync(
-                ingestion.Id,
-                attempt.Id,
-                ingestionState,
-                IngestionState.Failed,
-                BuildTransitionDetails(transferId, ex.Message, SongIngestionRetryPolicy.MaxDownloadRetries),
-                cancellationToken);
-            const string userError = "Transfer failed. See logs for details.";
-            downloadItem.ErrorMessage = userError;
-            return new TransferResult(false, TransferStage.Failed, null, userError, downloadItem);
+                Logger.LogError("Transfer", "Transfer failed", ex, new Dictionary<string, object?>
+                {
+                    ["transferId"] = transferId,
+                    ["displayName"] = downloadItem.DisplayName,
+                    ["stage"] = downloadItem.Status,
+                    ["sourceUrl"] = request.SourceUrl,
+                    ["destination"] = request.Destination.ToString(),
+                    ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
+                });
+                downloadItem.Finished = true;
+                SetStage(downloadItem, TransferStage.Failed, transferId, request.DisplayName, request.Destination);
+                await TransitionIngestionStateAsync(
+                    ingestion.Id,
+                    attempt.Id,
+                    ingestionState,
+                    IngestionState.Failed,
+                    BuildTransitionDetails(transferId, ex.Message, SongIngestionRetryPolicy.MaxDownloadRetries),
+                    cancellationToken);
+                const string userError = "Transfer failed. See logs for details.";
+                downloadItem.ErrorMessage = userError;
+                return new TransferResult(false, TransferStage.Failed, null, userError, downloadItem);
+            }
         }
+        finally
+        {
+            songDownloadGate.Release();
+        }
+    }
+
+    private SemaphoreSlim GetSongDownloadConcurrencyGate()
+    {
+        var desiredLimit = NormalizeSongDownloadConcurrency(_settings.TransferOrchestratorConcurrencyCap);
+        if (desiredLimit == _songDownloadConcurrencyLimit)
+            return _songDownloadConcurrencyGate;
+
+        lock (_songDownloadConcurrencySync)
+        {
+            if (desiredLimit == _songDownloadConcurrencyLimit)
+                return _songDownloadConcurrencyGate;
+
+            _songDownloadConcurrencyGate = new SemaphoreSlim(desiredLimit, desiredLimit);
+            _songDownloadConcurrencyLimit = desiredLimit;
+            Logger.LogInfo("Transfer", "Updated transfer concurrency cap", new Dictionary<string, object?>
+            {
+                ["concurrencyCap"] = desiredLimit,
+            });
+
+            return _songDownloadConcurrencyGate;
+        }
+    }
+
+    private static int NormalizeSongDownloadConcurrency(int value)
+    {
+        if (value < MinSongDownloadConcurrency)
+            return MinSongDownloadConcurrency;
+
+        if (value > MaxSongDownloadConcurrency)
+            return MaxSongDownloadConcurrency;
+
+        return value;
     }
 
     private async Task<TransferResult?> TryCopyDriveFileAsync(

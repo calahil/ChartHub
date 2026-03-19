@@ -329,7 +329,9 @@ namespace ChartHub.ViewModels
             IsPlaceholder = true;
             NoResults = false;
             RefreshButtonCommand = new AsyncRelayCommand(RefreshButton);
-            DownloadFileCommand = new AsyncRelayCommand<ViewSong?>(DownloadFile);
+            DownloadFileCommand = new AsyncRelayCommand<ViewSong?>(
+                DownloadFile,
+                AsyncRelayCommandOptions.AllowConcurrentExecutions);
             LoadMoreCommand = new AsyncRelayCommand(LoadMoreAsync);
             ViewCreatorCommand = new AsyncRelayCommand<ViewSong?>(ViewCreator);
             CancelDownloadCommand = new RelayCommand<DownloadFile?>(CancelDownload);

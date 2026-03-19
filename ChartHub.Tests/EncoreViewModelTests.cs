@@ -224,7 +224,7 @@ public class EncoreViewModelTests
         await sut.RefreshAsync();
 
         var song = Assert.Single(sut.DataItems);
-        Assert.Equal($"https://files.enchor.us/{albumArtMd5}", song.AlbumArtUrl);
+        Assert.Equal($"https://files.enchor.us/{albumArtMd5}.jpg", song.AlbumArtUrl);
     }
 
     [Fact]

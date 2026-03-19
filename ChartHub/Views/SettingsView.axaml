@@ -12,16 +12,12 @@
 
     <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*"
           Margin="12">
-        <Grid Grid.Row="0"
-              ColumnDefinitions="Auto,Auto,*">
+                <Grid Grid.Row="0"
+                            ColumnDefinitions="Auto,*">
             <Button Grid.Column="0"
                     Content="Save"
                     Command="{Binding SaveCommand}" />
-            <Button Grid.Column="1"
-                Margin="8,0,0,0"
-                    Content="Reload"
-                    Command="{Binding ReloadCommand}" />
-            <TextBlock Grid.Column="2"
+                        <TextBlock Grid.Column="1"
                    Margin="8,0,0,0"
                        VerticalAlignment="Center"
                        Text="{Binding StatusMessage}" />
@@ -144,7 +140,7 @@
                 BorderThickness="1"
                 CornerRadius="6"
                 IsVisible="{Binding HasPendingRestartSettings}">
-            <TextBlock Text="Some settings may require restart to take full effect."
+            <TextBlock Text="Some changes are non-hot-reloadable and will be reloaded from configuration when you save."
                        Foreground="{StaticResource ThemeForegroundLowBrush}" />
         </Border>
 
