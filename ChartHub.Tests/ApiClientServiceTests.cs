@@ -157,6 +157,48 @@ public class ApiClientServiceTests
         Assert.Equal(2, song.DrumString);
     }
 
+    [Fact]
+    public async Task GetSongFilesAsync_OnAndroid_WhenUseMockDataFalse_UsesLiveApi()
+    {
+        HttpRequestMessage? capturedRequest = null;
+
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(async (request, cancellationToken) =>
+        {
+            capturedRequest = request;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(BuildLiveFallbackResponseJson()),
+            };
+        }))
+        {
+            BaseAddress = new Uri("https://rhythmverse.co"),
+        };
+
+        var sut = CreateService(
+            configurationValues: new Dictionary<string, string?>
+            {
+                ["Runtime:UseMockData"] = "False",
+                ["rhythmverseToken"] = "token-test",
+            },
+            httpClient,
+            loadEmbeddedMockData: () => throw new InvalidOperationException("Mock data should not be loaded when UseMockData is false."),
+            resolveMockDataPath: () => throw new InvalidOperationException("Mock data path should not be resolved when UseMockData is false."),
+            isAndroid: true);
+
+        var results = await sut.GetSongFilesAsync(
+            search: true,
+            searchString: string.Empty,
+            sort: "downloads",
+            order: "desc",
+            instrument: [],
+            authorText: string.Empty);
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Post, capturedRequest!.Method);
+        var song = Assert.Single(results);
+        Assert.Equal("Live Artist", song.Artist);
+    }
+
       [Fact]
       public async Task GetSongFilesAsync_WhenLoadingNextPage_AppendsResultsInsteadOfClearing()
       {
