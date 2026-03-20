@@ -222,8 +222,7 @@ namespace ChartHub.Services
 
                     string responseBody;
 
-                    // On Android, prefer embedded mock payload to speed up UI testing.
-                    var useMockData = IsMockDataEnabled(_configuration) || _isAndroid();
+                    var useMockData = IsMockDataEnabled(_configuration);
 
                     if (useMockData)
                     {
