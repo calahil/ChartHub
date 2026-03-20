@@ -11,7 +11,7 @@
              x:DataType="viewmodels:SplashViewModel">
 
     <Grid Background="{DynamicResource ThemeBackgroundBrush}">
-         <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/logo.png"
+         <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/logo-1024.png"
              Stretch="Uniform"
              HorizontalAlignment="Center"
              VerticalAlignment="Center" />

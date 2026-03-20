@@ -3,5 +3,9 @@
           package="com.calahilstudios.charthub">
   <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="36" />
   <uses-permission android:name="android.permission.INTERNET" />
-  <application android:label="ChartHub" android:allowBackup="true" />
+  <application android:label="ChartHub"
+                android:allowBackup="true"
+                android:icon="@mipmap/ic_launcher"
+                android:supportsRtl="true">
+  </application>
 </manifest>

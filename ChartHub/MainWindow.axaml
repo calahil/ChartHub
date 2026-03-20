@@ -3,6 +3,7 @@
         xmlns:views="using:ChartHub.Views"
         x:Class="ChartHub.MainWindow"
         Title="ChartHub"
+        Icon="avares://ChartHub/Resources/Images/appicon.png"
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen">
     <views:AppShellView />
