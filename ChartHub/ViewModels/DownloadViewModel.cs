@@ -916,37 +916,8 @@ namespace ChartHub.ViewModels
                 return;
 
             var existing = await _ingestionCatalog.GetLatestIngestionByAssetLocationAsync(file.FilePath, cancellationToken);
-            if (existing is not null)
+            if (existing is null)
                 return;
-
-            var sourceLink = $"gdrive://{file.FilePath}";
-            var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
-                "googledrive",
-                LibraryIdentityService.NormalizeSourceKey("googledrive", file.FilePath),
-                sourceLink,
-                cancellationToken: cancellationToken);
-            var attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
-
-            var fromState = ingestion.CurrentState;
-            if (fromState != IngestionState.Downloaded)
-            {
-                await _ingestionCatalog.RecordStateTransitionAsync(
-                    ingestion.Id,
-                    attempt.Id,
-                    fromState,
-                    IngestionState.Downloaded,
-                    "Discovered from cloud watcher",
-                    cancellationToken);
-            }
-
-            await _ingestionCatalog.UpsertAssetAsync(new SongIngestionAssetEntry(
-                IngestionId: ingestion.Id,
-                AttemptId: attempt.Id,
-                AssetRole: IngestionAssetRole.Downloaded,
-                Location: file.FilePath,
-                SizeBytes: file.SizeBytes,
-                ContentHash: null,
-                RecordedAtUtc: DateTimeOffset.UtcNow), cancellationToken);
         }
 
         private async Task RunQueueRefreshLoopAsync(CancellationToken cancellationToken)
