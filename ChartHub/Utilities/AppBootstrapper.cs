@@ -161,7 +161,6 @@ namespace ChartHub.Utilities
             services.AddSingleton<SongIngestionStateMachine>();
             services.AddSingleton<ISongIniMetadataParser, SongIniMetadataParser>();
             services.AddSingleton<ICloneHeroDirectorySchemaService, CloneHeroDirectorySchemaService>();
-            services.AddSingleton<ICloneHeroLibraryReconciliationService, CloneHeroLibraryReconciliationService>();
             services.AddSingleton<IOnyxPipelineService, OnyxService>();
             services.AddSingleton<ISongInstallService, SongInstallService>();
             services.AddSingleton<IDesktopPathOpener, DesktopPathOpener>();

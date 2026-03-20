@@ -7,7 +7,6 @@ using ChartHub.Utilities;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Text;
 using System.Windows.Input;
 
 namespace ChartHub.ViewModels
@@ -138,21 +137,9 @@ namespace ChartHub.ViewModels
             }
         }
 
-        private string _installLogText = string.Empty;
-        public string InstallLogText
-        {
-            get => _installLogText;
-            private set
-            {
-                if (_installLogText == value)
-                    return;
+        public ObservableCollection<string> InstallLogItems { get; } = [];
 
-                _installLogText = value;
-                OnPropertyChanged(nameof(InstallLogText));
-                _clearInstallLogCommand?.NotifyCanExecuteChanged();
-                UpdateInstallPanelVisibility();
-            }
-        }
+        public bool CanCopyAllInstallLogs => InstallLogItems.Count > 0;
 
         private string _installSummaryText = string.Empty;
         public string InstallSummaryText
@@ -333,7 +320,7 @@ namespace ChartHub.ViewModels
         private readonly CancellationTokenSource _queueRefreshCts = new();
         private Task? _queueRefreshTask;
         private CancellationTokenSource? _installCts;
-        private readonly StringBuilder _installLogBuilder = new();
+        private const int MaxInstallLogItems = 500;
         private readonly RelayCommand _cancelInstallCommand;
         private readonly RelayCommand _clearInstallLogCommand;
         private readonly RelayCommand _toggleInstallLogCommand;
@@ -586,12 +573,14 @@ namespace ChartHub.ViewModels
             _installCts?.Cancel();
         }
 
-        private bool CanClearInstallLog() => !string.IsNullOrWhiteSpace(InstallLogText);
+        private bool CanClearInstallLog() => InstallLogItems.Count > 0;
 
         private void ClearInstallLog()
         {
-            _installLogBuilder.Clear();
-            InstallLogText = string.Empty;
+            InstallLogItems.Clear();
+            _clearInstallLogCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(CanCopyAllInstallLogs));
+            UpdateInstallPanelVisibility();
         }
 
         private void ToggleInstallLog()
@@ -599,17 +588,18 @@ namespace ChartHub.ViewModels
             IsInstallLogExpanded = !IsInstallLogExpanded;
         }
 
-        private bool CanDismissInstallPanel() => !IsInstallActive && (HasInstallSummary || !string.IsNullOrWhiteSpace(InstallLogText));
+        private bool CanDismissInstallPanel() => !IsInstallActive && (HasInstallSummary || InstallLogItems.Count > 0);
 
         private void DismissInstallPanel()
         {
-            _installLogBuilder.Clear();
-            InstallLogText = string.Empty;
+            InstallLogItems.Clear();
             InstallSummaryText = string.Empty;
             InstallCurrentItemName = string.Empty;
             InstallStageText = string.Empty;
             InstallProgressValue = 0;
             IsInstallProgressIndeterminate = false;
+            _clearInstallLogCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(CanCopyAllInstallLogs));
             UpdateInstallPanelVisibility();
         }
 
@@ -700,18 +690,20 @@ namespace ChartHub.ViewModels
 
         private void ResetInstallPanel()
         {
-            _installLogBuilder.Clear();
-            InstallLogText = string.Empty;
+            InstallLogItems.Clear();
             InstallSummaryText = string.Empty;
             InstallProgressValue = 0;
             InstallStageText = string.Empty;
             InstallCurrentItemName = string.Empty;
             IsInstallProgressIndeterminate = false;
+            _clearInstallLogCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(CanCopyAllInstallLogs));
+            UpdateInstallPanelVisibility();
         }
 
         private void UpdateInstallPanelVisibility()
         {
-            IsInstallPanelVisible = IsInstallActive || HasInstallSummary || !string.IsNullOrWhiteSpace(InstallLogText);
+            IsInstallPanelVisible = IsInstallActive || HasInstallSummary || InstallLogItems.Count > 0;
         }
 
         private void ApplyInstallProgress(InstallProgressUpdate update)
@@ -726,22 +718,31 @@ namespace ChartHub.ViewModels
             IsInstallProgressIndeterminate = update.IsIndeterminate;
 
             if (!string.IsNullOrWhiteSpace(update.Message))
-                AppendInstallLog($"[{update.Stage}] {update.Message}");
+                AppendInstallLog(update.Stage, "Status", update.Message);
 
             if (!string.IsNullOrWhiteSpace(update.LogLine))
-                AppendInstallLog(update.LogLine);
+                AppendInstallLog(update.Stage, "Detail", update.LogLine);
         }
 
-        private void AppendInstallLog(string line)
+        private void AppendInstallLog(InstallStage stage, string category, string text)
         {
-            if (string.IsNullOrWhiteSpace(line))
+            if (string.IsNullOrWhiteSpace(text))
                 return;
 
-            if (_installLogBuilder.Length > 0)
-                _installLogBuilder.AppendLine();
+            var normalizedText = text.ReplaceLineEndings(" ").Trim();
+            if (string.IsNullOrWhiteSpace(normalizedText))
+                return;
 
-            _installLogBuilder.Append(line);
-            InstallLogText = _installLogBuilder.ToString();
+            var normalizedCategory = string.IsNullOrWhiteSpace(category) ? "Info" : category.Trim();
+            var item = $"{stage} | {normalizedCategory} | {normalizedText}";
+
+            InstallLogItems.Add(item);
+            while (InstallLogItems.Count > MaxInstallLogItems)
+                InstallLogItems.RemoveAt(0);
+
+            _clearInstallLogCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(CanCopyAllInstallLogs));
+            UpdateInstallPanelVisibility();
         }
 
         public void CheckAllItems(bool isChecked)

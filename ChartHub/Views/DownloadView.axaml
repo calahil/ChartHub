@@ -116,18 +116,43 @@
                                Text="{Binding InstallProgressValue, StringFormat={}{0:F0}%}" />
                 </Grid>
 
-                <TextBox Grid.Row="3"
-                         x:Name="InstallLogTextBox"
-                     Margin="0,8,0,0"
-                         MinHeight="140"
-                         MaxHeight="260"
-                         Text="{Binding InstallLogText}"
-                     IsVisible="{Binding IsInstallLogExpanded}"
-                         IsReadOnly="True"
-                         AcceptsReturn="True"
-                         TextWrapping="Wrap"
-                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+                <Border Grid.Row="3"
+                        Margin="0,8,0,0"
+                        MinHeight="140"
+                        MaxHeight="260"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        BorderThickness="1"
+                        IsVisible="{Binding IsInstallLogExpanded}">
+                    <ScrollViewer x:Name="InstallLogScrollViewer"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <ScrollViewer.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Copy All Logs"
+                                          IsEnabled="{Binding CanCopyAllInstallLogs}"
+                                          Click="CopyAllLogs_Click" />
+                            </ContextMenu>
+                        </ScrollViewer.ContextMenu>
+                        <ItemsControl x:Name="InstallLogItemsControl"
+                                      ItemsSource="{Binding InstallLogItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="8,4">
+                                        <TextBlock Text="{Binding .}"
+                                                   TextWrapping="Wrap">
+                                            <TextBlock.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Copy"
+                                                              Click="CopyLogItem_Click" />
+                                                </ContextMenu>
+                                            </TextBlock.ContextMenu>
+                                        </TextBlock>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
             </Grid>
         </Border>
 

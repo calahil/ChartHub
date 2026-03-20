@@ -11,8 +11,8 @@
                        FontSize="18"
                        FontWeight="Bold" />
             <Button Grid.Column="1"
-                    Content="Reconcile Library"
-                    Command="{Binding ReconcileLibraryCommand}" />
+                    Content="Refresh Library"
+                    Command="{Binding RefreshLibraryCommand}" />
         </Grid>
 
         <Grid Grid.Row="1" ColumnDefinitions="280,*">
@@ -40,40 +40,13 @@
                         <ContextMenu>
                             <MenuItem Header="Open Song Folder" Command="{Binding OpenSongFolderCommand}" />
                             <MenuItem Header="Open song.ini Location" Command="{Binding OpenSongIniCommand}" />
-                            <MenuItem Header="Reconcile This Song" Command="{Binding ReconcileSelectedSongCommand}" />
                         </ContextMenu>
                     </DataGrid.ContextMenu>
                 </DataGrid>
             </Border>
         </Grid>
 
-        <Border Grid.RowSpan="2"
-                Background="#AA000000"
-                IsVisible="{Binding IsInitializing}">
-            <Border HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Width="420"
-                    Padding="16"
-                    CornerRadius="10"
-                    Background="{StaticResource ThemeControlLowBrush}"
-                    BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                    BorderThickness="1">
-                <StackPanel Spacing="10">
-                    <TextBlock Text="Reconciling Clone Hero Library"
-                               FontSize="16"
-                               FontWeight="Bold" />
-                    <TextBlock Text="{Binding ReconciliationStatus}"
-                               TextWrapping="Wrap" />
-                    <ProgressBar Minimum="0"
-                                 Maximum="100"
-                                 Value="{Binding ReconciliationProgressValue}"
-                                 Height="14" />
-                    <TextBlock Text="Please wait. Clone Hero tab will unlock after scan completes."
-                               Foreground="{StaticResource ThemeForegroundLowBrush}"
-                               TextWrapping="Wrap" />
-                </StackPanel>
-            </Border>
-        </Border>
+
     </Grid>
 
 </UserControl>

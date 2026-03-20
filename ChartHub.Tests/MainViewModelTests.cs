@@ -5,8 +5,6 @@ using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
 using ChartHub.Utilities;
-using ChartHub.Configuration.Interfaces;
-using ChartHub.Configuration.Models;
 
 namespace ChartHub.Tests;
 
@@ -137,46 +135,8 @@ public class MainViewModelTests
 
     private static ViewModels.CloneHeroViewModel CreateCloneHeroViewModel(string rootPath)
     {
-        var settings = CreateSettings(rootPath);
         var catalog = new LibraryCatalogService(Path.Combine(rootPath, "library-catalog.db"));
-        var reconciliation = new CloneHeroLibraryReconciliationService(
-            settings,
-            catalog,
-            new SongIniMetadataParser(),
-            new CloneHeroDirectorySchemaService());
-
-        return new ViewModels.CloneHeroViewModel(settings, catalog, reconciliation, new NoopDesktopPathOpener());
-    }
-
-    private static AppGlobalSettings CreateSettings(string rootPath)
-    {
-        var config = new AppConfigRoot
-        {
-            Runtime = new RuntimeAppConfig
-            {
-                TempDirectory = Path.Combine(rootPath, "Temp"),
-                DownloadDirectory = Path.Combine(rootPath, "Downloads"),
-                StagingDirectory = Path.Combine(rootPath, "Staging"),
-                OutputDirectory = Path.Combine(rootPath, "Output"),
-                CloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero"),
-                CloneHeroSongDirectory = Path.Combine(rootPath, "CloneHero", "Songs"),
-            },
-        };
-
-        foreach (var dir in new[]
-        {
-            config.Runtime.TempDirectory,
-            config.Runtime.DownloadDirectory,
-            config.Runtime.StagingDirectory,
-            config.Runtime.OutputDirectory,
-            config.Runtime.CloneHeroDataDirectory,
-            config.Runtime.CloneHeroSongDirectory,
-        })
-        {
-            Directory.CreateDirectory(dir);
-        }
-
-        return new AppGlobalSettings(new FakeSettingsOrchestrator(config));
+        return new ViewModels.CloneHeroViewModel(catalog, new NoopDesktopPathOpener());
     }
 
     private static ViewModels.DownloadViewModel CreateDownloadViewModel(IResourceWatcher watcher, IGoogleDriveClient driveClient)
@@ -215,25 +175,6 @@ public class MainViewModelTests
     {
         public Task OpenDirectoryAsync(string directoryPath, CancellationToken cancellationToken = default)
         {
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class FakeSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator
-    {
-        public AppConfigRoot Current { get; private set; } = current;
-        public event Action<AppConfigRoot>? SettingsChanged;
-
-        public Task<ConfigValidationResult> UpdateAsync(Action<AppConfigRoot> update, CancellationToken cancellationToken = default)
-        {
-            update(Current);
-            SettingsChanged?.Invoke(Current);
-            return Task.FromResult(ConfigValidationResult.Success);
-        }
-
-        public Task ReloadAsync(CancellationToken cancellationToken = default)
-        {
-            SettingsChanged?.Invoke(Current);
             return Task.CompletedTask;
         }
     }

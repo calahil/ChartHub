@@ -304,6 +304,10 @@ public sealed class SongInstallService : ISongInstallService
         return Task.FromResult(layout.FullPath);
     }
 
+    private static bool IsTrackableSource(string source) =>
+        string.Equals(source, LibrarySourceNames.RhythmVerse, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(source, LibrarySourceNames.Encore, StringComparison.OrdinalIgnoreCase);
+
     private async Task UpsertLibraryEntryAsync(
         string installDir,
         string source,
@@ -312,6 +316,11 @@ public sealed class SongInstallService : ISongInstallService
         CancellationToken cancellationToken)
     {
         if (_libraryCatalog is null)
+            return;
+
+        // Only persist library entries for songs from known, trusted sources.
+        // Local file and cloud drive installs must not pollute the library catalog.
+        if (!IsTrackableSource(source))
             return;
 
         var songIniPath = Directory

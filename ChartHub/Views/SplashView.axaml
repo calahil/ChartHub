@@ -5,20 +5,16 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
              mc:Ignorable="d"
+             d:DesignWidth="560"
+             d:DesignHeight="400"
              x:Class="ChartHub.Views.SplashView"
              x:DataType="viewmodels:SplashViewModel">
 
     <Grid Background="{DynamicResource ThemeBackgroundBrush}">
-        <StackPanel HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    Spacing="16">
-
-            <!-- App name -->
-            <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/logo.png"
-                   VerticalAlignment="Stretch"
-                   HorizontalAlignment="Stretch" />
-
-        </StackPanel>
+         <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/logo.png"
+             Stretch="Uniform"
+             HorizontalAlignment="Center"
+             VerticalAlignment="Center" />
     </Grid>
 
 </UserControl>

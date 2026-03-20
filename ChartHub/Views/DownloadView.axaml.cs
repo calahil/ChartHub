@@ -1,9 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.VisualTree;
 using Avalonia.Threading;
 using ChartHub.ViewModels;
+using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Linq;
 
 namespace ChartHub.Views;
 
@@ -20,25 +22,52 @@ public partial class DownloadView : UserControl
     {
         base.OnDataContextChanged(e);
 
-        if (_viewModel is not null)
-            _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+        DetachFromViewModel();
 
         _viewModel = DataContext as DownloadViewModel;
-        if (_viewModel is not null)
-            _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+        AttachToViewModel();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        if (_viewModel is not null)
-            _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+        DetachFromViewModel();
 
         base.OnDetachedFromVisualTree(e);
     }
 
+    private void AttachToViewModel()
+    {
+        if (_viewModel is null)
+            return;
+
+        _viewModel.PropertyChanged += ViewModel_PropertyChanged;
+        _viewModel.InstallLogItems.CollectionChanged += InstallLogItems_CollectionChanged;
+    }
+
+    private void DetachFromViewModel()
+    {
+        if (_viewModel is null)
+            return;
+
+        _viewModel.PropertyChanged -= ViewModel_PropertyChanged;
+        _viewModel.InstallLogItems.CollectionChanged -= InstallLogItems_CollectionChanged;
+    }
+
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(DownloadViewModel.InstallLogText))
+        if (e.PropertyName == nameof(DownloadViewModel.IsInstallLogExpanded) && _viewModel?.IsInstallLogExpanded == true)
+            ScrollLogToBottom();
+    }
+
+    private void InstallLogItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action is NotifyCollectionChangedAction.Add or NotifyCollectionChangedAction.Reset)
+            ScrollLogToBottom();
+    }
+
+    private void ScrollLogToBottom()
+    {
+        if (_viewModel is not null && !_viewModel.IsInstallLogExpanded)
             return;
 
         // Post at Background priority so layout has fully updated Extent before we scroll.
@@ -47,23 +76,39 @@ public partial class DownloadView : UserControl
             if (_viewModel is not null && !_viewModel.IsInstallLogExpanded)
                 return;
 
-            var logTextBox = this.FindControl<TextBox>("InstallLogTextBox");
-            if (logTextBox is null)
-                return;
-
-            var textLength = logTextBox.Text?.Length ?? 0;
-            logTextBox.CaretIndex = textLength;
-            logTextBox.SelectionStart = textLength;
-            logTextBox.SelectionEnd = textLength;
-
-            // Re-discover the scroll viewer each call to avoid stale references after
-            // the TextBox is hidden/shown via IsInstallLogExpanded toggling.
-            var scrollViewer = logTextBox.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+            var scrollViewer = this.FindControl<ScrollViewer>("InstallLogScrollViewer");
             if (scrollViewer is null)
                 return;
 
-            var targetOffsetY = Math.Max(0, scrollViewer.Extent.Height - scrollViewer.Viewport.Height);
-            scrollViewer.Offset = new Vector(scrollViewer.Offset.X, targetOffsetY);
+            scrollViewer.ScrollToEnd();
         }, DispatcherPriority.Background);
+    }
+
+    private async void CopyLogItem_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem)
+            return;
+
+        if (menuItem.DataContext is not string text || string.IsNullOrWhiteSpace(text))
+            return;
+
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is not null)
+            await clipboard.SetTextAsync(text);
+    }
+
+    private async void CopyAllLogs_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_viewModel is null || _viewModel.InstallLogItems.Count == 0)
+            return;
+
+        var lines = _viewModel.InstallLogItems.Where(static line => !string.IsNullOrWhiteSpace(line));
+        var text = string.Join(Environment.NewLine, lines);
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is not null)
+            await clipboard.SetTextAsync(text);
     }
 }

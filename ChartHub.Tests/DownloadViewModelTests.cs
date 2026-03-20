@@ -216,7 +216,7 @@ public class DownloadViewModelTests
 
             Assert.False(sut.IsInstallPanelVisible);
             Assert.False(sut.HasInstallSummary);
-            Assert.Equal(string.Empty, sut.InstallLogText);
+            Assert.Empty(sut.InstallLogItems);
         }
         finally
         {
