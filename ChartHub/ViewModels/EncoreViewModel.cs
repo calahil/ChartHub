@@ -556,19 +556,7 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
         var result = await _transferOrchestrator.QueueSongDownloadAsync(proxySong, downloadItem, Downloads, cts.Token);
         if (result.Success)
         {
-            foreach (var sourceId in selected.GetCatalogSourceIds().Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                await _libraryCatalog.UpsertAsync(new LibraryCatalogEntry(
-                    selected.SourceName,
-                    sourceId,
-                    selected.Name,
-                    selected.Artist,
-                    selected.Charter,
-                    result.FinalLocation,
-                    DateTimeOffset.UtcNow));
-            }
-
-            selected.IsInLibrary = true;
+            selected.IsInLibrary = false;
         }
         else if (!string.IsNullOrWhiteSpace(result.Error))
         {

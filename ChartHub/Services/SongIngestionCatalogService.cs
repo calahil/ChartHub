@@ -26,12 +26,23 @@ public enum IngestionAssetRole
     InstalledDirectory,
 }
 
+public enum DesktopState
+{
+    Cloud,
+    Downloaded,
+    Installed,
+}
+
 public sealed record SongIngestionRecord(
     long Id,
     string Source,
     string? SourceId,
     string SourceLink,
     string NormalizedLink,
+    string? Artist,
+    string? Title,
+    string? Charter,
+    DesktopState DesktopState,
     IngestionState CurrentState,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc);
@@ -66,6 +77,8 @@ public sealed record SongInstalledManifestFileEntry(
 
 public sealed class SongIngestionCatalogService
 {
+    private const int SchemaVersion = 4;
+    private const string SchemaVersionKey = "schema_version";
     private static readonly string[] TrackingKeys = ["fbclid", "gclid", "ref"];
 
     private readonly string _databasePath;
@@ -119,6 +132,9 @@ public sealed class SongIngestionCatalogService
         string source,
         string? sourceId,
         string sourceLink,
+        string? artist = null,
+        string? title = null,
+        string? charter = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(source))
@@ -143,6 +159,10 @@ public sealed class SongIngestionCatalogService
                         source_id,
                         source_link,
                         normalized_link,
+                        artist,
+                        title,
+                        charter,
+                        desktop_state,
                         current_state,
                         created_at_utc,
                         updated_at_utc
@@ -152,6 +172,10 @@ public sealed class SongIngestionCatalogService
                         $sourceId,
                         $sourceLink,
                         $normalizedLink,
+                        $artist,
+                        $title,
+                        $charter,
+                        $desktopState,
                         $currentState,
                         $createdAtUtc,
                         $updatedAtUtc
@@ -160,12 +184,20 @@ public sealed class SongIngestionCatalogService
                         source = excluded.source,
                         source_id = excluded.source_id,
                         source_link = excluded.source_link,
+                        artist = COALESCE(excluded.artist, song_ingestions.artist),
+                        title = COALESCE(excluded.title, song_ingestions.title),
+                        charter = COALESCE(excluded.charter, song_ingestions.charter),
+                        desktop_state = COALESCE(excluded.desktop_state, song_ingestions.desktop_state),
                         updated_at_utc = excluded.updated_at_utc;
                     """;
                 upsert.Parameters.AddWithValue("$source", source);
                 upsert.Parameters.AddWithValue("$sourceId", (object?)sourceId ?? DBNull.Value);
                 upsert.Parameters.AddWithValue("$sourceLink", sourceLink);
                 upsert.Parameters.AddWithValue("$normalizedLink", normalizedLink);
+                upsert.Parameters.AddWithValue("$artist", (object?)artist ?? DBNull.Value);
+                upsert.Parameters.AddWithValue("$title", (object?)title ?? DBNull.Value);
+                upsert.Parameters.AddWithValue("$charter", (object?)charter ?? DBNull.Value);
+                upsert.Parameters.AddWithValue("$desktopState", DesktopState.Cloud.ToString());
                 upsert.Parameters.AddWithValue("$currentState", IngestionState.Queued.ToString());
                 upsert.Parameters.AddWithValue("$createdAtUtc", now.UtcDateTime.ToString("O"));
                 upsert.Parameters.AddWithValue("$updatedAtUtc", now.UtcDateTime.ToString("O"));
@@ -181,6 +213,10 @@ public sealed class SongIngestionCatalogService
                     source_id,
                     source_link,
                     normalized_link,
+                    artist,
+                    title,
+                    charter,
+                    desktop_state,
                     current_state,
                     created_at_utc,
                     updated_at_utc
@@ -199,9 +235,13 @@ public sealed class SongIngestionCatalogService
                 SourceId: reader.IsDBNull(2) ? null : reader.GetString(2),
                 SourceLink: reader.GetString(3),
                 NormalizedLink: reader.GetString(4),
-                CurrentState: Enum.Parse<IngestionState>(reader.GetString(5), ignoreCase: true),
-                CreatedAtUtc: DateTimeOffset.Parse(reader.GetString(6)),
-                UpdatedAtUtc: DateTimeOffset.Parse(reader.GetString(7)));
+                Artist: reader.IsDBNull(5) ? null : reader.GetString(5),
+                Title: reader.IsDBNull(6) ? null : reader.GetString(6),
+                Charter: reader.IsDBNull(7) ? null : reader.GetString(7),
+                DesktopState: Enum.Parse<DesktopState>(reader.GetString(8), ignoreCase: true),
+                CurrentState: Enum.Parse<IngestionState>(reader.GetString(9), ignoreCase: true),
+                CreatedAtUtc: DateTimeOffset.Parse(reader.GetString(10)),
+                UpdatedAtUtc: DateTimeOffset.Parse(reader.GetString(11)));
         }
         finally
         {
@@ -230,6 +270,10 @@ public sealed class SongIngestionCatalogService
                     i.source_id,
                     i.source_link,
                     i.normalized_link,
+                    i.artist,
+                    i.title,
+                    i.charter,
+                    i.desktop_state,
                     i.current_state,
                     i.created_at_utc,
                     i.updated_at_utc
@@ -251,9 +295,13 @@ public sealed class SongIngestionCatalogService
                 SourceId: reader.IsDBNull(2) ? null : reader.GetString(2),
                 SourceLink: reader.GetString(3),
                 NormalizedLink: reader.GetString(4),
-                CurrentState: Enum.Parse<IngestionState>(reader.GetString(5), ignoreCase: true),
-                CreatedAtUtc: DateTimeOffset.Parse(reader.GetString(6)),
-                UpdatedAtUtc: DateTimeOffset.Parse(reader.GetString(7)));
+                Artist: reader.IsDBNull(5) ? null : reader.GetString(5),
+                Title: reader.IsDBNull(6) ? null : reader.GetString(6),
+                Charter: reader.IsDBNull(7) ? null : reader.GetString(7),
+                DesktopState: Enum.Parse<DesktopState>(reader.GetString(8), ignoreCase: true),
+                CurrentState: Enum.Parse<IngestionState>(reader.GetString(9), ignoreCase: true),
+                CreatedAtUtc: DateTimeOffset.Parse(reader.GetString(10)),
+                UpdatedAtUtc: DateTimeOffset.Parse(reader.GetString(11)));
         }
         finally
         {
@@ -282,6 +330,10 @@ public sealed class SongIngestionCatalogService
                     source_id,
                     source_link,
                     normalized_link,
+                    artist,
+                    title,
+                    charter,
+                    desktop_state,
                     current_state,
                     created_at_utc,
                     updated_at_utc
@@ -300,9 +352,13 @@ public sealed class SongIngestionCatalogService
                 SourceId: reader.IsDBNull(2) ? null : reader.GetString(2),
                 SourceLink: reader.GetString(3),
                 NormalizedLink: reader.GetString(4),
-                CurrentState: Enum.Parse<IngestionState>(reader.GetString(5), ignoreCase: true),
-                CreatedAtUtc: DateTimeOffset.Parse(reader.GetString(6)),
-                UpdatedAtUtc: DateTimeOffset.Parse(reader.GetString(7)));
+                Artist: reader.IsDBNull(5) ? null : reader.GetString(5),
+                Title: reader.IsDBNull(6) ? null : reader.GetString(6),
+                Charter: reader.IsDBNull(7) ? null : reader.GetString(7),
+                DesktopState: Enum.Parse<DesktopState>(reader.GetString(8), ignoreCase: true),
+                CurrentState: Enum.Parse<IngestionState>(reader.GetString(9), ignoreCase: true),
+                CreatedAtUtc: DateTimeOffset.Parse(reader.GetString(10)),
+                UpdatedAtUtc: DateTimeOffset.Parse(reader.GetString(11)));
         }
         finally
         {
@@ -368,6 +424,10 @@ public sealed class SongIngestionCatalogService
                     i.source,
                     i.source_id,
                     i.source_link,
+                    i.artist,
+                    i.title,
+                    i.charter,
+                    i.desktop_state,
                     i.current_state,
                     i.updated_at_utc,
                     (
@@ -385,7 +445,16 @@ public sealed class SongIngestionCatalogService
                           AND a.asset_role = 'InstalledDirectory'
                         ORDER BY a.recorded_at_utc DESC
                         LIMIT 1
-                    ) AS installed_location
+                    ) AS installed_location,
+                    (
+                        SELECT ls.local_path
+                        FROM library_song_keys lsk
+                        JOIN library_songs ls ON lsk.library_song_id = ls.id
+                        WHERE lsk.source = i.source
+                          AND lsk.source_id = i.source_id
+                        ORDER BY lsk.created_at_utc DESC
+                        LIMIT 1
+                    ) AS desktop_library_path
                 FROM song_ingestions i
                 WHERE i.id = $ingestionId
                 LIMIT 1;
@@ -399,8 +468,12 @@ public sealed class SongIngestionCatalogService
             var source = reader.GetString(1);
             var sourceId = reader.IsDBNull(2) ? null : reader.GetString(2);
             var sourceLink = reader.GetString(3);
-            var downloadedLocation = reader.IsDBNull(6) ? null : reader.GetString(6);
-            var installedLocation = reader.IsDBNull(7) ? null : reader.GetString(7);
+            var artist = reader.IsDBNull(4) ? null : reader.GetString(4);
+            var title = reader.IsDBNull(5) ? null : reader.GetString(5);
+            var charter = reader.IsDBNull(6) ? null : reader.GetString(6);
+            var downloadedLocation = reader.IsDBNull(10) ? null : reader.GetString(10);
+            var installedLocation = reader.IsDBNull(11) ? null : reader.GetString(11);
+            var desktopLibraryPath = reader.IsDBNull(12) ? null : reader.GetString(12);
 
             return new IngestionQueueItem
             {
@@ -408,11 +481,16 @@ public sealed class SongIngestionCatalogService
                 Source = source,
                 SourceId = sourceId,
                 SourceLink = sourceLink,
+                Artist = artist,
+                Title = title,
+                Charter = charter,
                 DisplayName = BuildDisplayName(downloadedLocation, sourceId, sourceLink),
-                CurrentState = Enum.Parse<IngestionState>(reader.GetString(4), ignoreCase: true),
-                UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(5)),
+                DesktopState = Enum.Parse<DesktopState>(reader.GetString(7), ignoreCase: true),
+                CurrentState = Enum.Parse<IngestionState>(reader.GetString(8), ignoreCase: true),
+                UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(9)),
                 DownloadedLocation = downloadedLocation,
                 InstalledLocation = installedLocation,
+                DesktopLibraryPath = desktopLibraryPath,
             };
         }
         finally
@@ -460,6 +538,10 @@ public sealed class SongIngestionCatalogService
                     i.source,
                     i.source_id,
                     i.source_link,
+                    i.artist,
+                    i.title,
+                    i.charter,
+                    i.desktop_state,
                     i.current_state,
                     i.updated_at_utc,
                     (
@@ -477,7 +559,16 @@ public sealed class SongIngestionCatalogService
                           AND a.asset_role = 'InstalledDirectory'
                         ORDER BY a.recorded_at_utc DESC
                         LIMIT 1
-                    ) AS installed_location
+                    ) AS installed_location,
+                    (
+                        SELECT ls.local_path
+                        FROM library_song_keys lsk
+                        JOIN library_songs ls ON lsk.library_song_id = ls.id
+                        WHERE lsk.source = i.source
+                          AND lsk.source_id = i.source_id
+                        ORDER BY lsk.created_at_utc DESC
+                        LIMIT 1
+                    ) AS desktop_library_path
                 FROM song_ingestions i
                 WHERE ($stateFilter IS NULL OR i.current_state = $stateFilter)
                   AND ($sourceFilter IS NULL OR i.source = $sourceFilter)
@@ -495,8 +586,12 @@ public sealed class SongIngestionCatalogService
                 var source = reader.GetString(1);
                 var sourceId = reader.IsDBNull(2) ? null : reader.GetString(2);
                 var sourceLink = reader.GetString(3);
-                var downloadedLocation = reader.IsDBNull(6) ? null : reader.GetString(6);
-                var installedLocation = reader.IsDBNull(7) ? null : reader.GetString(7);
+                var artist = reader.IsDBNull(4) ? null : reader.GetString(4);
+                var title = reader.IsDBNull(5) ? null : reader.GetString(5);
+                var charter = reader.IsDBNull(6) ? null : reader.GetString(6);
+                var downloadedLocation = reader.IsDBNull(10) ? null : reader.GetString(10);
+                var installedLocation = reader.IsDBNull(11) ? null : reader.GetString(11);
+                var desktopLibraryPath = reader.IsDBNull(12) ? null : reader.GetString(12);
 
                 items.Add(new IngestionQueueItem
                 {
@@ -504,11 +599,16 @@ public sealed class SongIngestionCatalogService
                     Source = source,
                     SourceId = sourceId,
                     SourceLink = sourceLink,
+                    Artist = artist,
+                    Title = title,
+                    Charter = charter,
                     DisplayName = BuildDisplayName(downloadedLocation, sourceId, sourceLink),
-                    CurrentState = Enum.Parse<IngestionState>(reader.GetString(4), ignoreCase: true),
-                    UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(5)),
+                    DesktopState = Enum.Parse<DesktopState>(reader.GetString(7), ignoreCase: true),
+                    CurrentState = Enum.Parse<IngestionState>(reader.GetString(8), ignoreCase: true),
+                    UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(9)),
                     DownloadedLocation = downloadedLocation,
                     InstalledLocation = installedLocation,
+                    DesktopLibraryPath = desktopLibraryPath,
                 });
             }
 
@@ -640,10 +740,12 @@ public sealed class SongIngestionCatalogService
                 ingestionUpdate.CommandText = """
                     UPDATE song_ingestions
                     SET current_state = $state,
+                        desktop_state = $desktopState,
                         updated_at_utc = $updatedAtUtc
                     WHERE id = $ingestionId;
                     """;
                 ingestionUpdate.Parameters.AddWithValue("$state", toState.ToString());
+                ingestionUpdate.Parameters.AddWithValue("$desktopState", MapDesktopStateFromIngestionState(toState).ToString());
                 ingestionUpdate.Parameters.AddWithValue("$updatedAtUtc", now.UtcDateTime.ToString("O"));
                 ingestionUpdate.Parameters.AddWithValue("$ingestionId", ingestionId);
                 await ingestionUpdate.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -676,6 +778,16 @@ public sealed class SongIngestionCatalogService
         {
             _gate.Release();
         }
+    }
+
+    private static DesktopState MapDesktopStateFromIngestionState(IngestionState state)
+    {
+        return state switch
+        {
+            IngestionState.Installed => DesktopState.Installed,
+            IngestionState.Downloaded or IngestionState.Staged or IngestionState.Converting or IngestionState.Converted or IngestionState.Installing => DesktopState.Downloaded,
+            _ => DesktopState.Cloud,
+        };
     }
 
     public async Task UpsertAssetAsync(SongIngestionAssetEntry entry, CancellationToken cancellationToken = default)
@@ -795,6 +907,36 @@ public sealed class SongIngestionCatalogService
         using var connection = CreateConnection();
         connection.Open();
 
+        EnsureSchemaMetadataTable(connection);
+        var existingVersion = GetSchemaVersion(connection);
+        if (existingVersion != SchemaVersion)
+        {
+            RebuildSchema(connection);
+            SetSchemaVersion(connection, SchemaVersion);
+            return;
+        }
+
+        EnsureColumnExists(connection, "song_ingestions", "desktop_state", "TEXT NOT NULL DEFAULT 'Cloud'");
+        EnsureColumnExists(connection, "song_ingestions", "artist", "TEXT NULL");
+        EnsureColumnExists(connection, "song_ingestions", "title", "TEXT NULL");
+        EnsureColumnExists(connection, "song_ingestions", "charter", "TEXT NULL");
+    }
+
+    private static void RebuildSchema(SqliteConnection connection)
+    {
+        using var dropCommand = connection.CreateCommand();
+        dropCommand.CommandText = """
+            DROP TABLE IF EXISTS installed_manifest_files;
+            DROP TABLE IF EXISTS song_assets;
+            DROP TABLE IF EXISTS song_state_events;
+            DROP TABLE IF EXISTS song_attempts;
+            DROP TABLE IF EXISTS song_ingestions;
+            DROP TABLE IF EXISTS library_song_keys;
+            DROP TABLE IF EXISTS library_songs;
+            DROP TABLE IF EXISTS library_entries;
+            """;
+        dropCommand.ExecuteNonQuery();
+
         using var command = connection.CreateCommand();
         command.CommandText = """
             CREATE TABLE IF NOT EXISTS song_ingestions (
@@ -803,6 +945,10 @@ public sealed class SongIngestionCatalogService
                 source_id TEXT NULL,
                 source_link TEXT NOT NULL,
                 normalized_link TEXT NOT NULL,
+                artist TEXT NULL,
+                title TEXT NULL,
+                charter TEXT NULL,
+                desktop_state TEXT NOT NULL,
                 current_state TEXT NOT NULL,
                 created_at_utc TEXT NOT NULL,
                 updated_at_utc TEXT NOT NULL,
@@ -876,8 +1022,94 @@ public sealed class SongIngestionCatalogService
 
             CREATE INDEX IF NOT EXISTS idx_manifest_ingestion
                 ON installed_manifest_files(ingestion_id);
+
+            CREATE TABLE IF NOT EXISTS library_songs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                local_path TEXT NOT NULL,
+                artist TEXT NULL,
+                title TEXT NULL,
+                charter TEXT NULL,
+                internal_identity_key TEXT NULL,
+                content_identity_hash TEXT NULL,
+                created_at_utc TEXT NOT NULL,
+                updated_at_utc TEXT NOT NULL,
+                UNIQUE(local_path)
+            );
+
+            CREATE TABLE IF NOT EXISTS library_song_keys (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                library_song_id INTEGER NOT NULL,
+                source TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                external_key_hash TEXT NOT NULL,
+                created_at_utc TEXT NOT NULL,
+                UNIQUE(external_key_hash),
+                UNIQUE(library_song_id, source),
+                FOREIGN KEY(library_song_id) REFERENCES library_songs(id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_library_songs_content_identity_hash
+                ON library_songs(content_identity_hash);
+
+            CREATE INDEX IF NOT EXISTS idx_library_song_keys_source
+                ON library_song_keys(source, source_id);
+
+            CREATE INDEX IF NOT EXISTS idx_library_song_keys_library_song_id
+                ON library_song_keys(library_song_id);
             """;
         command.ExecuteNonQuery();
+    }
+
+    private static void EnsureSchemaMetadataTable(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE TABLE IF NOT EXISTS schema_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            """;
+        command.ExecuteNonQuery();
+    }
+
+    private static int? GetSchemaVersion(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT value FROM schema_metadata WHERE key = $key LIMIT 1;";
+        command.Parameters.AddWithValue("$key", SchemaVersionKey);
+        var value = command.ExecuteScalar();
+        if (value is null || value is DBNull)
+            return null;
+
+        return int.TryParse(Convert.ToString(value), out var parsed) ? parsed : null;
+    }
+
+    private static void SetSchemaVersion(SqliteConnection connection, int version)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO schema_metadata (key, value)
+            VALUES ($key, $value)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+            """;
+        command.Parameters.AddWithValue("$key", SchemaVersionKey);
+        command.Parameters.AddWithValue("$value", version.ToString());
+        command.ExecuteNonQuery();
+    }
+
+    private static void EnsureColumnExists(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
+
+        try
+        {
+            command.ExecuteNonQuery();
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == 1 && ex.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+        {
+            // Existing installs may already have this column.
+        }
     }
 
     private SqliteConnection CreateConnection()

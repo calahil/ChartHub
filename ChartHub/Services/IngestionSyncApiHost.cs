@@ -127,6 +127,8 @@ public sealed class IngestionSyncApiHost(
                     ingestions = true,
                     events = true,
                     fromStateOverride = true,
+                    metadata = true,
+                    desktopState = true,
                 },
                 runtime = new
                 {
@@ -178,17 +180,31 @@ public sealed class IngestionSyncApiHost(
             }
 
             var source = payload.Source.Trim().ToLowerInvariant();
-            var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(source, payload.SourceId, payload.SourceLink, cancellationToken);
+            var canonicalSourceId = LibraryIdentityService.NormalizeSourceKey(source, payload.SourceId);
+            var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
+                source,
+                canonicalSourceId,
+                payload.SourceLink,
+                payload.Artist,
+                payload.Title,
+                payload.Charter,
+                cancellationToken);
             var attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
 
             var fromState = ingestion.CurrentState;
-            if (fromState != IngestionState.Downloaded)
+            var targetIngestionState = string.IsNullOrWhiteSpace(payload.DownloadedLocation)
+                ? IngestionState.Queued
+                : IngestionState.Downloaded;
+
+            if (fromState != targetIngestionState)
             {
-                var targetState = _ingestionStateMachine.CanTransition(fromState, IngestionState.Downloaded)
-                    ? IngestionState.Downloaded
+                var targetState = _ingestionStateMachine.CanTransition(fromState, targetIngestionState)
+                    ? targetIngestionState
                     : IngestionState.Queued;
 
-                if (targetState == IngestionState.Queued && _ingestionStateMachine.CanTransition(IngestionState.Queued, IngestionState.Downloaded))
+                if (targetState == IngestionState.Queued
+                    && targetIngestionState != IngestionState.Queued
+                    && _ingestionStateMachine.CanTransition(IngestionState.Queued, targetIngestionState))
                 {
                     await _ingestionCatalog.RecordStateTransitionAsync(
                         ingestion.Id,
@@ -199,7 +215,7 @@ public sealed class IngestionSyncApiHost(
                         cancellationToken);
 
                     fromState = IngestionState.Queued;
-                    targetState = IngestionState.Downloaded;
+                    targetState = targetIngestionState;
                 }
 
                 await _ingestionCatalog.RecordStateTransitionAsync(
@@ -227,7 +243,13 @@ public sealed class IngestionSyncApiHost(
             {
                 ingestionId = ingestion.Id,
                 normalizedLink = ingestion.NormalizedLink,
-                state = IngestionState.Downloaded.ToString(),
+                state = targetIngestionState.ToString(),
+                metadata = new
+                {
+                    artist = ingestion.Artist,
+                    title = ingestion.Title,
+                    charter = ingestion.Charter,
+                },
             });
             return;
         }
@@ -414,11 +436,14 @@ public sealed class IngestionSyncApiHost(
                 return;
             }
 
+            var queueItem = await _ingestionCatalog.GetQueueItemByIdAsync(ingestionId, cancellationToken);
             await WriteJsonAsync(response, HttpStatusCode.Accepted, new
             {
                 ingestionId,
                 action = "install",
                 installedDirectories,
+                desktopState = queueItem?.DesktopState.ToString() ?? DesktopState.Cloud.ToString(),
+                desktopPath = queueItem?.DesktopLibraryPath,
             });
             return;
         }
@@ -599,6 +624,9 @@ public sealed class IngestionSyncApiHost(
         public string? DownloadedLocation { get; set; }
         public long? SizeBytes { get; set; }
         public string? ContentHash { get; set; }
+        public string? Artist { get; set; }
+        public string? Title { get; set; }
+        public string? Charter { get; set; }
     }
 
     private sealed class IngestionEventRequest

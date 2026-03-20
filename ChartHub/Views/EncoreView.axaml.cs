@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.VisualTree;
 using ChartHub.ViewModels;
 
@@ -40,5 +41,15 @@ public partial class EncoreView : UserControl
             return;
 
         await viewModel.LoadMoreAsync();
+    }
+
+    private async void SearchTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || DataContext is not EncoreViewModel viewModel)
+            return;
+
+        e.Handled = true;
+        if (viewModel.RefreshCommand.CanExecute(null))
+            await viewModel.RefreshCommand.ExecuteAsync(null);
     }
 }

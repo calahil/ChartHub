@@ -13,9 +13,14 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
     public string? SourceId { get; init; }
     public string SourceLink { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
+    public string? Artist { get; init; }
+    public string? Title { get; init; }
+    public string? Charter { get; init; }
     public IngestionState CurrentState { get; init; }
     public string? DownloadedLocation { get; init; }
     public string? InstalledLocation { get; init; }
+    public DesktopState DesktopState { get; init; } = DesktopState.Cloud;
+    public string? DesktopLibraryPath { get; init; }
     public DateTimeOffset UpdatedAtUtc { get; init; }
 
     public bool Checked

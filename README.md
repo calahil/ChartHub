@@ -92,7 +92,9 @@ You can also use the workspace tasks in `.vscode/tasks.json` for `build`, `run`,
 	"supports": {
 		"ingestions": true,
 		"events": true,
-		"fromStateOverride": true
+		"fromStateOverride": true,
+		"metadata": true,
+		"desktopLibraryStatus": true
 	},
 	"runtime": {
 		"allowSyncApiStateOverride": false
@@ -109,7 +111,10 @@ You can also use the workspace tasks in `.vscode/tasks.json` for `build`, `run`,
 	"sourceLink": "https://drive.google.com/file/d/abc123/view",
 	"downloadedLocation": "/path/to/file.zip",
 	"sizeBytes": 12345,
-	"contentHash": "sha256:..."
+	"contentHash": "sha256:...",
+	"artist": "Tool",
+	"title": "Sober",
+	"charter": "Convour/clintilona/nunchuck/DenVaktare"
 }
 ```
 
@@ -119,7 +124,12 @@ You can also use the workspace tasks in `.vscode/tasks.json` for `build`, `run`,
 {
 	"ingestionId": 42,
 	"normalizedLink": "https://drive.google.com/file/d/abc123/view",
-	"state": "Downloaded"
+	"state": "Downloaded",
+	"metadata": {
+		"artist": "Tool",
+		"title": "Sober",
+		"charter": "Convour/clintilona/nunchuck/DenVaktare"
+	}
 }
 ```
 
@@ -132,10 +142,15 @@ You can also use the workspace tasks in `.vscode/tasks.json` for `build`, `run`,
 		"Source": "googledrive",
 		"SourceId": "drive-file-id",
 		"SourceLink": "https://drive.google.com/file/d/abc123/view",
+		"Artist": "Tool",
+		"Title": "Sober",
+		"Charter": "Convour/clintilona/nunchuck/DenVaktare",
 		"DisplayName": "song.zip",
 		"CurrentState": "Downloaded",
 		"DownloadedLocation": "/path/to/file.zip",
 		"InstalledLocation": null,
+		"IsInDesktopLibrary": false,
+		"DesktopLibraryPath": null,
 		"UpdatedAtUtc": "2026-03-18T12:34:56.0000000+00:00",
 		"Checked": false,
 		"UpdatedText": "2026-03-18 12:34:56",

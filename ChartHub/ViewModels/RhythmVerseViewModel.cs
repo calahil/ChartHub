@@ -119,6 +119,7 @@ namespace ChartHub.ViewModels
                 if (value != null && value > 0 && value <= TotalPages)
                 {
                     ApiClient.CurrentPage = value;
+                    ApiClient.HasMoreRecords = true;
                     OnPropertyChanged();
                     OnPropertyChanged(nameof(CurrentPage));
                     if (DataItems != null)
@@ -397,6 +398,8 @@ namespace ChartHub.ViewModels
             {
                 DataItems = [];
             }
+            ApiClient.CurrentPage = 1;
+            ApiClient.HasMoreRecords = true;
             IsLoading = false;
             IsPlaceholder = true;
             NoResults = false;
@@ -429,18 +432,8 @@ namespace ChartHub.ViewModels
                     ["status"] = downloadItem.Status,
                 });
 
-            if (result.Success && !string.IsNullOrWhiteSpace(file.SourceName) && !string.IsNullOrWhiteSpace(file.SourceId))
-            {
-                await _libraryCatalog.UpsertAsync(new LibraryCatalogEntry(
-                    file.SourceName,
-                    file.SourceId,
-                    file.Title,
-                    file.Artist,
-                    file.Author?.Shortname,
-                    result.FinalLocation,
-                    DateTimeOffset.UtcNow));
-                file.IsInLibrary = true;
-            }
+            if (result.Success)
+                file.IsInLibrary = false;
 
             _downloadTokens.Remove(downloadItem);
             cts.Dispose();
@@ -485,7 +478,14 @@ namespace ChartHub.ViewModels
             IsLoading = true;
             try
             {
-                if (!ApiClient.HasMoreRecords)
+                if (search)
+                {
+                    // Ensure new searches always execute a payload fetch, even after previous pagination exhaustion.
+                    ApiClient.CurrentPage = 1;
+                    ApiClient.HasMoreRecords = true;
+                }
+
+                if (!search && !ApiClient.HasMoreRecords)
                 {
                     NoResults = DataItems == null || DataItems.Count < 1;
                     return;
@@ -515,10 +515,20 @@ namespace ChartHub.ViewModels
 
         private async Task ApplyLibraryMembershipAsync(IEnumerable<ViewSong> songs)
         {
-            var sourceIds = songs
-                .Select(song => song.SourceId)
-                .Where(sourceId => !string.IsNullOrWhiteSpace(sourceId))
-                .Cast<string>()
+            var keyedSongs = songs
+                .Where(song => !string.IsNullOrWhiteSpace(song.SourceName) && !string.IsNullOrWhiteSpace(song.SourceId))
+                .Select(song => new
+                {
+                    Song = song,
+                    SourceKey = LibraryIdentityService.BuildSourceKey(song.SourceName!, song.SourceId),
+                })
+                .ToArray();
+
+            foreach (var keyedSong in keyedSongs)
+                keyedSong.Song.SourceId = keyedSong.SourceKey;
+
+            var sourceIds = keyedSongs
+                .Select(item => item.SourceKey)
                 .ToArray();
 
             var membership = await _libraryCatalog.GetMembershipMapAsync(LibrarySourceNames.RhythmVerse, sourceIds);

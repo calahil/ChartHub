@@ -329,6 +329,7 @@ namespace ChartHub.ViewModels
         private readonly ITransferOrchestrator _transferOrchestrator;
         private readonly ISongInstallService _songInstallService;
         private readonly SongIngestionCatalogService _ingestionCatalog;
+        private readonly CloneHeroViewModel? _cloneHeroViewModel;
         private readonly CancellationTokenSource _queueRefreshCts = new();
         private Task? _queueRefreshTask;
         private CancellationTokenSource? _installCts;
@@ -343,13 +344,15 @@ namespace ChartHub.ViewModels
             IGoogleDriveClient googleDrive,
             ITransferOrchestrator transferOrchestrator,
             ISongInstallService songInstallService,
-            SongIngestionCatalogService ingestionCatalog)
+            SongIngestionCatalogService ingestionCatalog,
+            CloneHeroViewModel? cloneHeroViewModel = null)
         {
             globalSettings = settings;
             _googleDrive = googleDrive;
             _transferOrchestrator = transferOrchestrator;
             _songInstallService = songInstallService;
             _ingestionCatalog = ingestionCatalog;
+            _cloneHeroViewModel = cloneHeroViewModel;
             DownloadWatcher = OperatingSystem.IsAndroid()
                 ? new SnapshotResourceWatcher(globalSettings.DownloadDir, WatcherType.File)
                 : new ResourceWatcher(globalSettings.DownloadDir, WatcherType.File);
@@ -656,6 +659,10 @@ namespace ChartHub.ViewModels
 
                 foreach (var queueItem in IngestionQueue.Where(item => item.Checked))
                     queueItem.Checked = false;
+
+                // Refresh Clone Hero library to show newly installed songs
+                if (_cloneHeroViewModel is not null)
+                    await _cloneHeroViewModel.RefreshAsync();
             }
             catch (OperationCanceledException)
             {
@@ -873,7 +880,11 @@ namespace ChartHub.ViewModels
                 return;
 
             var sourceLink = BuildLocalSourceLink(file.FilePath);
-            var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync("local", null, sourceLink, cancellationToken);
+            var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
+                "local",
+                LibraryIdentityService.NormalizeSourceKey("local", sourceLink),
+                sourceLink,
+                cancellationToken: cancellationToken);
             var attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
 
             var fromState = ingestion.CurrentState;
@@ -908,7 +919,11 @@ namespace ChartHub.ViewModels
                 return;
 
             var sourceLink = $"gdrive://{file.FilePath}";
-            var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync("googledrive", file.FilePath, sourceLink, cancellationToken);
+            var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
+                "googledrive",
+                LibraryIdentityService.NormalizeSourceKey("googledrive", file.FilePath),
+                sourceLink,
+                cancellationToken: cancellationToken);
             var attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
 
             var fromState = ingestion.CurrentState;

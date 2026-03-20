@@ -5,6 +5,8 @@ using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
 using ChartHub.Utilities;
+using ChartHub.Configuration.Interfaces;
+using ChartHub.Configuration.Models;
 
 namespace ChartHub.Tests;
 
@@ -16,9 +18,9 @@ public class MainViewModelTests
     [Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.Unit)]
     public void Constructor_InDesktopMode_LoadsWatchers_AndShowsDesktopTabs()
     {
-        var cloneHeroWatcher = new ResourceWatcherStub();
+        using var temp = new TemporaryDirectoryFixture("main-vm-clonehero");
         var downloadWatcher = new ResourceWatcherStub();
-        var cloneHeroViewModel = CreateCloneHeroViewModel(cloneHeroWatcher);
+        var cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
         var downloadViewModel = CreateDownloadViewModel(downloadWatcher, new FakeGoogleDriveClient(string.Empty));
         var rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
         var encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
@@ -41,10 +43,9 @@ public class MainViewModelTests
         Assert.Same(downloadViewModel, sut.DownloadViewModel);
         Assert.Same(cloneHeroViewModel, sut.CloneHeroViewModel);
         Assert.Same(settingsViewModel, sut.SettingsViewModel);
-        Assert.Equal(1, cloneHeroWatcher.LoadItemsCallCount);
         Assert.Equal(1, downloadWatcher.LoadItemsCallCount);
         Assert.True(sut.IsSettingsTabVisible);
-        Assert.True(sut.IsCloneHeroTabVisible);
+        Assert.True(SpinWait.SpinUntil(() => sut.IsCloneHeroTabVisible, TimeSpan.FromSeconds(2)));
         Assert.True(sut.IsDownloadTabVisible);
     }
 
@@ -134,11 +135,48 @@ public class MainViewModelTests
         ]);
     }
 
-    private static ViewModels.CloneHeroViewModel CreateCloneHeroViewModel(IResourceWatcher watcher)
+    private static ViewModels.CloneHeroViewModel CreateCloneHeroViewModel(string rootPath)
     {
-        var viewModel = CreateUninitialized<ViewModels.CloneHeroViewModel>();
-        viewModel.CloneHeroWatcher = watcher;
-        return viewModel;
+        var settings = CreateSettings(rootPath);
+        var catalog = new LibraryCatalogService(Path.Combine(rootPath, "library-catalog.db"));
+        var reconciliation = new CloneHeroLibraryReconciliationService(
+            settings,
+            catalog,
+            new SongIniMetadataParser(),
+            new CloneHeroDirectorySchemaService());
+
+        return new ViewModels.CloneHeroViewModel(settings, catalog, reconciliation, new NoopDesktopPathOpener());
+    }
+
+    private static AppGlobalSettings CreateSettings(string rootPath)
+    {
+        var config = new AppConfigRoot
+        {
+            Runtime = new RuntimeAppConfig
+            {
+                TempDirectory = Path.Combine(rootPath, "Temp"),
+                DownloadDirectory = Path.Combine(rootPath, "Downloads"),
+                StagingDirectory = Path.Combine(rootPath, "Staging"),
+                OutputDirectory = Path.Combine(rootPath, "Output"),
+                CloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero"),
+                CloneHeroSongDirectory = Path.Combine(rootPath, "CloneHero", "Songs"),
+            },
+        };
+
+        foreach (var dir in new[]
+        {
+            config.Runtime.TempDirectory,
+            config.Runtime.DownloadDirectory,
+            config.Runtime.StagingDirectory,
+            config.Runtime.OutputDirectory,
+            config.Runtime.CloneHeroDataDirectory,
+            config.Runtime.CloneHeroSongDirectory,
+        })
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        return new AppGlobalSettings(new FakeSettingsOrchestrator(config));
     }
 
     private static ViewModels.DownloadViewModel CreateDownloadViewModel(IResourceWatcher watcher, IGoogleDriveClient driveClient)
@@ -171,6 +209,33 @@ public class MainViewModelTests
         public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<ObservableCollection<WatcherFile>> GetFileDataCollectionAsync(string directoryId) => Task.FromResult(new ObservableCollection<WatcherFile>());
+    }
+
+    private sealed class NoopDesktopPathOpener : IDesktopPathOpener
+    {
+        public Task OpenDirectoryAsync(string directoryPath, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator
+    {
+        public AppConfigRoot Current { get; private set; } = current;
+        public event Action<AppConfigRoot>? SettingsChanged;
+
+        public Task<ConfigValidationResult> UpdateAsync(Action<AppConfigRoot> update, CancellationToken cancellationToken = default)
+        {
+            update(Current);
+            SettingsChanged?.Invoke(Current);
+            return Task.FromResult(ConfigValidationResult.Success);
+        }
+
+        public Task ReloadAsync(CancellationToken cancellationToken = default)
+        {
+            SettingsChanged?.Invoke(Current);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class ResourceWatcherStub : IResourceWatcher

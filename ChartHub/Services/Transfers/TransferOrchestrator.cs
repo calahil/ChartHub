@@ -71,10 +71,14 @@ public sealed class TransferOrchestrator(
         try
         {
             var sourceName = NormalizeSourceName(song.SourceName);
+            var canonicalSourceId = LibraryIdentityService.NormalizeSourceKey(sourceName, song.SourceId);
             var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
                 sourceName,
-                song.SourceId,
+                canonicalSourceId,
                 request.SourceUrl,
+                song.Artist,
+                song.Title,
+                song.Author?.Shortname,
                 cancellationToken);
             var attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
             var ingestionState = ingestion.CurrentState;

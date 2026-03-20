@@ -2,6 +2,26 @@ namespace ChartHub.Utilities;
 
 public static class SafePathHelper
 {
+    public static string SanitizePathSegment(string? segment, string fallback = "item")
+    {
+        var candidate = string.IsNullOrWhiteSpace(segment)
+            ? fallback
+            : segment;
+
+        candidate = candidate
+            .Replace(Path.DirectorySeparatorChar, '_')
+            .Replace(Path.AltDirectorySeparatorChar, '_')
+            .Trim();
+
+        foreach (var ch in Path.GetInvalidFileNameChars())
+            candidate = candidate.Replace(ch, '_');
+
+        if (string.IsNullOrWhiteSpace(candidate) || candidate is "." or "..")
+            return fallback;
+
+        return candidate;
+    }
+
     public static string SanitizeFileName(string? fileName, string fallback = "file")
     {
         var candidate = string.IsNullOrWhiteSpace(fileName)

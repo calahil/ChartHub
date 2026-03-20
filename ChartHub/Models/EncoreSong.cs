@@ -117,11 +117,7 @@ public sealed class EncoreSong : INotifyPropertyChanged
 
     public IEnumerable<string> GetCatalogSourceIds()
     {
-        if (ChartId > 0)
-            yield return ChartId.ToString();
-
-        if (!string.IsNullOrWhiteSpace(Md5))
-            yield return Md5;
+        yield return LibraryIdentityService.BuildEncoreSourceKey(ChartId, Md5);
     }
 
     public ViewSong ToViewSong(string? fileName = null)
@@ -134,7 +130,7 @@ public sealed class EncoreSong : INotifyPropertyChanged
             : ApplicationUsername;
         var sourceId = !string.IsNullOrWhiteSpace(SourceId)
             ? SourceId
-            : (ChartId > 0 ? ChartId.ToString() : Md5);
+            : LibraryIdentityService.BuildEncoreSourceKey(ChartId, Md5);
 
         return new ViewSong
         {

@@ -303,11 +303,12 @@ namespace ChartHub.Services
             var artist = GetYamlScalar(metadata, "artist", "Unknown Artist");
             var title = GetYamlScalar(metadata, "title", Path.GetFileNameWithoutExtension(songPath));
             var normalizedSuffix = NormalizeSourceSuffix(sourceSuffix);
-            var finalDirectoryName = SafePathHelper.SanitizeFileName($"{artist} - {title}", "song");
-
+            var finalArtist = SafePathHelper.SanitizeFileName(artist, "song");
+            var finalTitle = SafePathHelper.SanitizeFileName(title, "song");
+            var finalDirectoryName = Path.Combine(finalArtist, $"{finalTitle}__{normalizedSuffix}");
             using var writer = new StreamWriter(songPath);
             yaml.Save(writer, assignAnchors: false);
-            return $"{finalDirectoryName}__{normalizedSuffix}";
+            return finalDirectoryName;
         }
 
         private string MoveBuiltOutputToCloneHero(string buildOutputRoot, string finalDirectoryName)
@@ -335,6 +336,10 @@ namespace ChartHub.Services
 
                 return finalDirectory;
             }
+
+            var finalParent = Path.GetDirectoryName(finalDirectory);
+            if (!string.IsNullOrWhiteSpace(finalParent))
+                Directory.CreateDirectory(finalParent);
 
             Directory.Move(candidateDir, finalDirectory);
             return finalDirectory;

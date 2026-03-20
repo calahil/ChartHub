@@ -170,7 +170,6 @@ public sealed class EncoreApiService : INotifyPropertyChanged
 
     private EncoreSong MapSong(EncoreSongDto song)
     {
-        var sourceId = song.ChartId > 0 ? song.ChartId.ToString() : song.Md5;
         var charter = !string.IsNullOrWhiteSpace(song.Charter)
             ? song.Charter
             : (!string.IsNullOrWhiteSpace(song.ApplicationUsername) ? song.ApplicationUsername : "Unknown Charter");
@@ -198,7 +197,7 @@ public sealed class EncoreApiService : INotifyPropertyChanged
             BandDifficulty = song.DiffBand,
             GuitarDifficulty = song.DiffGuitar,
             GuitarCoopDifficulty = song.DiffGuitarCoop,
-            RhythmDifficulty = song.DiffRhythm,
+            SourceId = LibraryIdentityService.BuildEncoreSourceKey(song.ChartId, song.Md5),
             DrumsDifficulty = song.DiffDrums,
             RealDrumsDifficulty = song.DiffDrumsReal,
             BassDifficulty = song.DiffBass,
@@ -209,7 +208,6 @@ public sealed class EncoreApiService : INotifyPropertyChanged
             HasVideoBackground = song.HasVideoBackground,
             Modchart = song.Modchart,
             SourceName = LibrarySourceNames.Encore,
-            SourceId = sourceId,
         };
     }
 

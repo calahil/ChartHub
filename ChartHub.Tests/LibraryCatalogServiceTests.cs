@@ -1,5 +1,8 @@
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
+using ChartHub.Configuration.Interfaces;
+using ChartHub.Configuration.Models;
+using ChartHub.Utilities;
 
 namespace ChartHub.Tests;
 
@@ -101,5 +104,150 @@ public class LibraryCatalogServiceTests
         Assert.Equal(1, removed);
         Assert.True(await sut.IsInLibraryAsync(LibrarySourceNames.Encore, "existing"));
         Assert.False(await sut.IsInLibraryAsync(LibrarySourceNames.Encore, "missing"));
+    }
+
+    [Fact]
+    public async Task UpsertAsync_EnforcesUniqueLocalPathForInstalledLibraryRows()
+    {
+        using var temp = new TemporaryDirectoryFixture("library-catalog-unique-local-path");
+        var sut = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var localPath = Path.Combine(temp.RootPath, "CloneHero", "Songs", "Artist", "Song", "Charter__encore");
+        Directory.CreateDirectory(localPath);
+
+        await sut.UpsertAsync(new LibraryCatalogEntry(
+            LibrarySourceNames.Import,
+            LibraryIdentityService.BuildSourceKey(LibrarySourceNames.Import, "import-song"),
+            "Song",
+            "Artist",
+            "Charter",
+            localPath,
+            DateTimeOffset.UtcNow.AddMinutes(-1)));
+
+        await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(async () =>
+            await sut.UpsertAsync(new LibraryCatalogEntry(
+                LibrarySourceNames.Encore,
+                LibraryIdentityService.BuildEncoreSourceKey(1, "md5-song"),
+                "Song",
+                "Artist",
+                "Charter",
+                localPath,
+                DateTimeOffset.UtcNow)));
+    }
+
+    [Fact]
+    public async Task ReconcileSongDirectoryAsync_PreservesExistingSourceIdentityAcrossRename()
+    {
+        using var temp = new TemporaryDirectoryFixture("library-catalog-reconcile-preserve-source");
+        var settings = CreateSettings(temp.RootPath);
+        var sut = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var reconciliation = new CloneHeroLibraryReconciliationService(
+            settings,
+            sut,
+            new SongIniMetadataParser(),
+            new CloneHeroDirectorySchemaService());
+
+        var legacyDirectory = Path.Combine(temp.RootPath, "CloneHero", "Songs", "legacy-song");
+        Directory.CreateDirectory(legacyDirectory);
+        await File.WriteAllTextAsync(Path.Combine(legacyDirectory, "song.ini"), """
+            [song]
+            name = Reconciled Song
+            artist = Reconciled Artist
+            charter = Reconciled Charter
+            """);
+
+        await sut.UpsertAsync(new LibraryCatalogEntry(
+            LibrarySourceNames.Encore,
+            "encore-md5-123",
+            "Old Song",
+            "Old Artist",
+            null,
+            legacyDirectory,
+            DateTimeOffset.UtcNow.AddMinutes(-1)));
+
+        var reconciled = await reconciliation.ReconcileSongDirectoryAsync(legacyDirectory);
+
+        Assert.True(reconciled);
+
+        var entries = await sut.GetEntriesByArtistAsync("Reconciled Artist");
+        var entry = Assert.Single(entries);
+        Assert.Equal(LibrarySourceNames.Encore, entry.Source);
+        Assert.Equal(LibraryIdentityService.NormalizeSourceKey(LibrarySourceNames.Encore, "encore-md5-123"), entry.SourceId);
+        Assert.NotEqual(legacyDirectory, entry.LocalPath);
+        Assert.True(Directory.Exists(entry.LocalPath));
+        Assert.False(await sut.IsInLibraryAsync(LibrarySourceNames.Import, entry.LocalPath!));
+    }
+
+    [Fact]
+    public async Task RemoveDuplicateLocalPathEntriesUnderRootAsync_NoopsWhenSchemaAlreadyEnforcesUniquePaths()
+    {
+        using var temp = new TemporaryDirectoryFixture("library-catalog-root-dedupe-noop");
+        var sut = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var cloneHeroPath = Path.Combine(temp.RootPath, "CloneHero", "Songs", "Artist", "Song", "Charter__encore");
+        Directory.CreateDirectory(cloneHeroPath);
+
+        await sut.UpsertAsync(new LibraryCatalogEntry(
+            LibrarySourceNames.Encore,
+            LibraryIdentityService.BuildEncoreSourceKey(42, "clonehero-new"),
+            "Song",
+            "Artist",
+            "Charter",
+            cloneHeroPath,
+            DateTimeOffset.UtcNow));
+
+        var removed = await sut.RemoveDuplicateLocalPathEntriesUnderRootAsync(Path.Combine(temp.RootPath, "CloneHero", "Songs"));
+
+        Assert.Equal(0, removed);
+        Assert.True(await sut.IsInLibraryAsync(LibrarySourceNames.Encore, LibraryIdentityService.BuildEncoreSourceKey(42, "clonehero-new")));
+    }
+
+    private static AppGlobalSettings CreateSettings(string rootPath)
+    {
+        var config = new AppConfigRoot
+        {
+            Runtime = new RuntimeAppConfig
+            {
+                TempDirectory = Path.Combine(rootPath, "Temp"),
+                DownloadDirectory = Path.Combine(rootPath, "Downloads"),
+                StagingDirectory = Path.Combine(rootPath, "Staging"),
+                OutputDirectory = Path.Combine(rootPath, "Output"),
+                CloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero"),
+                CloneHeroSongDirectory = Path.Combine(rootPath, "CloneHero", "Songs"),
+            },
+        };
+
+        foreach (var dir in new[]
+        {
+            config.Runtime.TempDirectory,
+            config.Runtime.DownloadDirectory,
+            config.Runtime.StagingDirectory,
+            config.Runtime.OutputDirectory,
+            config.Runtime.CloneHeroDataDirectory,
+            config.Runtime.CloneHeroSongDirectory,
+        })
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        return new AppGlobalSettings(new FakeSettingsOrchestrator(config));
+    }
+
+    private sealed class FakeSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator
+    {
+        public AppConfigRoot Current { get; private set; } = current;
+
+        public event Action<AppConfigRoot>? SettingsChanged;
+
+        public Task<ConfigValidationResult> UpdateAsync(Action<AppConfigRoot> update, CancellationToken cancellationToken = default)
+        {
+            update(Current);
+            SettingsChanged?.Invoke(Current);
+            return Task.FromResult(ConfigValidationResult.Success);
+        }
+
+        public Task ReloadAsync(CancellationToken cancellationToken = default)
+        {
+            SettingsChanged?.Invoke(Current);
+            return Task.CompletedTask;
+        }
     }
 }

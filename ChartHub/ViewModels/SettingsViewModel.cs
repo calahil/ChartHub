@@ -747,6 +747,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 return;
             }
 
+            var requiresReloadAfterSave = Fields.Any(FieldRequiresReloadAfterSave);
+
             var result = await _settings.UpdateAsync(config =>
             {
                 foreach (var field in Fields)
@@ -779,7 +781,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 ["elapsedMs"] = saveStopwatch.ElapsedMilliseconds,
             });
 
-            if (Fields.Any(FieldRequiresReloadAfterSave))
+            if (requiresReloadAfterSave)
             {
                 await _settings.ReloadAsync();
                 StatusMessage = "Settings saved and reloaded from current configuration.";

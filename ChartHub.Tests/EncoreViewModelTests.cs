@@ -59,14 +59,15 @@ public class EncoreViewModelTests
     }
 
     [Fact]
-    public async Task RefreshAsync_WhenLegacyMd5CatalogEntryExists_MarksSongAsInLibrary_AndUsesChartIdSourceId()
+    public async Task RefreshAsync_WhenCanonicalCatalogEntryExists_MarksSongAsInLibrary_AndUsesCanonicalSourceId()
     {
-        using var temp = new TemporaryDirectoryFixture("encore-vm-legacy-md5-membership");
+        using var temp = new TemporaryDirectoryFixture("encore-vm-canonical-membership");
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
         const string md5 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var canonicalSourceId = LibraryIdentityService.BuildEncoreSourceKey(777, md5);
         await catalog.UpsertAsync(new LibraryCatalogEntry(
             LibrarySourceNames.Encore,
-            md5,
+            canonicalSourceId,
             "Legacy Song",
             "Legacy Artist",
             "Legacy Charter",
@@ -86,13 +87,13 @@ public class EncoreViewModelTests
 
         var song = Assert.Single(sut.DataItems);
         Assert.True(song.IsInLibrary);
-        Assert.Equal("777", song.SourceId);
+        Assert.Equal(canonicalSourceId, song.SourceId);
     }
 
     [Fact]
-    public async Task DownloadSongAsync_PersistsBothChartIdAndMd5CatalogKeys()
+    public async Task DownloadSongAsync_DoesNotPersistInstalledLibraryEntryBeforeInstall()
     {
-        using var temp = new TemporaryDirectoryFixture("encore-vm-dual-key-upsert");
+        using var temp = new TemporaryDirectoryFixture("encore-vm-download-no-library-upsert");
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
         const string md5 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
@@ -110,8 +111,8 @@ public class EncoreViewModelTests
 
         await sut.DownloadSongAsync(song);
 
-        Assert.True(await catalog.IsInLibraryAsync(LibrarySourceNames.Encore, "888"));
-        Assert.True(await catalog.IsInLibraryAsync(LibrarySourceNames.Encore, md5));
+        Assert.False(await catalog.IsInLibraryAsync(LibrarySourceNames.Encore, LibraryIdentityService.BuildEncoreSourceKey(888, md5)));
+        Assert.False(song.IsInLibrary);
     }
 
     [Fact]
@@ -188,7 +189,7 @@ public class EncoreViewModelTests
         Assert.Equal(0, transfer.LastSong.BassString);
         Assert.Equal(0, transfer.LastSong.VocalString);
         Assert.Equal(0, transfer.LastSong.KeysString);
-        Assert.Equal("321", transfer.LastSong.SourceId);
+        Assert.Equal(LibraryIdentityService.BuildEncoreSourceKey(321, md5), transfer.LastSong.SourceId);
     }
 
     [Fact]

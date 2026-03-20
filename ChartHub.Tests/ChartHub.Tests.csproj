@@ -22,4 +22,11 @@
     <ProjectReference Include="..\ChartHub\ChartHub.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\ChartHub\Tests\song-sample1.ini" Link="Samples\song-sample1.ini" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\ChartHub\Tests\song-sample2.ini" Link="Samples\song-sample2.ini" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\ChartHub\Tests\song-sample3.ini" Link="Samples\song-sample3.ini" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\ChartHub\Tests\song-sample4.ini" Link="Samples\song-sample4.ini" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

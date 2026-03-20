@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.VisualTree;
 using ChartHub.Models;
 using ChartHub.ViewModels;
@@ -97,5 +98,15 @@ public partial class RhythmVerseView : UserControl
             return;
 
         await viewModel.LoadMoreAsync();
+    }
+
+    private async void SearchTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || DataContext is not RhythmVerseViewModel viewModel)
+            return;
+
+        e.Handled = true;
+        if (viewModel.RefreshButtonCommand.CanExecute(null))
+            await viewModel.RefreshButtonCommand.ExecuteAsync(null);
     }
 }

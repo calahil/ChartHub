@@ -81,6 +81,8 @@ public class IngestionSyncApiHostTests
         Assert.True(json.RootElement.GetProperty("supports").GetProperty("ingestions").GetBoolean());
         Assert.True(json.RootElement.GetProperty("supports").GetProperty("events").GetBoolean());
         Assert.True(json.RootElement.GetProperty("supports").GetProperty("fromStateOverride").GetBoolean());
+        Assert.True(json.RootElement.GetProperty("supports").GetProperty("metadata").GetBoolean());
+        Assert.True(json.RootElement.GetProperty("supports").GetProperty("desktopState").GetBoolean());
         Assert.False(json.RootElement.GetProperty("runtime").GetProperty("allowSyncApiStateOverride").GetBoolean());
     }
 
@@ -125,7 +127,8 @@ public class IngestionSyncApiHostTests
         Assert.Equal("googledrive", item.GetProperty("Source").GetString());
         // Accept either Queued or Downloaded, depending on what POST /api/ingestions left it as
         Assert.Contains(item.GetProperty("CurrentState").GetString(), new[] { "Queued", "Downloaded" });
-        Assert.Equal("drive-id-single", item.GetProperty("SourceId").GetString());
+        Assert.Equal(LibraryIdentityService.BuildSourceKey("googledrive", "drive-id-single"), item.GetProperty("SourceId").GetString());
+        Assert.Contains(item.GetProperty("DesktopState").GetString(), new[] { "Cloud", "Downloaded" });
     }
 
     [Fact]
@@ -140,6 +143,49 @@ public class IngestionSyncApiHostTests
 
         using var response = await client.GetAsync("api/ingestions/999999");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateIngestion_WithMetadata_RoundTripsInSingleItemPayload()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-metadata");
+        await using var host = CreateHost(temp.RootPath, "token-metadata");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-metadata");
+
+        var createPayload = JsonSerializer.Serialize(new
+        {
+            source = "googledrive",
+            sourceId = "drive-id-meta",
+            sourceLink = "https://drive.google.com/file/d/meta/view",
+            downloadedLocation = "/tmp/meta-song.zip",
+            artist = "Tool",
+            title = "Sober",
+            charter = "Convour/clintilona/nunchuck/DenVaktare",
+        });
+
+        using var createResponse = await client.PostAsync(
+            "api/ingestions",
+            new StringContent(createPayload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.Accepted, createResponse.StatusCode);
+
+        var createBody = await createResponse.Content.ReadAsStringAsync();
+        using var createJson = JsonDocument.Parse(createBody);
+        var ingestionId = createJson.RootElement.GetProperty("ingestionId").GetInt64();
+
+        using var getResponse = await client.GetAsync($"api/ingestions/{ingestionId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+
+        var getBody = await getResponse.Content.ReadAsStringAsync();
+        using var getJson = JsonDocument.Parse(getBody);
+        var item = getJson.RootElement.GetProperty("item");
+
+        Assert.Equal("Tool", item.GetProperty("Artist").GetString());
+        Assert.Equal("Sober", item.GetProperty("Title").GetString());
+        Assert.Equal("Convour/clintilona/nunchuck/DenVaktare", item.GetProperty("Charter").GetString());
     }
 
     [Fact]
@@ -577,15 +623,15 @@ public class IngestionSyncApiHostTests
         Assert.Null(opener.LastOpenedDirectory);
     }
 
-        private static async Task<long> CreateDownloadedIngestionAsync(HttpClient client, string sourceId, string sourceLink, string downloadedLocation = "/tmp/song.zip")
+    private static async Task<long> CreateDownloadedIngestionAsync(HttpClient client, string sourceId, string sourceLink, string downloadedLocation = "/tmp/song.zip")
     {
-                var createPayload = JsonSerializer.Serialize(new
-                {
-                        source = "googledrive",
-                        sourceId,
-                        sourceLink,
-                downloadedLocation,
-                });
+        var createPayload = JsonSerializer.Serialize(new
+        {
+            source = "googledrive",
+            sourceId,
+            sourceLink,
+            downloadedLocation,
+        });
 
         using var createResponse = await client.PostAsync(
             "api/ingestions",

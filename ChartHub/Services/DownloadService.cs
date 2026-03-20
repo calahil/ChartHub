@@ -440,6 +440,7 @@ namespace ChartHub.Services
                 _finished = value;
                 OnPropertyChanged(nameof(Finished));
                 OnPropertyChanged(nameof(CanCancel));
+                OnPropertyChanged(nameof(CanClear));
             }
         }
 
@@ -454,6 +455,7 @@ namespace ChartHub.Services
                     _status = value;
                     OnPropertyChanged(nameof(Status));
                     OnPropertyChanged(nameof(CanCancel));
+                    OnPropertyChanged(nameof(CanClear));
                 }
             }
         }
@@ -463,6 +465,11 @@ namespace ChartHub.Services
             && !string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(Status, "Failed", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(Status, "Completed", StringComparison.OrdinalIgnoreCase);
+
+        public bool CanClear => Finished
+            || string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(Status, "Failed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(Status, "Completed", StringComparison.OrdinalIgnoreCase);
 
         private string? _errorMessage;
         public string? ErrorMessage

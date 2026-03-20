@@ -5,20 +5,75 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="ChartHub.Views.CloneHeroView">
 
-    <Grid RowDefinitions="*" Margin="10">
-        <!-- DataGrid -->
-        <DataGrid ItemsSource="{Binding DataItems}"
-                  SelectedItem="{Binding SelectedFile}"
-                  CanUserSortColumns="True"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="False">
-            <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="{Binding PageStrings.Select}" Binding="{Binding Checked}" Width="80" />
-                <DataGridTextColumn Header="{Binding PageStrings.DisplayName}" Binding="{Binding DisplayName}" />
-                <DataGridTextColumn Header="{Binding PageStrings.FileType}" Binding="{Binding FileType}" Width="120" />
-                <DataGridTextColumn Header="{Binding PageStrings.FileSize}" Binding="{Binding FileSize}" Width="120" />
-            </DataGrid.Columns>
-        </DataGrid>
+    <Grid Margin="10" RowDefinitions="Auto,*">
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <TextBlock Text="Clone Hero Library"
+                       FontSize="18"
+                       FontWeight="Bold" />
+            <Button Grid.Column="1"
+                    Content="Reconcile Library"
+                    Command="{Binding ReconcileLibraryCommand}" />
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnDefinitions="280,*">
+            <Border Grid.Column="0" Margin="0,0,10,0" BorderThickness="1" BorderBrush="{StaticResource ThemeBorderMidBrush}" Padding="8">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Artists" FontWeight="SemiBold" />
+                    <ListBox ItemsSource="{Binding Artists}"
+                             SelectedItem="{Binding SelectedArtist}" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="1" BorderThickness="1" BorderBrush="{StaticResource ThemeBorderMidBrush}" Padding="8">
+                <DataGrid ItemsSource="{Binding Songs}"
+                          SelectedItem="{Binding SelectedSong}"
+                          CanUserSortColumns="True"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" />
+                        <DataGridTextColumn Header="Artist" Binding="{Binding Artist}" Width="180" />
+                        <DataGridTextColumn Header="Charter" Binding="{Binding Charter}" Width="180" />
+                        <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="120" />
+                    </DataGrid.Columns>
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Open Song Folder" Command="{Binding OpenSongFolderCommand}" />
+                            <MenuItem Header="Open song.ini Location" Command="{Binding OpenSongIniCommand}" />
+                            <MenuItem Header="Reconcile This Song" Command="{Binding ReconcileSelectedSongCommand}" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                </DataGrid>
+            </Border>
+        </Grid>
+
+        <Border Grid.RowSpan="2"
+                Background="#AA000000"
+                IsVisible="{Binding IsInitializing}">
+            <Border HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Width="420"
+                    Padding="16"
+                    CornerRadius="10"
+                    Background="{StaticResource ThemeControlLowBrush}"
+                    BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                    BorderThickness="1">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Reconciling Clone Hero Library"
+                               FontSize="16"
+                               FontWeight="Bold" />
+                    <TextBlock Text="{Binding ReconciliationStatus}"
+                               TextWrapping="Wrap" />
+                    <ProgressBar Minimum="0"
+                                 Maximum="100"
+                                 Value="{Binding ReconciliationProgressValue}"
+                                 Height="14" />
+                    <TextBlock Text="Please wait. Clone Hero tab will unlock after scan completes."
+                               Foreground="{StaticResource ThemeForegroundLowBrush}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 
 </UserControl>
