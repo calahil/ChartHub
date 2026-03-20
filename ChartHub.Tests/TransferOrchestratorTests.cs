@@ -145,7 +145,7 @@ public class TransferOrchestratorTests
         Assert.NotNull(result);
         Assert.True(result!.Success);
         Assert.Equal(TransferStage.Completed, result.FinalStage);
-        Assert.Equal("drive://folder-test/song.zip", result.FinalLocation);
+        Assert.Equal("copied-file-id", result.FinalLocation);
         Assert.Equal("song.zip", downloadItem.DisplayName);
         Assert.Equal("folder-test", downloadItem.FilePath);
         Assert.Equal(100, downloadItem.DownloadProgress);
@@ -294,7 +294,7 @@ public class TransferOrchestratorTests
         {
             return Task.FromResult<DestinationWriteResult?>(new DestinationWriteResult(
                 FinalName: desiredName,
-                FinalLocation: $"drive://folder-test/{desiredName}",
+                FinalLocation: "copied-file-id",
                 DestinationContainer: "folder-test"));
         }
 

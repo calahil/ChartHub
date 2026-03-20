@@ -12,11 +12,11 @@ public sealed class GoogleDriveDestinationWriter(IGoogleDriveClient googleDriveC
         var folderId = await GetChartHubFolderIdAsync(cancellationToken);
         var finalName = await ResolveUniqueNameAsync(folderId, desiredName, cancellationToken);
 
-        await _googleDriveClient.UploadFileAsync(folderId, tempFilePath, finalName);
+        var uploadedFileId = await _googleDriveClient.UploadFileAsync(folderId, tempFilePath, finalName);
 
         return new DestinationWriteResult(
             FinalName: finalName,
-            FinalLocation: $"drive://{folderId}/{finalName}",
+            FinalLocation: uploadedFileId,
             DestinationContainer: folderId);
     }
 
@@ -30,17 +30,17 @@ public sealed class GoogleDriveDestinationWriter(IGoogleDriveClient googleDriveC
 
         try
         {
-            await _googleDriveClient.CopyFileIntoFolderAsync(sourceFileId, folderId, finalName);
+            var copiedFileId = await _googleDriveClient.CopyFileIntoFolderAsync(sourceFileId, folderId, finalName);
+
+            return new DestinationWriteResult(
+                FinalName: finalName,
+                FinalLocation: copiedFileId,
+                DestinationContainer: folderId);
         }
         catch
         {
             return null;
         }
-
-        return new DestinationWriteResult(
-            FinalName: finalName,
-            FinalLocation: $"drive://{folderId}/{finalName}",
-            DestinationContainer: folderId);
     }
 
     public async Task<string> GetChartHubFolderIdAsync(CancellationToken cancellationToken = default)
