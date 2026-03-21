@@ -71,11 +71,11 @@
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource ThemeForegroundBrush}" />
                     <TextBlock Text="{Binding Diagnostics.LastErrorMessage, StringFormat='Error: {0}'}"
-                               IsVisible="{Binding Diagnostics.LastErrorMessage, Converter={StaticResource NullToFalse}}"
+                               IsVisible="{Binding Diagnostics.HasLastErrorMessage}"
                                Foreground="{DynamicResource SemanticError}"
                                TextWrapping="Wrap" />
                     <TextBlock Text="{Binding Diagnostics.RemediationHint, StringFormat='💡 {0}'}"
-                               IsVisible="{Binding Diagnostics.RemediationHint, Converter={StaticResource NullToFalse}}"
+                               IsVisible="{Binding Diagnostics.HasRemediationHint}"
                                Foreground="{DynamicResource ThemeForegroundLowBrush}"
                                TextWrapping="Wrap" />
                     <TextBlock Text="{Binding Diagnostics.LastAttemptDisplay, StringFormat='Last attempt: {0}'}"
