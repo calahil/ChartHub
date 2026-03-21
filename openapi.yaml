@@ -192,10 +192,6 @@ components:
         charter:
           type: [string, 'null']
     IngestionEventRequest:
-              librarySource:
-                type: [string, 'null']
-                description: Library classification source (rhythmverse, encore). Optional.
-                example: rhythmverse
       type: object
       required: [toState]
       properties:
@@ -208,6 +204,10 @@ components:
         allowFromStateOverride:
           type: boolean
           default: false
+        librarySource:
+          type: [string, 'null']
+          description: Library classification source (rhythmverse, encore). Optional.
+          example: rhythmverse
     PairClaimRequest:
       type: object
       required: [pairCode]
@@ -250,9 +250,6 @@ components:
             charter:
               type: [string, 'null']
     QueueListResponse:
-                  librarySource:
-                    type: [string, 'null']
-                    description: Library classification source echoed from the request.
       type: object
       required: [items]
       properties:
@@ -260,6 +257,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/IngestionQueueItem'
+        librarySource:
+          type: [string, 'null']
+          description: Library classification source echoed from the request.
     SingleItemResponse:
       type: object
       required: [item]
@@ -298,12 +298,10 @@ components:
         Charter:
           type: [string, 'null']
         DisplayName:
-                  LibrarySource:
-                    type: [string, 'null']
-                    description: Library classification source (rhythmverse, encore).
-                      librarySource:
-                        type: boolean
           type: string
+        LibrarySource:
+          type: [string, 'null']
+          description: Library classification source (rhythmverse, encore).
         DesktopState:
           type: string
         CurrentState:
