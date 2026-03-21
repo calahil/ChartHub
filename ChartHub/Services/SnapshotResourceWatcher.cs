@@ -59,8 +59,8 @@ namespace ChartHub.Services
                 try
                 {
                     var itemName = Path.GetFileName(item);
-                    var itemType = await ResourceWatcher.GetFileTypeForSnapshotAsync(item);
-                    var imageFile = ResourceWatcher.GetIconForSnapshot(itemType);
+                    var itemType = await WatcherFileTypeResolver.GetFileTypeAsync(item);
+                    var imageFile = WatcherFileTypeResolver.GetIconForFileType(itemType);
                     long sizeBytes = _watcherType == WatcherType.Directory
                         ? FileTools.GetDirectorySize(item)
                         : new FileInfo(item).Length;

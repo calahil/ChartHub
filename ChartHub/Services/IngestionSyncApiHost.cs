@@ -973,11 +973,6 @@ public sealed class IngestionSyncApiHost(
         return CryptographicOperations.FixedTimeEquals(expectedBytes, suppliedBytes);
     }
 
-    private async Task ExecuteSerializedMutationAsync(Func<Task> mutation, CancellationToken cancellationToken)
-    {
-        await ExecuteSerializedMutationAsync(mutation, request: null, response: null, cancellationToken);
-    }
-
     private async Task ExecuteSerializedMutationAsync(
         Func<Task> mutation,
         HttpListenerRequest? request,

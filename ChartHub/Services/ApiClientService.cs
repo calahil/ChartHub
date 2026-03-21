@@ -17,7 +17,6 @@ namespace ChartHub.Services
         private readonly IConfiguration _configuration;
         private readonly Func<string?> _loadEmbeddedMockData;
         private readonly Func<string?> _resolveMockDataPath;
-        private readonly Func<bool> _isAndroid;
         private readonly Dictionary<string, List<string>> dictionary = new()
         {
                 { "rb3", ["Rock Band 3", "rb3.png"] },
@@ -117,7 +116,6 @@ namespace ChartHub.Services
         }
 
         private long? _endRecord;
-        private string? ResponseDebug;
 
         public long? EndRecord
         {
@@ -134,8 +132,7 @@ namespace ChartHub.Services
                 configuration,
                 CreateHttpClient(configuration),
                 LoadMockDataFromEmbeddedResource,
-                ResolveMockDataPath,
-                () => OperatingSystem.IsAndroid())
+                ResolveMockDataPath)
         {
         }
 
@@ -143,14 +140,12 @@ namespace ChartHub.Services
             IConfiguration configuration,
             HttpClient httpClient,
             Func<string?> loadEmbeddedMockData,
-            Func<string?> resolveMockDataPath,
-            Func<bool> isAndroid)
+            Func<string?> resolveMockDataPath)
         {
             _configuration = configuration;
             _httpClient = httpClient;
             _loadEmbeddedMockData = loadEmbeddedMockData;
             _resolveMockDataPath = resolveMockDataPath;
-            _isAndroid = isAndroid;
 
             if (_httpClient.BaseAddress is null)
             {
@@ -176,7 +171,6 @@ namespace ChartHub.Services
             try
             {
                 string endpoint;
-                //string payload;
 
                 if (!string.IsNullOrEmpty(searchString))
                 {
@@ -251,8 +245,6 @@ namespace ChartHub.Services
                         response.EnsureSuccessStatusCode();
                         responseBody = await response.Content.ReadAsStringAsync();
                     }
-
-                    ResponseDebug = responseBody;
                     var DecodedResponse = RootResponse.FromJson(responseBody);
 
                     if (DecodedResponse != null && DecodedResponse.Data != null)

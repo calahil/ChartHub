@@ -18,7 +18,6 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     public bool IsDesktopMode => !OperatingSystem.IsAndroid();
     private readonly EncoreApiService _apiService;
     private readonly ITransferOrchestrator _transferOrchestrator;
-    private readonly LibraryCatalogService _libraryCatalog;
     private readonly ISettingsOrchestrator _settingsOrchestrator;
     private readonly Dictionary<DownloadFile, CancellationTokenSource> _downloadTokens = [];
     private readonly object _stateSaveSync = new();
@@ -379,13 +378,11 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     public EncoreViewModel(
         EncoreApiService apiService,
         ITransferOrchestrator transferOrchestrator,
-        LibraryCatalogService libraryCatalog,
         ISettingsOrchestrator settingsOrchestrator,
         SharedDownloadQueue sharedDownloadQueue)
     {
         _apiService = apiService;
         _transferOrchestrator = transferOrchestrator;
-        _libraryCatalog = libraryCatalog;
         _settingsOrchestrator = settingsOrchestrator;
 
         Downloads = sharedDownloadQueue.Downloads;

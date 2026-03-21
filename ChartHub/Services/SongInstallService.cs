@@ -42,23 +42,6 @@ public sealed class SongInstallService : ISongInstallService
         _libraryCatalog = libraryCatalog;
     }
 
-    // Backward-compatible constructor used by tests that don't require catalog updates.
-    public SongInstallService(
-        AppGlobalSettings settings,
-        SongIngestionCatalogService ingestionCatalog,
-        SongIngestionStateMachine ingestionStateMachine,
-        IOnyxPipelineService onyxPipelineService)
-        : this(
-            settings,
-            ingestionCatalog,
-            ingestionStateMachine,
-            onyxPipelineService,
-            new SongIniMetadataParser(),
-            new CloneHeroDirectorySchemaService(),
-            libraryCatalog: null)
-    {
-    }
-
     public async Task<IReadOnlyList<string>> InstallSelectedDownloadsAsync(
         IEnumerable<string> selectedFilePaths,
         IProgress<InstallProgressUpdate>? progress = null,

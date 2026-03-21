@@ -47,15 +47,14 @@ public class AppShellViewModel : INotifyPropertyChanged
     {
         var silentlyInitialized = await _cloudAccountService.TryRestoreSessionAsync();
         IsSignedIn = silentlyInitialized;
-        await SwitchToMainAsync();
+        SwitchToMain();
     }
 
-    private Task SwitchToMainAsync()
+    private void SwitchToMain()
     {
         _mainViewModel ??= _serviceProvider.GetRequiredService<MainViewModel>();
         CurrentViewModel = _mainViewModel;
         OnPropertyChanged(nameof(RootMargin));
-        return Task.CompletedTask;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -1,0 +1,34 @@
+Phase 5: Complete unused-code cleanup (5 batches)
+
+Batch A: Remove write-only/dead injected fields
+- Remove ApiClientService._isAndroid field and constructor dependency
+- Remove ApiClientService.ResponseDebug write-only debug field
+- Remove unused EncoreViewModel._libraryCatalog constructor dependency
+- Update ApiClientServiceTests and EncoreViewModelTests for new signatures
+
+Batch B: Remove unused convenience overload
+- Remove IngestionSyncApiHost.ExecuteSerializedMutationAsync(Func<Task>, CancellationToken) wrapper
+- Simplifies to single 4-parameter overload
+
+Batch C: Remove legacy commented-out code
+- Remove stale //string payload; line from ApiClientService.GetSongFilesAsync
+
+Batch D: Thin wrapper cleanup
+- Replace private SwitchToMainAsync (returned Task.CompletedTask) with sync SwitchToMain
+- Update HandlePostSplashAsync to call synchronously
+
+Batch E: Old compatibility path removal
+- Remove backward-compatible SongInstallService 4-parameter constructor
+- Update IngestionSyncApiHostTests to use primary 7-parameter constructor with all explicit dependencies
+
+Batch F: Evaluate duplicate platform checks
+- Scanned for consolidation opportunities in OperatingSystem.IsAndroid() patterns
+- Conclusion: All checks serve distinct purposes (async execution, service registration, UI binding)
+- No consolidation without over-engineering; keep as-is
+
+Validation:
+- Build clean (ChartHub net10.0 succeeded in 7.4s)
+- All 219 tests passing
+- No IDE0051/IDE0052 warnings from removed symbols
+- AppShellViewModel.SwitchToMainAsync phase: 5/5 auth tests pass
+- SongInstallService/IngestionSyncApiHost phase: 42/42 targeted tests pass
