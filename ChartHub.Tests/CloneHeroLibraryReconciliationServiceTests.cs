@@ -10,7 +10,7 @@ namespace ChartHub.Tests;
 public class CloneHeroLibraryReconciliationServiceTests
 {
     [Fact]
-    public async Task ReconcileAsync_RenamesNonCanonicalDirectory_AndUpsertsImportEntry()
+    public async Task ReconcileAsync_MovesUnmanagedDirectoryToQuarantine_AndSkipsCatalogUpsert()
     {
         using var temp = new TemporaryDirectoryFixture("clonehero-reconcile-import");
         var settings = CreateSettings(temp.RootPath);
@@ -35,8 +35,9 @@ charter = Charter Name
 
         var result = await sut.ReconcileAsync();
 
-        var expectedPath = Path.Combine(songsRoot, "Artist Name", "Song Title", "Charter Name__import");
-        Assert.True(Directory.Exists(expectedPath));
+        var quarantineRoot = Path.Combine(settings.CloneHeroDataDir, "Quarantine");
+        Assert.True(Directory.Exists(quarantineRoot));
+        Assert.Single(Directory.GetDirectories(quarantineRoot));
         Assert.False(Directory.Exists(legacyDir));
 
         Assert.Equal(1, result.Scanned);
@@ -44,12 +45,8 @@ charter = Charter Name
         Assert.Equal(1, result.Renamed);
         Assert.Equal(0, result.Failed);
 
-        var entry = await libraryCatalog.GetEntryByLocalPathAsync(expectedPath);
-        Assert.NotNull(entry);
-        Assert.Equal(LibrarySourceNames.Import, entry!.Source);
-        Assert.Equal("Artist Name", entry.Artist);
-        Assert.Equal("Song Title", entry.Title);
-        Assert.Equal("Charter Name", entry.Charter);
+        var remainingEntries = await libraryCatalog.GetEntriesByArtistAsync("Artist Name");
+        Assert.Empty(remainingEntries);
     }
 
     [Fact]

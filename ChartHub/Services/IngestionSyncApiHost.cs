@@ -242,6 +242,19 @@ public sealed class IngestionSyncApiHost(
             {
                 var state = request.QueryString["state"];
                 var source = request.QueryString["source"];
+                if (!string.IsNullOrWhiteSpace(source) && !string.Equals(source, "all", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        source = LibrarySourceNames.NormalizeTrustedSource(source);
+                    }
+                    catch (ArgumentException)
+                    {
+                        await WriteErrorAsync(response, HttpStatusCode.BadRequest, "source must be rhythmverse or encore");
+                        return;
+                    }
+                }
+
                 var sort = request.QueryString["sort"] ?? "Updated";
                 var desc = bool.TryParse(request.QueryString["desc"], out var parsedDesc) && parsedDesc;
                 var limit = ParseLimit(request.QueryString["limit"]);
@@ -280,7 +293,31 @@ public sealed class IngestionSyncApiHost(
                     return;
                 }
 
-                var source = payload.Source.Trim().ToLowerInvariant();
+                string source;
+                try
+                {
+                    source = LibrarySourceNames.NormalizeTrustedSource(payload.Source);
+                }
+                catch (ArgumentException)
+                {
+                    await WriteErrorAsync(response, HttpStatusCode.BadRequest, "source must be rhythmverse or encore");
+                    return;
+                }
+
+                string? librarySource = null;
+                if (!string.IsNullOrWhiteSpace(payload.LibrarySource))
+                {
+                    try
+                    {
+                        librarySource = LibrarySourceNames.NormalizeTrustedSource(payload.LibrarySource);
+                    }
+                    catch (ArgumentException)
+                    {
+                        await WriteErrorAsync(response, HttpStatusCode.BadRequest, "librarySource must be rhythmverse or encore");
+                        return;
+                    }
+                }
+
                 var canonicalSourceId = LibraryIdentityService.NormalizeSourceKey(source, payload.SourceId);
                 var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
                     source,
@@ -290,7 +327,7 @@ public sealed class IngestionSyncApiHost(
                     payload.Title,
                     payload.Charter,
                     cancellationToken,
-                    payload.LibrarySource);
+                    librarySource);
                 var attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
 
                 var fromState = ingestion.CurrentState;

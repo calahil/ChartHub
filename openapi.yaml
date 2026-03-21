@@ -194,7 +194,7 @@ components:
     IngestionEventRequest:
               librarySource:
                 type: [string, 'null']
-                description: Library classification source (rhythmverse, encore, import). Optional.
+                description: Library classification source (rhythmverse, encore). Optional.
                 example: rhythmverse
       type: object
       required: [toState]
@@ -300,7 +300,7 @@ components:
         DisplayName:
                   LibrarySource:
                     type: [string, 'null']
-                    description: Library classification source (rhythmverse, encore, import).
+                    description: Library classification source (rhythmverse, encore).
                       librarySource:
                         type: boolean
           type: string

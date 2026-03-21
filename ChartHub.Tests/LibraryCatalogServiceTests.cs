@@ -113,8 +113,8 @@ public class LibraryCatalogServiceTests
         Directory.CreateDirectory(localPath);
 
         await sut.UpsertAsync(new LibraryCatalogEntry(
-            LibrarySourceNames.Import,
-            LibraryIdentityService.BuildSourceKey(LibrarySourceNames.Import, "import-song"),
+            LibrarySourceNames.RhythmVerse,
+            LibraryIdentityService.BuildSourceKey(LibrarySourceNames.RhythmVerse, "rv-song"),
             "Song",
             "Artist",
             "Charter",

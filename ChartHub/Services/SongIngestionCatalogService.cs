@@ -144,6 +144,9 @@ public sealed class SongIngestionCatalogService
         if (string.IsNullOrWhiteSpace(sourceLink))
             throw new ArgumentException("Source link is required.", nameof(sourceLink));
 
+        var normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
+        var normalizedLibrarySource = LibrarySourceNames.NormalizeTrustedSourceOrNull(librarySource);
+
         var now = DateTimeOffset.UtcNow;
         var normalizedLink = NormalizeSourceLink(sourceLink);
 
@@ -195,7 +198,7 @@ public sealed class SongIngestionCatalogService
                         desktop_state = COALESCE(excluded.desktop_state, song_ingestions.desktop_state),
                         updated_at_utc = excluded.updated_at_utc;
                     """;
-                upsert.Parameters.AddWithValue("$source", source);
+                upsert.Parameters.AddWithValue("$source", normalizedSource);
                 upsert.Parameters.AddWithValue("$sourceId", (object?)sourceId ?? DBNull.Value);
                 upsert.Parameters.AddWithValue("$sourceLink", sourceLink);
                 upsert.Parameters.AddWithValue("$normalizedLink", normalizedLink);
@@ -206,7 +209,7 @@ public sealed class SongIngestionCatalogService
                 upsert.Parameters.AddWithValue("$currentState", IngestionState.Queued.ToString());
                 upsert.Parameters.AddWithValue("$createdAtUtc", now.UtcDateTime.ToString("O"));
                 upsert.Parameters.AddWithValue("$updatedAtUtc", now.UtcDateTime.ToString("O"));
-                upsert.Parameters.AddWithValue("$librarySource", (object?)librarySource ?? DBNull.Value);
+                upsert.Parameters.AddWithValue("$librarySource", (object?)normalizedLibrarySource ?? DBNull.Value);
 
                 await upsert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
@@ -912,6 +915,48 @@ public sealed class SongIngestionCatalogService
         EnsureColumnExists(connection, "song_ingestions", "title", "TEXT NULL");
         EnsureColumnExists(connection, "song_ingestions", "charter", "TEXT NULL");
         EnsureColumnExists(connection, "song_ingestions", "library_source", "TEXT NULL");
+
+        using (var cleanup = connection.CreateCommand())
+        {
+            cleanup.CommandText = """
+                DELETE FROM installed_manifest_files
+                WHERE ingestion_id IN (
+                    SELECT id
+                    FROM song_ingestions
+                    WHERE lower(source) NOT IN ('rhythmverse', 'encore')
+                       OR (library_source IS NOT NULL AND lower(library_source) NOT IN ('rhythmverse', 'encore'))
+                );
+
+                DELETE FROM song_assets
+                WHERE ingestion_id IN (
+                    SELECT id
+                    FROM song_ingestions
+                    WHERE lower(source) NOT IN ('rhythmverse', 'encore')
+                       OR (library_source IS NOT NULL AND lower(library_source) NOT IN ('rhythmverse', 'encore'))
+                );
+
+                DELETE FROM song_state_events
+                WHERE ingestion_id IN (
+                    SELECT id
+                    FROM song_ingestions
+                    WHERE lower(source) NOT IN ('rhythmverse', 'encore')
+                       OR (library_source IS NOT NULL AND lower(library_source) NOT IN ('rhythmverse', 'encore'))
+                );
+
+                DELETE FROM song_attempts
+                WHERE ingestion_id IN (
+                    SELECT id
+                    FROM song_ingestions
+                    WHERE lower(source) NOT IN ('rhythmverse', 'encore')
+                       OR (library_source IS NOT NULL AND lower(library_source) NOT IN ('rhythmverse', 'encore'))
+                );
+
+                DELETE FROM song_ingestions
+                WHERE lower(source) NOT IN ('rhythmverse', 'encore')
+                   OR (library_source IS NOT NULL AND lower(library_source) NOT IN ('rhythmverse', 'encore'));
+                """;
+            cleanup.ExecuteNonQuery();
+        }
 
         var existingVersion = GetSchemaVersion(connection);
         if (existingVersion is null || existingVersion < SchemaVersion)

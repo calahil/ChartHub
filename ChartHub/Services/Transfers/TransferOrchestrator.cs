@@ -643,10 +643,7 @@ public sealed class TransferOrchestrator(
 
     private static string NormalizeSourceName(string? sourceName)
     {
-        if (string.IsNullOrWhiteSpace(sourceName))
-            return "unknown";
-
-        return sourceName.Trim().ToLowerInvariant();
+        return LibrarySourceNames.NormalizeTrustedSource(sourceName, nameof(sourceName));
     }
 
     public async Task<IReadOnlyList<string>> DownloadSelectedCloudFilesToLocalAsync(

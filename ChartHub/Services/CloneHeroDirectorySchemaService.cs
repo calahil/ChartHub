@@ -24,17 +24,7 @@ public sealed class CloneHeroDirectorySchemaService : ICloneHeroDirectorySchemaS
 {
     public string NormalizeSource(string? source)
     {
-        if (string.IsNullOrWhiteSpace(source))
-            return LibrarySourceNames.Import;
-
-        var normalized = source.Trim().ToLowerInvariant();
-        return normalized switch
-        {
-            LibrarySourceNames.RhythmVerse => LibrarySourceNames.RhythmVerse,
-            LibrarySourceNames.Encore => LibrarySourceNames.Encore,
-            LibrarySourceNames.Import => LibrarySourceNames.Import,
-            _ => LibrarySourceNames.Import,
-        };
+        return LibrarySourceNames.NormalizeTrustedSource(source);
     }
 
     public CloneHeroDirectoryLayout ResolveUniqueLayout(

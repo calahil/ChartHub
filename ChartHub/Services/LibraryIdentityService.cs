@@ -115,7 +115,7 @@ public static class LibraryIdentityService
 
     private static string NormalizeSource(string? source)
     {
-        return string.IsNullOrWhiteSpace(source) ? LibrarySourceNames.Import : source.Trim().ToLowerInvariant();
+        return LibrarySourceNames.NormalizeTrustedSource(source);
     }
 
     private static string EscapeComponent(string value)

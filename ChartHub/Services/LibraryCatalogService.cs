@@ -6,7 +6,37 @@ public static class LibrarySourceNames
 {
     public const string RhythmVerse = "rhythmverse";
     public const string Encore = "encore";
-    public const string Import = "import";
+
+    public static bool IsTrustedSource(string? source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+            return false;
+
+        var normalized = source.Trim().ToLowerInvariant();
+        return normalized is RhythmVerse or Encore;
+    }
+
+    public static string NormalizeTrustedSource(string? source, string paramName = "source")
+    {
+        if (string.IsNullOrWhiteSpace(source))
+            throw new ArgumentException("Only rhythmverse and encore sources are supported.", paramName);
+
+        var normalized = source.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            RhythmVerse => RhythmVerse,
+            Encore => Encore,
+            _ => throw new ArgumentException("Only rhythmverse and encore sources are supported.", paramName),
+        };
+    }
+
+    public static string? NormalizeTrustedSourceOrNull(string? source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+            return null;
+
+        return NormalizeTrustedSource(source);
+    }
 }
 
 public sealed record LibraryCatalogEntry(
@@ -42,6 +72,8 @@ public sealed class LibraryCatalogService
         if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(sourceId))
             return false;
 
+        var normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
+
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -56,7 +88,7 @@ public sealed class LibraryCatalogService
                     WHERE source = $source AND source_id = $sourceId
                 );
                 """;
-            command.Parameters.AddWithValue("$source", source);
+                command.Parameters.AddWithValue("$source", normalizedSource);
             command.Parameters.AddWithValue("$sourceId", sourceId);
 
             var result = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
@@ -81,6 +113,8 @@ public sealed class LibraryCatalogService
         if (string.IsNullOrWhiteSpace(source) || normalizedIds.Length == 0)
             return new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
 
+        var normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
+
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -102,7 +136,7 @@ public sealed class LibraryCatalogService
                 WHERE source = $source
                   AND source_id IN ({string.Join(",", parameterNames)})
                 """;
-            command.Parameters.AddWithValue("$source", source);
+                        command.Parameters.AddWithValue("$source", normalizedSource);
 
             var map = normalizedIds.ToDictionary(id => id, _ => false, StringComparer.OrdinalIgnoreCase);
 
@@ -124,6 +158,8 @@ public sealed class LibraryCatalogService
     {
         if (string.IsNullOrWhiteSpace(entry.Source) || string.IsNullOrWhiteSpace(entry.SourceId))
             throw new ArgumentException("Source and source identifier are required.", nameof(entry));
+
+        var normalizedSource = LibrarySourceNames.NormalizeTrustedSource(entry.Source, nameof(entry.Source));
 
         // Only persist key mappings for entries with valid local paths (installed songs)
         if (string.IsNullOrWhiteSpace(entry.LocalPath))
@@ -148,7 +184,7 @@ public sealed class LibraryCatalogService
                       AND NOT (lsk.source = $source AND lsk.source_id = $sourceId);
                     """;
                 checkCommand.Parameters.AddWithValue("$localPath", entry.LocalPath);
-                checkCommand.Parameters.AddWithValue("$source", entry.Source);
+                                checkCommand.Parameters.AddWithValue("$source", normalizedSource);
                 checkCommand.Parameters.AddWithValue("$sourceId", entry.SourceId);
 
                 var count = Convert.ToInt64(await checkCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
@@ -201,7 +237,7 @@ public sealed class LibraryCatalogService
                     source_id = excluded.source_id
                 """;
             keyCommand.Parameters.AddWithValue("$librarySongId", librarySongId);
-            keyCommand.Parameters.AddWithValue("$source", entry.Source);
+            keyCommand.Parameters.AddWithValue("$source", normalizedSource);
             keyCommand.Parameters.AddWithValue("$sourceId", entry.SourceId);
             keyCommand.Parameters.AddWithValue("$externalKeyHash", entry.ExternalKeyHash ?? LibraryIdentityService.BuildExternalKeyHash(entry.SourceId));
             keyCommand.Parameters.AddWithValue("$createdAtUtc", entry.AddedAtUtc.UtcDateTime.ToString("O"));
@@ -225,6 +261,8 @@ public sealed class LibraryCatalogService
             || string.IsNullOrWhiteSpace(keepSourceId))
             return;
 
+        var normalizedKeepSource = LibrarySourceNames.NormalizeTrustedSource(keepSource, nameof(keepSource));
+
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -240,7 +278,7 @@ public sealed class LibraryCatalogService
                 AND NOT (source = $source AND source_id = $sourceId);
                 """;
             command.Parameters.AddWithValue("$localPath", localPath);
-            command.Parameters.AddWithValue("$source", keepSource);
+            command.Parameters.AddWithValue("$source", normalizedKeepSource);
             command.Parameters.AddWithValue("$sourceId", keepSourceId);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -255,6 +293,8 @@ public sealed class LibraryCatalogService
         if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(sourceId))
             return;
 
+        var normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
+
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -266,7 +306,7 @@ public sealed class LibraryCatalogService
                 DELETE FROM library_song_keys
                 WHERE source = $source AND source_id = $sourceId;
                 """;
-            command.Parameters.AddWithValue("$source", source);
+            command.Parameters.AddWithValue("$source", normalizedSource);
             command.Parameters.AddWithValue("$sourceId", sourceId);
 
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -626,6 +666,15 @@ public sealed class LibraryCatalogService
 
             CREATE INDEX IF NOT EXISTS idx_library_song_keys_library_song_id
                 ON library_song_keys(library_song_id);
+
+            DELETE FROM library_song_keys
+            WHERE lower(source) NOT IN ('rhythmverse', 'encore');
+
+            DELETE FROM library_songs
+            WHERE id NOT IN (
+                SELECT DISTINCT library_song_id
+                FROM library_song_keys
+            );
             """;
         command.ExecuteNonQuery();
     }

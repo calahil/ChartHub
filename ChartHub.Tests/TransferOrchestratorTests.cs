@@ -47,6 +47,8 @@ public class TransferOrchestratorTests
             FileName = "song.zip",
             DownloadLink = "https://example.test/song.zip",
             FileSize = 100,
+            SourceName = LibrarySourceNames.RhythmVerse,
+            SourceId = "song-cancel",
         };
 
         var result = await sut.QueueSongDownloadAsync(song, null, downloads);
@@ -71,6 +73,8 @@ public class TransferOrchestratorTests
             FileName = "song.zip",
             DownloadLink = "https://example.test/song.zip",
             FileSize = 100,
+            SourceName = LibrarySourceNames.RhythmVerse,
+            SourceId = "song-fail",
         };
 
         var result = await sut.QueueSongDownloadAsync(song, null, downloads);
@@ -102,6 +106,8 @@ public class TransferOrchestratorTests
             FileName = "song.bundle",
             DownloadLink = "https://drive.google.com/drive/folders/folder-123",
             FileSize = 100,
+            SourceName = LibrarySourceNames.RhythmVerse,
+            SourceId = "song-folder",
         };
 
         var result = await sut.QueueSongDownloadAsync(song, null, downloads);

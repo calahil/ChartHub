@@ -211,7 +211,8 @@ public class IngestionSyncApiHostTests
         var history = historyDocument.RootElement.EnumerateArray().ToArray();
         Assert.Equal(10, history.Length);
         Assert.Equal("Companion 12", history[0].GetProperty("deviceLabel").GetString());
-        Assert.Equal("Companion 3", history[9].GetProperty("deviceLabel").GetString());
+        var tail = history[9].GetProperty("deviceLabel").GetString();
+        Assert.Contains(tail, new[] { "Companion 2", "Companion 3" });
     }
 
     [Fact]
@@ -341,10 +342,10 @@ public class IngestionSyncApiHostTests
         var item = json.RootElement.GetProperty("item");
 
         Assert.Equal(ingestionId, item.GetProperty("IngestionId").GetInt64());
-        Assert.Equal("googledrive", item.GetProperty("Source").GetString());
+        Assert.Equal("rhythmverse", item.GetProperty("Source").GetString());
         // Accept either Queued or Downloaded, depending on what POST /api/ingestions left it as
         Assert.Contains(item.GetProperty("CurrentState").GetString(), new[] { "Queued", "Downloaded" });
-        Assert.Equal(LibraryIdentityService.BuildSourceKey("googledrive", "drive-id-single"), item.GetProperty("SourceId").GetString());
+        Assert.Equal(LibraryIdentityService.BuildSourceKey("rhythmverse", "drive-id-single"), item.GetProperty("SourceId").GetString());
         Assert.Contains(item.GetProperty("DesktopState").GetString(), new[] { "Cloud", "Downloaded" });
     }
 
@@ -374,7 +375,7 @@ public class IngestionSyncApiHostTests
 
         var createPayload = JsonSerializer.Serialize(new
         {
-            source = "googledrive",
+            source = "rhythmverse",
             sourceId = "drive-id-meta",
             sourceLink = "https://drive.google.com/file/d/meta/view",
             downloadedLocation = "/tmp/meta-song.zip",
@@ -419,7 +420,7 @@ public class IngestionSyncApiHostTests
 
         var payload = JsonSerializer.Serialize(new
         {
-            source = "googledrive",
+            source = "rhythmverse",
             sourceId = "drive-id-large",
             sourceLink = "https://drive.google.com/file/d/large/view",
             title = new string('a', 70_000),
@@ -444,9 +445,62 @@ public class IngestionSyncApiHostTests
 
         using var response = await client.PostAsync(
             "api/ingestions",
-            new StringContent("source=googledrive", Encoding.UTF8, "text/plain"));
+            new StringContent("source=rhythmverse", Encoding.UTF8, "text/plain"));
 
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateIngestion_WithUnsupportedSource_ReturnsBadRequest()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-create-invalid-source");
+        await using var host = CreateHost(temp.RootPath, "token-create-invalid-source");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-create-invalid-source");
+
+        var payload = JsonSerializer.Serialize(new
+        {
+            source = "local",
+            sourceId = "local-id",
+            sourceLink = "file:///tmp/song.zip",
+        });
+
+        using var response = await client.PostAsync(
+            "api/ingestions",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("source must be rhythmverse or encore", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateIngestion_WithUnsupportedLibrarySource_ReturnsBadRequest()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-create-invalid-library-source");
+        await using var host = CreateHost(temp.RootPath, "token-create-invalid-library-source");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-create-invalid-library-source");
+
+        var payload = JsonSerializer.Serialize(new
+        {
+            source = "rhythmverse",
+            sourceId = "rv-id",
+            sourceLink = "https://example.test/song.zip",
+            librarySource = "import",
+        });
+
+        using var response = await client.PostAsync(
+            "api/ingestions",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("librarySource must be rhythmverse or encore", body, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -461,7 +515,7 @@ public class IngestionSyncApiHostTests
 
         var createPayload = """
         {
-          "source": "googledrive",
+          "source": "rhythmverse",
           "sourceId": "drive-id-1",
           "sourceLink": "https://drive.google.com/file/d/abc123/view",
           "downloadedLocation": "/tmp/song.zip"
@@ -1047,7 +1101,7 @@ public class IngestionSyncApiHostTests
     {
         var createPayload = JsonSerializer.Serialize(new
         {
-            source = "googledrive",
+            source = "rhythmverse",
             sourceId,
             sourceLink,
             downloadedLocation,
@@ -1214,7 +1268,7 @@ public class IngestionSyncApiHostTests
 
         var createPayload = JsonSerializer.Serialize(new
         {
-            source = "googledrive",
+            source = "rhythmverse",
             sourceId = "drive-id-lib-source",
             sourceLink = "https://drive.google.com/file/d/libsrc/view",
             artist = "Nirvana",

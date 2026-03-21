@@ -70,21 +70,21 @@ public class CloneHeroViewModelTests
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
 
         await catalog.UpsertAsync(new LibraryCatalogEntry(
-            Source: LibrarySourceNames.Import,
+            Source: LibrarySourceNames.RhythmVerse,
             SourceId: "artist-a-song-1",
             Title: "Song One",
             Artist: "Artist A",
             Charter: "Charter A",
-            LocalPath: Path.Combine(temp.RootPath, "songs", "Artist A", "Song One", "Charter A__import"),
+            LocalPath: Path.Combine(temp.RootPath, "songs", "Artist A", "Song One", "Charter A__rhythmverse"),
             AddedAtUtc: DateTimeOffset.UtcNow));
 
         await catalog.UpsertAsync(new LibraryCatalogEntry(
-            Source: LibrarySourceNames.Import,
+            Source: LibrarySourceNames.RhythmVerse,
             SourceId: "artist-b-song-1",
             Title: "Song Two",
             Artist: "Artist B",
             Charter: "Charter B",
-            LocalPath: Path.Combine(temp.RootPath, "songs", "Artist B", "Song Two", "Charter B__import"),
+            LocalPath: Path.Combine(temp.RootPath, "songs", "Artist B", "Song Two", "Charter B__rhythmverse"),
             AddedAtUtc: DateTimeOffset.UtcNow));
 
         var sut = new CloneHeroViewModel(catalog, new NoopDesktopPathOpener(), new ImmediateReconciliationService());
@@ -106,11 +106,11 @@ public class CloneHeroViewModelTests
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
 
         // Seed a catalog entry so SelectedSong gets populated after init
-        var songDir = Path.Combine(temp.RootPath, "songs", "Artista", "Titulo", "Charter__import");
+        var songDir = Path.Combine(temp.RootPath, "songs", "Artista", "Titulo", "Charter__rhythmverse");
         Directory.CreateDirectory(songDir);
         File.WriteAllText(Path.Combine(songDir, "song.ini"), "[song]\nartist = Artista\ntitle = Titulo\ncharter = Charter\n");
         await catalog.UpsertAsync(new LibraryCatalogEntry(
-            Source: "import", SourceId: "test-id",
+            Source: LibrarySourceNames.RhythmVerse, SourceId: "test-id",
             Title: "Titulo", Artist: "Artista", Charter: "Charter",
             LocalPath: songDir, AddedAtUtc: DateTimeOffset.UtcNow));
 

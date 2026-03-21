@@ -28,17 +28,17 @@ public class CloneHeroDirectorySchemaServiceTests
 
         var existing = new HashSet<string>(StringComparer.Ordinal)
         {
-            Path.Combine(root, "Artist", "Song", "Charter__import"),
-            Path.Combine(root, "Artist", "Song", "Charter__import_2"),
+            Path.Combine(root, "Artist", "Song", "Charter__rhythmverse"),
+            Path.Combine(root, "Artist", "Song", "Charter__rhythmverse_2"),
         };
 
         var layout = sut.ResolveUniqueLayout(
             root,
             new SongMetadata("Artist", "Song", "Charter"),
-            source: null,
+            source: LibrarySourceNames.RhythmVerse,
             exists: existing.Contains);
 
-        Assert.Equal(Path.Combine("Artist", "Song", "Charter__import_3"), layout.RelativePath);
+        Assert.Equal(Path.Combine("Artist", "Song", "Charter__rhythmverse_3"), layout.RelativePath);
     }
 
     [Fact]
@@ -60,17 +60,15 @@ public class CloneHeroDirectorySchemaServiceTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("customsource")]
-    public void ResolveUniqueLayout_UnknownSources_FallBackToImport(string? source)
+    public void ResolveUniqueLayout_UnknownSources_Throw(string? source)
     {
         var sut = new CloneHeroDirectorySchemaService();
         var root = Path.Combine("/tmp", "songs-root");
 
-        var layout = sut.ResolveUniqueLayout(
+        Assert.Throws<ArgumentException>(() => sut.ResolveUniqueLayout(
             root,
             new SongMetadata("Artist", "Song", "Charter"),
             source,
-            exists: _ => false);
-
-        Assert.Equal(Path.Combine("Artist", "Song", "Charter__import"), layout.RelativePath);
+            exists: _ => false));
     }
 }

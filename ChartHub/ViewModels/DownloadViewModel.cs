@@ -876,38 +876,8 @@ namespace ChartHub.ViewModels
             if (string.IsNullOrWhiteSpace(file.FilePath) || !File.Exists(file.FilePath))
                 return;
 
-            var existing = await _ingestionCatalog.GetLatestIngestionByAssetLocationAsync(file.FilePath, cancellationToken);
-            if (existing is not null)
-                return;
-
-            var sourceLink = BuildLocalSourceLink(file.FilePath);
-            var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
-                "local",
-                LibraryIdentityService.NormalizeSourceKey("local", sourceLink),
-                sourceLink,
-                cancellationToken: cancellationToken);
-            var attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
-
-            var fromState = ingestion.CurrentState;
-            if (fromState != IngestionState.Downloaded)
-            {
-                await _ingestionCatalog.RecordStateTransitionAsync(
-                    ingestion.Id,
-                    attempt.Id,
-                    fromState,
-                    IngestionState.Downloaded,
-                    "Discovered from local watcher",
-                    cancellationToken);
-            }
-
-            await _ingestionCatalog.UpsertAssetAsync(new SongIngestionAssetEntry(
-                IngestionId: ingestion.Id,
-                AttemptId: attempt.Id,
-                AssetRole: IngestionAssetRole.Downloaded,
-                Location: file.FilePath,
-                SizeBytes: file.SizeBytes,
-                ContentHash: null,
-                RecordedAtUtc: DateTimeOffset.UtcNow), cancellationToken);
+            // Local watcher files are unmanaged unless they were already ingested through trusted sources.
+            await Task.CompletedTask;
         }
 
         private async Task ReconcileCloudFileAsync(WatcherFile file, CancellationToken cancellationToken)
@@ -938,14 +908,6 @@ namespace ChartHub.ViewModels
                     Logger.LogError("Download", "Queue refresh loop failed", ex);
                 }
             }
-        }
-
-        private static string BuildLocalSourceLink(string filePath)
-        {
-            if (Uri.TryCreate(filePath, UriKind.Absolute, out var uri) && !string.IsNullOrWhiteSpace(uri.Scheme))
-                return uri.AbsoluteUri;
-
-            return new Uri(filePath).AbsoluteUri;
         }
 
     }

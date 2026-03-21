@@ -127,7 +127,19 @@ public sealed class CloneHeroLibraryReconciliationService(
 
         var metadata = _songIniMetadataParser.ParseFromSongIni(songIniPath);
         var existingEntry = await _libraryCatalog.GetEntryByLocalPathAsync(songDirectory, cancellationToken).ConfigureAwait(false);
-        var normalizedSource = _schemaService.NormalizeSource(existingEntry?.Source);
+        if (existingEntry is null)
+            return false;
+
+        string normalizedSource;
+        try
+        {
+            normalizedSource = _schemaService.NormalizeSource(existingEntry.Source);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+
         var persistedSourceId = existingEntry?.SourceId ?? string.Empty;
 
         await _libraryCatalog.UpsertAsync(new LibraryCatalogEntry(
@@ -153,7 +165,24 @@ public sealed class CloneHeroLibraryReconciliationService(
 
         var metadata = _songIniMetadataParser.ParseFromSongIni(songIniPath);
         var existingEntry = await _libraryCatalog.GetEntryByLocalPathAsync(songDirectory, cancellationToken).ConfigureAwait(false);
-        var normalizedSource = _schemaService.NormalizeSource(existingEntry?.Source);
+
+        if (existingEntry is null)
+        {
+            await QuarantineDirectoryAsync(songDirectory, cancellationToken).ConfigureAwait(false);
+            return (true, true);
+        }
+
+        string normalizedSource;
+        try
+        {
+            normalizedSource = _schemaService.NormalizeSource(existingEntry.Source);
+        }
+        catch (ArgumentException)
+        {
+            await _libraryCatalog.RemoveAsync(existingEntry.Source, existingEntry.SourceId, cancellationToken).ConfigureAwait(false);
+            await QuarantineDirectoryAsync(songDirectory, cancellationToken).ConfigureAwait(false);
+            return (true, true);
+        }
 
         var layout = _schemaService.ResolveUniqueLayout(
             _settings.CloneHeroSongsDir,
@@ -195,5 +224,32 @@ public sealed class CloneHeroLibraryReconciliationService(
             ContentIdentityHash: contentIdentityHash), cancellationToken).ConfigureAwait(false);
 
         return (true, renamed);
+    }
+
+    private async Task QuarantineDirectoryAsync(string songDirectory, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!Directory.Exists(songDirectory))
+            return;
+
+        var quarantineRoot = Path.Combine(_settings.CloneHeroDataDir, "Quarantine");
+        Directory.CreateDirectory(quarantineRoot);
+
+        var leaf = Path.GetFileName(songDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        var safeLeaf = SafePathHelper.SanitizeFileName(leaf, "unmanaged-song");
+        var target = Path.Combine(quarantineRoot, safeLeaf);
+        if (Directory.Exists(target))
+            target = Path.Combine(quarantineRoot, $"{safeLeaf}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}");
+
+        Directory.Move(songDirectory, target);
+
+        Logger.LogWarning("CloneHero", "Quarantined unmanaged song directory", new Dictionary<string, object?>
+        {
+            ["sourceDirectory"] = songDirectory,
+            ["quarantineDirectory"] = target,
+        });
+
+        await Task.CompletedTask;
     }
 }
