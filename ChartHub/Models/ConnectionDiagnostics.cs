@@ -39,6 +39,16 @@ public sealed class ConnectionDiagnostics
     public bool IsHealthy => ServerInfo is not null && LastErrorMessage is null;
 
     /// <summary>
+    /// True when a last error message is available for display.
+    /// </summary>
+    public bool HasLastErrorMessage => !string.IsNullOrWhiteSpace(LastErrorMessage);
+
+    /// <summary>
+    /// True when a remediation hint is available for display.
+    /// </summary>
+    public bool HasRemediationHint => !string.IsNullOrWhiteSpace(RemediationHint);
+
+    /// <summary>
     /// Summary text for UI display combining status and remediation.
     /// </summary>
     public string DiagnosticsSummary => IsHealthy
