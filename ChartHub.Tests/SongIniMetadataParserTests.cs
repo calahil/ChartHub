@@ -32,4 +32,60 @@ public class SongIniMetadataParserTests
         Assert.Equal("Unknown Song", metadata.Title);
         Assert.Equal("Unknown Charter", metadata.Charter);
     }
+
+    [Fact]
+    public async Task ParseFromSongIni_WhenKeysMissing_UsesFallbackValues()
+    {
+        var parser = new SongIniMetadataParser();
+        var tempPath = Path.GetTempFileName();
+
+        try
+        {
+            await File.WriteAllTextAsync(tempPath, """
+                [song]
+                name = Only Title
+                """);
+
+            var metadata = parser.ParseFromSongIni(tempPath);
+
+            Assert.Equal("Unknown Artist", metadata.Artist);
+            Assert.Equal("Only Title", metadata.Title);
+            Assert.Equal("Unknown Charter", metadata.Charter);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
+
+    [Fact]
+    public async Task ParseFromSongIni_IgnoresMalformedLines_Comments_AndUnknownKeys()
+    {
+        var parser = new SongIniMetadataParser();
+        var tempPath = Path.GetTempFileName();
+
+        try
+        {
+            await File.WriteAllTextAsync(tempPath, """
+                ; leading comment
+                [Song]
+                artist Tool
+                // ignored comment
+                random_key = should be ignored
+                name = Sober
+                frets =   Charter Fallback   
+                charter =   
+                """);
+
+            var metadata = parser.ParseFromSongIni(tempPath);
+
+            Assert.Equal("Unknown Artist", metadata.Artist);
+            Assert.Equal("Sober", metadata.Title);
+            Assert.Equal("Charter Fallback", metadata.Charter);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
 }

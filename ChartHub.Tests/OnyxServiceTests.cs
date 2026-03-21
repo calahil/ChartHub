@@ -61,7 +61,12 @@ public class OnyxServiceTests
         Assert.StartsWith(settings.OutputDir, buildArgs[5], StringComparison.Ordinal);
 
         Assert.StartsWith(settings.CloneHeroSongsDir, result.FinalInstallDirectory, StringComparison.Ordinal);
+        Assert.Contains($"{Path.DirectorySeparatorChar}Test Artist{Path.DirectorySeparatorChar}", result.FinalInstallDirectory, StringComparison.Ordinal);
+        Assert.Contains($"{Path.DirectorySeparatorChar}Test Song{Path.DirectorySeparatorChar}", result.FinalInstallDirectory, StringComparison.Ordinal);
         Assert.Contains("__rhythmverse", result.FinalInstallDirectory, StringComparison.Ordinal);
+        Assert.Equal("Test Artist", result.ParsedMetadata.Artist);
+        Assert.Equal("Test Song", result.ParsedMetadata.Title);
+        Assert.Equal("Unknown Charter", result.ParsedMetadata.Charter);
         Assert.True(Directory.Exists(result.FinalInstallDirectory));
         Assert.True(File.Exists(Path.Combine(result.FinalInstallDirectory, "notes.chart")));
     }

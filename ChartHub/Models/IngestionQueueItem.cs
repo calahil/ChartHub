@@ -7,6 +7,7 @@ namespace ChartHub.Models;
 public sealed class IngestionQueueItem : INotifyPropertyChanged
 {
     private bool _checked;
+    private ActionResult? _lastActionResult;
 
     public long IngestionId { get; init; }
     public string Source { get; init; } = string.Empty;
@@ -22,6 +23,9 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
     public DesktopState DesktopState { get; init; } = DesktopState.Cloud;
     public string? DesktopLibraryPath { get; init; }
     public DateTimeOffset UpdatedAtUtc { get; init; }
+    public string? LibrarySource { get; init; }
+
+    public bool IsInDesktopLibrary => !string.IsNullOrEmpty(InstalledLocation) || DesktopState == DesktopState.Installed;
 
     public bool Checked
     {
@@ -35,6 +39,34 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
             OnPropertyChanged();
         }
     }
+
+    /// <summary>
+    /// The most recent action result (Retry, Install, OpenFolder) for this item. Null if no action has been attempted.
+    /// </summary>
+    public ActionResult? LastActionResult
+    {
+        get => _lastActionResult;
+        set
+        {
+            if (Equals(_lastActionResult, value))
+                return;
+
+            _lastActionResult = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasActionResult));
+            OnPropertyChanged(nameof(ActionResultDisplay));
+        }
+    }
+
+    /// <summary>
+    /// True if an action result exists (successful or failed).
+    /// </summary>
+    public bool HasActionResult => LastActionResult is not null;
+
+    /// <summary>
+    /// Display text for the UI showing action status and message.
+    /// </summary>
+    public string ActionResultDisplay => LastActionResult?.DisplayText ?? string.Empty;
 
     public string UpdatedText => UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
 

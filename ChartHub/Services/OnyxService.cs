@@ -88,7 +88,7 @@ namespace ChartHub.Services
                 }
 
                 ReportProgress(progress, InstallStage.PatchingYaml, "Patching song.yml targets", 45, songPath);
-                var finalDirectoryName = ProcessYaml(songYamlPath, sourceSuffix);
+                var processedMetadata = ProcessYaml(songYamlPath, sourceSuffix);
 
                 ReportProgress(progress, InstallStage.Building, "Running Onyx build", 60, songPath, isIndeterminate: true);
                 await ExecuteCommandAsync(
@@ -98,7 +98,7 @@ namespace ChartHub.Services
                     cancellationToken);
 
                 ReportProgress(progress, InstallStage.MovingToCloneHero, "Moving built output into Clone Hero songs", 85, songPath);
-                var finalDirectory = MoveBuiltOutputToCloneHero(buildOutputRoot, finalDirectoryName);
+                var finalDirectory = MoveBuiltOutputToCloneHero(buildOutputRoot, processedMetadata.FinalDirectoryName);
 
                 ReportProgress(progress, InstallStage.CleaningUp, "Cleaning temporary Onyx workspace", 95, songPath);
                 CleanupDirectory(stagingRoot);
@@ -111,7 +111,7 @@ namespace ChartHub.Services
                 });
 
                 ReportProgress(progress, InstallStage.Completed, "Onyx install completed", 100, songPath);
-                return new OnyxInstallResult(finalDirectory, importPath, buildOutputRoot);
+                return new OnyxInstallResult(finalDirectory, importPath, buildOutputRoot, processedMetadata.Metadata);
             }
             catch (OperationCanceledException)
             {
@@ -266,7 +266,7 @@ namespace ChartHub.Services
             throw new FileNotFoundException("Unable to locate the Onyx executable in a trusted tools directory.");
         }
 
-        private string ProcessYaml(string songPath, string sourceSuffix)
+        private (string FinalDirectoryName, SongMetadata Metadata) ProcessYaml(string songPath, string sourceSuffix)
         {
             var yaml = new YamlStream();
             using (var reader = new StreamReader(songPath))
@@ -302,13 +302,15 @@ namespace ChartHub.Services
 
             var artist = GetYamlScalar(metadata, "artist", "Unknown Artist");
             var title = GetYamlScalar(metadata, "title", Path.GetFileNameWithoutExtension(songPath));
+            var charter = GetYamlScalar(metadata, "charter", "Unknown Charter");
             var normalizedSuffix = NormalizeSourceSuffix(sourceSuffix);
             var finalArtist = SafePathHelper.SanitizeFileName(artist, "song");
             var finalTitle = SafePathHelper.SanitizeFileName(title, "song");
-            var finalDirectoryName = Path.Combine(finalArtist, $"{finalTitle}__{normalizedSuffix}");
+            var finalCharter = SafePathHelper.SanitizeFileName(charter, "song");
+            var finalDirectoryName = Path.Combine(finalArtist, finalTitle, $"{finalCharter}__{normalizedSuffix}");
             using var writer = new StreamWriter(songPath);
             yaml.Save(writer, assignAnchors: false);
-            return finalDirectoryName;
+            return (finalDirectoryName, new SongMetadata(artist, title, charter));
         }
 
         private string MoveBuiltOutputToCloneHero(string buildOutputRoot, string finalDirectoryName)

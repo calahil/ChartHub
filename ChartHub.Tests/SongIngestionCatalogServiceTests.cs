@@ -1,5 +1,6 @@
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
+using Microsoft.Data.Sqlite;
 
 namespace ChartHub.Tests;
 
@@ -92,5 +93,176 @@ public class SongIngestionCatalogServiceTests
             SizeBytes: 1024,
             ContentHash: "hash1",
             RecordedAtUtc: DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public async Task Initialize_WhenUpgradingExistingSchema_PreservesExistingIngestionData()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-migration-preserve");
+        var databasePath = Path.Combine(temp.RootPath, "library-catalog.db");
+
+        await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        {
+            await connection.OpenAsync();
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE schema_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+
+                INSERT INTO schema_metadata (key, value)
+                VALUES ('schema_version', '4');
+
+                CREATE TABLE song_ingestions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source TEXT NOT NULL,
+                    source_id TEXT NULL,
+                    source_link TEXT NOT NULL,
+                    normalized_link TEXT NOT NULL,
+                    artist TEXT NULL,
+                    title TEXT NULL,
+                    charter TEXT NULL,
+                    desktop_state TEXT NOT NULL,
+                    current_state TEXT NOT NULL,
+                    created_at_utc TEXT NOT NULL,
+                    updated_at_utc TEXT NOT NULL,
+                    UNIQUE(normalized_link)
+                );
+
+                CREATE TABLE song_attempts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ingestion_id INTEGER NOT NULL,
+                    attempt_number INTEGER NOT NULL,
+                    started_at_utc TEXT NOT NULL,
+                    ended_at_utc TEXT NULL,
+                    result_state TEXT NOT NULL,
+                    error_summary TEXT NULL,
+                    UNIQUE(ingestion_id, attempt_number)
+                );
+
+                CREATE TABLE song_state_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ingestion_id INTEGER NOT NULL,
+                    attempt_id INTEGER NULL,
+                    from_state TEXT NOT NULL,
+                    to_state TEXT NOT NULL,
+                    at_utc TEXT NOT NULL,
+                    details_json TEXT NULL
+                );
+
+                CREATE TABLE song_assets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ingestion_id INTEGER NOT NULL,
+                    attempt_id INTEGER NULL,
+                    asset_role TEXT NOT NULL,
+                    location TEXT NOT NULL,
+                    size_bytes INTEGER NULL,
+                    content_hash TEXT NULL,
+                    recorded_at_utc TEXT NOT NULL,
+                    UNIQUE(ingestion_id, asset_role, location)
+                );
+
+                CREATE TABLE installed_manifest_files (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ingestion_id INTEGER NOT NULL,
+                    attempt_id INTEGER NULL,
+                    install_root TEXT NOT NULL,
+                    relative_path TEXT NOT NULL,
+                    sha256 TEXT NOT NULL,
+                    size_bytes INTEGER NOT NULL,
+                    last_write_utc TEXT NOT NULL,
+                    recorded_at_utc TEXT NOT NULL,
+                    UNIQUE(ingestion_id, install_root, relative_path)
+                );
+
+                INSERT INTO song_ingestions (
+                    id,
+                    source,
+                    source_id,
+                    source_link,
+                    normalized_link,
+                    artist,
+                    title,
+                    charter,
+                    desktop_state,
+                    current_state,
+                    created_at_utc,
+                    updated_at_utc
+                ) VALUES (
+                    1,
+                    'rhythmverse',
+                    'rv-legacy',
+                    'https://example.com/song.zip?token=abc',
+                    'https://example.com/song.zip?token=abc',
+                    'Legacy Artist',
+                    'Legacy Title',
+                    'Legacy Charter',
+                    'Installed',
+                    'Installed',
+                    '2026-03-18T12:00:00.0000000Z',
+                    '2026-03-18T12:30:00.0000000Z'
+                );
+
+                INSERT INTO song_assets (
+                    ingestion_id,
+                    attempt_id,
+                    asset_role,
+                    location,
+                    size_bytes,
+                    content_hash,
+                    recorded_at_utc
+                ) VALUES (
+                    1,
+                    NULL,
+                    'InstalledDirectory',
+                    '/songs/Legacy Artist/Legacy Title/Legacy Charter__rhythmverse',
+                    NULL,
+                    NULL,
+                    '2026-03-18T12:31:00.0000000Z'
+                );
+                """;
+
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var sut = new SongIngestionCatalogService(databasePath);
+
+        var ingestion = await sut.GetIngestionByIdAsync(1);
+        Assert.NotNull(ingestion);
+        Assert.Equal("Legacy Artist", ingestion!.Artist);
+        Assert.Equal("Legacy Title", ingestion.Title);
+        Assert.Equal("Legacy Charter", ingestion.Charter);
+        Assert.Null(ingestion.LibrarySource);
+
+        var queueItem = await sut.GetQueueItemByIdAsync(1);
+        Assert.NotNull(queueItem);
+        Assert.Equal("/songs/Legacy Artist/Legacy Title/Legacy Charter__rhythmverse", queueItem!.InstalledLocation);
+        Assert.Equal(queueItem.InstalledLocation, queueItem.DesktopLibraryPath);
+
+        await using var verifyConnection = new SqliteConnection($"Data Source={databasePath}");
+        await verifyConnection.OpenAsync();
+
+        await using var versionCommand = verifyConnection.CreateCommand();
+        versionCommand.CommandText = "SELECT value FROM schema_metadata WHERE key = 'schema_version';";
+        var version = Convert.ToString(await versionCommand.ExecuteScalarAsync());
+        Assert.Equal("5", version);
+
+        await using var pragmaCommand = verifyConnection.CreateCommand();
+        pragmaCommand.CommandText = "PRAGMA table_info(song_ingestions);";
+        await using var reader = await pragmaCommand.ExecuteReaderAsync();
+
+        var hasLibrarySource = false;
+        while (await reader.ReadAsync())
+        {
+            if (string.Equals(reader.GetString(1), "library_source", StringComparison.OrdinalIgnoreCase))
+            {
+                hasLibrarySource = true;
+                break;
+            }
+        }
+
+        Assert.True(hasLibrarySource);
     }
 }

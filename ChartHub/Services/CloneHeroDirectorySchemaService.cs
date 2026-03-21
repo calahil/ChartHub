@@ -45,9 +45,9 @@ public sealed class CloneHeroDirectorySchemaService : ICloneHeroDirectorySchemaS
     {
         exists ??= Directory.Exists;
 
-        var artistSegment = SafePathHelper.SanitizePathSegment(metadata.Artist, "Unknown Artist");
-        var songSegment = SafePathHelper.SanitizePathSegment(metadata.Title, "Unknown Song");
-        var charterSegment = SafePathHelper.SanitizePathSegment(metadata.Charter, "Unknown Charter");
+        var artistSegment = SanitizeSchemaSegment(metadata.Artist, "Unknown Artist");
+        var songSegment = SanitizeSchemaSegment(metadata.Title, "Unknown Song");
+        var charterSegment = SanitizeSchemaSegment(metadata.Charter, "Unknown Charter");
         var sourceSegment = NormalizeSource(source);
         var leafSegment = $"{charterSegment}__{sourceSegment}";
 
@@ -82,5 +82,15 @@ public sealed class CloneHeroDirectorySchemaService : ICloneHeroDirectorySchemaS
 
             counter++;
         }
+    }
+
+    private static string SanitizeSchemaSegment(string? value, string fallback)
+    {
+        // Preserve slash-separated tokens by flattening separators before file-name sanitization.
+        var flattened = value?
+            .Replace(Path.DirectorySeparatorChar, '_')
+            .Replace(Path.AltDirectorySeparatorChar, '_');
+
+        return SafePathHelper.SanitizeFileName(flattened, fallback);
     }
 }

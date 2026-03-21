@@ -64,24 +64,32 @@ You can also use the workspace tasks in `.vscode/tasks.json` for `build`, `run`,
 
 ## Local Sync API (Desktop <-> Android)
 
+Machine-readable contract: see `openapi.yaml` at repository root.
+Interactive docs: open `docs/swagger-ui.html` in a browser or static host.
+
 - Desktop hosts a loopback API at `http://127.0.0.1:15123/`.
 - `GET /health` is unauthenticated and returns `{ "status": "ok" }`.
-- All `/api/*` endpoints require one of:
+- `POST /api/pair/claim` is unauthenticated and exchanges a pair code for the sync token.
+- All other `/api/*` endpoints require one of:
 	- `X-ChartHub-Sync-Token: <token>`
 	- `Authorization: Bearer <token>`
 - Token source: `Runtime.SyncApiAuthToken` in `ChartHub/appsettings.json`.
+- Pair code source: `Runtime.SyncApiPairCode` in `ChartHub/appsettings.json`.
+- Pair codes are one-time use and expire based on `Runtime.SyncApiPairCodeTtlMinutes`.
+- Successful pair claims update `Runtime.SyncApiLastPairedDeviceLabel`, `Runtime.SyncApiLastPairedAtUtc`, and append to `Runtime.SyncApiPairingHistoryJson` (last 10 entries).
 - Optional override gate: `Runtime.AllowSyncApiStateOverride` (default `false`).
 
 ### Endpoints
 
 1. `GET /api/version`
-2. `GET /api/ingestions?state=<state>&source=<source>&sort=Updated&desc=true|false`
-3. `GET /api/ingestions/{id}`
-4. `POST /api/ingestions`
-5. `POST /api/ingestions/{id}/events`
-6. `POST /api/ingestions/{id}/actions/retry`
-7. `POST /api/ingestions/{id}/actions/install`
-8. `POST /api/ingestions/{id}/actions/open-folder`
+2. `POST /api/pair/claim`
+3. `GET /api/ingestions?state=<state>&source=<source>&sort=Updated&desc=true|false&limit=1..500`
+4. `GET /api/ingestions/{id}`
+5. `POST /api/ingestions`
+6. `POST /api/ingestions/{id}/events`
+7. `POST /api/ingestions/{id}/actions/retry`
+8. `POST /api/ingestions/{id}/actions/install`
+9. `POST /api/ingestions/{id}/actions/open-folder`
 
 ### `GET /api/version` response body
 
@@ -94,10 +102,23 @@ You can also use the workspace tasks in `.vscode/tasks.json` for `build`, `run`,
 		"events": true,
 		"fromStateOverride": true,
 		"metadata": true,
-		"desktopLibraryStatus": true
+		"desktopLibraryStatus": true,
+		"desktopState": true
 	},
 	"runtime": {
-		"allowSyncApiStateOverride": false
+		"allowSyncApiStateOverride": false,
+		"maxRequestBodyBytes": 65536,
+		"bodyReadTimeoutMs": 1000,
+		"mutationWaitTimeoutMs": 250,
+		"slowRequestThresholdMs": 500,
+		"telemetry": {
+			"startedAtUtc": "2026-03-20T12:34:56.0000000+00:00",
+			"requestsTotal": 12,
+			"slowRequestsTotal": 1,
+			"busyMutationRejectionsTotal": 0,
+			"clientErrorsTotal": 2,
+			"serverErrorsTotal": 0
+		}
 	}
 }
 ```
@@ -173,26 +194,58 @@ You can also use the workspace tasks in `.vscode/tasks.json` for `build`, `run`,
 - `fromState` is optional. If provided, it must match the persisted ingestion state unless `allowFromStateOverride` is `true`.
 - Even when `allowFromStateOverride=true` is sent by the client, the server only honors it when `Runtime.AllowSyncApiStateOverride=true`.
 
+### `POST /api/pair/claim` request body
+
+```json
+{
+	"pairCode": "PAIR-1234",
+	"deviceLabel": "Pixel Companion"
+}
+```
+
+### `POST /api/pair/claim` response body
+
+```json
+{
+	"paired": true,
+	"token": "<Runtime.SyncApiAuthToken>",
+	"apiBaseUrl": "http://127.0.0.1:15123",
+	"pairedAtUtc": "2026-03-20T14:22:31.0000000+00:00"
+}
+```
+
+- Successful claim rotates the desktop pair code immediately.
+- Successful claim also records the pairing event in the desktop Settings "Recent Pairings" panel.
+
 ### Error semantics
 
-- `400`: invalid body or invalid state transition.
+- `400`: invalid body, invalid JSON, or invalid state transition.
 - `409`: `fromState` mismatch with persisted ingestion state when override is not allowed.
 - `401`: missing/invalid sync token for `/api/*` routes.
+- `401` on `/api/pair/claim`: invalid pair code.
+- `410` on `/api/pair/claim`: pair code expired.
 - `404`: ingestion id not found.
+- `408`: request body upload/read timed out.
+- `415`: `Content-Type` is not `application/json`.
+- `413`: JSON request body exceeds 64 KiB.
+- `503`: sync API mutation queue is busy; retry later.
 
 ### Action endpoint semantics
 
 - `POST /api/ingestions/{id}/actions/retry`
 	- Moves an ingestion back to `Queued` when state-machine rules allow it.
+	- Returns `correlationId` (UUID) for client/desktop log correlation.
 	- Returns `202` with `noop=true` if already `Queued`.
 	- Returns `409` when retry is invalid for current state.
 - `POST /api/ingestions/{id}/actions/install`
 	- Uses the latest `Downloaded` asset path for the ingestion and runs desktop install flow.
+	- Returns `correlationId` (UUID) for client/desktop log correlation.
 	- Returns `202` with `installedDirectories` on success.
 	- Returns `409` when no downloaded asset exists or file is missing.
 - `POST /api/ingestions/{id}/actions/open-folder`
 	- Opens the latest installed directory when available.
 	- Falls back to the parent directory of the latest downloaded asset.
+	- Returns `correlationId` (UUID) for client/desktop log correlation.
 	- Returns `202` with `directory` on success.
 	- Returns `409` when no usable folder path exists.
 
@@ -246,7 +299,7 @@ curl -s -X POST http://127.0.0.1:15123/api/ingestions \
 Query queue items by state/source:
 
 ```bash
-curl -s "http://127.0.0.1:15123/api/ingestions?state=Downloaded&source=googledrive&sort=Updated&desc=true" \
+curl -s "http://127.0.0.1:15123/api/ingestions?state=Downloaded&source=googledrive&sort=Updated&desc=true&limit=100" \
 	-H "X-ChartHub-Sync-Token: ${CH_SYNC_TOKEN}" | jq
 ```
 

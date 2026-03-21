@@ -24,6 +24,7 @@ public class MainViewModelTests
         var encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
         var sharedDownloadQueue = new SharedDownloadQueue();
         var settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
+        var syncViewModel = CreateUninitialized<ViewModels.SyncViewModel>();
 
         var sut = CreateMainViewModel(
             rhythmVerseViewModel,
@@ -31,6 +32,7 @@ public class MainViewModelTests
             sharedDownloadQueue,
             downloadViewModel,
             cloneHeroViewModel,
+            syncViewModel,
             settingsViewModel,
             action => action(),
             isAndroid: false);
@@ -40,11 +42,44 @@ public class MainViewModelTests
         Assert.Same(sharedDownloadQueue.Downloads, sut.SharedDownloads);
         Assert.Same(downloadViewModel, sut.DownloadViewModel);
         Assert.Same(cloneHeroViewModel, sut.CloneHeroViewModel);
+        Assert.Same(syncViewModel, sut.SyncViewModel);
         Assert.Same(settingsViewModel, sut.SettingsViewModel);
         Assert.Equal(1, downloadWatcher.LoadItemsCallCount);
         Assert.True(sut.IsSettingsTabVisible);
-        Assert.True(SpinWait.SpinUntil(() => sut.IsCloneHeroTabVisible, TimeSpan.FromSeconds(2)));
+        Assert.False(sut.IsSyncTabVisible);
+        Assert.True(sut.IsCloneHeroTabVisible);
         Assert.True(sut.IsDownloadTabVisible);
+    }
+
+    [Fact]
+    [Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.Unit)]
+    public void Constructor_InAndroidMode_ShowsSyncTabAndHidesCloneHero()
+    {
+        using var temp = new TemporaryDirectoryFixture("main-vm-android");
+        var downloadWatcher = new ResourceWatcherStub();
+        var cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
+        var downloadViewModel = CreateDownloadViewModel(downloadWatcher, new FakeGoogleDriveClient(string.Empty));
+        var rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
+        var encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
+        var sharedDownloadQueue = new SharedDownloadQueue();
+        var settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
+        var syncViewModel = CreateUninitialized<ViewModels.SyncViewModel>();
+
+        var sut = CreateMainViewModel(
+            rhythmVerseViewModel,
+            encoreViewModel,
+            sharedDownloadQueue,
+            downloadViewModel,
+            cloneHeroViewModel,
+            syncViewModel,
+            settingsViewModel,
+            action => action(),
+            isAndroid: true);
+
+        Assert.True(sut.IsSyncTabVisible);
+        Assert.False(sut.IsCloneHeroTabVisible);
+        Assert.True(sut.IsDownloadTabVisible);
+        Assert.Equal(0, downloadWatcher.LoadItemsCallCount);
     }
 
     [Fact]
@@ -100,6 +135,7 @@ public class MainViewModelTests
         SharedDownloadQueue sharedDownloadQueue,
         ViewModels.DownloadViewModel downloadViewModel,
         ViewModels.CloneHeroViewModel cloneHeroViewModel,
+        ViewModels.SyncViewModel syncViewModel,
         ViewModels.SettingsViewModel settingsViewModel,
         Action<Action> postToUi,
         bool isAndroid)
@@ -113,6 +149,7 @@ public class MainViewModelTests
                 typeof(SharedDownloadQueue),
                 typeof(ViewModels.DownloadViewModel),
                 typeof(ViewModels.CloneHeroViewModel),
+                typeof(ViewModels.SyncViewModel),
                 typeof(ViewModels.SettingsViewModel),
                 typeof(Action<Action>),
                 typeof(bool),
@@ -127,6 +164,7 @@ public class MainViewModelTests
             sharedDownloadQueue,
             downloadViewModel,
             cloneHeroViewModel,
+            syncViewModel,
             settingsViewModel,
             postToUi,
             isAndroid,

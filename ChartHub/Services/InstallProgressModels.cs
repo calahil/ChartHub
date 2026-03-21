@@ -26,4 +26,5 @@ public sealed record InstallProgressUpdate(
 public sealed record OnyxInstallResult(
     string FinalInstallDirectory,
     string ImportPath,
-    string BuildOutputPath);
+    string BuildOutputPath,
+    SongMetadata ParsedMetadata);

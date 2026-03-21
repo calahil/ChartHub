@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using ChartHub.Configuration.Interfaces;
@@ -201,6 +202,11 @@ public sealed class SecretFieldViewModel : INotifyPropertyChanged
 
 public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 {
+    private static readonly JsonSerializerOptions PairingHistoryJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
+
     private readonly ISettingsOrchestrator _settings;
     private readonly ISecretStore _secretStore;
     private readonly ICloudStorageAccountService _cloudAccountService;
@@ -215,9 +221,14 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private string _cloudAccountStatusMessage = string.Empty;
     private string? _cloudAccountErrorMessage;
     private AuthGateViewModel? _cloudAuthGateViewModel;
+    private string _currentPairCodeDisplay = "Not set";
+    private string _pairCodeExpiryDisplay = "Unknown";
+    private string _lastPairedDeviceDisplay = "Never paired";
+    private string _lastPairedAtDisplay = "-";
 
     public ObservableCollection<SettingsFieldViewModel> Fields { get; } = [];
     public ObservableCollection<SecretFieldViewModel> Secrets { get; } = [];
+    public ObservableCollection<SyncPairingHistoryEntryViewModel> PairingHistoryEntries { get; } = [];
 
     public AsyncRelayCommand SaveCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> SaveSecretCommand { get; }
@@ -225,6 +236,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public IAsyncRelayCommand LinkCloudAccountCommand { get; }
     public IAsyncRelayCommand UnlinkCloudAccountCommand { get; }
     public IRelayCommand DismissCloudAuthGateCommand { get; }
+    public IAsyncRelayCommand RegeneratePairCodeCommand { get; }
     public string SecretStorageBackend { get; }
     public string CloudProviderId => _cloudAccountService.ProviderId;
     public string CloudProviderDisplayName => _cloudAccountService.ProviderDisplayName;
@@ -329,6 +341,62 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     public bool IsSecretsPanelVisible => IsDeveloperBuild && ShowDeveloperSettings;
 
+    public string CurrentPairCodeDisplay
+    {
+        get => _currentPairCodeDisplay;
+        private set
+        {
+            if (_currentPairCodeDisplay == value)
+                return;
+
+            _currentPairCodeDisplay = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string PairCodeExpiryDisplay
+    {
+        get => _pairCodeExpiryDisplay;
+        private set
+        {
+            if (_pairCodeExpiryDisplay == value)
+                return;
+
+            _pairCodeExpiryDisplay = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string LastPairedDeviceDisplay
+    {
+        get => _lastPairedDeviceDisplay;
+        private set
+        {
+            if (_lastPairedDeviceDisplay == value)
+                return;
+
+            _lastPairedDeviceDisplay = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string LastPairedAtDisplay
+    {
+        get => _lastPairedAtDisplay;
+        private set
+        {
+            if (_lastPairedAtDisplay == value)
+                return;
+
+            _lastPairedAtDisplay = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool HasPairingHistory => PairingHistoryEntries.Count > 0;
+
+    public bool HasNoPairingHistory => PairingHistoryEntries.Count == 0;
+
     public string StatusMessage
     {
         get => _statusMessage;
@@ -383,6 +451,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         LinkCloudAccountCommand = new AsyncRelayCommand(LinkCloudAccountAsync, CanLinkCloudAccount);
         UnlinkCloudAccountCommand = new AsyncRelayCommand(UnlinkCloudAccountAsync, CanUnlinkCloudAccount);
         DismissCloudAuthGateCommand = new RelayCommand(DismissCloudAuthGate, CanDismissCloudAuthGate);
+        RegeneratePairCodeCommand = new AsyncRelayCommand(RegeneratePairCodeAsync, CanRegeneratePairCode);
         SecretStorageBackend = ResolveSecretStorageBackend(secretStore);
         CloudAccountStatusMessage = $"{CloudProviderDisplayName} is not linked.";
 
@@ -400,6 +469,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private bool CanUnlinkCloudAccount() => !IsCloudAccountBusy && IsCloudAccountLinked && !IsCloudAuthGateVisible;
 
     private bool CanDismissCloudAuthGate() => IsCloudAuthGateVisible;
+
+    private bool CanRegeneratePairCode() => !_isSaving;
 
     private async Task RefreshCloudAccountStateAsync(CancellationToken cancellationToken = default)
     {
@@ -538,7 +609,68 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
 
         HasPendingRestartSettings = Fields.Any(FieldRequiresReloadAfterSave);
+        RefreshPairingDisplay(config);
         RefreshSaveState();
+    }
+
+    private void RefreshPairingDisplay(AppConfigRoot config)
+    {
+        var pairCode = config.Runtime.SyncApiPairCode;
+        CurrentPairCodeDisplay = string.IsNullOrWhiteSpace(pairCode) ? "Not set" : pairCode;
+
+        var issuedAt = DateTimeOffset.TryParse(config.Runtime.SyncApiPairCodeIssuedAtUtc, out var parsedIssued)
+            ? parsedIssued
+            : DateTimeOffset.UtcNow;
+        var ttlMinutes = Math.Clamp(config.Runtime.SyncApiPairCodeTtlMinutes, 1, 1440);
+        var expiresAt = issuedAt.AddMinutes(ttlMinutes).ToLocalTime();
+        PairCodeExpiryDisplay = expiresAt.ToString("yyyy-MM-dd HH:mm:ss");
+
+        var lastPairedDevice = config.Runtime.SyncApiLastPairedDeviceLabel;
+        LastPairedDeviceDisplay = string.IsNullOrWhiteSpace(lastPairedDevice)
+            ? "Never paired"
+            : lastPairedDevice;
+
+        if (DateTimeOffset.TryParse(config.Runtime.SyncApiLastPairedAtUtc, out var lastPairedAt))
+            LastPairedAtDisplay = lastPairedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+        else
+            LastPairedAtDisplay = "-";
+
+        RefreshPairingHistory(config.Runtime.SyncApiPairingHistoryJson);
+    }
+
+    private void RefreshPairingHistory(string pairingHistoryJson)
+    {
+        PairingHistoryEntries.Clear();
+
+        if (string.IsNullOrWhiteSpace(pairingHistoryJson))
+        {
+            OnPropertyChanged(nameof(HasPairingHistory));
+            OnPropertyChanged(nameof(HasNoPairingHistory));
+            return;
+        }
+
+        try
+        {
+            var entries = JsonSerializer.Deserialize<List<PairingHistoryEntryPayload>>(pairingHistoryJson, PairingHistoryJsonOptions) ?? [];
+            foreach (var entry in entries)
+            {
+                if (string.IsNullOrWhiteSpace(entry.PairedAtUtc))
+                    continue;
+
+                var deviceLabel = string.IsNullOrWhiteSpace(entry.DeviceLabel) ? "Unknown device" : entry.DeviceLabel;
+                if (!DateTimeOffset.TryParse(entry.PairedAtUtc, out var pairedAtUtc))
+                    continue;
+
+                PairingHistoryEntries.Add(new SyncPairingHistoryEntryViewModel(deviceLabel, pairedAtUtc));
+            }
+        }
+        catch
+        {
+            // Keep empty history on malformed JSON.
+        }
+
+        OnPropertyChanged(nameof(HasPairingHistory));
+        OnPropertyChanged(nameof(HasNoPairingHistory));
     }
 
     private void OnFieldPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -616,6 +748,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
         foreach (var property in properties)
         {
+            if (property.GetCustomAttribute<SettingHiddenAttribute>() is not null)
+                continue;
+
             var display = property.GetCustomAttribute<SettingDisplayAttribute>()?.Label ?? property.Name;
             var group = property.GetCustomAttribute<SettingGroupAttribute>()?.Name ?? "General";
             var description = property.GetCustomAttribute<SettingDescriptionAttribute>()?.Text ?? string.Empty;
@@ -719,6 +854,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         });
 
         _isSaving = true;
+        RegeneratePairCodeCommand.NotifyCanExecuteChanged();
         RefreshSaveState();
         try
         {
@@ -803,8 +939,32 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         finally
         {
             _isSaving = false;
+            RegeneratePairCodeCommand.NotifyCanExecuteChanged();
             RefreshSaveState();
         }
+    }
+
+    private async Task RegeneratePairCodeAsync()
+    {
+        if (!CanRegeneratePairCode())
+            return;
+
+        var now = DateTimeOffset.UtcNow;
+        var nextCode = AppGlobalSettings.GenerateSyncPairCode();
+
+        var result = await _settings.UpdateAsync(config =>
+        {
+            config.Runtime.SyncApiPairCode = nextCode;
+            config.Runtime.SyncApiPairCodeIssuedAtUtc = now.ToString("O");
+        });
+
+        if (!result.IsValid)
+        {
+            StatusMessage = "Failed to regenerate pair code.";
+            return;
+        }
+
+        StatusMessage = "Pair code regenerated.";
     }
 
     private bool CanSave()
@@ -1010,4 +1170,15 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         foreach (var field in Fields)
             field.PropertyChanged -= OnFieldPropertyChanged;
     }
+}
+
+public sealed record SyncPairingHistoryEntryViewModel(string DeviceLabel, DateTimeOffset PairedAtUtc)
+{
+    public string PairedAtDisplay => PairedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+}
+
+internal sealed class PairingHistoryEntryPayload
+{
+    public string DeviceLabel { get; set; } = string.Empty;
+    public string PairedAtUtc { get; set; } = string.Empty;
 }

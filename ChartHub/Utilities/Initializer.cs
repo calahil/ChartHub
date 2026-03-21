@@ -25,6 +25,13 @@ namespace ChartHub.Utilities
 
     public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
     {
+        private const int MinSyncApiMaxRequestBodyBytes = 4 * 1024;
+        private const int MaxSyncApiMaxRequestBodyBytes = 1024 * 1024;
+        private const int MinSyncApiTimeoutMs = 100;
+        private const int MaxSyncApiTimeoutMs = 30_000;
+        private const int MinSyncPairCodeTtlMinutes = 1;
+        private const int MaxSyncPairCodeTtlMinutes = 1440;
+
         private static string GetDefaultCloneHeroDataDirectory()
         {
             if (OperatingSystem.IsAndroid())
@@ -88,10 +95,88 @@ namespace ChartHub.Utilities
             set => QueueConfigUpdate(config => config.Runtime.SyncApiAuthToken = value);
         }
 
+        public string SyncApiDesktopBaseUrl
+        {
+            get => NormalizeSyncApiBaseUrl(Runtime.SyncApiDesktopBaseUrl);
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiDesktopBaseUrl = NormalizeSyncApiBaseUrl(value));
+        }
+
+        public string SyncApiDeviceLabel
+        {
+            get => NormalizeSyncDeviceLabel(Runtime.SyncApiDeviceLabel);
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiDeviceLabel = NormalizeSyncDeviceLabel(value));
+        }
+
+        public string SyncApiPairCode
+        {
+            get => Runtime.SyncApiPairCode ?? string.Empty;
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiPairCode = value ?? string.Empty);
+        }
+
+        public string SyncApiPairCodeIssuedAtUtc
+        {
+            get => Runtime.SyncApiPairCodeIssuedAtUtc ?? string.Empty;
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiPairCodeIssuedAtUtc = value ?? string.Empty);
+        }
+
+        public int SyncApiPairCodeTtlMinutes
+        {
+            get => ClampSyncPairCodeTtlMinutes(Runtime.SyncApiPairCodeTtlMinutes);
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiPairCodeTtlMinutes = ClampSyncPairCodeTtlMinutes(value));
+        }
+
+        public string SyncApiLastPairedDeviceLabel
+        {
+            get => Runtime.SyncApiLastPairedDeviceLabel ?? string.Empty;
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiLastPairedDeviceLabel = value ?? string.Empty);
+        }
+
+        public string SyncApiLastPairedAtUtc
+        {
+            get => Runtime.SyncApiLastPairedAtUtc ?? string.Empty;
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiLastPairedAtUtc = value ?? string.Empty);
+        }
+
+        public string SyncApiPairingHistoryJson
+        {
+            get => NormalizeSyncConnectionsJson(Runtime.SyncApiPairingHistoryJson);
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiPairingHistoryJson = NormalizeSyncConnectionsJson(value));
+        }
+
+        public string SyncApiSavedConnectionsJson
+        {
+            get => NormalizeSyncConnectionsJson(Runtime.SyncApiSavedConnectionsJson);
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiSavedConnectionsJson = NormalizeSyncConnectionsJson(value));
+        }
+
         public bool AllowSyncApiStateOverride
         {
             get => Runtime.AllowSyncApiStateOverride;
             set => QueueConfigUpdate(config => config.Runtime.AllowSyncApiStateOverride = value);
+        }
+
+        public int SyncApiMaxRequestBodyBytes
+        {
+            get => ClampSyncApiMaxRequestBodyBytes(Runtime.SyncApiMaxRequestBodyBytes);
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiMaxRequestBodyBytes = ClampSyncApiMaxRequestBodyBytes(value));
+        }
+
+        public int SyncApiBodyReadTimeoutMs
+        {
+            get => ClampSyncApiTimeoutMs(Runtime.SyncApiBodyReadTimeoutMs);
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiBodyReadTimeoutMs = ClampSyncApiTimeoutMs(value));
+        }
+
+        public int SyncApiMutationWaitTimeoutMs
+        {
+            get => ClampSyncApiTimeoutMs(Runtime.SyncApiMutationWaitTimeoutMs);
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiMutationWaitTimeoutMs = ClampSyncApiTimeoutMs(value));
+        }
+
+        public int SyncApiSlowRequestThresholdMs
+        {
+            get => ClampSyncApiTimeoutMs(Runtime.SyncApiSlowRequestThresholdMs);
+            set => QueueConfigUpdate(config => config.Runtime.SyncApiSlowRequestThresholdMs = ClampSyncApiTimeoutMs(value));
         }
 
         public int TransferOrchestratorConcurrencyCap
@@ -129,6 +214,21 @@ namespace ChartHub.Utilities
             var syncApiAuthToken = string.IsNullOrWhiteSpace(Runtime.SyncApiAuthToken)
                 ? GenerateSyncApiToken()
                 : Runtime.SyncApiAuthToken;
+            var syncApiDesktopBaseUrl = NormalizeSyncApiBaseUrl(Runtime.SyncApiDesktopBaseUrl);
+            var syncApiDeviceLabel = NormalizeSyncDeviceLabel(Runtime.SyncApiDeviceLabel);
+            var syncApiPairCode = string.IsNullOrWhiteSpace(Runtime.SyncApiPairCode)
+                ? GenerateSyncPairCode()
+                : Runtime.SyncApiPairCode;
+            var syncApiPairCodeIssuedAtUtc = NormalizeSyncPairCodeIssuedAt(Runtime.SyncApiPairCodeIssuedAtUtc);
+            var syncApiPairCodeTtlMinutes = ClampSyncPairCodeTtlMinutes(Runtime.SyncApiPairCodeTtlMinutes);
+            var syncApiLastPairedDeviceLabel = Runtime.SyncApiLastPairedDeviceLabel ?? string.Empty;
+            var syncApiLastPairedAtUtc = Runtime.SyncApiLastPairedAtUtc ?? string.Empty;
+            var syncApiPairingHistoryJson = NormalizeSyncConnectionsJson(Runtime.SyncApiPairingHistoryJson);
+            var syncApiSavedConnectionsJson = NormalizeSyncConnectionsJson(Runtime.SyncApiSavedConnectionsJson);
+            var syncApiMaxRequestBodyBytes = ClampSyncApiMaxRequestBodyBytes(Runtime.SyncApiMaxRequestBodyBytes);
+            var syncApiBodyReadTimeoutMs = ClampSyncApiTimeoutMs(Runtime.SyncApiBodyReadTimeoutMs);
+            var syncApiMutationWaitTimeoutMs = ClampSyncApiTimeoutMs(Runtime.SyncApiMutationWaitTimeoutMs);
+            var syncApiSlowRequestThresholdMs = ClampSyncApiTimeoutMs(Runtime.SyncApiSlowRequestThresholdMs);
             var transferConcurrencyCap = Math.Clamp(Runtime.TransferOrchestratorConcurrencyCap, 1, 8);
 
             FileTools.CreateDirectoryIfNotExists(tempDir);
@@ -147,6 +247,19 @@ namespace ChartHub.Utilities
                 config.Runtime.CloneHeroDataDirectory = cloneHeroDataDir;
                 config.Runtime.CloneHeroSongDirectory = cloneHeroSongsDir;
                 config.Runtime.SyncApiAuthToken = syncApiAuthToken;
+                config.Runtime.SyncApiDesktopBaseUrl = syncApiDesktopBaseUrl;
+                config.Runtime.SyncApiDeviceLabel = syncApiDeviceLabel;
+                config.Runtime.SyncApiPairCode = syncApiPairCode;
+                config.Runtime.SyncApiPairCodeIssuedAtUtc = syncApiPairCodeIssuedAtUtc;
+                config.Runtime.SyncApiPairCodeTtlMinutes = syncApiPairCodeTtlMinutes;
+                config.Runtime.SyncApiLastPairedDeviceLabel = syncApiLastPairedDeviceLabel;
+                config.Runtime.SyncApiLastPairedAtUtc = syncApiLastPairedAtUtc;
+                config.Runtime.SyncApiPairingHistoryJson = syncApiPairingHistoryJson;
+                config.Runtime.SyncApiSavedConnectionsJson = syncApiSavedConnectionsJson;
+                config.Runtime.SyncApiMaxRequestBodyBytes = syncApiMaxRequestBodyBytes;
+                config.Runtime.SyncApiBodyReadTimeoutMs = syncApiBodyReadTimeoutMs;
+                config.Runtime.SyncApiMutationWaitTimeoutMs = syncApiMutationWaitTimeoutMs;
+                config.Runtime.SyncApiSlowRequestThresholdMs = syncApiSlowRequestThresholdMs;
                 config.Runtime.TransferOrchestratorConcurrencyCap = transferConcurrencyCap;
             });
         }
@@ -163,6 +276,61 @@ namespace ChartHub.Utilities
             return string.IsNullOrWhiteSpace(value) || value == "first_install"
                 ? fallback
                 : value;
+        }
+
+        private static int ClampSyncApiMaxRequestBodyBytes(int value)
+        {
+            return Math.Clamp(value, MinSyncApiMaxRequestBodyBytes, MaxSyncApiMaxRequestBodyBytes);
+        }
+
+        private static string NormalizeSyncApiBaseUrl(string? value)
+        {
+            var candidate = value?.Trim();
+            return string.IsNullOrWhiteSpace(candidate)
+                ? "http://127.0.0.1:15123"
+                : candidate;
+        }
+
+        private static string NormalizeSyncDeviceLabel(string? value)
+        {
+            var candidate = value?.Trim();
+            return string.IsNullOrWhiteSpace(candidate)
+                ? "Android Companion"
+                : candidate;
+        }
+
+        private static string NormalizeSyncConnectionsJson(string? value)
+        {
+            var candidate = value?.Trim();
+            return string.IsNullOrWhiteSpace(candidate)
+                ? "[]"
+                : candidate;
+        }
+
+        private static string NormalizeSyncPairCodeIssuedAt(string? value)
+        {
+            if (DateTimeOffset.TryParse(value, out _))
+                return value!;
+
+            return DateTimeOffset.UtcNow.ToString("O");
+        }
+
+        public static string GenerateSyncPairCode()
+        {
+            Span<byte> bytes = stackalloc byte[4];
+            RandomNumberGenerator.Fill(bytes);
+            var number = BitConverter.ToUInt32(bytes) % 1_000_000;
+            return number.ToString("D6");
+        }
+
+        private static int ClampSyncPairCodeTtlMinutes(int value)
+        {
+            return Math.Clamp(value, MinSyncPairCodeTtlMinutes, MaxSyncPairCodeTtlMinutes);
+        }
+
+        private static int ClampSyncApiTimeoutMs(int value)
+        {
+            return Math.Clamp(value, MinSyncApiTimeoutMs, MaxSyncApiTimeoutMs);
         }
 
         private void QueueConfigUpdate(Action<AppConfigRoot> update)
@@ -206,7 +374,20 @@ namespace ChartHub.Utilities
             OnPropertyChanged(nameof(CloneHeroDataDir));
             OnPropertyChanged(nameof(CloneHeroSongsDir));
             OnPropertyChanged(nameof(SyncApiAuthToken));
+            OnPropertyChanged(nameof(SyncApiDesktopBaseUrl));
+            OnPropertyChanged(nameof(SyncApiDeviceLabel));
+            OnPropertyChanged(nameof(SyncApiPairCode));
+            OnPropertyChanged(nameof(SyncApiPairCodeIssuedAtUtc));
+            OnPropertyChanged(nameof(SyncApiPairCodeTtlMinutes));
+            OnPropertyChanged(nameof(SyncApiLastPairedDeviceLabel));
+            OnPropertyChanged(nameof(SyncApiLastPairedAtUtc));
+            OnPropertyChanged(nameof(SyncApiPairingHistoryJson));
+            OnPropertyChanged(nameof(SyncApiSavedConnectionsJson));
             OnPropertyChanged(nameof(AllowSyncApiStateOverride));
+            OnPropertyChanged(nameof(SyncApiMaxRequestBodyBytes));
+            OnPropertyChanged(nameof(SyncApiBodyReadTimeoutMs));
+            OnPropertyChanged(nameof(SyncApiMutationWaitTimeoutMs));
+            OnPropertyChanged(nameof(SyncApiSlowRequestThresholdMs));
             OnPropertyChanged(nameof(TransferOrchestratorConcurrencyCap));
             OnPropertyChanged(nameof(InstallLogExpanded));
         }

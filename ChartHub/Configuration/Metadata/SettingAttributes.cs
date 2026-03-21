@@ -35,6 +35,11 @@ public sealed class SettingRequiresRestartAttribute : Attribute
 {
 }
 
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class SettingHiddenAttribute : Attribute
+{
+}
+
 public enum SettingEditorKind
 {
     Text,

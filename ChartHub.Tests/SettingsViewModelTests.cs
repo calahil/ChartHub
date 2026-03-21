@@ -23,9 +23,19 @@ public class SettingsViewModelTests
         using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
-        Assert.Equal(13, sut.Fields.Count);
+        Assert.Equal(23, sut.Fields.Count);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.UseMockData" && field.IsToggleEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.DownloadDirectory" && field.IsDirectoryPicker);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiDesktopBaseUrl" && field.IsTextEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiDeviceLabel" && field.IsTextEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiPairCode" && field.IsTextEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiPairCodeIssuedAtUtc" && field.IsTextEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiPairCodeTtlMinutes" && field.IsNumberEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiSavedConnectionsJson" && field.IsTextEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiMaxRequestBodyBytes" && field.IsNumberEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiBodyReadTimeoutMs" && field.IsNumberEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiMutationWaitTimeoutMs" && field.IsNumberEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiSlowRequestThresholdMs" && field.IsNumberEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.TransferOrchestratorConcurrencyCap" && field.IsNumberEditor);
         Assert.Contains(sut.Fields, field => field.Key == "GoogleAuth.AndroidClientId" && field.IsTextEditor);
         Assert.Contains(sut.Fields, field => field.IsGroupHeaderVisible);
@@ -231,6 +241,47 @@ public class SettingsViewModelTests
         Assert.True(sut.IsCloudAccountLinked);
         Assert.Equal("Google Drive linked.", sut.CloudAccountStatusMessage);
         Assert.False(sut.HasCloudAccountError);
+    }
+
+    [Fact]
+    public async Task Constructor_WithPairingHistory_PopulatesRecentPairings()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-pairing-history");
+        var config = CreateConfig(temp.RootPath);
+        config.Runtime.SyncApiPairingHistoryJson =
+            "[{\"deviceLabel\":\"Pixel 9\",\"pairedAtUtc\":\"2026-01-02T03:04:05Z\"},{\"deviceLabel\":\"Galaxy S24\",\"pairedAtUtc\":\"2026-01-01T01:02:03Z\"}]";
+
+        var orchestrator = new FakeSettingsOrchestrator(config);
+        var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
+
+        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        await Task.Yield();
+
+        Assert.True(sut.HasPairingHistory);
+        Assert.False(sut.HasNoPairingHistory);
+        Assert.Equal(2, sut.PairingHistoryEntries.Count);
+        Assert.Equal("Pixel 9", sut.PairingHistoryEntries[0].DeviceLabel);
+        Assert.Equal("Galaxy S24", sut.PairingHistoryEntries[1].DeviceLabel);
+    }
+
+    [Fact]
+    public async Task Constructor_WithMalformedPairingHistory_UsesEmptyHistory()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-pairing-history-malformed");
+        var config = CreateConfig(temp.RootPath);
+        config.Runtime.SyncApiPairingHistoryJson = "{not-json";
+
+        var orchestrator = new FakeSettingsOrchestrator(config);
+        var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
+
+        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        await Task.Yield();
+
+        Assert.False(sut.HasPairingHistory);
+        Assert.True(sut.HasNoPairingHistory);
+        Assert.Empty(sut.PairingHistoryEntries);
     }
 
     private static AppConfigRoot CreateConfig(string rootPath)

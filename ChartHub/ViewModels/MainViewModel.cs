@@ -26,6 +26,7 @@ namespace ChartHub.ViewModels
         private DownloadViewModel _downloadViewModel = null!;
         private SharedDownloadQueue _sharedDownloadQueue = new();
         private CloneHeroViewModel _cloneHeroViewModel = null!;
+        private SyncViewModel _syncViewModel = null!;
         private SettingsViewModel _settingsViewModel = null!;
         private SidePaneMode _activeSidePaneMode = SidePaneMode.Filters;
         private MainViewPageStrings _pageStrings = new MainViewPageStrings();
@@ -86,6 +87,16 @@ namespace ChartHub.ViewModels
             }
         }
 
+        public SyncViewModel SyncViewModel
+        {
+            get => _syncViewModel;
+            set
+            {
+                _syncViewModel = value;
+                OnPropertyChanged();
+            }
+        }
+
         private bool _isDownloadTabVisible;
         public bool IsDownloadTabVisible
         {
@@ -119,6 +130,7 @@ namespace ChartHub.ViewModels
         }
 
         private bool _isSettingsTabVisible;
+        private bool _isSyncTabVisible;
         private int _selectedMainTabIndex;
         private bool _isFilterPaneOpen;
 
@@ -212,6 +224,16 @@ namespace ChartHub.ViewModels
             }
         }
 
+        public bool IsSyncTabVisible
+        {
+            get => _isSyncTabVisible;
+            set
+            {
+                _isSyncTabVisible = value;
+                OnPropertyChanged();
+            }
+        }
+
         public MainViewModel()
         {
             ShowFiltersPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Filters));
@@ -226,6 +248,7 @@ namespace ChartHub.ViewModels
             SharedDownloadQueue sharedDownloadQueue,
             DownloadViewModel downloadViewModel,
             CloneHeroViewModel cloneHeroViewModel,
+            SyncViewModel syncViewModel,
             SettingsViewModel settingsViewModel)
             : this(
                 rhythmVerseViewModel,
@@ -233,6 +256,7 @@ namespace ChartHub.ViewModels
                 sharedDownloadQueue,
                 downloadViewModel,
                 cloneHeroViewModel,
+                syncViewModel,
                 settingsViewModel,
                 action => Dispatcher.UIThread.Post(action),
                 OperatingSystem.IsAndroid())
@@ -245,6 +269,7 @@ namespace ChartHub.ViewModels
             SharedDownloadQueue sharedDownloadQueue,
             DownloadViewModel downloadViewModel,
             CloneHeroViewModel cloneHeroViewModel,
+            SyncViewModel syncViewModel,
             SettingsViewModel settingsViewModel,
             Action<Action> postToUi,
             bool isAndroid)
@@ -255,17 +280,20 @@ namespace ChartHub.ViewModels
             _sharedDownloadQueue.Downloads.CollectionChanged += SharedDownloads_CollectionChanged;
             _downloadViewModel = downloadViewModel;
             _cloneHeroViewModel = cloneHeroViewModel;
+            _syncViewModel = syncViewModel;
             _settingsViewModel = settingsViewModel;
             _settingsViewModel.PropertyChanged += SettingsViewModel_PropertyChanged;
             ShowFiltersPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Filters));
             ShowDownloadsPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Downloads));
             CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
             ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
-            _isCloneHeroTabVisible = false;
-            _isDownloadTabVisible = false;
-            _isSettingsTabVisible = true;
 
             var supportsCloneHero = !isAndroid;
+
+            _isCloneHeroTabVisible = supportsCloneHero;
+            _isDownloadTabVisible = false;
+            _isSettingsTabVisible = true;
+            _isSyncTabVisible = isAndroid;
 
             if (supportsCloneHero)
             {
@@ -284,7 +312,6 @@ namespace ChartHub.ViewModels
         private async Task InitializeCloneHeroAsync(Action<Action> postToUi)
         {
             await _cloneHeroViewModel.InitializeAsync();
-            postToUi(() => IsCloneHeroTabVisible = true);
         }
 
         private void SettingsViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -161,6 +161,7 @@ namespace ChartHub.Utilities
             services.AddSingleton<SongIngestionStateMachine>();
             services.AddSingleton<ISongIniMetadataParser, SongIniMetadataParser>();
             services.AddSingleton<ICloneHeroDirectorySchemaService, CloneHeroDirectorySchemaService>();
+            services.AddSingleton<ICloneHeroLibraryReconciliationService, CloneHeroLibraryReconciliationService>();
             services.AddSingleton<IOnyxPipelineService, OnyxService>();
             services.AddSingleton<ISongInstallService, SongInstallService>();
             services.AddSingleton<IDesktopPathOpener, DesktopPathOpener>();
@@ -169,8 +170,10 @@ namespace ChartHub.Utilities
             services.AddSingleton<IGoogleDriveDestinationWriter, GoogleDriveDestinationWriter>();
             services.AddSingleton<ITransferOrchestrator, TransferOrchestrator>();
             services.AddSingleton<IIngestionSyncApiHost, IngestionSyncApiHost>();
+            services.AddSingleton<IDesktopSyncApiClient, DesktopSyncApiClient>();
             services.AddSingleton<DownloadViewModel>();
             services.AddSingleton<CloneHeroViewModel>();
+            services.AddSingleton<SyncViewModel>();
             services.AddSingleton<SettingsViewModel>();
             services.AddSingleton<RhythmVerseViewModel>();
             services.AddSingleton<EncoreViewModel>();
@@ -181,6 +184,7 @@ namespace ChartHub.Utilities
                     serviceProvider.GetRequiredService<SharedDownloadQueue>(),
                     serviceProvider.GetRequiredService<DownloadViewModel>(),
                     serviceProvider.GetRequiredService<CloneHeroViewModel>(),
+                    serviceProvider.GetRequiredService<SyncViewModel>(),
                     serviceProvider.GetRequiredService<SettingsViewModel>()
                 )
             );

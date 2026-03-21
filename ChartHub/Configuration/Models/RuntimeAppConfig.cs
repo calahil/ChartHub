@@ -57,10 +57,79 @@ public sealed class RuntimeAppConfig
     public string SyncApiAuthToken { get; set; } = string.Empty;
 
     [SettingGroup("Sync API")]
+    [SettingDisplay("Desktop Sync API URL")]
+    [SettingEditor(SettingEditorKind.Text)]
+    [SettingHotReloadable(true)]
+    public string SyncApiDesktopBaseUrl { get; set; } = "http://127.0.0.1:15123";
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Companion Device Label")]
+    [SettingEditor(SettingEditorKind.Text)]
+    [SettingHotReloadable(true)]
+    public string SyncApiDeviceLabel { get; set; } = "Android Companion";
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Pair Code")]
+    [SettingEditor(SettingEditorKind.Text)]
+    [SettingHotReloadable(true)]
+    public string SyncApiPairCode { get; set; } = string.Empty;
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Pair Code Issued At (UTC)")]
+    [SettingEditor(SettingEditorKind.Text)]
+    [SettingHotReloadable(true)]
+    public string SyncApiPairCodeIssuedAtUtc { get; set; } = string.Empty;
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Pair Code TTL (minutes)")]
+    [SettingEditor(SettingEditorKind.Number)]
+    [SettingHotReloadable(true)]
+    public int SyncApiPairCodeTtlMinutes { get; set; } = 10;
+
+    [SettingHidden]
+    public string SyncApiLastPairedDeviceLabel { get; set; } = string.Empty;
+
+    [SettingHidden]
+    public string SyncApiLastPairedAtUtc { get; set; } = string.Empty;
+
+    [SettingHidden]
+    public string SyncApiPairingHistoryJson { get; set; } = "[]";
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Saved Connections JSON")]
+    [SettingEditor(SettingEditorKind.Text)]
+    [SettingHotReloadable(true)]
+    public string SyncApiSavedConnectionsJson { get; set; } = "[]";
+
+    [SettingGroup("Sync API")]
     [SettingDisplay("Allow Event State Override")]
     [SettingEditor(SettingEditorKind.Toggle)]
     [SettingHotReloadable(true)]
     public bool AllowSyncApiStateOverride { get; set; }
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Max Request Body Bytes")]
+    [SettingEditor(SettingEditorKind.Number)]
+    [SettingHotReloadable(true)]
+    public int SyncApiMaxRequestBodyBytes { get; set; } = 64 * 1024;
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Request Body Timeout (ms)")]
+    [SettingEditor(SettingEditorKind.Number)]
+    [SettingHotReloadable(true)]
+    public int SyncApiBodyReadTimeoutMs { get; set; } = 1000;
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Mutation Wait Timeout (ms)")]
+    [SettingEditor(SettingEditorKind.Number)]
+    [SettingHotReloadable(true)]
+    public int SyncApiMutationWaitTimeoutMs { get; set; } = 250;
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Slow Request Threshold (ms)")]
+    [SettingEditor(SettingEditorKind.Number)]
+    [SettingHotReloadable(true)]
+    public int SyncApiSlowRequestThresholdMs { get; set; } = 500;
 
     [SettingGroup("Transfers")]
     [SettingDisplay("Transfer Concurrency Cap")]

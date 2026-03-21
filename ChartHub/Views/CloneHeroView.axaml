@@ -2,20 +2,53 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
-             x:Class="ChartHub.Views.CloneHeroView">
+             x:Class="ChartHub.Views.CloneHeroView"
+             x:DataType="viewmodels:CloneHeroViewModel">
 
-    <Grid Margin="10" RowDefinitions="Auto,*">
+    <Grid Margin="10" RowDefinitions="Auto,Auto,*">
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
             <TextBlock Text="Clone Hero Library"
                        FontSize="18"
                        FontWeight="Bold" />
-            <Button Grid.Column="1"
-                    Content="Refresh Library"
-                    Command="{Binding RefreshLibraryCommand}" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button Content="Reconcile Library"
+                        Command="{Binding ReconcileLibraryCommand}" />
+                <Button Content="Refresh Library"
+                        Command="{Binding RefreshLibraryCommand}" />
+            </StackPanel>
         </Grid>
 
-        <Grid Grid.Row="1" ColumnDefinitions="280,*">
+        <Border Grid.Row="1"
+            IsVisible="{Binding ShowPostStartupStatus}"
+                Margin="0,0,0,10"
+                Padding="8"
+                BorderThickness="1"
+                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                Background="{StaticResource ThemeControlLowBrush}">
+            <TextBlock Text="{Binding ReconciliationStatusMessage}"
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
+        </Border>
+
+        <Border Grid.Row="1"
+                IsVisible="{Binding ShowStartupBlockingState}"
+                Margin="0,0,0,10"
+                Padding="12"
+                BorderThickness="1"
+                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                Background="{StaticResource ThemeControlLowBrush}">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Preparing Clone Hero library..."
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding ReconciliationStatusMessage}"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource ThemeForegroundLowBrush}" />
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="2" ColumnDefinitions="280,*">
             <Border Grid.Column="0" Margin="0,0,10,0" BorderThickness="1" BorderBrush="{StaticResource ThemeBorderMidBrush}" Padding="8">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Artists" FontWeight="SemiBold" />
@@ -40,6 +73,9 @@
                         <ContextMenu>
                             <MenuItem Header="Open Song Folder" Command="{Binding OpenSongFolderCommand}" />
                             <MenuItem Header="Open song.ini Location" Command="{Binding OpenSongIniCommand}" />
+                            <Separator />
+                            <MenuItem Header="Re-parse Metadata" Command="{Binding ReParseMetadataCommand}" />
+                            <MenuItem Header="Reconcile This Song" Command="{Binding ReconcileThisSongCommand}" />
                         </ContextMenu>
                     </DataGrid.ContextMenu>
                 </DataGrid>

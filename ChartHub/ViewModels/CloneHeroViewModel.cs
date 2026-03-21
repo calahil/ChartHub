@@ -13,6 +13,7 @@ namespace ChartHub.ViewModels
     {
         private readonly LibraryCatalogService _libraryCatalog;
         private readonly IDesktopPathOpener _desktopPathOpener;
+        private readonly ICloneHeroLibraryReconciliationService? _reconciliationService;
 
         private bool _hasInitialized;
         public bool HasInitialized
@@ -25,8 +26,29 @@ namespace ChartHub.ViewModels
 
                 _hasInitialized = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(ShowStartupBlockingState));
+                OnPropertyChanged(nameof(ShowPostStartupStatus));
             }
         }
+
+        private bool _isStartupScanInProgress;
+        public bool IsStartupScanInProgress
+        {
+            get => _isStartupScanInProgress;
+            private set
+            {
+                if (_isStartupScanInProgress == value)
+                    return;
+
+                _isStartupScanInProgress = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ShowStartupBlockingState));
+                OnPropertyChanged(nameof(ShowPostStartupStatus));
+            }
+        }
+
+        public bool ShowStartupBlockingState => !HasInitialized || IsStartupScanInProgress;
+        public bool ShowPostStartupStatus => HasReconciliationStatus && !ShowStartupBlockingState;
 
         private ObservableCollection<string> _artists = [];
         public ObservableCollection<string> Artists
@@ -75,10 +97,47 @@ namespace ChartHub.ViewModels
                 OnPropertyChanged();
                 _openSongFolderCommand.NotifyCanExecuteChanged();
                 _openSongIniCommand.NotifyCanExecuteChanged();
+                _reParseMetadataCommand?.NotifyCanExecuteChanged();
+                _reconcileThisSongCommand?.NotifyCanExecuteChanged();
             }
         }
 
         public CloneHeroPageStrings PageStrings { get; }
+
+        private bool _isReconciling;
+        public bool IsReconciling
+        {
+            get => _isReconciling;
+            private set
+            {
+                if (_isReconciling == value)
+                    return;
+
+                _isReconciling = value;
+                OnPropertyChanged();
+                _reconcileLibraryCommand.NotifyCanExecuteChanged();
+                _reParseMetadataCommand?.NotifyCanExecuteChanged();
+                _reconcileThisSongCommand?.NotifyCanExecuteChanged();
+            }
+        }
+
+        private string _reconciliationStatusMessage = "";
+        public string ReconciliationStatusMessage
+        {
+            get => _reconciliationStatusMessage;
+            private set
+            {
+                if (_reconciliationStatusMessage == value)
+                    return;
+
+                _reconciliationStatusMessage = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasReconciliationStatus));
+                OnPropertyChanged(nameof(ShowPostStartupStatus));
+            }
+        }
+
+        public bool HasReconciliationStatus => !string.IsNullOrWhiteSpace(ReconciliationStatusMessage);
 
         private readonly AsyncRelayCommand _refreshLibraryCommand;
         public IAsyncRelayCommand RefreshLibraryCommand => _refreshLibraryCommand;
@@ -89,17 +148,31 @@ namespace ChartHub.ViewModels
         private readonly AsyncRelayCommand _openSongIniCommand;
         public IAsyncRelayCommand OpenSongIniCommand => _openSongIniCommand;
 
+        private readonly AsyncRelayCommand _reconcileLibraryCommand;
+        public IAsyncRelayCommand ReconcileLibraryCommand => _reconcileLibraryCommand;
+
+        private readonly AsyncRelayCommand _reParseMetadataCommand;
+        public IAsyncRelayCommand ReParseMetadataCommand => _reParseMetadataCommand;
+
+        private readonly AsyncRelayCommand _reconcileThisSongCommand;
+        public IAsyncRelayCommand ReconcileThisSongCommand => _reconcileThisSongCommand;
+
         public CloneHeroViewModel(
             LibraryCatalogService libraryCatalog,
-            IDesktopPathOpener desktopPathOpener)
+            IDesktopPathOpener desktopPathOpener,
+            ICloneHeroLibraryReconciliationService? reconciliationService = null)
         {
             _libraryCatalog = libraryCatalog;
             _desktopPathOpener = desktopPathOpener;
+            _reconciliationService = reconciliationService;
             PageStrings = new CloneHeroPageStrings();
 
             _refreshLibraryCommand = new AsyncRelayCommand(() => RefreshArtistsAsync(CancellationToken.None));
             _openSongFolderCommand = new AsyncRelayCommand(OpenSelectedSongFolderAsync, () => SelectedSong is not null);
             _openSongIniCommand = new AsyncRelayCommand(OpenSelectedSongIniLocationAsync, () => SelectedSong is not null);
+            _reconcileLibraryCommand = new AsyncRelayCommand(ReconcileLibraryAsync, () => !IsReconciling);
+            _reParseMetadataCommand = new AsyncRelayCommand(ReParseSelectedSongMetadataAsync, () => SelectedSong is not null && !IsReconciling);
+            _reconcileThisSongCommand = new AsyncRelayCommand(ReconcileSelectedSongAsync, () => SelectedSong is not null && !IsReconciling);
         }
 
         public async Task InitializeAsync(CancellationToken cancellationToken = default)
@@ -107,8 +180,17 @@ namespace ChartHub.ViewModels
             if (HasInitialized)
                 return;
 
-            await RefreshArtistsAsync(cancellationToken);
-            HasInitialized = true;
+            IsStartupScanInProgress = true;
+            try
+            {
+                await RunReconciliationAsync(isStartup: true, cancellationToken);
+                await RefreshArtistsAsync(cancellationToken);
+                HasInitialized = true;
+            }
+            finally
+            {
+                IsStartupScanInProgress = false;
+            }
         }
 
         /// <summary>
@@ -117,6 +199,50 @@ namespace ChartHub.ViewModels
         public async Task RefreshAsync(CancellationToken cancellationToken = default)
         {
             await RefreshArtistsAsync(cancellationToken);
+        }
+
+        private async Task ReconcileLibraryAsync()
+        {
+            await RunReconciliationAsync(isStartup: false, CancellationToken.None);
+            await RefreshArtistsAsync(CancellationToken.None);
+        }
+
+        private async Task RunReconciliationAsync(bool isStartup, CancellationToken cancellationToken)
+        {
+            if (_reconciliationService is null || IsReconciling)
+                return;
+
+            IsReconciling = true;
+            ReconciliationStatusMessage = isStartup
+                ? "Reconciling Clone Hero library..."
+                : "Running library reconciliation...";
+
+            try
+            {
+                var progress = new Progress<CloneHeroReconciliationProgress>(update =>
+                {
+                    if (update.TotalSongs > 0)
+                    {
+                        ReconciliationStatusMessage = $"{update.Message} ({update.ProcessedSongs}/{update.TotalSongs})";
+                    }
+                    else
+                    {
+                        ReconciliationStatusMessage = update.Message;
+                    }
+                });
+
+                var result = await _reconciliationService.ReconcileAsync(progress, cancellationToken);
+                ReconciliationStatusMessage = $"Reconciliation complete. Scanned {result.Scanned}, updated {result.Updated}, renamed {result.Renamed}, failed {result.Failed}.";
+            }
+            catch (Exception ex)
+            {
+                ReconciliationStatusMessage = $"Reconciliation failed: {ex.Message}";
+                Logger.LogError("CloneHero", "Library reconciliation failed", ex);
+            }
+            finally
+            {
+                IsReconciling = false;
+            }
         }
 
         private async Task RefreshArtistsAsync(CancellationToken cancellationToken)
@@ -165,6 +291,58 @@ namespace ChartHub.ViewModels
 
             _openSongFolderCommand.NotifyCanExecuteChanged();
             _openSongIniCommand.NotifyCanExecuteChanged();
+        }
+
+        private async Task ReParseSelectedSongMetadataAsync()
+        {
+            if (SelectedSong is null || _reconciliationService is null)
+                return;
+
+            IsReconciling = true;
+            ReconciliationStatusMessage = "Re-parsing metadata...";
+            try
+            {
+                var updated = await _reconciliationService.ReParseMetadataAsync(SelectedSong.LocalPath, CancellationToken.None);
+                ReconciliationStatusMessage = updated
+                    ? "Metadata updated from song.ini."
+                    : "No changes — song.ini not found or entry unchanged.";
+                await RefreshArtistsAsync(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                ReconciliationStatusMessage = $"Failed to re-parse metadata: {ex.Message}";
+                Logger.LogError("CloneHero", "Re-parse metadata failed", ex);
+            }
+            finally
+            {
+                IsReconciling = false;
+            }
+        }
+
+        private async Task ReconcileSelectedSongAsync()
+        {
+            if (SelectedSong is null || _reconciliationService is null)
+                return;
+
+            IsReconciling = true;
+            ReconciliationStatusMessage = "Reconciling song...";
+            try
+            {
+                var updated = await _reconciliationService.ReconcileSongDirectoryAsync(SelectedSong.LocalPath, CancellationToken.None);
+                ReconciliationStatusMessage = updated
+                    ? "Song reconciled and catalog updated."
+                    : "No changes needed for this song.";
+                await RefreshArtistsAsync(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                ReconciliationStatusMessage = $"Failed to reconcile song: {ex.Message}";
+                Logger.LogError("CloneHero", "Reconcile this song failed", ex);
+            }
+            finally
+            {
+                IsReconciling = false;
+            }
         }
 
         private async Task OpenSelectedSongFolderAsync()

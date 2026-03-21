@@ -61,6 +61,160 @@ public class IngestionSyncApiHostTests
     }
 
     [Fact]
+    public async Task PairClaimEndpoint_WithValidCode_ReturnsTokenWithoutAuthHeader()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-ok");
+        await using var host = CreateHost(temp.RootPath, "token-pair-ok", pairCode: "PAIR-1234");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        var payload = JsonSerializer.Serialize(new
+        {
+            pairCode = "PAIR-1234",
+            deviceLabel = "Pixel Companion",
+        });
+
+        using var response = await client.PostAsync(
+            "api/pair/claim",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(body);
+        Assert.True(json.RootElement.GetProperty("paired").GetBoolean());
+        Assert.Equal("token-pair-ok", json.RootElement.GetProperty("token").GetString());
+    }
+
+    [Fact]
+    public async Task PairClaimEndpoint_WithInvalidCode_ReturnsUnauthorized()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-bad-code");
+        await using var host = CreateHost(temp.RootPath, "token-pair-bad", pairCode: "PAIR-1234");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        var payload = JsonSerializer.Serialize(new
+        {
+            pairCode = "WRONG-CODE",
+            deviceLabel = "Pixel Companion",
+        });
+
+        using var response = await client.PostAsync(
+            "api/pair/claim",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PairClaimEndpoint_WithoutConfiguredCode_ReturnsUnauthorized()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-missing");
+        await using var host = CreateHost(temp.RootPath, "token-pair-missing", pairCode: string.Empty);
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        var payload = JsonSerializer.Serialize(new
+        {
+            pairCode = "PAIR-1234",
+            deviceLabel = "Pixel Companion",
+        });
+
+        using var response = await client.PostAsync(
+            "api/pair/claim",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PairClaimEndpoint_WithExpiredCode_ReturnsGone()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-expired");
+        await using var host = CreateHost(
+            temp.RootPath,
+            "token-pair-expired",
+            pairCode: "PAIR-1234",
+            pairCodeIssuedAtUtc: DateTimeOffset.UtcNow.AddHours(-2).ToString("O"),
+            pairCodeTtlMinutes: 10);
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        var payload = JsonSerializer.Serialize(new
+        {
+            pairCode = "PAIR-1234",
+            deviceLabel = "Pixel Companion",
+        });
+
+        using var response = await client.PostAsync(
+            "api/pair/claim",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.Gone, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PairClaimEndpoint_IsOneTimeUse_SecondClaimFails()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-onetime");
+        await using var host = CreateHost(temp.RootPath, "token-pair-onetime", pairCode: "PAIR-1234");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        var payload = JsonSerializer.Serialize(new
+        {
+            pairCode = "PAIR-1234",
+            deviceLabel = "Pixel Companion",
+        });
+
+        using var firstResponse = await client.PostAsync(
+            "api/pair/claim",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+
+        using var secondResponse = await client.PostAsync(
+            "api/pair/claim",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.Unauthorized, secondResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task PairClaimEndpoint_AppendsAndTrimsPairingHistory()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-history");
+        var (host, settings) = CreateHostWithSettings(temp.RootPath, "token-pair-history", pairCode: "PAIR-1234");
+        await using (host)
+        {
+            await host.StartAsync();
+
+            using var client = CreateHttpClient();
+            for (var index = 1; index <= 12; index++)
+            {
+                var payload = JsonSerializer.Serialize(new
+                {
+                    pairCode = settings.SyncApiPairCode,
+                    deviceLabel = $"Companion {index}",
+                });
+
+                using var response = await client.PostAsync(
+                    "api/pair/claim",
+                    new StringContent(payload, Encoding.UTF8, "application/json"));
+
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            }
+        }
+
+        Assert.Equal("Companion 12", settings.SyncApiLastPairedDeviceLabel);
+        Assert.False(string.IsNullOrWhiteSpace(settings.SyncApiLastPairedAtUtc));
+
+        using var historyDocument = JsonDocument.Parse(settings.SyncApiPairingHistoryJson);
+        var history = historyDocument.RootElement.EnumerateArray().ToArray();
+        Assert.Equal(10, history.Length);
+        Assert.Equal("Companion 12", history[0].GetProperty("deviceLabel").GetString());
+        Assert.Equal("Companion 3", history[9].GetProperty("deviceLabel").GetString());
+    }
+
+    [Fact]
     public async Task VersionEndpoint_WithToken_ReturnsContractMetadata()
     {
         using var temp = new TemporaryDirectoryFixture("sync-api-version");
@@ -83,7 +237,20 @@ public class IngestionSyncApiHostTests
         Assert.True(json.RootElement.GetProperty("supports").GetProperty("fromStateOverride").GetBoolean());
         Assert.True(json.RootElement.GetProperty("supports").GetProperty("metadata").GetBoolean());
         Assert.True(json.RootElement.GetProperty("supports").GetProperty("desktopState").GetBoolean());
-        Assert.False(json.RootElement.GetProperty("runtime").GetProperty("allowSyncApiStateOverride").GetBoolean());
+        var runtime = json.RootElement.GetProperty("runtime");
+        Assert.False(runtime.GetProperty("allowSyncApiStateOverride").GetBoolean());
+        Assert.Equal(65536, runtime.GetProperty("maxRequestBodyBytes").GetInt32());
+        Assert.Equal(1000, runtime.GetProperty("bodyReadTimeoutMs").GetInt32());
+        Assert.Equal(250, runtime.GetProperty("mutationWaitTimeoutMs").GetInt32());
+        Assert.Equal(500, runtime.GetProperty("slowRequestThresholdMs").GetInt32());
+
+        var telemetry = runtime.GetProperty("telemetry");
+        Assert.True(telemetry.GetProperty("requestsTotal").GetInt64() >= 0);
+        Assert.True(telemetry.GetProperty("slowRequestsTotal").GetInt64() >= 0);
+        Assert.True(telemetry.GetProperty("busyMutationRejectionsTotal").GetInt64() >= 0);
+        Assert.True(telemetry.GetProperty("clientErrorsTotal").GetInt64() >= 0);
+        Assert.True(telemetry.GetProperty("serverErrorsTotal").GetInt64() >= 0);
+        Assert.NotNull(telemetry.GetProperty("startedAtUtc").GetString());
     }
 
     [Fact]
@@ -102,6 +269,56 @@ public class IngestionSyncApiHostTests
         var body = await response.Content.ReadAsStringAsync();
         using var json = JsonDocument.Parse(body);
         Assert.True(json.RootElement.GetProperty("runtime").GetProperty("allowSyncApiStateOverride").GetBoolean());
+    }
+
+    [Fact]
+    public async Task VersionEndpoint_CustomThresholds_ReflectConfiguredValues()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-version-thresholds");
+        await using var host = CreateHost(
+            temp.RootPath,
+            "token-version-thresholds",
+            syncApiMaxRequestBodyBytes: 32768,
+            syncApiBodyReadTimeoutMs: 1500,
+            syncApiMutationWaitTimeoutMs: 600,
+            syncApiSlowRequestThresholdMs: 1200);
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-version-thresholds");
+
+        using var response = await client.GetAsync("api/version");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(body);
+        var runtime = json.RootElement.GetProperty("runtime");
+        Assert.Equal(32768, runtime.GetProperty("maxRequestBodyBytes").GetInt32());
+        Assert.Equal(1500, runtime.GetProperty("bodyReadTimeoutMs").GetInt32());
+        Assert.Equal(600, runtime.GetProperty("mutationWaitTimeoutMs").GetInt32());
+        Assert.Equal(1200, runtime.GetProperty("slowRequestThresholdMs").GetInt32());
+        Assert.True(runtime.GetProperty("telemetry").GetProperty("requestsTotal").GetInt64() >= 0);
+    }
+
+    [Fact]
+    public async Task IngestionsEndpoint_WithLimitParameter_ReturnsClampedSubset()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-list-limit");
+        await using var host = CreateHost(temp.RootPath, "token-list-limit");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-list-limit");
+
+        await CreateDownloadedIngestionAsync(client, "drive-id-limit-1", "https://drive.google.com/file/d/limit-1/view");
+        await CreateDownloadedIngestionAsync(client, "drive-id-limit-2", "https://drive.google.com/file/d/limit-2/view");
+
+        using var response = await client.GetAsync("api/ingestions?limit=1");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(body);
+        Assert.Single(json.RootElement.GetProperty("items").EnumerateArray());
     }
 
     [Fact]
@@ -164,6 +381,7 @@ public class IngestionSyncApiHostTests
             artist = "Tool",
             title = "Sober",
             charter = "Convour/clintilona/nunchuck/DenVaktare",
+                    librarySource = "rhythmverse",
         });
 
         using var createResponse = await client.PostAsync(
@@ -186,6 +404,49 @@ public class IngestionSyncApiHostTests
         Assert.Equal("Tool", item.GetProperty("Artist").GetString());
         Assert.Equal("Sober", item.GetProperty("Title").GetString());
         Assert.Equal("Convour/clintilona/nunchuck/DenVaktare", item.GetProperty("Charter").GetString());
+        Assert.Equal("rhythmverse", item.GetProperty("LibrarySource").GetString());
+    }
+
+    [Fact]
+    public async Task CreateIngestion_WithOversizedBody_ReturnsRequestEntityTooLarge()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-create-oversized");
+        await using var host = CreateHost(temp.RootPath, "token-create-oversized");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-create-oversized");
+
+        var payload = JsonSerializer.Serialize(new
+        {
+            source = "googledrive",
+            sourceId = "drive-id-large",
+            sourceLink = "https://drive.google.com/file/d/large/view",
+            title = new string('a', 70_000),
+        });
+
+        using var response = await client.PostAsync(
+            "api/ingestions",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateIngestion_WithUnsupportedMediaType_ReturnsUnsupportedMediaType()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-create-text");
+        await using var host = CreateHost(temp.RootPath, "token-create-text");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-create-text");
+
+        using var response = await client.PostAsync(
+            "api/ingestions",
+            new StringContent("source=googledrive", Encoding.UTF8, "text/plain"));
+
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
     }
 
     [Fact]
@@ -397,6 +658,57 @@ public class IngestionSyncApiHostTests
     }
 
     [Fact]
+    public async Task EventEndpoint_ConcurrentRequests_WithSameFromState_OneConflicts()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-events-concurrent");
+        await using var host = CreateHost(temp.RootPath, "token-events-concurrent");
+        await host.StartAsync();
+
+        using var clientA = CreateHttpClient();
+        clientA.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-events-concurrent");
+        using var clientB = CreateHttpClient();
+        clientB.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-events-concurrent");
+
+        var ingestionId = await CreateDownloadedIngestionAsync(clientA, "drive-id-concurrent", "https://drive.google.com/file/d/concurrent/view");
+
+                using var seedResponse = await clientA.PostAsync(
+                        $"api/ingestions/{ingestionId}/events",
+                        new StringContent("{\"toState\":\"Cancelled\",\"details\":\"seed-cancelled\"}", Encoding.UTF8, "application/json"));
+                Assert.Equal(HttpStatusCode.Accepted, seedResponse.StatusCode);
+
+        var payloadA = """
+        {
+                    "fromState": "Cancelled",
+                    "toState": "ResolvingSource",
+          "details": "event-a"
+        }
+        """;
+
+        var payloadB = """
+        {
+                    "fromState": "Cancelled",
+          "toState": "ResolvingSource",
+          "details": "event-b"
+        }
+        """;
+
+        var requestA = clientA.PostAsync(
+            $"api/ingestions/{ingestionId}/events",
+            new StringContent(payloadA, Encoding.UTF8, "application/json"));
+        var requestB = clientB.PostAsync(
+            $"api/ingestions/{ingestionId}/events",
+            new StringContent(payloadB, Encoding.UTF8, "application/json"));
+
+        await Task.WhenAll(requestA, requestB);
+
+        using var responseA = await requestA;
+        using var responseB = await requestB;
+        var statuses = new[] { responseA.StatusCode, responseB.StatusCode };
+        Assert.Contains(HttpStatusCode.Accepted, statuses);
+        Assert.Contains(HttpStatusCode.Conflict, statuses);
+    }
+
+    [Fact]
     public async Task EventEndpoint_NotFound_Returns404()
     {
         using var temp = new TemporaryDirectoryFixture("sync-api-notfound");
@@ -474,6 +786,30 @@ public class IngestionSyncApiHostTests
     }
 
     [Fact]
+    public async Task EventEndpoint_WithOversizedBody_ReturnsRequestEntityTooLarge()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-event-oversized");
+        await using var host = CreateHost(temp.RootPath, "token-event-oversized");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-event-oversized");
+
+        var ingestionId = await CreateDownloadedIngestionAsync(client, "drive-id-event-large", "https://drive.google.com/file/d/event-large/view");
+        var payload = JsonSerializer.Serialize(new
+        {
+            toState = "ResolvingSource",
+            details = new string('b', 70_000),
+        });
+
+        using var response = await client.PostAsync(
+            $"api/ingestions/{ingestionId}/events",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+    }
+
+    [Fact]
     public async Task ActionEndpoint_Retry_TransitionsToQueued()
     {
         using var temp = new TemporaryDirectoryFixture("sync-api-action-retry");
@@ -501,13 +837,17 @@ public class IngestionSyncApiHostTests
         Assert.Equal("retry", actionJson.RootElement.GetProperty("action").GetString());
         Assert.Equal("Cancelled", actionJson.RootElement.GetProperty("fromState").GetString());
         Assert.Equal("Queued", actionJson.RootElement.GetProperty("toState").GetString());
+        var correlationId = actionJson.RootElement.GetProperty("correlationId").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(correlationId));
+        Assert.True(Guid.TryParse(correlationId, out _));
     }
 
     [Fact]
     public async Task ActionEndpoint_Install_InstallsZipAndReturnsOutputDirectories()
     {
         using var temp = new TemporaryDirectoryFixture("sync-api-action-install");
-        var zipPath = CreateTestZip(temp.RootPath, "action-install-song.zip");
+        var downloadDir = Path.Combine(temp.RootPath, "Downloads");
+        var zipPath = CreateTestZip(downloadDir, "action-install-song.zip");
 
         await using var host = CreateHost(temp.RootPath, "token-action-install");
         await host.StartAsync();
@@ -532,6 +872,9 @@ public class IngestionSyncApiHostTests
         var installedDirs = json.RootElement.GetProperty("installedDirectories").EnumerateArray().Select(e => e.GetString()).Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
         Assert.NotEmpty(installedDirs);
         Assert.All(installedDirs, dir => Assert.True(Directory.Exists(dir!)));
+        var correlationId = json.RootElement.GetProperty("correlationId").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(correlationId));
+        Assert.True(Guid.TryParse(correlationId, out _));
     }
 
     [Fact]
@@ -539,7 +882,8 @@ public class IngestionSyncApiHostTests
     {
         using var temp = new TemporaryDirectoryFixture("sync-api-action-open-installed");
         var opener = new FakeDesktopPathOpener();
-        var zipPath = CreateTestZip(temp.RootPath, "open-folder-installed.zip");
+        var downloadDir = Path.Combine(temp.RootPath, "Downloads");
+        var zipPath = CreateTestZip(downloadDir, "open-folder-installed.zip");
 
         await using var host = CreateHost(temp.RootPath, "token-open-installed", opener: opener);
         await host.StartAsync();
@@ -563,6 +907,11 @@ public class IngestionSyncApiHostTests
             new StringContent("{}", Encoding.UTF8, "application/json"));
 
         Assert.Equal(HttpStatusCode.Accepted, openResponse.StatusCode);
+        var openBody = await openResponse.Content.ReadAsStringAsync();
+        using var openJson = JsonDocument.Parse(openBody);
+        var correlationId = openJson.RootElement.GetProperty("correlationId").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(correlationId));
+        Assert.True(Guid.TryParse(correlationId, out _));
         Assert.False(string.IsNullOrWhiteSpace(opener.LastOpenedDirectory));
         Assert.True(Directory.Exists(opener.LastOpenedDirectory!));
     }
@@ -623,6 +972,77 @@ public class IngestionSyncApiHostTests
         Assert.Null(opener.LastOpenedDirectory);
     }
 
+    [Fact]
+    public async Task ActionEndpoint_UnknownAction_ReturnsNotFound()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-action-unknown");
+        await using var host = CreateHost(temp.RootPath, "token-action-unknown");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-action-unknown");
+
+        var ingestionId = await CreateDownloadedIngestionAsync(
+            client,
+            "drive-id-action-unknown",
+            "https://drive.google.com/file/d/action-unknown/view");
+
+        using var response = await client.PostAsync(
+            $"api/ingestions/{ingestionId}/actions/not-a-real-action",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ActionEndpoint_Install_WithPathOutsideManagedRoots_ReturnsConflict()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-action-install-unmanaged");
+        await using var host = CreateHost(temp.RootPath, "token-action-install-unmanaged");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-action-install-unmanaged");
+
+        var ingestionId = await CreateDownloadedIngestionAsync(
+            client,
+            "drive-id-action-install-unmanaged",
+            "https://drive.google.com/file/d/action-install-unmanaged/view",
+            "/etc/passwd");
+
+        using var response = await client.PostAsync(
+            $"api/ingestions/{ingestionId}/actions/install",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ActionEndpoint_OpenFolder_WithPathOutsideManagedRoots_ReturnsConflict()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-action-open-unmanaged");
+        var opener = new FakeDesktopPathOpener();
+
+        await using var host = CreateHost(temp.RootPath, "token-action-open-unmanaged", opener: opener);
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-action-open-unmanaged");
+
+        var ingestionId = await CreateDownloadedIngestionAsync(
+            client,
+            "drive-id-action-open-unmanaged",
+            "https://drive.google.com/file/d/action-open-unmanaged/view",
+            "/etc/passwd");
+
+        using var response = await client.PostAsync(
+            $"api/ingestions/{ingestionId}/actions/open-folder",
+            new StringContent("{}", Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Null(opener.LastOpenedDirectory);
+    }
+
     private static async Task<long> CreateDownloadedIngestionAsync(HttpClient client, string sourceId, string sourceLink, string downloadedLocation = "/tmp/song.zip")
     {
         var createPayload = JsonSerializer.Serialize(new
@@ -646,6 +1066,7 @@ public class IngestionSyncApiHostTests
 
     private static string CreateTestZip(string rootPath, string fileName)
     {
+        Directory.CreateDirectory(rootPath);
         var zipPath = Path.Combine(rootPath, fileName);
         using var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create);
         var entry = archive.CreateEntry("song/chart.mid");
@@ -657,7 +1078,43 @@ public class IngestionSyncApiHostTests
     private static IngestionSyncApiHost CreateHost(
         string rootPath,
         string token,
+        string pairCode = "PAIR-1234",
+        string? pairCodeIssuedAtUtc = null,
+        int pairCodeTtlMinutes = 10,
         bool allowStateOverride = false,
+        int syncApiMaxRequestBodyBytes = 64 * 1024,
+        int syncApiBodyReadTimeoutMs = 1000,
+        int syncApiMutationWaitTimeoutMs = 250,
+        int syncApiSlowRequestThresholdMs = 500,
+        IDesktopPathOpener? opener = null)
+    {
+        var (host, _) = CreateHostWithSettings(
+            rootPath,
+            token,
+            pairCode,
+            pairCodeIssuedAtUtc,
+            pairCodeTtlMinutes,
+            allowStateOverride,
+            syncApiMaxRequestBodyBytes,
+            syncApiBodyReadTimeoutMs,
+            syncApiMutationWaitTimeoutMs,
+            syncApiSlowRequestThresholdMs,
+            opener);
+
+        return host;
+    }
+
+    private static (IngestionSyncApiHost Host, AppGlobalSettings Settings) CreateHostWithSettings(
+        string rootPath,
+        string token,
+        string pairCode = "PAIR-1234",
+        string? pairCodeIssuedAtUtc = null,
+        int pairCodeTtlMinutes = 10,
+        bool allowStateOverride = false,
+        int syncApiMaxRequestBodyBytes = 64 * 1024,
+        int syncApiBodyReadTimeoutMs = 1000,
+        int syncApiMutationWaitTimeoutMs = 250,
+        int syncApiSlowRequestThresholdMs = 500,
         IDesktopPathOpener? opener = null)
     {
         var config = new AppConfigRoot
@@ -671,7 +1128,14 @@ public class IngestionSyncApiHostTests
                 CloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero"),
                 CloneHeroSongDirectory = Path.Combine(rootPath, "CloneHero", "Songs"),
                 SyncApiAuthToken = token,
+                SyncApiPairCode = pairCode,
+                SyncApiPairCodeIssuedAtUtc = pairCodeIssuedAtUtc ?? DateTimeOffset.UtcNow.ToString("O"),
+                SyncApiPairCodeTtlMinutes = pairCodeTtlMinutes,
                 AllowSyncApiStateOverride = allowStateOverride,
+                SyncApiMaxRequestBodyBytes = syncApiMaxRequestBodyBytes,
+                SyncApiBodyReadTimeoutMs = syncApiBodyReadTimeoutMs,
+                SyncApiMutationWaitTimeoutMs = syncApiMutationWaitTimeoutMs,
+                SyncApiSlowRequestThresholdMs = syncApiSlowRequestThresholdMs,
             },
         };
 
@@ -693,7 +1157,8 @@ public class IngestionSyncApiHostTests
         var stateMachine = new SongIngestionStateMachine();
 
         var installer = new SongInstallService(settings, catalog, stateMachine, new OnyxService(settings));
-        return new IngestionSyncApiHost(catalog, stateMachine, settings, installer, opener ?? new FakeDesktopPathOpener());
+        var host = new IngestionSyncApiHost(catalog, stateMachine, settings, installer, opener ?? new FakeDesktopPathOpener());
+        return (host, settings);
     }
 
     private static HttpClient CreateHttpClient()
@@ -736,4 +1201,38 @@ public class IngestionSyncApiHostTests
             return Task.CompletedTask;
         }
     }
-}
+
+    [Fact]
+    public async Task CreateIngestion_WithLibrarySource_AppearsInPostResponseMetadata()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-library-source-post");
+        await using var host = CreateHost(temp.RootPath, "token-lib-source");
+        await host.StartAsync();
+
+        using var client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-lib-source");
+
+        var createPayload = JsonSerializer.Serialize(new
+        {
+            source = "googledrive",
+            sourceId = "drive-id-lib-source",
+            sourceLink = "https://drive.google.com/file/d/libsrc/view",
+            artist = "Nirvana",
+            title = "Smells Like Teen Spirit",
+            charter = "SomeCharter",
+            librarySource = "encore",
+        });
+
+        using var createResponse = await client.PostAsync(
+            "api/ingestions",
+            new StringContent(createPayload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.Accepted, createResponse.StatusCode);
+
+        var body = await createResponse.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(body);
+        var metadata = json.RootElement.GetProperty("metadata");
+        Assert.Equal("encore", metadata.GetProperty("librarySource").GetString());
+        Assert.Equal("Nirvana", metadata.GetProperty("artist").GetString());
+    }
+    }
