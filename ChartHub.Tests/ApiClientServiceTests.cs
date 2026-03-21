@@ -25,8 +25,7 @@ public class ApiClientServiceTests
             },
             httpClient,
             loadEmbeddedMockData: () => BuildMappedSongResponseJson(),
-            resolveMockDataPath: () => null,
-            isAndroid: false);
+          resolveMockDataPath: () => null);
 
         var results = await sut.GetSongFilesAsync(
             search: false,
@@ -79,8 +78,7 @@ public class ApiClientServiceTests
             },
             httpClient,
             loadEmbeddedMockData: () => BuildMappedSongResponseJson(),
-            resolveMockDataPath: () => null,
-            isAndroid: false);
+          resolveMockDataPath: () => null);
 
         var results = await sut.GetSongFilesAsync(
             search: false,
@@ -121,8 +119,7 @@ public class ApiClientServiceTests
             },
             httpClient,
             loadEmbeddedMockData: () => null,
-            resolveMockDataPath: () => null,
-            isAndroid: false);
+          resolveMockDataPath: () => null);
 
         var results = await sut.GetSongFilesAsync(
             search: true,
@@ -182,8 +179,7 @@ public class ApiClientServiceTests
             },
             httpClient,
             loadEmbeddedMockData: () => throw new InvalidOperationException("Mock data should not be loaded when UseMockData is false."),
-            resolveMockDataPath: () => throw new InvalidOperationException("Mock data path should not be resolved when UseMockData is false."),
-            isAndroid: true);
+          resolveMockDataPath: () => throw new InvalidOperationException("Mock data path should not be resolved when UseMockData is false."));
 
         var results = await sut.GetSongFilesAsync(
             search: true,
@@ -218,8 +214,7 @@ public class ApiClientServiceTests
           },
           httpClient,
           loadEmbeddedMockData: () => null,
-          resolveMockDataPath: () => null,
-          isAndroid: false);
+          resolveMockDataPath: () => null);
 
         var firstPage = await sut.GetSongFilesAsync(
           search: true,
@@ -248,8 +243,7 @@ public class ApiClientServiceTests
         IReadOnlyDictionary<string, string?> configurationValues,
         HttpClient httpClient,
         Func<string?> loadEmbeddedMockData,
-        Func<string?> resolveMockDataPath,
-        bool isAndroid)
+      Func<string?> resolveMockDataPath)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configurationValues)
@@ -262,8 +256,7 @@ public class ApiClientServiceTests
                 typeof(IConfiguration),
                 typeof(HttpClient),
                 typeof(Func<string?>),
-                typeof(Func<string?>),
-                typeof(Func<bool>),
+              typeof(Func<string?>),
             ],
             modifiers: null);
 
@@ -274,7 +267,6 @@ public class ApiClientServiceTests
             httpClient,
             loadEmbeddedMockData,
             resolveMockDataPath,
-            () => isAndroid,
         ]);
     }
 

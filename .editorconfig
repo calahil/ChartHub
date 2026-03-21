@@ -1,0 +1,23 @@
+root = true
+
+[*.cs]
+# Unused-code detection (report-only — warnings, not errors)
+
+# IDE0051: Remove unused private member
+dotnet_diagnostic.IDE0051.severity = warning
+
+# IDE0052: Remove unread private member (assigned but never read)
+dotnet_diagnostic.IDE0052.severity = warning
+
+# IDE0060: Remove unused parameter
+# Kept at suggestion to reduce noise from virtual/override/handler signatures
+dotnet_diagnostic.IDE0060.severity = suggestion
+
+# ---- Per-file suppressions ----
+
+# IGoogleAuthProvider.cs contains AndroidGoogleAuthProvider whose private helpers
+# are called exclusively from within #if ANDROID blocks.  The net10.0 (desktop)
+# build excludes those call sites via the preprocessor, so the analyzer flags the
+# methods as unused — this is a known false-positive pattern for #if guards.
+[ChartHub/Services/IGoogleAuthProvider.cs]
+dotnet_diagnostic.IDE0051.severity = none

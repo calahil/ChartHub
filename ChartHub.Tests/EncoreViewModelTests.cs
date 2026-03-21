@@ -24,7 +24,7 @@ public class EncoreViewModelTests
         };
 
         var api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), catalog, new NoOpSettingsOrchestrator(), new SharedDownloadQueue())
+        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue())
         {
             AdvancedName = "Song",
             AdvancedAlbum = "Album",
@@ -51,7 +51,7 @@ public class EncoreViewModelTests
         };
 
         var api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), catalog, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -81,7 +81,7 @@ public class EncoreViewModelTests
         };
 
         var api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), catalog, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -104,7 +104,7 @@ public class EncoreViewModelTests
         };
 
         var api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), catalog, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
         var song = Assert.Single(sut.DataItems);
@@ -127,7 +127,7 @@ public class EncoreViewModelTests
         };
 
         var api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), catalog, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -164,7 +164,7 @@ public class EncoreViewModelTests
 
         var api = CreateApiService(catalog, httpClient);
         var transfer = new CapturingTransferOrchestrator();
-        var sut = new EncoreViewModel(api, transfer, catalog, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, transfer, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
         var song = Assert.Single(sut.DataItems);
@@ -220,7 +220,7 @@ public class EncoreViewModelTests
         };
 
         var api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), catalog, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -242,7 +242,7 @@ public class EncoreViewModelTests
         };
 
         var api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), catalog, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 

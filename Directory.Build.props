@@ -1,0 +1,8 @@
+<Project>
+  <PropertyGroup>
+    <!-- Surface IDE code-style diagnostics (IDE0051, IDE0052, ...) during dotnet build.
+         Rules are set to warning severity in .editorconfig, not error, so the build
+         still passes while findings are visible and actionable. -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+</Project>
