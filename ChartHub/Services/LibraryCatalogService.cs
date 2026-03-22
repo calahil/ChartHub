@@ -10,18 +10,22 @@ public static class LibrarySourceNames
     public static bool IsTrustedSource(string? source)
     {
         if (string.IsNullOrWhiteSpace(source))
+        {
             return false;
+        }
 
-        var normalized = source.Trim().ToLowerInvariant();
+        string normalized = source.Trim().ToLowerInvariant();
         return normalized is RhythmVerse or Encore;
     }
 
     public static string NormalizeTrustedSource(string? source, string paramName = "source")
     {
         if (string.IsNullOrWhiteSpace(source))
+        {
             throw new ArgumentException("Only rhythmverse and encore sources are supported.", paramName);
+        }
 
-        var normalized = source.Trim().ToLowerInvariant();
+        string normalized = source.Trim().ToLowerInvariant();
         return normalized switch
         {
             RhythmVerse => RhythmVerse,
@@ -33,7 +37,9 @@ public static class LibrarySourceNames
     public static string? NormalizeTrustedSourceOrNull(string? source)
     {
         if (string.IsNullOrWhiteSpace(source))
+        {
             return null;
+        }
 
         return NormalizeTrustedSource(source);
     }
@@ -60,9 +66,11 @@ public sealed class LibraryCatalogService
     {
         _databasePath = databasePath;
 
-        var directory = Path.GetDirectoryName(_databasePath);
+        string? directory = Path.GetDirectoryName(_databasePath);
         if (!string.IsNullOrWhiteSpace(directory))
+        {
             Directory.CreateDirectory(directory);
+        }
 
         Initialize();
     }
@@ -70,17 +78,19 @@ public sealed class LibraryCatalogService
     public async Task<bool> IsInLibraryAsync(string source, string sourceId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(sourceId))
+        {
             return false;
+        }
 
-        var normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
+        string normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT EXISTS(
                     SELECT 1
@@ -88,10 +98,10 @@ public sealed class LibraryCatalogService
                     WHERE source = $source AND source_id = $sourceId
                 );
                 """;
-                command.Parameters.AddWithValue("$source", normalizedSource);
+            command.Parameters.AddWithValue("$source", normalizedSource);
             command.Parameters.AddWithValue("$sourceId", sourceId);
 
-            var result = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            object? result = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
             return Convert.ToInt64(result) == 1;
         }
         finally
@@ -105,27 +115,29 @@ public sealed class LibraryCatalogService
         IEnumerable<string> sourceIds,
         CancellationToken cancellationToken = default)
     {
-        var normalizedIds = sourceIds
+        string[] normalizedIds = sourceIds
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         if (string.IsNullOrWhiteSpace(source) || normalizedIds.Length == 0)
+        {
             return new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        }
 
-        var normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
+        string normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             var parameterNames = new List<string>(normalizedIds.Length);
-            for (var index = 0; index < normalizedIds.Length; index++)
+            for (int index = 0; index < normalizedIds.Length; index++)
             {
-                var parameterName = "$id" + index;
+                string parameterName = "$id" + index;
                 parameterNames.Add(parameterName);
                 command.Parameters.AddWithValue(parameterName, normalizedIds[index]);
             }
@@ -136,11 +148,11 @@ public sealed class LibraryCatalogService
                 WHERE source = $source
                   AND source_id IN ({string.Join(",", parameterNames)})
                 """;
-                        command.Parameters.AddWithValue("$source", normalizedSource);
+            command.Parameters.AddWithValue("$source", normalizedSource);
 
-            var map = normalizedIds.ToDictionary(id => id, _ => false, StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, bool> map = normalizedIds.ToDictionary(id => id, _ => false, StringComparer.OrdinalIgnoreCase);
 
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 map[reader.GetString(0)] = true;
@@ -157,24 +169,28 @@ public sealed class LibraryCatalogService
     public async Task UpsertAsync(LibraryCatalogEntry entry, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(entry.Source) || string.IsNullOrWhiteSpace(entry.SourceId))
+        {
             throw new ArgumentException("Source and source identifier are required.", nameof(entry));
+        }
 
-        var normalizedSource = LibrarySourceNames.NormalizeTrustedSource(entry.Source, nameof(entry.Source));
+        string normalizedSource = LibrarySourceNames.NormalizeTrustedSource(entry.Source, nameof(entry.Source));
 
         // Only persist key mappings for entries with valid local paths (installed songs)
         if (string.IsNullOrWhiteSpace(entry.LocalPath))
+        {
             return;
+        }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            var nowUtc = DateTimeOffset.UtcNow.UtcDateTime.ToString("O");
+            string nowUtc = DateTimeOffset.UtcNow.UtcDateTime.ToString("O");
 
             // First, check if local_path already exists with a different source key
-            await using (var checkCommand = connection.CreateCommand())
+            await using (SqliteCommand checkCommand = connection.CreateCommand())
             {
                 checkCommand.CommandText = """
                     SELECT COUNT(*)
@@ -184,10 +200,10 @@ public sealed class LibraryCatalogService
                       AND NOT (lsk.source = $source AND lsk.source_id = $sourceId);
                     """;
                 checkCommand.Parameters.AddWithValue("$localPath", entry.LocalPath);
-                                checkCommand.Parameters.AddWithValue("$source", normalizedSource);
+                checkCommand.Parameters.AddWithValue("$source", normalizedSource);
                 checkCommand.Parameters.AddWithValue("$sourceId", entry.SourceId);
 
-                var count = Convert.ToInt64(await checkCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+                long count = Convert.ToInt64(await checkCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
                 if (count > 0)
                 {
                     // Local path is already taken by a different source key
@@ -199,7 +215,7 @@ public sealed class LibraryCatalogService
 
             // Get or create library_songs row
             long librarySongId;
-            await using (var songCommand = connection.CreateCommand())
+            await using (SqliteCommand songCommand = connection.CreateCommand())
             {
                 songCommand.CommandText = """
                     INSERT INTO library_songs (local_path, artist, title, charter, internal_identity_key, content_identity_hash, created_at_utc, updated_at_utc)
@@ -222,12 +238,12 @@ public sealed class LibraryCatalogService
                 songCommand.Parameters.AddWithValue("$createdAtUtc", entry.AddedAtUtc.UtcDateTime.ToString("O"));
                 songCommand.Parameters.AddWithValue("$updatedAtUtc", nowUtc);
 
-                var result = await songCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+                object? result = await songCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
                 librarySongId = Convert.ToInt64(result);
             }
 
             // Insert or update the key mapping
-            await using var keyCommand = connection.CreateCommand();
+            await using SqliteCommand keyCommand = connection.CreateCommand();
             keyCommand.CommandText = """
                 INSERT INTO library_song_keys (library_song_id, source, source_id, external_key_hash, created_at_utc)
                 VALUES ($librarySongId, $source, $sourceId, $externalKeyHash, $createdAtUtc)
@@ -259,17 +275,19 @@ public sealed class LibraryCatalogService
         if (string.IsNullOrWhiteSpace(localPath)
             || string.IsNullOrWhiteSpace(keepSource)
             || string.IsNullOrWhiteSpace(keepSourceId))
+        {
             return;
+        }
 
-        var normalizedKeepSource = LibrarySourceNames.NormalizeTrustedSource(keepSource, nameof(keepSource));
+        string normalizedKeepSource = LibrarySourceNames.NormalizeTrustedSource(keepSource, nameof(keepSource));
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 DELETE FROM library_song_keys
                 WHERE library_song_id IN (
@@ -291,17 +309,19 @@ public sealed class LibraryCatalogService
     public async Task RemoveAsync(string source, string sourceId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(sourceId))
+        {
             return;
+        }
 
-        var normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
+        string normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 DELETE FROM library_song_keys
                 WHERE source = $source AND source_id = $sourceId;
@@ -322,12 +342,12 @@ public sealed class LibraryCatalogService
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
             var idsToDelete = new List<long>();
 
-            await using (var select = connection.CreateCommand())
+            await using (SqliteCommand select = connection.CreateCommand())
             {
                 select.CommandText = """
                     SELECT id, local_path
@@ -335,24 +355,28 @@ public sealed class LibraryCatalogService
                     WHERE local_path IS NOT NULL AND local_path != '';
                     """;
 
-                await using var reader = await select.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+                await using SqliteDataReader reader = await select.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
                 while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    var id = reader.GetInt64(0);
-                    var localPath = reader.GetString(1);
+                    long id = reader.GetInt64(0);
+                    string localPath = reader.GetString(1);
                     if (!File.Exists(localPath) && !Directory.Exists(localPath))
+                    {
                         idsToDelete.Add(id);
+                    }
                 }
             }
 
             if (idsToDelete.Count == 0)
-                return 0;
-
-            await using var delete = connection.CreateCommand();
-            var paramNames = new List<string>(idsToDelete.Count);
-            for (var i = 0; i < idsToDelete.Count; i++)
             {
-                var name = "$id" + i;
+                return 0;
+            }
+
+            await using SqliteCommand delete = connection.CreateCommand();
+            var paramNames = new List<string>(idsToDelete.Count);
+            for (int i = 0; i < idsToDelete.Count; i++)
+            {
+                string name = "$id" + i;
                 paramNames.Add(name);
                 delete.Parameters.AddWithValue(name, idsToDelete[i]);
             }
@@ -371,19 +395,21 @@ public sealed class LibraryCatalogService
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(rootPath))
+        {
             return 0;
+        }
 
-        var normalizedRoot = Path.GetFullPath(rootPath);
+        string normalizedRoot = Path.GetFullPath(rootPath);
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
             // With the UNIQUE constraint on local_path, duplicates shouldn't exist,
             // but this method is kept for compatibility and defensive cleanup.
-            await using var select = connection.CreateCommand();
+            await using SqliteCommand select = connection.CreateCommand();
             select.CommandText = """
                 SELECT id, local_path
                 FROM library_songs
@@ -392,12 +418,12 @@ public sealed class LibraryCatalogService
 
             var idsToDelete = new List<long>();
             var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            
-            await using var reader = await select.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+            await using SqliteDataReader reader = await select.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                var id = reader.GetInt64(0);
-                var localPath = reader.GetString(1);
+                long id = reader.GetInt64(0);
+                string localPath = reader.GetString(1);
 
                 string fullPath;
                 try
@@ -410,22 +436,30 @@ public sealed class LibraryCatalogService
                 }
 
                 if (!fullPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+                {
                     continue;
+                }
 
                 if (seenPaths.Contains(fullPath))
+                {
                     idsToDelete.Add(id);
+                }
                 else
+                {
                     seenPaths.Add(fullPath);
+                }
             }
 
             if (idsToDelete.Count == 0)
-                return 0;
-
-            await using var delete = connection.CreateCommand();
-            var parameterNames = new List<string>(idsToDelete.Count);
-            for (var i = 0; i < idsToDelete.Count; i++)
             {
-                var name = "$id" + i;
+                return 0;
+            }
+
+            await using SqliteCommand delete = connection.CreateCommand();
+            var parameterNames = new List<string>(idsToDelete.Count);
+            for (int i = 0; i < idsToDelete.Count; i++)
+            {
+                string name = "$id" + i;
                 parameterNames.Add(name);
                 delete.Parameters.AddWithValue(name, idsToDelete[i]);
             }
@@ -442,15 +476,17 @@ public sealed class LibraryCatalogService
     public async Task<string?> ResolveSourceByLocalPathAsync(string localPath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(localPath))
+        {
             return null;
+        }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT source
                 FROM library_song_keys
@@ -462,7 +498,7 @@ public sealed class LibraryCatalogService
                 """;
             command.Parameters.AddWithValue("$localPath", localPath);
 
-            var result = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            object? result = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
             return result is null || result is DBNull ? null : Convert.ToString(result);
         }
         finally
@@ -474,15 +510,17 @@ public sealed class LibraryCatalogService
     public async Task<string?> ResolveSourceIdByLocalPathAsync(string localPath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(localPath))
+        {
             return null;
+        }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT source_id
                 FROM library_song_keys
@@ -494,7 +532,7 @@ public sealed class LibraryCatalogService
                 """;
             command.Parameters.AddWithValue("$localPath", localPath);
 
-            var result = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            object? result = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
             return result is null || result is DBNull ? null : Convert.ToString(result);
         }
         finally
@@ -506,15 +544,17 @@ public sealed class LibraryCatalogService
     public async Task<LibraryCatalogEntry?> GetEntryByLocalPathAsync(string localPath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(localPath))
+        {
             return null;
+        }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT k.source, k.source_id, s.title, s.artist, s.charter, s.local_path, k.created_at_utc, k.external_key_hash, s.internal_identity_key, s.content_identity_hash
                 FROM library_song_keys k
@@ -525,9 +565,11 @@ public sealed class LibraryCatalogService
                 """;
             command.Parameters.AddWithValue("$localPath", localPath);
 
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
                 return null;
+            }
 
             return new LibraryCatalogEntry(
                 Source: reader.GetString(0),
@@ -552,10 +594,10 @@ public sealed class LibraryCatalogService
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT DISTINCT COALESCE(NULLIF(TRIM(artist), ''), 'Unknown Artist') AS artist_name
                 FROM library_songs
@@ -564,7 +606,7 @@ public sealed class LibraryCatalogService
                 """;
 
             var artists = new List<string>();
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 artists.Add(reader.GetString(0));
@@ -581,15 +623,17 @@ public sealed class LibraryCatalogService
     public async Task<IReadOnlyList<LibraryCatalogEntry>> GetEntriesByArtistAsync(string artist, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(artist))
+        {
             return [];
+        }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT k.source, k.source_id, s.title, s.artist, s.charter, s.local_path, k.created_at_utc, k.external_key_hash, s.internal_identity_key, s.content_identity_hash
                 FROM library_song_keys k
@@ -602,7 +646,7 @@ public sealed class LibraryCatalogService
             command.Parameters.AddWithValue("$artist", artist);
 
             var entries = new List<LibraryCatalogEntry>();
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 entries.Add(new LibraryCatalogEntry(
@@ -628,10 +672,10 @@ public sealed class LibraryCatalogService
 
     private void Initialize()
     {
-        using var connection = CreateConnection();
+        using SqliteConnection connection = CreateConnection();
         connection.Open();
 
-        using var command = connection.CreateCommand();
+        using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             CREATE TABLE IF NOT EXISTS library_songs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

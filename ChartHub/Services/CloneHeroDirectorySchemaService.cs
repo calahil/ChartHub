@@ -35,15 +35,15 @@ public sealed class CloneHeroDirectorySchemaService : ICloneHeroDirectorySchemaS
     {
         exists ??= Directory.Exists;
 
-        var artistSegment = SanitizeSchemaSegment(metadata.Artist, "Unknown Artist");
-        var songSegment = SanitizeSchemaSegment(metadata.Title, "Unknown Song");
-        var charterSegment = SanitizeSchemaSegment(metadata.Charter, "Unknown Charter");
-        var sourceSegment = NormalizeSource(source);
-        var leafSegment = $"{charterSegment}__{sourceSegment}";
+        string artistSegment = SanitizeSchemaSegment(metadata.Artist, "Unknown Artist");
+        string songSegment = SanitizeSchemaSegment(metadata.Title, "Unknown Song");
+        string charterSegment = SanitizeSchemaSegment(metadata.Charter, "Unknown Charter");
+        string sourceSegment = NormalizeSource(source);
+        string leafSegment = $"{charterSegment}__{sourceSegment}";
 
-        var artistPath = Path.Combine(cloneHeroSongsRoot, artistSegment);
-        var songPath = Path.Combine(artistPath, songSegment);
-        var finalPath = Path.Combine(songPath, leafSegment);
+        string artistPath = Path.Combine(cloneHeroSongsRoot, artistSegment);
+        string songPath = Path.Combine(artistPath, songSegment);
+        string finalPath = Path.Combine(songPath, leafSegment);
 
         if (!exists(finalPath))
         {
@@ -55,11 +55,11 @@ public sealed class CloneHeroDirectorySchemaService : ICloneHeroDirectorySchemaS
                 FullPath: finalPath);
         }
 
-        var counter = 2;
+        int counter = 2;
         while (true)
         {
-            var candidateLeaf = $"{leafSegment}_{counter}";
-            var candidate = Path.Combine(songPath, candidateLeaf);
+            string candidateLeaf = $"{leafSegment}_{counter}";
+            string candidate = Path.Combine(songPath, candidateLeaf);
             if (!exists(candidate))
             {
                 return new CloneHeroDirectoryLayout(
@@ -77,7 +77,7 @@ public sealed class CloneHeroDirectorySchemaService : ICloneHeroDirectorySchemaS
     private static string SanitizeSchemaSegment(string? value, string fallback)
     {
         // Preserve slash-separated tokens by flattening separators before file-name sanitization.
-        var flattened = value?
+        string? flattened = value?
             .Replace(Path.DirectorySeparatorChar, '_')
             .Replace(Path.AltDirectorySeparatorChar, '_');
 

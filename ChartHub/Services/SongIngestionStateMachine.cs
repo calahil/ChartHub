@@ -29,14 +29,16 @@ public sealed class SongIngestionStateMachine
 
     public bool CanTransition(IngestionState from, IngestionState to)
     {
-        return AllowedTransitions.TryGetValue(from, out var allowed)
+        return AllowedTransitions.TryGetValue(from, out HashSet<IngestionState>? allowed)
             && allowed.Contains(to);
     }
 
     public void EnsureCanTransition(IngestionState from, IngestionState to)
     {
         if (!CanTransition(from, to))
+        {
             throw new InvalidOperationException($"Invalid ingestion transition: {from} -> {to}");
+        }
     }
 
     public IngestionState GetRetryStartState(IngestionState failedState)

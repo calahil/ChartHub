@@ -1,8 +1,9 @@
+using ChartHub.Services;
+
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Drive.v3;
-using ChartHub.Services;
 
 namespace ChartHub.Tests;
 
@@ -15,11 +16,11 @@ public sealed class GoogleDriveClientTests
         var authProvider = new CountingGoogleAuthProvider(returnSilentCredential: true);
         var sut = new GoogleDriveClient(authProvider);
 
-        var tasks = Enumerable.Range(0, 20)
+        Task<DriveService>[] tasks = Enumerable.Range(0, 20)
             .Select(_ => sut.GetServiceAsync())
             .ToArray();
 
-        var services = await Task.WhenAll(tasks);
+        DriveService[] services = await Task.WhenAll(tasks);
 
         Assert.NotEmpty(services);
         Assert.All(services, service => Assert.Same(services[0], service));
@@ -33,11 +34,11 @@ public sealed class GoogleDriveClientTests
         var authProvider = new CountingGoogleAuthProvider(returnSilentCredential: false);
         var sut = new GoogleDriveClient(authProvider);
 
-        var tasks = Enumerable.Range(0, 20)
+        Task<DriveService>[] tasks = Enumerable.Range(0, 20)
             .Select(_ => sut.GetServiceAsync())
             .ToArray();
 
-        var services = await Task.WhenAll(tasks);
+        DriveService[] services = await Task.WhenAll(tasks);
 
         Assert.NotEmpty(services);
         Assert.All(services, service => Assert.Same(services[0], service));
@@ -51,14 +52,14 @@ public sealed class GoogleDriveClientTests
         var authProvider = new CountingGoogleAuthProvider(returnSilentCredential: true);
         var sut = new GoogleDriveClient(authProvider);
 
-        var firstService = await sut.GetServiceAsync();
+        DriveService firstService = await sut.GetServiceAsync();
         Assert.Equal(1, authProvider.TryAuthorizeSilentCallCount);
 
         await sut.SignOutAsync();
 
         Assert.Equal(1, authProvider.SignOutCallCount);
 
-        var secondService = await sut.GetServiceAsync();
+        DriveService secondService = await sut.GetServiceAsync();
 
         Assert.Equal(2, authProvider.TryAuthorizeSilentCallCount);
         Assert.NotSame(firstService, secondService);

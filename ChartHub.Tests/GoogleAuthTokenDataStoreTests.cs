@@ -14,7 +14,7 @@ public class GoogleAuthTokenDataStoreTests
         var payload = new TokenLikePayload("access-1", "refresh-1", 3600);
 
         await sut.StoreAsync("user", payload);
-        var loaded = await sut.GetAsync<TokenLikePayload>("user");
+        TokenLikePayload loaded = await sut.GetAsync<TokenLikePayload>("user");
 
         Assert.NotNull(loaded);
         Assert.Equal("access-1", loaded.AccessToken);
@@ -34,8 +34,8 @@ public class GoogleAuthTokenDataStoreTests
 
         await sut.DeleteAsync<TokenLikePayload>("user");
 
-        var missing = await sut.GetAsync<TokenLikePayload>("user");
-        var stillThere = await sut.GetAsync<TokenLikePayload>("user-2");
+        TokenLikePayload missing = await sut.GetAsync<TokenLikePayload>("user");
+        TokenLikePayload stillThere = await sut.GetAsync<TokenLikePayload>("user-2");
 
         Assert.Null(missing);
         Assert.NotNull(stillThere);
@@ -55,8 +55,8 @@ public class GoogleAuthTokenDataStoreTests
 
         await sut.ClearAsync();
 
-        var user = await sut.GetAsync<TokenLikePayload>("user");
-        var user2 = await sut.GetAsync<TokenLikePayload>("user-2");
+        TokenLikePayload user = await sut.GetAsync<TokenLikePayload>("user");
+        TokenLikePayload user2 = await sut.GetAsync<TokenLikePayload>("user-2");
 
         Assert.Null(user);
         Assert.Null(user2);
@@ -74,10 +74,10 @@ public class GoogleAuthTokenDataStoreTests
         await sut.StoreAsync("user", new TokenLikePayload("access-1", "refresh-1", 3600));
         await sut.StoreAsync("user", new TokenLikePayload("access-2", "refresh-2", 1800));
 
-        var registry = await secrets.GetAsync("google-oauth-test:__keys");
+        string? registry = await secrets.GetAsync("google-oauth-test:__keys");
 
         Assert.NotNull(registry);
-        var parsed = System.Text.Json.JsonSerializer.Deserialize<HashSet<string>>(registry!);
+        HashSet<string>? parsed = System.Text.Json.JsonSerializer.Deserialize<HashSet<string>>(registry!);
         Assert.NotNull(parsed);
         Assert.Single(parsed!);
         Assert.Contains("google-oauth-test:user", parsed!);
@@ -91,7 +91,7 @@ public class GoogleAuthTokenDataStoreTests
 
         public Task<string?> GetAsync(string key, CancellationToken cancellationToken = default)
         {
-            _store.TryGetValue(key, out var value);
+            _store.TryGetValue(key, out string? value);
             return Task.FromResult<string?>(value);
         }
 

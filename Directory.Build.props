@@ -1,17 +1,27 @@
 <Project>
   <PropertyGroup>
-    <!-- Surface IDE code-style diagnostics (IDE0051, IDE0052, ...) during dotnet build.
-         Rules are set to warning severity in .editorconfig, not error, so the build
-         still passes while findings are visible and actionable. -->
+    <!-- Surface IDE code-style diagnostics (IDE0051, IDE0052, ...) during dotnet build. -->
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
 
-    <!-- Modern analyzer defaults with balanced strictness for incremental rollout. -->
+    <!-- Strict but app-focused analyzer defaults. Keep style and correctness hard,
+         but avoid library-oriented rules that create large amounts of low-signal churn. -->
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <AnalysisMode>Recommended</AnalysisMode>
+
+    <!-- Fail builds on warnings by default. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
+
+    <!-- Temporary exceptions: explicitly documented and intentionally scoped. -->
+    <!-- CS1591 is temporarily excluded while public API XML docs are added. -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1591</WarningsNotAsErrors>
   </PropertyGroup>
 
-  <!-- CI-only escalation for selected high-value style/analyzer IDs. -->
-  <PropertyGroup Condition="'$(CI)' == 'true' or '$(GITHUB_ACTIONS)' == 'true' or '$(TF_BUILD)' == 'True'">
-    <WarningsAsErrors>$(WarningsAsErrors);IDE0011;IDE0044;IDE0063;IDE0161;IDE1006;CA1852</WarningsAsErrors>
-  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="3.3.4" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)BannedSymbols.txt')">
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+  </ItemGroup>
 </Project>

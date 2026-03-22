@@ -13,8 +13,8 @@ public sealed class LocalDestinationWriter(AppGlobalSettings settings) : ILocalD
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var finalName = ResolveUniqueName(desiredName);
-        var finalPath = Path.Combine(_settings.DownloadDir, finalName);
+        string finalName = ResolveUniqueName(desiredName);
+        string finalPath = Path.Combine(_settings.DownloadDir, finalName);
         File.Move(tempFilePath, finalPath, overwrite: false);
 
         return Task.FromResult(new DestinationWriteResult(

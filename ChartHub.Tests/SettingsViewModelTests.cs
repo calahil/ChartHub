@@ -1,10 +1,11 @@
 using System.Reflection;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Configuration.Secrets;
 using ChartHub.Services;
-using ChartHub.ViewModels;
 using ChartHub.Tests.TestInfrastructure;
+using ChartHub.ViewModels;
 
 namespace ChartHub.Tests;
 
@@ -20,7 +21,7 @@ public class SettingsViewModelTests
         var cloudAccount = new FakeCloudStorageAccountService();
         await secrets.SetAsync(SecretKeys.GoogleRefreshToken, "stored-refresh-token");
 
-        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         Assert.Equal(23, sut.Fields.Count);
@@ -39,8 +40,12 @@ public class SettingsViewModelTests
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.TransferOrchestratorConcurrencyCap" && field.IsNumberEditor);
         Assert.Contains(sut.Fields, field => field.Key == "GoogleAuth.AndroidClientId" && field.IsTextEditor);
         Assert.Contains(sut.Fields, field => field.IsGroupHeaderVisible);
-        Assert.Equal(3, sut.Secrets.Count);
-        Assert.Contains(sut.Secrets, secret => secret.Key == SecretKeys.GoogleRefreshToken && secret.HasStoredValue);
+        int expectedSecretCount = sut.IsDeveloperBuild ? 3 : 0;
+        Assert.Equal(expectedSecretCount, sut.Secrets.Count);
+        if (sut.IsDeveloperBuild)
+        {
+            Assert.Contains(sut.Secrets, secret => secret.Key == SecretKeys.GoogleRefreshToken && secret.HasStoredValue);
+        }
     }
 
     [Fact]
@@ -51,10 +56,10 @@ public class SettingsViewModelTests
         var secrets = new InMemorySecretStore();
         var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
-        var field = Assert.Single(sut.Fields, item => item.Key == "Runtime.DownloadDirectory");
+        SettingsFieldViewModel field = Assert.Single(sut.Fields, item => item.Key == "Runtime.DownloadDirectory");
         field.StringValue = "https://example.com/downloads";
 
         Assert.True(field.HasError);
@@ -71,10 +76,10 @@ public class SettingsViewModelTests
         var secrets = new InMemorySecretStore();
         var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
-        var androidClientField = Assert.Single(sut.Fields, item => item.Key == "GoogleAuth.AndroidClientId");
+        SettingsFieldViewModel androidClientField = Assert.Single(sut.Fields, item => item.Key == "GoogleAuth.AndroidClientId");
         androidClientField.StringValue = "android-client-updated";
 
         Assert.True(sut.SaveCommand.CanExecute(null));
@@ -93,10 +98,10 @@ public class SettingsViewModelTests
         var secrets = new InMemorySecretStore();
         var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
-        var tempDirectoryField = Assert.Single(sut.Fields, item => item.Key == "Runtime.TempDirectory");
+        SettingsFieldViewModel tempDirectoryField = Assert.Single(sut.Fields, item => item.Key == "Runtime.TempDirectory");
         tempDirectoryField.StringValue = Path.Combine(temp.RootPath, "Temp-New");
 
         Assert.True(sut.HasPendingRestartSettings);
@@ -116,16 +121,16 @@ public class SettingsViewModelTests
         var secrets = new InMemorySecretStore();
         var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         Assert.False(sut.HasPendingRestartSettings);
 
-        var hotReloadableField = Assert.Single(sut.Fields, item => item.Key == "GoogleAuth.AndroidClientId");
+        SettingsFieldViewModel hotReloadableField = Assert.Single(sut.Fields, item => item.Key == "GoogleAuth.AndroidClientId");
         hotReloadableField.StringValue = "android-client-changed";
         Assert.False(sut.HasPendingRestartSettings);
 
-        var nonHotField = Assert.Single(sut.Fields, item => item.Key == "Runtime.StagingDirectory");
+        SettingsFieldViewModel nonHotField = Assert.Single(sut.Fields, item => item.Key == "Runtime.StagingDirectory");
         nonHotField.StringValue = Path.Combine(temp.RootPath, "Staging-New");
         Assert.True(sut.HasPendingRestartSettings);
     }
@@ -138,10 +143,16 @@ public class SettingsViewModelTests
         var secrets = new InMemorySecretStore();
         var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
-        var secret = Assert.Single(sut.Secrets, item => item.Key == SecretKeys.GoogleDesktopClientSecret);
+        if (!sut.IsDeveloperBuild)
+        {
+            Assert.Empty(sut.Secrets);
+            return;
+        }
+
+        SecretFieldViewModel secret = Assert.Single(sut.Secrets, item => item.Key == SecretKeys.GoogleDesktopClientSecret);
         secret.Value = " desktop-secret-value ";
 
         await sut.SaveSecretCommand.ExecuteAsync(secret);
@@ -169,7 +180,7 @@ public class SettingsViewModelTests
             TryRestoreSessionResult = false,
         };
 
-        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         Assert.False(sut.IsCloudAccountLinked);
@@ -208,7 +219,7 @@ public class SettingsViewModelTests
             TryRestoreSessionResult = false,
         };
 
-        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         await sut.LinkCloudAccountCommand.ExecuteAsync(null);
@@ -235,7 +246,7 @@ public class SettingsViewModelTests
             TryRestoreSessionResult = true,
         };
 
-        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         Assert.True(sut.IsCloudAccountLinked);
@@ -247,7 +258,7 @@ public class SettingsViewModelTests
     public async Task Constructor_WithPairingHistory_PopulatesRecentPairings()
     {
         using var temp = new TemporaryDirectoryFixture("settings-vm-pairing-history");
-        var config = CreateConfig(temp.RootPath);
+        AppConfigRoot config = CreateConfig(temp.RootPath);
         config.Runtime.SyncApiPairingHistoryJson =
             "[{\"deviceLabel\":\"Pixel 9\",\"pairedAtUtc\":\"2026-01-02T03:04:05Z\"},{\"deviceLabel\":\"Galaxy S24\",\"pairedAtUtc\":\"2026-01-01T01:02:03Z\"}]";
 
@@ -255,7 +266,7 @@ public class SettingsViewModelTests
         var secrets = new InMemorySecretStore();
         var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         Assert.True(sut.HasPairingHistory);
@@ -269,14 +280,14 @@ public class SettingsViewModelTests
     public async Task Constructor_WithMalformedPairingHistory_UsesEmptyHistory()
     {
         using var temp = new TemporaryDirectoryFixture("settings-vm-pairing-history-malformed");
-        var config = CreateConfig(temp.RootPath);
+        AppConfigRoot config = CreateConfig(temp.RootPath);
         config.Runtime.SyncApiPairingHistoryJson = "{not-json";
 
         var orchestrator = new FakeSettingsOrchestrator(config);
         var secrets = new InMemorySecretStore();
         var cloudAccount = new FakeCloudStorageAccountService();
 
-        using var sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
         Assert.False(sut.HasPairingHistory);
@@ -286,12 +297,12 @@ public class SettingsViewModelTests
 
     private static AppConfigRoot CreateConfig(string rootPath)
     {
-        var tempDirectory = Path.Combine(rootPath, "Temp");
-        var downloadDirectory = Path.Combine(rootPath, "Downloads");
-        var stagingDirectory = Path.Combine(rootPath, "Staging");
-        var outputDirectory = Path.Combine(rootPath, "Output");
-        var cloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero");
-        var cloneHeroSongDirectory = Path.Combine(cloneHeroDataDirectory, "Songs");
+        string tempDirectory = Path.Combine(rootPath, "Temp");
+        string downloadDirectory = Path.Combine(rootPath, "Downloads");
+        string stagingDirectory = Path.Combine(rootPath, "Staging");
+        string outputDirectory = Path.Combine(rootPath, "Output");
+        string cloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero");
+        string cloneHeroSongDirectory = Path.Combine(cloneHeroDataDirectory, "Songs");
 
         Directory.CreateDirectory(tempDirectory);
         Directory.CreateDirectory(downloadDirectory);
@@ -322,7 +333,7 @@ public class SettingsViewModelTests
 
     private static SettingsViewModel CreateSettingsViewModel(ISettingsOrchestrator orchestrator, ISecretStore secrets, ICloudStorageAccountService cloudAccount)
     {
-        var constructor = typeof(SettingsViewModel).GetConstructor(
+        ConstructorInfo? constructor = typeof(SettingsViewModel).GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic,
             binder: null,
             [
@@ -374,7 +385,7 @@ public class SettingsViewModelTests
 
         public Task<string?> GetAsync(string key, CancellationToken cancellationToken = default)
         {
-            _values.TryGetValue(key, out var value);
+            _values.TryGetValue(key, out string? value);
             return Task.FromResult<string?>(value);
         }
 
@@ -412,7 +423,9 @@ public class SettingsViewModelTests
         {
             TryRestoreSessionCallCount++;
             if (TryRestoreSessionException is not null)
+            {
                 throw TryRestoreSessionException;
+            }
 
             return Task.FromResult(TryRestoreSessionResult);
         }

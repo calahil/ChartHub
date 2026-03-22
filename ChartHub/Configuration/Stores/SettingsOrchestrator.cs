@@ -31,12 +31,16 @@ public sealed class SettingsOrchestrator : ISettingsOrchestrator, IDisposable
             candidate = Clone(Current);
             update(candidate);
             if (candidate.ConfigVersion <= 0)
+            {
                 candidate.ConfigVersion = AppConfigRoot.CurrentVersion;
+            }
         }
 
-        var validation = _validator.Validate(candidate);
+        ConfigValidationResult validation = _validator.Validate(candidate);
         if (!validation.IsValid)
+        {
             return validation;
+        }
 
         await _appConfigStore.SaveAsync(candidate, cancellationToken).ConfigureAwait(false);
 

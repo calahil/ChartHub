@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+
 using ChartHub.Services;
 
 namespace ChartHub.Models;
@@ -33,7 +34,9 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
         set
         {
             if (_checked == value)
+            {
                 return;
+            }
 
             _checked = value;
             OnPropertyChanged();
@@ -49,7 +52,9 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
         set
         {
             if (Equals(_lastActionResult, value))
+            {
                 return;
+            }
 
             _lastActionResult = value;
             OnPropertyChanged();

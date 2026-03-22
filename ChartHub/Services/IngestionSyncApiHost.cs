@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
+using ChartHub.Models;
 using ChartHub.Utilities;
 
 namespace ChartHub.Services;
@@ -58,7 +60,9 @@ public sealed class IngestionSyncApiHost(
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
         if (_started || OperatingSystem.IsAndroid())
+        {
             return Task.CompletedTask;
+        }
 
         _listener.Prefixes.Add(DefaultPrefix);
         _listener.Start();
@@ -104,15 +108,17 @@ public sealed class IngestionSyncApiHost(
                     ["path"] = context?.Request?.Url?.AbsolutePath,
                 });
                 if (context is not null)
+                {
                     await WriteErrorAsync(context.Response, HttpStatusCode.InternalServerError, "Internal server error");
+                }
             }
         }
     }
 
     private async Task HandleRequestAsync(HttpListenerContext context, CancellationToken cancellationToken)
     {
-        var request = context.Request;
-        var response = context.Response;
+        HttpListenerRequest request = context.Request;
+        HttpListenerResponse response = context.Response;
         var stopwatch = Stopwatch.StartNew();
 
         try
@@ -123,7 +129,7 @@ public sealed class IngestionSyncApiHost(
                 return;
             }
 
-            var path = request.Url.AbsolutePath.TrimEnd('/');
+            string path = request.Url.AbsolutePath.TrimEnd('/');
 
             if (request.HttpMethod.Equals("GET", StringComparison.OrdinalIgnoreCase)
                 && path.Equals("/health", StringComparison.OrdinalIgnoreCase))
@@ -135,9 +141,11 @@ public sealed class IngestionSyncApiHost(
             if (request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase)
                 && IsPairClaimEndpoint(path))
             {
-                var payload = await TryReadJsonBodyAsync<PairClaimRequest>(request, response, cancellationToken);
+                PairClaimRequest? payload = await TryReadJsonBodyAsync<PairClaimRequest>(request, response, cancellationToken);
                 if (payload is null)
+                {
                     return;
+                }
 
                 if (string.IsNullOrWhiteSpace(payload.PairCode))
                 {
@@ -145,7 +153,7 @@ public sealed class IngestionSyncApiHost(
                     return;
                 }
 
-                var configuredPairCode = GetCurrentPairCode();
+                string configuredPairCode = GetCurrentPairCode();
                 if (string.IsNullOrWhiteSpace(configuredPairCode))
                 {
                     await WriteErrorAsync(response, HttpStatusCode.Conflict, "Desktop pairing code is not configured");
@@ -166,8 +174,8 @@ public sealed class IngestionSyncApiHost(
 
                 RotatePairCode();
 
-                var deviceLabel = payload.DeviceLabel?.Trim() ?? string.Empty;
-                var pairedAtUtc = DateTimeOffset.UtcNow;
+                string deviceLabel = payload.DeviceLabel?.Trim() ?? string.Empty;
+                DateTimeOffset pairedAtUtc = DateTimeOffset.UtcNow;
 
                 _globalSettings.SyncApiLastPairedDeviceLabel = deviceLabel;
                 _globalSettings.SyncApiLastPairedAtUtc = pairedAtUtc.ToString("O");
@@ -240,8 +248,8 @@ public sealed class IngestionSyncApiHost(
             if (request.HttpMethod.Equals("GET", StringComparison.OrdinalIgnoreCase)
                 && path.Equals("/api/ingestions", StringComparison.OrdinalIgnoreCase))
             {
-                var state = request.QueryString["state"];
-                var source = request.QueryString["source"];
+                string? state = request.QueryString["state"];
+                string? source = request.QueryString["source"];
                 if (!string.IsNullOrWhiteSpace(source) && !string.Equals(source, "all", StringComparison.OrdinalIgnoreCase))
                 {
                     try
@@ -255,19 +263,19 @@ public sealed class IngestionSyncApiHost(
                     }
                 }
 
-                var sort = request.QueryString["sort"] ?? "Updated";
-                var desc = bool.TryParse(request.QueryString["desc"], out var parsedDesc) && parsedDesc;
-                var limit = ParseLimit(request.QueryString["limit"]);
+                string sort = request.QueryString["sort"] ?? "Updated";
+                bool desc = bool.TryParse(request.QueryString["desc"], out bool parsedDesc) && parsedDesc;
+                int limit = ParseLimit(request.QueryString["limit"]);
 
-                var items = await _ingestionCatalog.QueryQueueAsync(state, source, sort, desc, limit, cancellationToken);
+                IReadOnlyList<IngestionQueueItem> items = await _ingestionCatalog.QueryQueueAsync(state, source, sort, desc, limit, cancellationToken);
                 await WriteJsonAsync(response, HttpStatusCode.OK, new { items });
                 return;
             }
 
             if (request.HttpMethod.Equals("GET", StringComparison.OrdinalIgnoreCase)
-                && TryParseSingleIngestionEndpoint(path, out var singleIngestionId))
+                && TryParseSingleIngestionEndpoint(path, out long singleIngestionId))
             {
-                var item = await _ingestionCatalog.GetQueueItemByIdAsync(singleIngestionId, cancellationToken);
+                IngestionQueueItem? item = await _ingestionCatalog.GetQueueItemByIdAsync(singleIngestionId, cancellationToken);
                 if (item is null)
                 {
                     await WriteErrorAsync(response, HttpStatusCode.NotFound, "ingestion not found");
@@ -283,216 +291,220 @@ public sealed class IngestionSyncApiHost(
             {
                 await ExecuteSerializedMutationAsync(async () =>
                 {
-                var payload = await TryReadJsonBodyAsync<IngestionSyncRequest>(request, response, cancellationToken);
-                if (payload is null)
-                    return;
+                    IngestionSyncRequest? payload = await TryReadJsonBodyAsync<IngestionSyncRequest>(request, response, cancellationToken);
+                    if (payload is null)
+                    {
+                        return;
+                    }
 
-                if (payload is null || string.IsNullOrWhiteSpace(payload.Source) || string.IsNullOrWhiteSpace(payload.SourceLink))
-                {
-                    await WriteErrorAsync(response, HttpStatusCode.BadRequest, "source and sourceLink are required");
-                    return;
-                }
+                    if (payload is null || string.IsNullOrWhiteSpace(payload.Source) || string.IsNullOrWhiteSpace(payload.SourceLink))
+                    {
+                        await WriteErrorAsync(response, HttpStatusCode.BadRequest, "source and sourceLink are required");
+                        return;
+                    }
 
-                string source;
-                try
-                {
-                    source = LibrarySourceNames.NormalizeTrustedSource(payload.Source);
-                }
-                catch (ArgumentException)
-                {
-                    await WriteErrorAsync(response, HttpStatusCode.BadRequest, "source must be rhythmverse or encore");
-                    return;
-                }
-
-                string? librarySource = null;
-                if (!string.IsNullOrWhiteSpace(payload.LibrarySource))
-                {
+                    string source;
                     try
                     {
-                        librarySource = LibrarySourceNames.NormalizeTrustedSource(payload.LibrarySource);
+                        source = LibrarySourceNames.NormalizeTrustedSource(payload.Source);
                     }
                     catch (ArgumentException)
                     {
-                        await WriteErrorAsync(response, HttpStatusCode.BadRequest, "librarySource must be rhythmverse or encore");
+                        await WriteErrorAsync(response, HttpStatusCode.BadRequest, "source must be rhythmverse or encore");
                         return;
                     }
-                }
 
-                var canonicalSourceId = LibraryIdentityService.NormalizeSourceKey(source, payload.SourceId);
-                var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
-                    source,
-                    canonicalSourceId,
-                    payload.SourceLink,
-                    payload.Artist,
-                    payload.Title,
-                    payload.Charter,
-                    cancellationToken,
-                    librarySource);
-                var attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
-
-                var fromState = ingestion.CurrentState;
-                var targetIngestionState = string.IsNullOrWhiteSpace(payload.DownloadedLocation)
-                    ? IngestionState.Queued
-                    : IngestionState.Downloaded;
-
-                if (fromState != targetIngestionState)
-                {
-                    var targetState = _ingestionStateMachine.CanTransition(fromState, targetIngestionState)
-                        ? targetIngestionState
-                        : IngestionState.Queued;
-
-                    if (targetState == IngestionState.Queued
-                        && targetIngestionState != IngestionState.Queued
-                        && _ingestionStateMachine.CanTransition(IngestionState.Queued, targetIngestionState))
+                    string? librarySource = null;
+                    if (!string.IsNullOrWhiteSpace(payload.LibrarySource))
                     {
+                        try
+                        {
+                            librarySource = LibrarySourceNames.NormalizeTrustedSource(payload.LibrarySource);
+                        }
+                        catch (ArgumentException)
+                        {
+                            await WriteErrorAsync(response, HttpStatusCode.BadRequest, "librarySource must be rhythmverse or encore");
+                            return;
+                        }
+                    }
+
+                    string canonicalSourceId = LibraryIdentityService.NormalizeSourceKey(source, payload.SourceId);
+                    SongIngestionRecord ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
+                        source,
+                        canonicalSourceId,
+                        payload.SourceLink,
+                        payload.Artist,
+                        payload.Title,
+                        payload.Charter,
+                        cancellationToken,
+                        librarySource);
+                    SongIngestionAttemptRecord attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
+
+                    IngestionState fromState = ingestion.CurrentState;
+                    IngestionState targetIngestionState = string.IsNullOrWhiteSpace(payload.DownloadedLocation)
+                        ? IngestionState.Queued
+                        : IngestionState.Downloaded;
+
+                    if (fromState != targetIngestionState)
+                    {
+                        IngestionState targetState = _ingestionStateMachine.CanTransition(fromState, targetIngestionState)
+                            ? targetIngestionState
+                            : IngestionState.Queued;
+
+                        if (targetState == IngestionState.Queued
+                            && targetIngestionState != IngestionState.Queued
+                            && _ingestionStateMachine.CanTransition(IngestionState.Queued, targetIngestionState))
+                        {
+                            await _ingestionCatalog.RecordStateTransitionAsync(
+                                ingestion.Id,
+                                attempt.Id,
+                                fromState,
+                                IngestionState.Queued,
+                                "Sync API reset",
+                                cancellationToken);
+
+                            fromState = IngestionState.Queued;
+                            targetState = targetIngestionState;
+                        }
+
                         await _ingestionCatalog.RecordStateTransitionAsync(
                             ingestion.Id,
                             attempt.Id,
                             fromState,
-                            IngestionState.Queued,
-                            "Sync API reset",
+                            targetState,
+                            "Sync API ingestion update",
                             cancellationToken);
-
-                        fromState = IngestionState.Queued;
-                        targetState = targetIngestionState;
                     }
 
-                    await _ingestionCatalog.RecordStateTransitionAsync(
-                        ingestion.Id,
-                        attempt.Id,
-                        fromState,
-                        targetState,
-                        "Sync API ingestion update",
-                        cancellationToken);
-                }
-
-                if (!string.IsNullOrWhiteSpace(payload.DownloadedLocation))
-                {
-                    await _ingestionCatalog.UpsertAssetAsync(new SongIngestionAssetEntry(
-                        IngestionId: ingestion.Id,
-                        AttemptId: attempt.Id,
-                        AssetRole: IngestionAssetRole.Downloaded,
-                        Location: payload.DownloadedLocation,
-                        SizeBytes: payload.SizeBytes,
-                        ContentHash: payload.ContentHash,
-                        RecordedAtUtc: DateTimeOffset.UtcNow), cancellationToken);
-                }
-
-                await WriteJsonAsync(response, HttpStatusCode.Accepted, new
-                {
-                    ingestionId = ingestion.Id,
-                    normalizedLink = ingestion.NormalizedLink,
-                    state = targetIngestionState.ToString(),
-                    metadata = new
+                    if (!string.IsNullOrWhiteSpace(payload.DownloadedLocation))
                     {
-                        artist = ingestion.Artist,
-                        title = ingestion.Title,
-                        charter = ingestion.Charter,
-                        librarySource = ingestion.LibrarySource,
-                    },
-                });
+                        await _ingestionCatalog.UpsertAssetAsync(new SongIngestionAssetEntry(
+                            IngestionId: ingestion.Id,
+                            AttemptId: attempt.Id,
+                            AssetRole: IngestionAssetRole.Downloaded,
+                            Location: payload.DownloadedLocation,
+                            SizeBytes: payload.SizeBytes,
+                            ContentHash: payload.ContentHash,
+                            RecordedAtUtc: DateTimeOffset.UtcNow), cancellationToken);
+                    }
+
+                    await WriteJsonAsync(response, HttpStatusCode.Accepted, new
+                    {
+                        ingestionId = ingestion.Id,
+                        normalizedLink = ingestion.NormalizedLink,
+                        state = targetIngestionState.ToString(),
+                        metadata = new
+                        {
+                            artist = ingestion.Artist,
+                            title = ingestion.Title,
+                            charter = ingestion.Charter,
+                            librarySource = ingestion.LibrarySource,
+                        },
+                    });
                 }, request, response, cancellationToken);
                 return;
             }
 
             if (request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase)
-                && TryParseEventsEndpoint(path, out var ingestionId))
+                && TryParseEventsEndpoint(path, out long ingestionId))
             {
                 await ExecuteSerializedMutationAsync(async () =>
                 {
-                var ingestion = await _ingestionCatalog.GetIngestionByIdAsync(ingestionId, cancellationToken);
-                if (ingestion is null)
-                {
-                    await WriteErrorAsync(response, HttpStatusCode.NotFound, "ingestion not found");
-                    return;
-                }
-
-                var payload = await TryReadJsonBodyAsync<IngestionEventRequest>(request, response, cancellationToken);
-                if (payload is null)
-                    return;
-
-                if (payload is null || string.IsNullOrWhiteSpace(payload.ToState))
-                {
-                    await WriteErrorAsync(response, HttpStatusCode.BadRequest, "toState is required");
-                    return;
-                }
-
-                if (!Enum.TryParse<IngestionState>(payload.ToState, ignoreCase: true, out var toState))
-                {
-                    await WriteErrorAsync(response, HttpStatusCode.BadRequest, "Invalid toState");
-                    return;
-                }
-
-                var persistedState = ingestion.CurrentState;
-                var fromState = persistedState;
-                if (!string.IsNullOrWhiteSpace(payload.FromState))
-                {
-                    if (!Enum.TryParse<IngestionState>(payload.FromState, ignoreCase: true, out var requestFromState))
+                    SongIngestionRecord? ingestion = await _ingestionCatalog.GetIngestionByIdAsync(ingestionId, cancellationToken);
+                    if (ingestion is null)
                     {
-                        await WriteErrorAsync(response, HttpStatusCode.BadRequest, "Invalid fromState");
+                        await WriteErrorAsync(response, HttpStatusCode.NotFound, "ingestion not found");
                         return;
                     }
 
-                    var allowOverride = payload.AllowFromStateOverride && _globalSettings.AllowSyncApiStateOverride;
-                    if (requestFromState != persistedState && !allowOverride)
+                    IngestionEventRequest? payload = await TryReadJsonBodyAsync<IngestionEventRequest>(request, response, cancellationToken);
+                    if (payload is null)
                     {
-                        await WriteErrorAsync(response, HttpStatusCode.Conflict, "fromState does not match persisted ingestion state");
                         return;
                     }
 
-                    fromState = requestFromState;
-                }
-
-                if (fromState != toState)
-                {
-                    if (_ingestionStateMachine.CanTransition(fromState, toState))
+                    if (payload is null || string.IsNullOrWhiteSpace(payload.ToState))
                     {
-                        await _ingestionCatalog.RecordStateTransitionAsync(
-                            ingestion.Id,
-                            attemptId: null,
-                            fromState,
-                            toState,
-                            payload.Details ?? "Sync API event",
-                            cancellationToken);
-                    }
-                    else if (_ingestionStateMachine.CanTransition(fromState, IngestionState.Queued)
-                        && _ingestionStateMachine.CanTransition(IngestionState.Queued, toState))
-                    {
-                        await _ingestionCatalog.RecordStateTransitionAsync(
-                            ingestion.Id,
-                            attemptId: null,
-                            fromState,
-                            IngestionState.Queued,
-                            "Sync API event reset",
-                            cancellationToken);
-
-                        await _ingestionCatalog.RecordStateTransitionAsync(
-                            ingestion.Id,
-                            attemptId: null,
-                            IngestionState.Queued,
-                            toState,
-                            payload.Details ?? "Sync API event",
-                            cancellationToken);
-                    }
-                    else
-                    {
-                        await WriteErrorAsync(response, HttpStatusCode.BadRequest, "Invalid ingestion transition");
+                        await WriteErrorAsync(response, HttpStatusCode.BadRequest, "toState is required");
                         return;
                     }
-                }
 
-                await WriteJsonAsync(response, HttpStatusCode.Accepted, new
-                {
-                    ingestionId = ingestion.Id,
-                    fromState = fromState.ToString(),
-                    toState = toState.ToString(),
-                });
+                    if (!Enum.TryParse<IngestionState>(payload.ToState, ignoreCase: true, out IngestionState toState))
+                    {
+                        await WriteErrorAsync(response, HttpStatusCode.BadRequest, "Invalid toState");
+                        return;
+                    }
+
+                    IngestionState persistedState = ingestion.CurrentState;
+                    IngestionState fromState = persistedState;
+                    if (!string.IsNullOrWhiteSpace(payload.FromState))
+                    {
+                        if (!Enum.TryParse<IngestionState>(payload.FromState, ignoreCase: true, out IngestionState requestFromState))
+                        {
+                            await WriteErrorAsync(response, HttpStatusCode.BadRequest, "Invalid fromState");
+                            return;
+                        }
+
+                        bool allowOverride = payload.AllowFromStateOverride && _globalSettings.AllowSyncApiStateOverride;
+                        if (requestFromState != persistedState && !allowOverride)
+                        {
+                            await WriteErrorAsync(response, HttpStatusCode.Conflict, "fromState does not match persisted ingestion state");
+                            return;
+                        }
+
+                        fromState = requestFromState;
+                    }
+
+                    if (fromState != toState)
+                    {
+                        if (_ingestionStateMachine.CanTransition(fromState, toState))
+                        {
+                            await _ingestionCatalog.RecordStateTransitionAsync(
+                                ingestion.Id,
+                                attemptId: null,
+                                fromState,
+                                toState,
+                                payload.Details ?? "Sync API event",
+                                cancellationToken);
+                        }
+                        else if (_ingestionStateMachine.CanTransition(fromState, IngestionState.Queued)
+                            && _ingestionStateMachine.CanTransition(IngestionState.Queued, toState))
+                        {
+                            await _ingestionCatalog.RecordStateTransitionAsync(
+                                ingestion.Id,
+                                attemptId: null,
+                                fromState,
+                                IngestionState.Queued,
+                                "Sync API event reset",
+                                cancellationToken);
+
+                            await _ingestionCatalog.RecordStateTransitionAsync(
+                                ingestion.Id,
+                                attemptId: null,
+                                IngestionState.Queued,
+                                toState,
+                                payload.Details ?? "Sync API event",
+                                cancellationToken);
+                        }
+                        else
+                        {
+                            await WriteErrorAsync(response, HttpStatusCode.BadRequest, "Invalid ingestion transition");
+                            return;
+                        }
+                    }
+
+                    await WriteJsonAsync(response, HttpStatusCode.Accepted, new
+                    {
+                        ingestionId = ingestion.Id,
+                        fromState = fromState.ToString(),
+                        toState = toState.ToString(),
+                    });
                 }, request, response, cancellationToken);
                 return;
             }
 
             if (request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase)
-                && TryParseActionEndpoint(path, out var actionIngestionId, out var actionName))
+                && TryParseActionEndpoint(path, out long actionIngestionId, out string? actionName))
             {
                 await ExecuteSerializedMutationAsync(
                     () => HandleActionRequestAsync(response, actionIngestionId, actionName, cancellationToken),
@@ -516,8 +528,8 @@ public sealed class IngestionSyncApiHost(
         string actionName,
         CancellationToken cancellationToken)
     {
-        var correlationId = Guid.NewGuid().ToString("N");
-        var ingestion = await _ingestionCatalog.GetIngestionByIdAsync(ingestionId, cancellationToken);
+        string correlationId = Guid.NewGuid().ToString("N");
+        SongIngestionRecord? ingestion = await _ingestionCatalog.GetIngestionByIdAsync(ingestionId, cancellationToken);
         if (ingestion is null)
         {
             await WriteErrorAsync(response, HttpStatusCode.NotFound, "ingestion not found");
@@ -526,7 +538,7 @@ public sealed class IngestionSyncApiHost(
 
         if (actionName.Equals("retry", StringComparison.OrdinalIgnoreCase))
         {
-            var fromState = ingestion.CurrentState;
+            IngestionState fromState = ingestion.CurrentState;
             if (fromState == IngestionState.Queued)
             {
                 await WriteJsonAsync(response, HttpStatusCode.Accepted, new
@@ -567,7 +579,7 @@ public sealed class IngestionSyncApiHost(
 
         if (actionName.Equals("install", StringComparison.OrdinalIgnoreCase))
         {
-            var downloadablePath = await _ingestionCatalog.GetLatestAssetLocationAsync(
+            string? downloadablePath = await _ingestionCatalog.GetLatestAssetLocationAsync(
                 ingestionId,
                 IngestionAssetRole.Downloaded,
                 cancellationToken);
@@ -590,14 +602,14 @@ public sealed class IngestionSyncApiHost(
                 return;
             }
 
-            var installedDirectories = await _songInstallService.InstallSelectedDownloadsAsync([downloadablePath], cancellationToken: cancellationToken);
+            IReadOnlyList<string> installedDirectories = await _songInstallService.InstallSelectedDownloadsAsync([downloadablePath], cancellationToken: cancellationToken);
             if (installedDirectories.Count == 0)
             {
                 await WriteErrorAsync(response, HttpStatusCode.Conflict, "Install action completed with no installed output");
                 return;
             }
 
-            var queueItem = await _ingestionCatalog.GetQueueItemByIdAsync(ingestionId, cancellationToken);
+            IngestionQueueItem? queueItem = await _ingestionCatalog.GetQueueItemByIdAsync(ingestionId, cancellationToken);
             await WriteJsonAsync(response, HttpStatusCode.Accepted, new
             {
                 ingestionId,
@@ -612,15 +624,15 @@ public sealed class IngestionSyncApiHost(
 
         if (actionName.Equals("open-folder", StringComparison.OrdinalIgnoreCase))
         {
-            var installedDirectory = await _ingestionCatalog.GetLatestAssetLocationAsync(
+            string? installedDirectory = await _ingestionCatalog.GetLatestAssetLocationAsync(
                 ingestionId,
                 IngestionAssetRole.InstalledDirectory,
                 cancellationToken);
 
-            var targetDirectory = installedDirectory;
+            string? targetDirectory = installedDirectory;
             if (string.IsNullOrWhiteSpace(targetDirectory))
             {
-                var downloadedPath = await _ingestionCatalog.GetLatestAssetLocationAsync(
+                string? downloadedPath = await _ingestionCatalog.GetLatestAssetLocationAsync(
                     ingestionId,
                     IngestionAssetRole.Downloaded,
                     cancellationToken);
@@ -662,7 +674,9 @@ public sealed class IngestionSyncApiHost(
     private bool IsWithinManagedRoots(string candidatePath, bool expectDirectory)
     {
         if (string.IsNullOrWhiteSpace(candidatePath))
+        {
             return false;
+        }
 
         string resolvedPath;
         try
@@ -683,7 +697,7 @@ public sealed class IngestionSyncApiHost(
 
     private IEnumerable<string> GetManagedRoots()
     {
-        var roots = new[]
+        string[] roots = new[]
         {
             _globalSettings.TempDir,
             _globalSettings.DownloadDir,
@@ -700,21 +714,25 @@ public sealed class IngestionSyncApiHost(
 
     private static bool IsWithinRoot(string rootPath, string candidatePath)
     {
-        var comparison = OperatingSystem.IsWindows()
+        StringComparison comparison = OperatingSystem.IsWindows()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
 
         if (candidatePath.Equals(rootPath, comparison))
+        {
             return true;
+        }
 
-        var normalizedRoot = rootPath + Path.DirectorySeparatorChar;
+        string normalizedRoot = rootPath + Path.DirectorySeparatorChar;
         return candidatePath.StartsWith(normalizedRoot, comparison);
     }
 
     private static int ParseLimit(string? limitValue)
     {
-        if (!int.TryParse(limitValue, out var parsedLimit) || parsedLimit <= 0)
+        if (!int.TryParse(limitValue, out int parsedLimit) || parsedLimit <= 0)
+        {
             return MaxQueryLimit;
+        }
 
         return Math.Min(parsedLimit, MaxQueryLimit);
     }
@@ -741,14 +759,16 @@ public sealed class IngestionSyncApiHost(
         readTimeoutCts.CancelAfter(MaxRequestBodyReadDuration);
 
         await using var bodyBuffer = new MemoryStream();
-        var buffer = new byte[8192];
+        byte[] buffer = new byte[8192];
         try
         {
             while (true)
             {
-                var bytesRead = await request.InputStream.ReadAsync(buffer, readTimeoutCts.Token);
+                int bytesRead = await request.InputStream.ReadAsync(buffer, readTimeoutCts.Token);
                 if (bytesRead == 0)
+                {
                     break;
+                }
 
                 if (bodyBuffer.Length + bytesRead > MaxRequestBodyBytes)
                 {
@@ -783,8 +803,8 @@ public sealed class IngestionSyncApiHost(
     {
         try
         {
-            var json = JsonSerializer.Serialize(payload, ResponseJsonOptions);
-            var buffer = Encoding.UTF8.GetBytes(json);
+            string json = JsonSerializer.Serialize(payload, ResponseJsonOptions);
+            byte[] buffer = Encoding.UTF8.GetBytes(json);
             response.StatusCode = (int)statusCode;
             response.ContentType = "application/json";
             response.ContentEncoding = Encoding.UTF8;
@@ -812,15 +832,19 @@ public sealed class IngestionSyncApiHost(
     private static bool TryParseEventsEndpoint(string path, out long ingestionId)
     {
         ingestionId = 0;
-        var normalized = path.Trim('/');
-        var parts = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        string normalized = path.Trim('/');
+        string[] parts = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length != 4)
+        {
             return false;
+        }
 
         if (!parts[0].Equals("api", StringComparison.OrdinalIgnoreCase)
             || !parts[1].Equals("ingestions", StringComparison.OrdinalIgnoreCase)
             || !parts[3].Equals("events", StringComparison.OrdinalIgnoreCase))
+        {
             return false;
+        }
 
         return long.TryParse(parts[2], out ingestionId);
     }
@@ -830,18 +854,24 @@ public sealed class IngestionSyncApiHost(
         ingestionId = 0;
         actionName = string.Empty;
 
-        var normalized = path.Trim('/');
-        var parts = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        string normalized = path.Trim('/');
+        string[] parts = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length != 5)
+        {
             return false;
+        }
 
         if (!parts[0].Equals("api", StringComparison.OrdinalIgnoreCase)
             || !parts[1].Equals("ingestions", StringComparison.OrdinalIgnoreCase)
             || !parts[3].Equals("actions", StringComparison.OrdinalIgnoreCase))
+        {
             return false;
+        }
 
         if (!long.TryParse(parts[2], out ingestionId))
+        {
             return false;
+        }
 
         actionName = parts[4];
         return !string.IsNullOrWhiteSpace(actionName);
@@ -850,14 +880,18 @@ public sealed class IngestionSyncApiHost(
     private static bool TryParseSingleIngestionEndpoint(string path, out long ingestionId)
     {
         ingestionId = 0;
-        var normalized = path.Trim('/');
-        var parts = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        string normalized = path.Trim('/');
+        string[] parts = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length != 3)
+        {
             return false;
+        }
 
         if (!parts[0].Equals("api", StringComparison.OrdinalIgnoreCase)
             || !parts[1].Equals("ingestions", StringComparison.OrdinalIgnoreCase))
+        {
             return false;
+        }
 
         return long.TryParse(parts[2], out ingestionId);
     }
@@ -872,7 +906,9 @@ public sealed class IngestionSyncApiHost(
         lock (_pairCodeSync)
         {
             if (!string.IsNullOrWhiteSpace(_currentPairCode))
+            {
                 return _currentPairCode;
+            }
 
             _currentPairCode = _globalSettings.SyncApiPairCode.Trim();
             _currentPairCodeIssuedAtUtc = TryParseIssuedAt(_globalSettings.SyncApiPairCodeIssuedAtUtc);
@@ -890,8 +926,8 @@ public sealed class IngestionSyncApiHost(
                 _currentPairCodeIssuedAtUtc = TryParseIssuedAt(_globalSettings.SyncApiPairCodeIssuedAtUtc);
             }
 
-            var ttlMinutes = Math.Clamp(_globalSettings.SyncApiPairCodeTtlMinutes, 1, 1440);
-            var expiresAt = _currentPairCodeIssuedAtUtc.AddMinutes(ttlMinutes);
+            int ttlMinutes = Math.Clamp(_globalSettings.SyncApiPairCodeTtlMinutes, 1, 1440);
+            DateTimeOffset expiresAt = _currentPairCodeIssuedAtUtc.AddMinutes(ttlMinutes);
             return DateTimeOffset.UtcNow > expiresAt;
         }
     }
@@ -931,7 +967,9 @@ public sealed class IngestionSyncApiHost(
             });
 
             while (items.Count > MaxPairingHistoryEntries)
+            {
                 items.RemoveAt(items.Count - 1);
+            }
 
             _globalSettings.SyncApiPairingHistoryJson = JsonSerializer.Serialize(items);
         }
@@ -939,7 +977,7 @@ public sealed class IngestionSyncApiHost(
 
     private static DateTimeOffset TryParseIssuedAt(string? value)
     {
-        return DateTimeOffset.TryParse(value, out var parsed)
+        return DateTimeOffset.TryParse(value, out DateTimeOffset parsed)
             ? parsed
             : DateTimeOffset.UtcNow;
     }
@@ -947,12 +985,14 @@ public sealed class IngestionSyncApiHost(
     private static bool IsAuthorized(HttpListenerRequest request, string expectedToken)
     {
         if (string.IsNullOrWhiteSpace(expectedToken))
+        {
             return true;
+        }
 
-        var suppliedToken = request.Headers[SyncTokenHeader];
+        string? suppliedToken = request.Headers[SyncTokenHeader];
         if (string.IsNullOrWhiteSpace(suppliedToken))
         {
-            var authorization = request.Headers["Authorization"];
+            string? authorization = request.Headers["Authorization"];
             if (!string.IsNullOrWhiteSpace(authorization)
                 && authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
             {
@@ -961,15 +1001,17 @@ public sealed class IngestionSyncApiHost(
         }
 
         if (string.IsNullOrWhiteSpace(suppliedToken))
+        {
             return false;
+        }
 
         return FixedTimeEquals(expectedToken, suppliedToken);
     }
 
     private static bool FixedTimeEquals(string expected, string supplied)
     {
-        var expectedBytes = Encoding.UTF8.GetBytes(expected);
-        var suppliedBytes = Encoding.UTF8.GetBytes(supplied);
+        byte[] expectedBytes = Encoding.UTF8.GetBytes(expected);
+        byte[] suppliedBytes = Encoding.UTF8.GetBytes(supplied);
         return CryptographicOperations.FixedTimeEquals(expectedBytes, suppliedBytes);
     }
 
@@ -1012,9 +1054,13 @@ public sealed class IngestionSyncApiHost(
         Interlocked.Increment(ref _requestsTotal);
 
         if (response.StatusCode is >= 400 and <= 499)
+        {
             Interlocked.Increment(ref _clientErrorsTotal);
+        }
         else if (response.StatusCode >= 500)
+        {
             Interlocked.Increment(ref _serverErrorsTotal);
+        }
 
         var context = new Dictionary<string, object?>
         {

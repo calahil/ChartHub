@@ -1,8 +1,9 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
-using System.Linq;
+
 using ChartHub.Models;
 using ChartHub.Utilities;
 
@@ -90,10 +91,10 @@ public sealed class EncoreApiService : INotifyPropertyChanged
         request.Page = CurrentPage;
         request.PerPage = RecordsPerPage;
 
-        var response = await _httpClient.PostAsJsonAsync("/search", request, JsonCerealOptions.Instance, cancellationToken).ConfigureAwait(false);
+        HttpResponseMessage response = await _httpClient.PostAsJsonAsync("/search", request, JsonCerealOptions.Instance, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        var payload = await response.Content.ReadFromJsonAsync<EncoreSearchResponse>(JsonCerealOptions.Instance, cancellationToken).ConfigureAwait(false)
+        EncoreSearchResponse payload = await response.Content.ReadFromJsonAsync<EncoreSearchResponse>(JsonCerealOptions.Instance, cancellationToken).ConfigureAwait(false)
             ?? new EncoreSearchResponse();
 
         await PopulateSongsAsync(payload.Data, payload.Found, payload.Page, cancellationToken).ConfigureAwait(false);
@@ -116,10 +117,10 @@ public sealed class EncoreApiService : INotifyPropertyChanged
         request.Page = CurrentPage;
         request.PerPage = RecordsPerPage;
 
-        var response = await _httpClient.PostAsJsonAsync("/search/advanced", request, JsonCerealOptions.Instance, cancellationToken).ConfigureAwait(false);
+        HttpResponseMessage response = await _httpClient.PostAsJsonAsync("/search/advanced", request, JsonCerealOptions.Instance, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        var payload = await response.Content.ReadFromJsonAsync<EncoreAdvancedSearchResponse>(JsonCerealOptions.Instance, cancellationToken).ConfigureAwait(false)
+        EncoreAdvancedSearchResponse payload = await response.Content.ReadFromJsonAsync<EncoreAdvancedSearchResponse>(JsonCerealOptions.Instance, cancellationToken).ConfigureAwait(false)
             ?? new EncoreAdvancedSearchResponse();
 
         await PopulateSongsAsync(payload.Data, payload.Found, CurrentPage, cancellationToken).ConfigureAwait(false);
@@ -151,15 +152,15 @@ public sealed class EncoreApiService : INotifyPropertyChanged
         DataItems ??= [];
 
         var mapped = songs.Select(MapSong).ToList();
-        var membership = await _libraryCatalog.GetMembershipMapAsync(
+        IReadOnlyDictionary<string, bool> membership = await _libraryCatalog.GetMembershipMapAsync(
             LibrarySourceNames.Encore,
             mapped.SelectMany(song => song.GetCatalogSourceIds()),
             cancellationToken).ConfigureAwait(false);
 
-        foreach (var song in mapped)
+        foreach (EncoreSong? song in mapped)
         {
             song.IsInLibrary = song.GetCatalogSourceIds()
-                .Any(sourceId => membership.TryGetValue(sourceId, out var isPresent) && isPresent);
+                .Any(sourceId => membership.TryGetValue(sourceId, out bool isPresent) && isPresent);
             DataItems.Add(song);
         }
 
@@ -170,7 +171,7 @@ public sealed class EncoreApiService : INotifyPropertyChanged
 
     private EncoreSong MapSong(EncoreSongDto song)
     {
-        var charter = !string.IsNullOrWhiteSpace(song.Charter)
+        string charter = !string.IsNullOrWhiteSpace(song.Charter)
             ? song.Charter
             : (!string.IsNullOrWhiteSpace(song.ApplicationUsername) ? song.ApplicationUsername : "Unknown Charter");
 

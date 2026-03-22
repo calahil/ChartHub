@@ -1,13 +1,15 @@
 using System.Collections.ObjectModel;
 using System.Reflection;
-using Google.Apis.Auth.OAuth2;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Services.Transfers;
-using ChartHub.Utilities;
 using ChartHub.Tests.TestInfrastructure;
+using ChartHub.Utilities;
+
+using Google.Apis.Auth.OAuth2;
 
 namespace ChartHub.Tests;
 
@@ -18,7 +20,7 @@ public class TransferOrchestratorTests
     public async Task QueueSongDownloadAsync_InvalidMetadata_FailsWithoutThrowing()
     {
         using var temp = new TemporaryDirectoryFixture("transfer-invalid");
-        var sut = CreateOrchestrator(temp.RootPath, new ResolverSuccessStub());
+        TransferOrchestrator sut = CreateOrchestrator(temp.RootPath, new ResolverSuccessStub());
         var downloads = new ObservableCollection<DownloadFile>();
         var song = new ViewSong
         {
@@ -27,7 +29,7 @@ public class TransferOrchestratorTests
             FileSize = 123,
         };
 
-        var result = await sut.QueueSongDownloadAsync(song, null, downloads);
+        TransferResult result = await sut.QueueSongDownloadAsync(song, null, downloads);
 
         Assert.False(result.Success);
         Assert.Equal(TransferStage.Failed, result.FinalStage);
@@ -40,7 +42,7 @@ public class TransferOrchestratorTests
     public async Task QueueSongDownloadAsync_WhenResolverCancels_ReturnsCancelled()
     {
         using var temp = new TemporaryDirectoryFixture("transfer-cancel");
-        var sut = CreateOrchestrator(temp.RootPath, new ResolverCancelledStub());
+        TransferOrchestrator sut = CreateOrchestrator(temp.RootPath, new ResolverCancelledStub());
         var downloads = new ObservableCollection<DownloadFile>();
         var song = new ViewSong
         {
@@ -51,7 +53,7 @@ public class TransferOrchestratorTests
             SourceId = "song-cancel",
         };
 
-        var result = await sut.QueueSongDownloadAsync(song, null, downloads);
+        TransferResult result = await sut.QueueSongDownloadAsync(song, null, downloads);
 
         Assert.False(result.Success);
         Assert.Equal(TransferStage.Cancelled, result.FinalStage);
@@ -66,7 +68,7 @@ public class TransferOrchestratorTests
     public async Task QueueSongDownloadAsync_WhenResolverThrows_ReturnsFailedWithUserSafeMessage()
     {
         using var temp = new TemporaryDirectoryFixture("transfer-fail");
-        var sut = CreateOrchestrator(temp.RootPath, new ResolverFailureStub());
+        TransferOrchestrator sut = CreateOrchestrator(temp.RootPath, new ResolverFailureStub());
         var downloads = new ObservableCollection<DownloadFile>();
         var song = new ViewSong
         {
@@ -77,7 +79,7 @@ public class TransferOrchestratorTests
             SourceId = "song-fail",
         };
 
-        var result = await sut.QueueSongDownloadAsync(song, null, downloads);
+        TransferResult result = await sut.QueueSongDownloadAsync(song, null, downloads);
 
         Assert.False(result.Success);
         Assert.Equal(TransferStage.Failed, result.FinalStage);
@@ -92,9 +94,9 @@ public class TransferOrchestratorTests
     public async Task QueueSongDownloadAsync_GoogleFolderSource_CompletesLocalDestination()
     {
         using var temp = new TemporaryDirectoryFixture("transfer-local-success");
-        var settingsRoot = temp.CreateSubdirectory("settings-root");
-        var localDestinationRoot = temp.CreateSubdirectory("local-destination");
-        var sut = CreateOrchestrator(
+        string settingsRoot = temp.CreateSubdirectory("settings-root");
+        string localDestinationRoot = temp.CreateSubdirectory("local-destination");
+        TransferOrchestrator sut = CreateOrchestrator(
             settingsRoot,
             new ResolverGoogleFolderStub("folder-123"),
             new GoogleDriveClientCreatesZipStub(),
@@ -110,7 +112,7 @@ public class TransferOrchestratorTests
             SourceId = "song-folder",
         };
 
-        var result = await sut.QueueSongDownloadAsync(song, null, downloads);
+        TransferResult result = await sut.QueueSongDownloadAsync(song, null, downloads);
 
         Assert.True(result.Success);
         Assert.Equal(TransferStage.Completed, result.FinalStage);
@@ -129,7 +131,7 @@ public class TransferOrchestratorTests
     {
         using var temp = new TemporaryDirectoryFixture("transfer-copy-success");
         var destinationWriter = new GoogleDriveDestinationWriterCopySuccessStub();
-        var sut = CreateOrchestrator(
+        TransferOrchestrator sut = CreateOrchestrator(
             temp.RootPath,
             new ResolverSuccessStub(),
             googleDriveDestinationWriter: destinationWriter);
@@ -146,7 +148,7 @@ public class TransferOrchestratorTests
             DriveId: "file-123");
         var downloadItem = new DownloadFile("song.zip", temp.RootPath, request.SourceUrl, 100);
 
-        var result = await InvokeTryCopyDriveFileAsync(sut, request, source, downloadItem);
+        TransferResult? result = await InvokeTryCopyDriveFileAsync(sut, request, source, downloadItem);
 
         Assert.NotNull(result);
         Assert.True(result!.Success);
@@ -164,7 +166,7 @@ public class TransferOrchestratorTests
     {
         using var temp = new TemporaryDirectoryFixture("transfer-copy-fallback");
         var destinationWriter = new GoogleDriveDestinationWriterCopyThrowsStub();
-        var sut = CreateOrchestrator(
+        TransferOrchestrator sut = CreateOrchestrator(
             temp.RootPath,
             new ResolverSuccessStub(),
             googleDriveDestinationWriter: destinationWriter);
@@ -181,7 +183,7 @@ public class TransferOrchestratorTests
             DriveId: "file-123");
         var downloadItem = new DownloadFile("song.zip", temp.RootPath, request.SourceUrl, 100);
 
-        var result = await InvokeTryCopyDriveFileAsync(sut, request, source, downloadItem);
+        TransferResult? result = await InvokeTryCopyDriveFileAsync(sut, request, source, downloadItem);
 
         Assert.Null(result);
         Assert.Equal(TransferStage.CopyingInGoogleDrive.ToString(), downloadItem.Status);
@@ -215,7 +217,7 @@ public class TransferOrchestratorTests
         ResolvedTransferSource source,
         DownloadFile downloadItem)
     {
-        var method = typeof(TransferOrchestrator).GetMethod("TryCopyDriveFileAsync", BindingFlags.Instance | BindingFlags.NonPublic);
+        MethodInfo? method = typeof(TransferOrchestrator).GetMethod("TryCopyDriveFileAsync", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
 
         var task = method!.Invoke(sut, [request, source, downloadItem, "trf-test", 0L, 0L, IngestionState.Queued, CancellationToken.None]) as Task<TransferResult?>;
@@ -351,9 +353,11 @@ public class TransferOrchestratorTests
     {
         public override Task DownloadFolderAsZipAsync(string folderId, string zipFilePath, IProgress<TransferProgressUpdate>? stageProgress = null, CancellationToken cancellationToken = default)
         {
-            var directory = Path.GetDirectoryName(zipFilePath);
+            string? directory = Path.GetDirectoryName(zipFilePath);
             if (!string.IsNullOrWhiteSpace(directory))
+            {
                 Directory.CreateDirectory(directory);
+            }
 
             File.WriteAllText(zipFilePath, "zip payload");
             stageProgress?.Report(new TransferProgressUpdate(TransferStage.ZippingFolder, 100));
@@ -368,7 +372,7 @@ public class TransferOrchestratorTests
         public Task<DestinationWriteResult> WriteFromTempAsync(string tempFilePath, string desiredName, CancellationToken cancellationToken = default)
         {
             Directory.CreateDirectory(_destinationRoot);
-            var finalPath = Path.Combine(_destinationRoot, desiredName);
+            string finalPath = Path.Combine(_destinationRoot, desiredName);
             File.Move(tempFilePath, finalPath, overwrite: false);
 
             return Task.FromResult(new DestinationWriteResult(

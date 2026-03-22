@@ -12,9 +12,9 @@ public class SongIniMetadataParserTests
     public void ParseFromSongIni_ReadsExpectedFields(string fileName, string expectedArtist, string expectedTitle, string expectedCharter)
     {
         var parser = new SongIniMetadataParser();
-        var path = Path.Combine(AppContext.BaseDirectory, "Samples", fileName);
+        string path = Path.Combine(AppContext.BaseDirectory, "Samples", fileName);
 
-        var metadata = parser.ParseFromSongIni(path);
+        SongMetadata metadata = parser.ParseFromSongIni(path);
 
         Assert.Equal(expectedArtist, metadata.Artist);
         Assert.Equal(expectedTitle, metadata.Title);
@@ -26,7 +26,7 @@ public class SongIniMetadataParserTests
     {
         var parser = new SongIniMetadataParser();
 
-        var metadata = parser.ParseFromSongIni(Path.Combine(AppContext.BaseDirectory, "Samples", "missing.ini"));
+        SongMetadata metadata = parser.ParseFromSongIni(Path.Combine(AppContext.BaseDirectory, "Samples", "missing.ini"));
 
         Assert.Equal("Unknown Artist", metadata.Artist);
         Assert.Equal("Unknown Song", metadata.Title);
@@ -37,7 +37,7 @@ public class SongIniMetadataParserTests
     public async Task ParseFromSongIni_WhenKeysMissing_UsesFallbackValues()
     {
         var parser = new SongIniMetadataParser();
-        var tempPath = Path.GetTempFileName();
+        string tempPath = Path.GetTempFileName();
 
         try
         {
@@ -46,7 +46,7 @@ public class SongIniMetadataParserTests
                 name = Only Title
                 """);
 
-            var metadata = parser.ParseFromSongIni(tempPath);
+            SongMetadata metadata = parser.ParseFromSongIni(tempPath);
 
             Assert.Equal("Unknown Artist", metadata.Artist);
             Assert.Equal("Only Title", metadata.Title);
@@ -62,7 +62,7 @@ public class SongIniMetadataParserTests
     public async Task ParseFromSongIni_IgnoresMalformedLines_Comments_AndUnknownKeys()
     {
         var parser = new SongIniMetadataParser();
-        var tempPath = Path.GetTempFileName();
+        string tempPath = Path.GetTempFileName();
 
         try
         {
@@ -77,7 +77,7 @@ public class SongIniMetadataParserTests
                 charter =   
                 """);
 
-            var metadata = parser.ParseFromSongIni(tempPath);
+            SongMetadata metadata = parser.ParseFromSongIni(tempPath);
 
             Assert.Equal("Unknown Artist", metadata.Artist);
             Assert.Equal("Sober", metadata.Title);

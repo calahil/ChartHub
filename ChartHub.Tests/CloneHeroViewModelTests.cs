@@ -14,7 +14,7 @@ public class CloneHeroViewModelTests
     public void InitialState_ShowsStartupBlockingState()
     {
         using var temp = new TemporaryDirectoryFixture("clonehero-vm-initial");
-        var sut = CreateViewModel(temp.RootPath, new ImmediateReconciliationService());
+        CloneHeroViewModel sut = CreateViewModel(temp.RootPath, new ImmediateReconciliationService());
 
         Assert.False(sut.HasInitialized);
         Assert.True(sut.ShowStartupBlockingState);
@@ -26,9 +26,9 @@ public class CloneHeroViewModelTests
     {
         using var temp = new TemporaryDirectoryFixture("clonehero-vm-startup-block");
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var sut = CreateViewModel(temp.RootPath, new GatedReconciliationService(gate.Task));
+        CloneHeroViewModel sut = CreateViewModel(temp.RootPath, new GatedReconciliationService(gate.Task));
 
-        var initTask = sut.InitializeAsync();
+        Task initTask = sut.InitializeAsync();
 
         Assert.True(SpinWait.SpinUntil(() => sut.IsStartupScanInProgress, TimeSpan.FromSeconds(2)));
         Assert.True(sut.ShowStartupBlockingState);
@@ -45,7 +45,7 @@ public class CloneHeroViewModelTests
     public async Task ReParseMetadataCommand_IsDisabled_WhenNoSongSelected()
     {
         using var temp = new TemporaryDirectoryFixture("clonehero-vm-reparse-guard");
-        var sut = CreateViewModel(temp.RootPath, new ImmediateReconciliationService());
+        CloneHeroViewModel sut = CreateViewModel(temp.RootPath, new ImmediateReconciliationService());
         await sut.InitializeAsync();
 
         Assert.Null(sut.SelectedSong);
@@ -56,7 +56,7 @@ public class CloneHeroViewModelTests
     public async Task ReconcileThisSongCommand_IsDisabled_WhenNoSongSelected()
     {
         using var temp = new TemporaryDirectoryFixture("clonehero-vm-reconcilethis-guard");
-        var sut = CreateViewModel(temp.RootPath, new ImmediateReconciliationService());
+        CloneHeroViewModel sut = CreateViewModel(temp.RootPath, new ImmediateReconciliationService());
         await sut.InitializeAsync();
 
         Assert.Null(sut.SelectedSong);
@@ -106,7 +106,7 @@ public class CloneHeroViewModelTests
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
 
         // Seed a catalog entry so SelectedSong gets populated after init
-        var songDir = Path.Combine(temp.RootPath, "songs", "Artista", "Titulo", "Charter__rhythmverse");
+        string songDir = Path.Combine(temp.RootPath, "songs", "Artista", "Titulo", "Charter__rhythmverse");
         Directory.CreateDirectory(songDir);
         File.WriteAllText(Path.Combine(songDir, "song.ini"), "[song]\nartist = Artista\ntitle = Titulo\ncharter = Charter\n");
         await catalog.UpsertAsync(new LibraryCatalogEntry(

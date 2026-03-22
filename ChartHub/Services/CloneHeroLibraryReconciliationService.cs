@@ -49,20 +49,22 @@ public sealed class CloneHeroLibraryReconciliationService(
         var songIniFiles = Directory
             .EnumerateFiles(_settings.CloneHeroSongsDir, "song.ini", SearchOption.AllDirectories)
             .ToList();
-        var total = songIniFiles.Count;
+        int total = songIniFiles.Count;
 
-        var scanned = 0;
-        var updated = 0;
-        var renamed = 0;
-        var failed = 0;
+        int scanned = 0;
+        int updated = 0;
+        int renamed = 0;
+        int failed = 0;
 
-        foreach (var songIniPath in songIniFiles)
+        foreach (string? songIniPath in songIniFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var songDirectory = Path.GetDirectoryName(songIniPath);
+            string? songDirectory = Path.GetDirectoryName(songIniPath);
             if (string.IsNullOrWhiteSpace(songDirectory))
+            {
                 continue;
+            }
 
             scanned++;
             progress?.Report(new CloneHeroReconciliationProgress(
@@ -73,13 +75,17 @@ public sealed class CloneHeroLibraryReconciliationService(
 
             try
             {
-                var result = await ReconcileSongDirectoryInternalAsync(songDirectory, cancellationToken).ConfigureAwait(false);
+                (bool Updated, bool Renamed) result = await ReconcileSongDirectoryInternalAsync(songDirectory, cancellationToken).ConfigureAwait(false);
                 if (!result.Updated)
+                {
                     continue;
+                }
 
                 updated++;
                 if (result.Renamed)
+                {
                     renamed++;
+                }
             }
             catch (Exception ex)
             {
@@ -106,29 +112,39 @@ public sealed class CloneHeroLibraryReconciliationService(
     public async Task<bool> ReconcileSongDirectoryAsync(string songDirectory, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(songDirectory) || !Directory.Exists(songDirectory))
+        {
             return false;
+        }
 
-        var songIniPath = Path.Combine(songDirectory, "song.ini");
+        string songIniPath = Path.Combine(songDirectory, "song.ini");
         if (!File.Exists(songIniPath))
+        {
             return false;
+        }
 
-        var result = await ReconcileSongDirectoryInternalAsync(songDirectory, cancellationToken).ConfigureAwait(false);
+        (bool Updated, bool Renamed) result = await ReconcileSongDirectoryInternalAsync(songDirectory, cancellationToken).ConfigureAwait(false);
         return result.Updated;
     }
 
     public async Task<bool> ReParseMetadataAsync(string songDirectory, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(songDirectory) || !Directory.Exists(songDirectory))
+        {
             return false;
+        }
 
-        var songIniPath = Path.Combine(songDirectory, "song.ini");
+        string songIniPath = Path.Combine(songDirectory, "song.ini");
         if (!File.Exists(songIniPath))
+        {
             return false;
+        }
 
-        var metadata = _songIniMetadataParser.ParseFromSongIni(songIniPath);
-        var existingEntry = await _libraryCatalog.GetEntryByLocalPathAsync(songDirectory, cancellationToken).ConfigureAwait(false);
+        SongMetadata metadata = _songIniMetadataParser.ParseFromSongIni(songIniPath);
+        LibraryCatalogEntry? existingEntry = await _libraryCatalog.GetEntryByLocalPathAsync(songDirectory, cancellationToken).ConfigureAwait(false);
         if (existingEntry is null)
+        {
             return false;
+        }
 
         string normalizedSource;
         try
@@ -140,7 +156,7 @@ public sealed class CloneHeroLibraryReconciliationService(
             return false;
         }
 
-        var persistedSourceId = existingEntry?.SourceId ?? string.Empty;
+        string persistedSourceId = existingEntry?.SourceId ?? string.Empty;
 
         await _libraryCatalog.UpsertAsync(new LibraryCatalogEntry(
             Source: normalizedSource,
@@ -159,12 +175,14 @@ public sealed class CloneHeroLibraryReconciliationService(
 
     private async Task<(bool Updated, bool Renamed)> ReconcileSongDirectoryInternalAsync(string songDirectory, CancellationToken cancellationToken)
     {
-        var songIniPath = Path.Combine(songDirectory, "song.ini");
+        string songIniPath = Path.Combine(songDirectory, "song.ini");
         if (!File.Exists(songIniPath))
+        {
             return (false, false);
+        }
 
-        var metadata = _songIniMetadataParser.ParseFromSongIni(songIniPath);
-        var existingEntry = await _libraryCatalog.GetEntryByLocalPathAsync(songDirectory, cancellationToken).ConfigureAwait(false);
+        SongMetadata metadata = _songIniMetadataParser.ParseFromSongIni(songIniPath);
+        LibraryCatalogEntry? existingEntry = await _libraryCatalog.GetEntryByLocalPathAsync(songDirectory, cancellationToken).ConfigureAwait(false);
 
         if (existingEntry is null)
         {
@@ -184,14 +202,14 @@ public sealed class CloneHeroLibraryReconciliationService(
             return (true, true);
         }
 
-        var layout = _schemaService.ResolveUniqueLayout(
+        CloneHeroDirectoryLayout layout = _schemaService.ResolveUniqueLayout(
             _settings.CloneHeroSongsDir,
             metadata,
             normalizedSource,
             exists: path => string.Equals(path, songDirectory, StringComparison.Ordinal) || Directory.Exists(path));
 
-        var finalPath = layout.FullPath;
-        var renamed = false;
+        string finalPath = layout.FullPath;
+        bool renamed = false;
         if (!string.Equals(songDirectory, finalPath, StringComparison.Ordinal))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
@@ -199,9 +217,9 @@ public sealed class CloneHeroLibraryReconciliationService(
             renamed = true;
         }
 
-        var contentIdentityHash = await LibraryIdentityService.ComputeInstalledContentIdentityHashAsync(finalPath, cancellationToken).ConfigureAwait(false);
-        var internalIdentityKey = LibraryIdentityService.BuildInternalIdentityKey(contentIdentityHash, metadata);
-        var persistedSourceId = string.IsNullOrWhiteSpace(existingEntry?.SourceId)
+        string contentIdentityHash = await LibraryIdentityService.ComputeInstalledContentIdentityHashAsync(finalPath, cancellationToken).ConfigureAwait(false);
+        string internalIdentityKey = LibraryIdentityService.BuildInternalIdentityKey(contentIdentityHash, metadata);
+        string persistedSourceId = string.IsNullOrWhiteSpace(existingEntry?.SourceId)
             ? internalIdentityKey
             : LibraryIdentityService.NormalizeSourceKey(normalizedSource, existingEntry!.SourceId);
 
@@ -231,16 +249,20 @@ public sealed class CloneHeroLibraryReconciliationService(
         cancellationToken.ThrowIfCancellationRequested();
 
         if (!Directory.Exists(songDirectory))
+        {
             return;
+        }
 
-        var quarantineRoot = Path.Combine(_settings.CloneHeroDataDir, "Quarantine");
+        string quarantineRoot = Path.Combine(_settings.CloneHeroDataDir, "Quarantine");
         Directory.CreateDirectory(quarantineRoot);
 
-        var leaf = Path.GetFileName(songDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        var safeLeaf = SafePathHelper.SanitizeFileName(leaf, "unmanaged-song");
-        var target = Path.Combine(quarantineRoot, safeLeaf);
+        string leaf = Path.GetFileName(songDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        string safeLeaf = SafePathHelper.SanitizeFileName(leaf, "unmanaged-song");
+        string target = Path.Combine(quarantineRoot, safeLeaf);
         if (Directory.Exists(target))
+        {
             target = Path.Combine(quarantineRoot, $"{safeLeaf}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}");
+        }
 
         Directory.Move(songDirectory, target);
 

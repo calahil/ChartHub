@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
 using ChartHub.Utilities;
+using ChartHub.ViewModels;
 
 namespace ChartHub.Tests;
 
@@ -18,15 +20,15 @@ public class MainViewModelTests
     {
         using var temp = new TemporaryDirectoryFixture("main-vm-clonehero");
         var downloadWatcher = new ResourceWatcherStub();
-        var cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
-        var downloadViewModel = CreateDownloadViewModel(downloadWatcher, new FakeGoogleDriveClient(string.Empty));
-        var rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
-        var encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
+        CloneHeroViewModel cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
+        DownloadViewModel downloadViewModel = CreateDownloadViewModel(downloadWatcher, new FakeGoogleDriveClient(string.Empty));
+        RhythmVerseViewModel rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
+        EncoreViewModel encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
         var sharedDownloadQueue = new SharedDownloadQueue();
-        var settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
-        var syncViewModel = CreateUninitialized<ViewModels.SyncViewModel>();
+        SettingsViewModel settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
+        SyncViewModel syncViewModel = CreateUninitialized<ViewModels.SyncViewModel>();
 
-        var sut = CreateMainViewModel(
+        MainViewModel sut = CreateMainViewModel(
             rhythmVerseViewModel,
             encoreViewModel,
             sharedDownloadQueue,
@@ -57,15 +59,15 @@ public class MainViewModelTests
     {
         using var temp = new TemporaryDirectoryFixture("main-vm-android");
         var downloadWatcher = new ResourceWatcherStub();
-        var cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
-        var downloadViewModel = CreateDownloadViewModel(downloadWatcher, new FakeGoogleDriveClient(string.Empty));
-        var rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
-        var encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
+        CloneHeroViewModel cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
+        DownloadViewModel downloadViewModel = CreateDownloadViewModel(downloadWatcher, new FakeGoogleDriveClient(string.Empty));
+        RhythmVerseViewModel rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
+        EncoreViewModel encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
         var sharedDownloadQueue = new SharedDownloadQueue();
-        var settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
-        var syncViewModel = CreateUninitialized<ViewModels.SyncViewModel>();
+        SettingsViewModel settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
+        SyncViewModel syncViewModel = CreateUninitialized<ViewModels.SyncViewModel>();
 
-        var sut = CreateMainViewModel(
+        MainViewModel sut = CreateMainViewModel(
             rhythmVerseViewModel,
             encoreViewModel,
             sharedDownloadQueue,
@@ -89,26 +91,26 @@ public class MainViewModelTests
         lock (LoggerSync)
         {
             using var temp = new TemporaryDirectoryFixture("main-vm-logging");
-            var logPath = Path.Combine(temp.RootPath, "charthub.log");
+            string logPath = Path.Combine(temp.RootPath, "charthub.log");
 
             Logger.Initialize(temp.RootPath);
 
             try
             {
-                var observeMethod = typeof(ViewModels.MainViewModel).GetMethod("ObserveBackgroundTask", BindingFlags.NonPublic | BindingFlags.Static);
+                MethodInfo? observeMethod = typeof(ViewModels.MainViewModel).GetMethod("ObserveBackgroundTask", BindingFlags.NonPublic | BindingFlags.Static);
 
                 Assert.NotNull(observeMethod);
 
                 observeMethod.Invoke(null, [Task.FromException(new InvalidOperationException("boom-marker")), "Google watcher startup"]);
 
-                var wroteFailure = SpinWait.SpinUntil(() =>
+                bool wroteFailure = SpinWait.SpinUntil(() =>
                 {
                     if (!File.Exists(logPath))
                     {
                         return false;
                     }
 
-                    var text = File.ReadAllText(logPath);
+                    string text = File.ReadAllText(logPath);
                     return text.Contains("Google watcher startup failed", StringComparison.Ordinal)
                         && text.Contains("boom-marker", StringComparison.Ordinal);
                 }, TimeSpan.FromSeconds(2));
@@ -117,7 +119,7 @@ public class MainViewModelTests
 
                 Assert.True(wroteFailure, "Expected background task failure to be written to the log.");
 
-                var finalText = File.ReadAllText(logPath);
+                string finalText = File.ReadAllText(logPath);
                 Assert.Contains("Google watcher startup failed", finalText, StringComparison.Ordinal);
                 Assert.Contains("exceptionType=System.InvalidOperationException", finalText, StringComparison.Ordinal);
                 Assert.Contains("boom-marker", finalText, StringComparison.Ordinal);
@@ -140,7 +142,7 @@ public class MainViewModelTests
         Action<Action> postToUi,
         bool isAndroid)
     {
-        var constructor = typeof(ViewModels.MainViewModel).GetConstructor(
+        ConstructorInfo? constructor = typeof(ViewModels.MainViewModel).GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic,
             binder: null,
             [
@@ -179,7 +181,7 @@ public class MainViewModelTests
 
     private static ViewModels.DownloadViewModel CreateDownloadViewModel(IResourceWatcher watcher, IGoogleDriveClient driveClient)
     {
-        var viewModel = CreateUninitialized<ViewModels.DownloadViewModel>();
+        DownloadViewModel viewModel = CreateUninitialized<ViewModels.DownloadViewModel>();
         viewModel.DownloadWatcher = watcher;
         viewModel.GoogleWatcher = new GoogleDriveWatcher(driveClient);
         return viewModel;

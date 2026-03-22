@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Utilities;
 
@@ -190,11 +191,15 @@ internal sealed class LinuxSecretToolStore : ISecretStore
     public static bool CanUse()
     {
         if (!OperatingSystem.IsLinux())
+        {
             return false;
+        }
 
-        var dbusAddress = Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS");
+        string? dbusAddress = Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS");
         if (string.IsNullOrWhiteSpace(dbusAddress))
+        {
             return false;
+        }
 
         try
         {
@@ -209,11 +214,15 @@ internal sealed class LinuxSecretToolStore : ISecretStore
             });
 
             if (process is null)
+            {
                 return false;
+            }
 
             process.WaitForExit(1000);
             if (!process.HasExited)
+            {
                 process.Kill(entireProcessTree: true);
+            }
 
             return true;
         }
@@ -225,20 +234,22 @@ internal sealed class LinuxSecretToolStore : ISecretStore
 
     public async Task<string?> GetAsync(string key, CancellationToken cancellationToken = default)
     {
-        var result = await RunSecretToolAsync(
+        SecretToolResult result = await RunSecretToolAsync(
             new[] { "lookup", "application", _applicationName, "key", key },
             standardInput: null,
             cancellationToken).ConfigureAwait(false);
 
         if (result.ExitCode != 0)
+        {
             return null;
+        }
 
         return result.StandardOutput.TrimEnd('\r', '\n');
     }
 
     public async Task SetAsync(string key, string value, CancellationToken cancellationToken = default)
     {
-        var result = await RunSecretToolAsync(
+        SecretToolResult result = await RunSecretToolAsync(
             new[]
             {
                 "store",
@@ -250,23 +261,27 @@ internal sealed class LinuxSecretToolStore : ISecretStore
             cancellationToken).ConfigureAwait(false);
 
         if (result.ExitCode != 0)
+        {
             throw new InvalidOperationException($"secret-tool store failed: {result.StandardError}");
+        }
     }
 
     public async Task RemoveAsync(string key, CancellationToken cancellationToken = default)
     {
-        var result = await RunSecretToolAsync(
+        SecretToolResult result = await RunSecretToolAsync(
             new[] { "clear", "application", _applicationName, "key", key },
             standardInput: null,
             cancellationToken).ConfigureAwait(false);
 
         if (result.ExitCode != 0)
+        {
             throw new InvalidOperationException($"secret-tool clear failed: {result.StandardError}");
+        }
     }
 
     public async Task<bool> ContainsAsync(string key, CancellationToken cancellationToken = default)
     {
-        var result = await RunSecretToolAsync(
+        SecretToolResult result = await RunSecretToolAsync(
             new[] { "lookup", "application", _applicationName, "key", key },
             standardInput: null,
             cancellationToken).ConfigureAwait(false);
@@ -292,21 +307,26 @@ internal sealed class LinuxSecretToolStore : ISecretStore
             },
         };
 
-        foreach (var argument in arguments)
+        foreach (string argument in arguments)
+        {
             process.StartInfo.ArgumentList.Add(argument);
+        }
 
         process.Start();
 
         if (standardInput is not null)
+        {
             await process.StandardInput.WriteAsync(standardInput).ConfigureAwait(false);
+        }
+
         process.StandardInput.Close();
 
-        var stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        Task<string> stdOutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        Task<string> stdErrTask = process.StandardError.ReadToEndAsync(cancellationToken);
 
         await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-        var standardOutput = await stdOutTask.ConfigureAwait(false);
-        var standardError = await stdErrTask.ConfigureAwait(false);
+        string standardOutput = await stdOutTask.ConfigureAwait(false);
+        string standardError = await stdErrTask.ConfigureAwait(false);
 
         return new SecretToolResult(process.ExitCode, standardOutput, standardError);
     }

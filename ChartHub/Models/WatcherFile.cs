@@ -1,154 +1,156 @@
 
 using System.ComponentModel;
+
 using ChartHub.Utilities;
 
-namespace ChartHub.Models
+namespace ChartHub.Models;
+
+public enum WatcherType
 {
-    public enum WatcherType
+    Directory,
+    File
+}
+
+public enum WatcherFileType
+{
+    Con,
+    CloneHero,
+    Directory,
+    Rar,
+    SevenZip,
+    Unknown,
+    Zip
+}
+
+public class WatcherFile(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile, long sizeBytes) : INotifyPropertyChanged
+{
+    private string _imageFile = imageFile;
+    private bool _checked = false;
+    private string _displayName = displayName;
+    private string _filePath = filePath;
+    private WatcherFileType _fileType = watcherFileType;
+    private long _sizeBytes = sizeBytes;
+    private double _downloadProgress = 0;
+
+    public bool Checked
     {
-        Directory,
-        File
+        get => _checked;
+        set
+        {
+            if (_checked != value)
+            {
+                _checked = value;
+                OnPropertyChanged(nameof(Checked));
+            }
+        }
     }
 
-    public enum WatcherFileType
+    public string ImageFile
     {
-        Con,
-        CloneHero,
-        Directory,
-        Rar,
-        SevenZip,
-        Unknown,
-        Zip
+        get => _imageFile;
+        set
+        {
+            if (_imageFile != value)
+            {
+                _imageFile = value;
+                OnPropertyChanged(nameof(ImageFile));
+            }
+        }
     }
 
-    public class WatcherFile(string displayName, string filePath, WatcherFileType watcherFileType, string imageFile, long sizeBytes) : INotifyPropertyChanged
+    public string DisplayName
     {
-        private string _imageFile = imageFile;
-        private bool _checked = false;
-        private string _displayName = displayName;
-        private string _filePath = filePath;
-        private WatcherFileType _fileType = watcherFileType;
-        private long _sizeBytes = sizeBytes;
-        private double _downloadProgress = 0;
-
-        public bool Checked
+        get => _displayName;
+        set
         {
-            get => _checked;
-            set
+            if (_displayName != value)
             {
-                if (_checked != value)
-                {
-                    _checked = value;
-                    OnPropertyChanged(nameof(Checked));
-                }
+                _displayName = value;
+                OnPropertyChanged(nameof(DisplayName));
             }
         }
+    }
 
-        public string ImageFile
+    public WatcherFileType FileType
+    {
+        get => _fileType;
+        set
         {
-            get => _imageFile;
-            set
+            if (_fileType != value)
             {
-                if (_imageFile != value)
-                {
-                    _imageFile = value;
-                    OnPropertyChanged(nameof(ImageFile));
-                }
+                _fileType = value;
+                OnPropertyChanged(nameof(FileType));
             }
         }
+    }
 
-        public string DisplayName
+    public string FileSize
+    {
+        get => FileTools.ConvertFileSize(_sizeBytes);
+    }
+
+    public string FilePath
+    {
+        get => _filePath;
+        set
         {
-            get => _displayName;
-            set
+            if (_filePath != value)
             {
-                if (_displayName != value)
-                {
-                    _displayName = value;
-                    OnPropertyChanged(nameof(DisplayName));
-                }
+                _filePath = value;
+                OnPropertyChanged(nameof(FilePath));
             }
         }
+    }
 
-        public WatcherFileType FileType
+    public long SizeBytes
+    {
+        get => _sizeBytes;
+        set
         {
-            get => _fileType;
-            set
+            if (_sizeBytes == value)
             {
-                if (_fileType != value)
-                {
-                    _fileType = value;
-                    OnPropertyChanged(nameof(FileType));
-                }
+                return;
             }
-        }
 
-        public string FileSize
+            _sizeBytes = value;
+            OnPropertyChanged(nameof(SizeBytes));
+            OnPropertyChanged(nameof(FileSize));
+        }
+    }
+
+    public double DownloadProgress
+    {
+        get => _downloadProgress;
+        set
         {
-            get => FileTools.ConvertFileSize(_sizeBytes);
+            _downloadProgress = value;
+            OnPropertyChanged(nameof(DownloadProgress));
         }
+    }
 
-        public string FilePath
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected virtual void OnPropertyChanged(string propertyName)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public override string ToString()
+    {
+        return DisplayName;
+    }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is WatcherFile other)
         {
-            get => _filePath;
-            set
-            {
-                if (_filePath != value)
-                {
-                    _filePath = value;
-                    OnPropertyChanged(nameof(FilePath));
-                }
-            }
+            return this.DisplayName == other.DisplayName && this.FilePath == other.FilePath;
         }
+        return false;
+    }
 
-        public long SizeBytes
-        {
-            get => _sizeBytes;
-            set
-            {
-                if (_sizeBytes == value)
-                    return;
-
-                _sizeBytes = value;
-                OnPropertyChanged(nameof(SizeBytes));
-                OnPropertyChanged(nameof(FileSize));
-            }
-        }
-
-        public double DownloadProgress
-        {
-            get => _downloadProgress;
-            set
-            {
-                _downloadProgress = value;
-                OnPropertyChanged(nameof(DownloadProgress));
-            }
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected virtual void OnPropertyChanged(string propertyName)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        public override string ToString()
-        {
-            return DisplayName;
-        }
-
-        public override bool Equals(object? obj)
-        {
-            if (obj is WatcherFile other)
-            {
-                return this.DisplayName == other.DisplayName && this.FilePath == other.FilePath;
-            }
-            return false;
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(DisplayName, FilePath);
-        }
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(DisplayName, FilePath);
     }
 }

@@ -1,280 +1,279 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace ChartHub.Models
+namespace ChartHub.Models;
+
+
+public class ViewSong : INotifyPropertyChanged
 {
-
-    public class ViewSong : INotifyPropertyChanged
+    private string? _artist;
+    public string? Artist
     {
-        private string? _artist;
-        public string? Artist
+        get => _artist;
+        set
         {
-            get => _artist;
-            set
-            {
-                _artist = value;
-                OnPropertyChanged();
-            }
+            _artist = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _title;
-        public string? Title
+    private string? _title;
+    public string? Title
+    {
+        get => _title;
+        set
         {
-            get => _title;
-            set
-            {
-                _title = value;
-                OnPropertyChanged();
-            }
+            _title = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _album;
-        public string? Album
+    private string? _album;
+    public string? Album
+    {
+        get => _album;
+        set
         {
-            get => _album;
-            set
-            {
-                _album = value;
-                OnPropertyChanged();
-            }
+            _album = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _year;
-        public string? Year
+    private string? _year;
+    public string? Year
+    {
+        get => _year;
+        set
         {
-            get => _year;
-            set
-            {
-                _year = value;
-                OnPropertyChanged();
-            }
+            _year = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _genre;
-        public string? Genre
+    private string? _genre;
+    public string? Genre
+    {
+        get => _genre;
+        set
         {
-            get => _genre;
-            set
-            {
-                _genre = value;
-                OnPropertyChanged();
-            }
+            _genre = value;
+            OnPropertyChanged();
         }
+    }
 
-        private long? _downloads;
-        public long? Downloads
+    private long? _downloads;
+    public long? Downloads
+    {
+        get => _downloads;
+        set
         {
-            get => _downloads;
-            set
-            {
-                _downloads = value;
-                OnPropertyChanged();
-            }
+            _downloads = value;
+            OnPropertyChanged();
         }
+    }
 
-        private Author? _author;
-        public Author? Author
+    private Author? _author;
+    public Author? Author
+    {
+        get => _author;
+        set
         {
-            get => _author;
-            set
-            {
-                _author = value;
-                OnPropertyChanged();
-            }
+            _author = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _avatar;
-        public string? Avatar
+    private string? _avatar;
+    public string? Avatar
+    {
+        get => _avatar;
+        set
         {
-            get => _avatar;
-            set
-            {
-                _avatar = value;
-                OnPropertyChanged();
-            }
+            _avatar = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _albumArt;
-        public string? AlbumArt
+    private string? _albumArt;
+    public string? AlbumArt
+    {
+        get => _albumArt;
+        set
         {
-            get => _albumArt;
-            set
-            {
-                _albumArt = value;
-                OnPropertyChanged();
-            }
+            _albumArt = value;
+            OnPropertyChanged();
         }
+    }
 
-        private long? _songLength;
-        public long? SongLength
+    private long? _songLength;
+    public long? SongLength
+    {
+        get => _songLength;
+        set
         {
-            get => _songLength;
-            set
-            {
-                _songLength = value;
-                OnPropertyChanged();
-            }
+            _songLength = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _downloadLink;
-        public string? DownloadLink
+    private string? _downloadLink;
+    public string? DownloadLink
+    {
+        get => _downloadLink;
+        set
         {
-            get => _downloadLink;
-            set
-            {
-                _downloadLink = value;
-                OnPropertyChanged();
-            }
+            _downloadLink = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _sourceName;
-        public string? SourceName
+    private string? _sourceName;
+    public string? SourceName
+    {
+        get => _sourceName;
+        set
         {
-            get => _sourceName;
-            set
-            {
-                _sourceName = value;
-                OnPropertyChanged();
-            }
+            _sourceName = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _sourceId;
-        public string? SourceId
+    private string? _sourceId;
+    public string? SourceId
+    {
+        get => _sourceId;
+        set
         {
-            get => _sourceId;
-            set
-            {
-                _sourceId = value;
-                OnPropertyChanged();
-            }
+            _sourceId = value;
+            OnPropertyChanged();
         }
+    }
 
-        private bool _isInLibrary;
-        public bool IsInLibrary
+    private bool _isInLibrary;
+    public bool IsInLibrary
+    {
+        get => _isInLibrary;
+        set
         {
-            get => _isInLibrary;
-            set
-            {
-                _isInLibrary = value;
-                OnPropertyChanged();
-            }
+            _isInLibrary = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _fileName;
-        public string? FileName
+    private string? _fileName;
+    public string? FileName
+    {
+        get => _fileName;
+        set
         {
-            get => _fileName;
-            set
-            {
-                _fileName = value;
-                OnPropertyChanged();
-            }
+            _fileName = value;
+            OnPropertyChanged();
         }
+    }
 
-        private long? _fileSize;
-        public long? FileSize
+    private long? _fileSize;
+    public long? FileSize
+    {
+        get => _fileSize;
+        set
         {
-            get => _fileSize;
-            set
-            {
-                _fileSize = value;
-                OnPropertyChanged();
-            }
+            _fileSize = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _formattedTime;
-        public string? FormattedTime
+    private string? _formattedTime;
+    public string? FormattedTime
+    {
+        get => _formattedTime;
+        set
         {
-            get => _formattedTime;
-            set
-            {
-                _formattedTime = value;
-                OnPropertyChanged();
-            }
+            _formattedTime = value;
+            OnPropertyChanged();
         }
+    }
 
-        private string? _gameformat;
-        public string? Gameformat
+    private string? _gameformat;
+    public string? Gameformat
+    {
+        get => _gameformat;
+        set
         {
-            get => _gameformat;
-            set
-            {
-                _gameformat = value;
-                OnPropertyChanged();
-            }
+            _gameformat = value;
+            OnPropertyChanged();
         }
+    }
 
-        private int _drumString;
-        public int DrumString
+    private int _drumString;
+    public int DrumString
+    {
+        get => _drumString;
+        set
         {
-            get => _drumString;
-            set
-            {
-                _drumString = value;
-                OnPropertyChanged();
-            }
+            _drumString = value;
+            OnPropertyChanged();
         }
+    }
 
-        private int _guitarString;
-        public int GuitarString
+    private int _guitarString;
+    public int GuitarString
+    {
+        get => _guitarString;
+        set
         {
-            get => _guitarString;
-            set
-            {
-                _guitarString = value;
-                OnPropertyChanged();
-            }
+            _guitarString = value;
+            OnPropertyChanged();
         }
+    }
 
-        private int _bassString;
-        public int BassString
+    private int _bassString;
+    public int BassString
+    {
+        get => _bassString;
+        set
         {
-            get => _bassString;
-            set
-            {
-                _bassString = value;
-                OnPropertyChanged();
-            }
+            _bassString = value;
+            OnPropertyChanged();
         }
+    }
 
-        private int _vocalString;
-        public int VocalString
+    private int _vocalString;
+    public int VocalString
+    {
+        get => _vocalString;
+        set
         {
-            get => _vocalString;
-            set
-            {
-                _vocalString = value;
-                OnPropertyChanged();
-            }
+            _vocalString = value;
+            OnPropertyChanged();
         }
+    }
 
-        private int _keysString;
-        public int KeysString
+    private int _keysString;
+    public int KeysString
+    {
+        get => _keysString;
+        set
         {
-            get => _keysString;
-            set
-            {
-                _keysString = value;
-                OnPropertyChanged();
-            }
+            _keysString = value;
+            OnPropertyChanged();
         }
+    }
 
-        private long? _comments;
-        public long? Comments
+    private long? _comments;
+    public long? Comments
+    {
+        get => _comments;
+        set
         {
-            get => _comments;
-            set
-            {
-                _comments = value;
-                OnPropertyChanged();
-            }
+            _comments = value;
+            OnPropertyChanged();
         }
+    }
 
-        public event PropertyChangedEventHandler? PropertyChanged;
+    public event PropertyChangedEventHandler? PropertyChanged;
 
-        protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

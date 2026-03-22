@@ -1,5 +1,6 @@
-using Microsoft.Data.Sqlite;
 using ChartHub.Models;
+
+using Microsoft.Data.Sqlite;
 
 namespace ChartHub.Services;
 
@@ -89,9 +90,11 @@ public sealed class SongIngestionCatalogService
     {
         _databasePath = databasePath;
 
-        var directory = Path.GetDirectoryName(_databasePath);
+        string? directory = Path.GetDirectoryName(_databasePath);
         if (!string.IsNullOrWhiteSpace(directory))
+        {
             Directory.CreateDirectory(directory);
+        }
 
         Initialize();
     }
@@ -99,23 +102,29 @@ public sealed class SongIngestionCatalogService
     public static string NormalizeSourceLink(string sourceLink)
     {
         if (string.IsNullOrWhiteSpace(sourceLink))
+        {
             return string.Empty;
+        }
 
-        var trimmed = sourceLink.Trim();
-        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+        string trimmed = sourceLink.Trim();
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? uri))
+        {
             return trimmed;
+        }
 
-        var path = uri.AbsolutePath;
+        string path = uri.AbsolutePath;
         if (path.Length > 1)
+        {
             path = path.TrimEnd('/');
+        }
 
-        var queryItems = ParseQuery(uri.Query)
+        KeyValuePair<string, string>[] queryItems = ParseQuery(uri.Query)
             .Where(item => !IsTrackingParam(item.Key))
             .OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
             .ThenBy(item => item.Value, StringComparer.Ordinal)
             .ToArray();
 
-        var normalizedQuery = BuildQuery(queryItems);
+        string normalizedQuery = BuildQuery(queryItems);
         var builder = new UriBuilder(uri)
         {
             Scheme = uri.Scheme.ToLowerInvariant(),
@@ -140,23 +149,28 @@ public sealed class SongIngestionCatalogService
         string? librarySource = null)
     {
         if (string.IsNullOrWhiteSpace(source))
+        {
             throw new ArgumentException("Source is required.", nameof(source));
+        }
+
         if (string.IsNullOrWhiteSpace(sourceLink))
+        {
             throw new ArgumentException("Source link is required.", nameof(sourceLink));
+        }
 
-        var normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
-        var normalizedLibrarySource = LibrarySourceNames.NormalizeTrustedSourceOrNull(librarySource);
+        string normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
+        string? normalizedLibrarySource = LibrarySourceNames.NormalizeTrustedSourceOrNull(librarySource);
 
-        var now = DateTimeOffset.UtcNow;
-        var normalizedLink = NormalizeSourceLink(sourceLink);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        string normalizedLink = NormalizeSourceLink(sourceLink);
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using (var upsert = connection.CreateCommand())
+            await using (SqliteCommand upsert = connection.CreateCommand())
             {
                 upsert.CommandText = """
                     INSERT INTO song_ingestions (
@@ -214,7 +228,7 @@ public sealed class SongIngestionCatalogService
                 await upsert.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            await using var select = connection.CreateCommand();
+            await using SqliteCommand select = connection.CreateCommand();
             select.CommandText = """
                 SELECT
                     id,
@@ -235,9 +249,11 @@ public sealed class SongIngestionCatalogService
                 """;
             select.Parameters.AddWithValue("$normalizedLink", normalizedLink);
 
-            await using var reader = await select.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using SqliteDataReader reader = await select.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
                 throw new InvalidOperationException("Failed to upsert or load ingestion record.");
+            }
 
             return new SongIngestionRecord(
                 Id: reader.GetInt64(0),
@@ -265,15 +281,17 @@ public sealed class SongIngestionCatalogService
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(assetLocation))
+        {
             return null;
+        }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT
                     i.id,
@@ -297,9 +315,11 @@ public sealed class SongIngestionCatalogService
                 """;
             command.Parameters.AddWithValue("$location", assetLocation);
 
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
                 return null;
+            }
 
             return new SongIngestionRecord(
                 Id: reader.GetInt64(0),
@@ -327,15 +347,17 @@ public sealed class SongIngestionCatalogService
         CancellationToken cancellationToken = default)
     {
         if (ingestionId <= 0)
+        {
             return null;
+        }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT
                     id,
@@ -356,9 +378,11 @@ public sealed class SongIngestionCatalogService
                 """;
             command.Parameters.AddWithValue("$id", ingestionId);
 
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
                 return null;
+            }
 
             return new SongIngestionRecord(
                 Id: reader.GetInt64(0),
@@ -387,15 +411,17 @@ public sealed class SongIngestionCatalogService
         CancellationToken cancellationToken = default)
     {
         if (ingestionId <= 0)
+        {
             return null;
+        }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT location
                 FROM song_assets
@@ -407,9 +433,11 @@ public sealed class SongIngestionCatalogService
             command.Parameters.AddWithValue("$ingestionId", ingestionId);
             command.Parameters.AddWithValue("$assetRole", assetRole.ToString());
 
-            var scalar = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            object? scalar = await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
             if (scalar is null || scalar == DBNull.Value)
+            {
                 return null;
+            }
 
             return Convert.ToString(scalar);
         }
@@ -424,15 +452,17 @@ public sealed class SongIngestionCatalogService
         CancellationToken cancellationToken = default)
     {
         if (ingestionId <= 0)
+        {
             return null;
+        }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 SELECT
                     i.id,
@@ -468,19 +498,21 @@ public sealed class SongIngestionCatalogService
                 """;
             command.Parameters.AddWithValue("$ingestionId", ingestionId);
 
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
                 return null;
+            }
 
-            var source = reader.GetString(1);
-            var sourceId = reader.IsDBNull(2) ? null : reader.GetString(2);
-            var sourceLink = reader.GetString(3);
-            var artist = reader.IsDBNull(4) ? null : reader.GetString(4);
-            var title = reader.IsDBNull(5) ? null : reader.GetString(5);
-            var charter = reader.IsDBNull(6) ? null : reader.GetString(6);
-            var downloadedLocation = reader.IsDBNull(10) ? null : reader.GetString(10);
-            var installedLocation = reader.IsDBNull(11) ? null : reader.GetString(11);
-            var librarySource = reader.IsDBNull(12) ? null : reader.GetString(12);
+            string source = reader.GetString(1);
+            string? sourceId = reader.IsDBNull(2) ? null : reader.GetString(2);
+            string sourceLink = reader.GetString(3);
+            string? artist = reader.IsDBNull(4) ? null : reader.GetString(4);
+            string? title = reader.IsDBNull(5) ? null : reader.GetString(5);
+            string? charter = reader.IsDBNull(6) ? null : reader.GetString(6);
+            string? downloadedLocation = reader.IsDBNull(10) ? null : reader.GetString(10);
+            string? installedLocation = reader.IsDBNull(11) ? null : reader.GetString(11);
+            string? librarySource = reader.IsDBNull(12) ? null : reader.GetString(12);
 
             return new IngestionQueueItem
             {
@@ -515,31 +547,31 @@ public sealed class SongIngestionCatalogService
         int limit = 500,
         CancellationToken cancellationToken = default)
     {
-        var normalizedStateFilter = string.IsNullOrWhiteSpace(stateFilter)
+        string? normalizedStateFilter = string.IsNullOrWhiteSpace(stateFilter)
             || string.Equals(stateFilter, "All", StringComparison.OrdinalIgnoreCase)
             ? null
             : stateFilter.Trim();
-        var normalizedSourceFilter = string.IsNullOrWhiteSpace(sourceFilter)
+        string? normalizedSourceFilter = string.IsNullOrWhiteSpace(sourceFilter)
             || string.Equals(sourceFilter, "All", StringComparison.OrdinalIgnoreCase)
             ? null
             : sourceFilter.Trim().ToLowerInvariant();
 
-        var orderBy = sortBy.Trim().ToLowerInvariant() switch
+        string orderBy = sortBy.Trim().ToLowerInvariant() switch
         {
             "source" => "i.source",
             "state" => "i.current_state",
             "name" => "downloaded_location",
             _ => "i.updated_at_utc",
         };
-        var sortDirection = descending ? "DESC" : "ASC";
+        string sortDirection = descending ? "DESC" : "ASC";
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = $"""
                 SELECT
                     i.id,
@@ -580,18 +612,18 @@ public sealed class SongIngestionCatalogService
             command.Parameters.AddWithValue("$limit", limit);
 
             var items = new List<IngestionQueueItem>();
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                var source = reader.GetString(1);
-                var sourceId = reader.IsDBNull(2) ? null : reader.GetString(2);
-                var sourceLink = reader.GetString(3);
-                var artist = reader.IsDBNull(4) ? null : reader.GetString(4);
-                var title = reader.IsDBNull(5) ? null : reader.GetString(5);
-                var charter = reader.IsDBNull(6) ? null : reader.GetString(6);
-                var downloadedLocation = reader.IsDBNull(10) ? null : reader.GetString(10);
-                var installedLocation = reader.IsDBNull(11) ? null : reader.GetString(11);
-                var librarySource = reader.IsDBNull(12) ? null : reader.GetString(12);
+                string source = reader.GetString(1);
+                string? sourceId = reader.IsDBNull(2) ? null : reader.GetString(2);
+                string sourceLink = reader.GetString(3);
+                string? artist = reader.IsDBNull(4) ? null : reader.GetString(4);
+                string? title = reader.IsDBNull(5) ? null : reader.GetString(5);
+                string? charter = reader.IsDBNull(6) ? null : reader.GetString(6);
+                string? downloadedLocation = reader.IsDBNull(10) ? null : reader.GetString(10);
+                string? installedLocation = reader.IsDBNull(11) ? null : reader.GetString(11);
+                string? librarySource = reader.IsDBNull(12) ? null : reader.GetString(12);
 
                 items.Add(new IngestionQueueItem
                 {
@@ -625,16 +657,16 @@ public sealed class SongIngestionCatalogService
         long ingestionId,
         CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
             int nextAttemptNumber;
-            await using (var getAttemptNumber = connection.CreateCommand())
+            await using (SqliteCommand getAttemptNumber = connection.CreateCommand())
             {
                 getAttemptNumber.CommandText = """
                     SELECT COALESCE(MAX(attempt_number), 0) + 1
@@ -642,12 +674,12 @@ public sealed class SongIngestionCatalogService
                     WHERE ingestion_id = $ingestionId;
                     """;
                 getAttemptNumber.Parameters.AddWithValue("$ingestionId", ingestionId);
-                var scalar = await getAttemptNumber.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+                object? scalar = await getAttemptNumber.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
                 nextAttemptNumber = Convert.ToInt32(scalar);
             }
 
             long attemptId;
-            await using (var insertAttempt = connection.CreateCommand())
+            await using (SqliteCommand insertAttempt = connection.CreateCommand())
             {
                 insertAttempt.CommandText = """
                     INSERT INTO song_attempts (
@@ -672,7 +704,7 @@ public sealed class SongIngestionCatalogService
                 insertAttempt.Parameters.AddWithValue("$attemptNumber", nextAttemptNumber);
                 insertAttempt.Parameters.AddWithValue("$startedAtUtc", now.UtcDateTime.ToString("O"));
                 insertAttempt.Parameters.AddWithValue("$resultState", IngestionState.Queued.ToString());
-                var scalar = await insertAttempt.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+                object? scalar = await insertAttempt.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
                 attemptId = Convert.ToInt64(scalar);
             }
 
@@ -699,15 +731,15 @@ public sealed class SongIngestionCatalogService
         string? detailsJson,
         CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using (var eventCommand = connection.CreateCommand())
+            await using (SqliteCommand eventCommand = connection.CreateCommand())
             {
                 eventCommand.CommandText = """
                     INSERT INTO song_state_events (
@@ -736,7 +768,7 @@ public sealed class SongIngestionCatalogService
                 await eventCommand.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
 
-            await using (var ingestionUpdate = connection.CreateCommand())
+            await using (SqliteCommand ingestionUpdate = connection.CreateCommand())
             {
                 ingestionUpdate.CommandText = """
                     UPDATE song_ingestions
@@ -754,7 +786,7 @@ public sealed class SongIngestionCatalogService
 
             if (attemptId.HasValue)
             {
-                await using var attemptUpdate = connection.CreateCommand();
+                await using SqliteCommand attemptUpdate = connection.CreateCommand();
                 attemptUpdate.CommandText = """
                     UPDATE song_attempts
                     SET result_state = $resultState,
@@ -794,15 +826,17 @@ public sealed class SongIngestionCatalogService
     public async Task UpsertAssetAsync(SongIngestionAssetEntry entry, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(entry.Location))
+        {
             throw new ArgumentException("Asset location is required.", nameof(entry));
+        }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO song_assets (
                     ingestion_id,
@@ -846,19 +880,27 @@ public sealed class SongIngestionCatalogService
     public async Task UpsertManifestFileAsync(SongInstalledManifestFileEntry entry, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(entry.InstallRoot))
+        {
             throw new ArgumentException("Install root is required.", nameof(entry));
+        }
+
         if (string.IsNullOrWhiteSpace(entry.RelativePath))
+        {
             throw new ArgumentException("Relative path is required.", nameof(entry));
+        }
+
         if (string.IsNullOrWhiteSpace(entry.Sha256))
+        {
             throw new ArgumentException("SHA-256 is required.", nameof(entry));
+        }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var connection = CreateConnection();
+            await using SqliteConnection connection = CreateConnection();
             await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO installed_manifest_files (
                     ingestion_id,
@@ -905,7 +947,7 @@ public sealed class SongIngestionCatalogService
 
     private void Initialize()
     {
-        using var connection = CreateConnection();
+        using SqliteConnection connection = CreateConnection();
         connection.Open();
 
         EnsureSchemaMetadataTable(connection);
@@ -916,7 +958,7 @@ public sealed class SongIngestionCatalogService
         EnsureColumnExists(connection, "song_ingestions", "charter", "TEXT NULL");
         EnsureColumnExists(connection, "song_ingestions", "library_source", "TEXT NULL");
 
-        using (var cleanup = connection.CreateCommand())
+        using (SqliteCommand cleanup = connection.CreateCommand())
         {
             cleanup.CommandText = """
                 DELETE FROM installed_manifest_files
@@ -958,14 +1000,16 @@ public sealed class SongIngestionCatalogService
             cleanup.ExecuteNonQuery();
         }
 
-        var existingVersion = GetSchemaVersion(connection);
+        int? existingVersion = GetSchemaVersion(connection);
         if (existingVersion is null || existingVersion < SchemaVersion)
+        {
             SetSchemaVersion(connection, SchemaVersion);
+        }
     }
 
     private static void RebuildSchema(SqliteConnection connection)
     {
-        using var command = connection.CreateCommand();
+        using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             CREATE TABLE IF NOT EXISTS song_ingestions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1091,7 +1135,7 @@ public sealed class SongIngestionCatalogService
 
     private static void EnsureSchemaMetadataTable(SqliteConnection connection)
     {
-        using var command = connection.CreateCommand();
+        using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             CREATE TABLE IF NOT EXISTS schema_metadata (
                 key TEXT PRIMARY KEY,
@@ -1103,19 +1147,21 @@ public sealed class SongIngestionCatalogService
 
     private static int? GetSchemaVersion(SqliteConnection connection)
     {
-        using var command = connection.CreateCommand();
+        using SqliteCommand command = connection.CreateCommand();
         command.CommandText = "SELECT value FROM schema_metadata WHERE key = $key LIMIT 1;";
         command.Parameters.AddWithValue("$key", SchemaVersionKey);
-        var value = command.ExecuteScalar();
+        object? value = command.ExecuteScalar();
         if (value is null || value is DBNull)
+        {
             return null;
+        }
 
-        return int.TryParse(Convert.ToString(value), out var parsed) ? parsed : null;
+        return int.TryParse(Convert.ToString(value), out int parsed) ? parsed : null;
     }
 
     private static void SetSchemaVersion(SqliteConnection connection, int version)
     {
-        using var command = connection.CreateCommand();
+        using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO schema_metadata (key, value)
             VALUES ($key, $value)
@@ -1128,7 +1174,7 @@ public sealed class SongIngestionCatalogService
 
     private static void EnsureColumnExists(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
     {
-        using var command = connection.CreateCommand();
+        using SqliteCommand command = connection.CreateCommand();
         command.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
 
         try
@@ -1154,7 +1200,9 @@ public sealed class SongIngestionCatalogService
     private static bool IsTrackingParam(string key)
     {
         if (key.StartsWith("utm_", StringComparison.OrdinalIgnoreCase))
+        {
             return true;
+        }
 
         return TrackingKeys.Any(trackingKey => string.Equals(key, trackingKey, StringComparison.OrdinalIgnoreCase));
     }
@@ -1168,23 +1216,29 @@ public sealed class SongIngestionCatalogService
     private static IReadOnlyList<KeyValuePair<string, string>> ParseQuery(string query)
     {
         if (string.IsNullOrWhiteSpace(query))
+        {
             return [];
+        }
 
-        var raw = query.StartsWith('?') ? query[1..] : query;
+        string raw = query.StartsWith('?') ? query[1..] : query;
         if (string.IsNullOrWhiteSpace(raw))
+        {
             return [];
+        }
 
         var list = new List<KeyValuePair<string, string>>();
-        foreach (var chunk in raw.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        foreach (string chunk in raw.Split('&', StringSplitOptions.RemoveEmptyEntries))
         {
-            var splitIndex = chunk.IndexOf('=');
-            var key = splitIndex < 0 ? chunk : chunk[..splitIndex];
-            var value = splitIndex < 0 ? string.Empty : chunk[(splitIndex + 1)..];
+            int splitIndex = chunk.IndexOf('=');
+            string key = splitIndex < 0 ? chunk : chunk[..splitIndex];
+            string value = splitIndex < 0 ? string.Empty : chunk[(splitIndex + 1)..];
 
-            var decodedKey = Uri.UnescapeDataString(key.Replace('+', ' '));
-            var decodedValue = Uri.UnescapeDataString(value.Replace('+', ' '));
+            string decodedKey = Uri.UnescapeDataString(key.Replace('+', ' '));
+            string decodedValue = Uri.UnescapeDataString(value.Replace('+', ' '));
             if (string.IsNullOrWhiteSpace(decodedKey))
+            {
                 continue;
+            }
 
             list.Add(new KeyValuePair<string, string>(decodedKey, decodedValue));
         }
@@ -1194,7 +1248,7 @@ public sealed class SongIngestionCatalogService
 
     private static string BuildQuery(IEnumerable<KeyValuePair<string, string>> queryItems)
     {
-        var encoded = queryItems
+        string[] encoded = queryItems
             .Select(item => string.IsNullOrWhiteSpace(item.Value)
                 ? Uri.EscapeDataString(item.Key)
                 : $"{Uri.EscapeDataString(item.Key)}={Uri.EscapeDataString(item.Value)}")
@@ -1206,10 +1260,14 @@ public sealed class SongIngestionCatalogService
     private static string BuildDisplayName(string? downloadedLocation, string? sourceId, string sourceLink)
     {
         if (!string.IsNullOrWhiteSpace(downloadedLocation))
+        {
             return Path.GetFileName(downloadedLocation);
+        }
 
         if (!string.IsNullOrWhiteSpace(sourceId))
+        {
             return sourceId;
+        }
 
         return sourceLink;
     }

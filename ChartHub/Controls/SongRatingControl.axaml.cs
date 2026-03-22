@@ -1,8 +1,10 @@
+using System.Collections.Generic;
+
 using Avalonia;
 using Avalonia.Controls;
+
 using ChartHub.Models;
 using ChartHub.Strings;
-using System.Collections.Generic;
 
 namespace ChartHub.Controls;
 
@@ -157,7 +159,7 @@ public partial class SongRatingControl : UserControl
 
     private void RefreshRatings()
     {
-        var song = Song;
+        object? song = Song;
         if (song is EncoreSong e)
         {
             DrumString = e.DrumsDifficulty ?? 0;
@@ -176,7 +178,7 @@ public partial class SongRatingControl : UserControl
         }
         else
         {
-            var rv = RhythmSong;
+            ViewSong rv = RhythmSong;
             DrumString = rv.DrumString;
             GuitarString = rv.GuitarString;
             BassString = rv.BassString;

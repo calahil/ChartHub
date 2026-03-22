@@ -1,4 +1,6 @@
 using System.Text.Json;
+
+using ChartHub.Configuration.Models;
 using ChartHub.Configuration.Stores;
 using ChartHub.Tests.TestInfrastructure;
 
@@ -11,10 +13,10 @@ public class JsonAppConfigStoreTests
     public void Load_WhenConfigMissing_CreatesDefaultConfigFile()
     {
         using var temp = new TemporaryDirectoryFixture("json-config-missing");
-        var configPath = temp.GetPath("appsettings.json");
+        string configPath = temp.GetPath("appsettings.json");
 
         using var sut = new JsonAppConfigStore(configPath);
-        var config = sut.Load();
+        AppConfigRoot config = sut.Load();
 
         Assert.True(File.Exists(configPath));
         Assert.Equal(2, config.ConfigVersion);
@@ -26,9 +28,9 @@ public class JsonAppConfigStoreTests
     public void Load_WhenLegacyFlatKeysPresent_MapsIntoRuntimeAndGoogleAuth()
     {
         using var temp = new TemporaryDirectoryFixture("json-config-legacy");
-        var configPath = temp.GetPath("appsettings.json");
+        string configPath = temp.GetPath("appsettings.json");
 
-        var legacy = """
+        string legacy = """
         {
           "ConfigVersion": 0,
           "UseMockData": true,
@@ -44,7 +46,7 @@ public class JsonAppConfigStoreTests
         File.WriteAllText(configPath, legacy);
 
         using var sut = new JsonAppConfigStore(configPath);
-        var config = sut.Load();
+        AppConfigRoot config = sut.Load();
 
         Assert.Equal(2, config.ConfigVersion);
         Assert.True(config.Runtime.UseMockData);
@@ -59,10 +61,10 @@ public class JsonAppConfigStoreTests
     public async Task SaveAsync_WritesConfigAndCleansTemporaryFile()
     {
         using var temp = new TemporaryDirectoryFixture("json-config-save");
-        var configPath = temp.GetPath("appsettings.json");
+        string configPath = temp.GetPath("appsettings.json");
 
         using var sut = new JsonAppConfigStore(configPath);
-        var config = sut.Load();
+        AppConfigRoot config = sut.Load();
         config.Runtime.OutputDirectory = "/tmp/new-output";
 
         await sut.SaveAsync(config);
@@ -70,9 +72,9 @@ public class JsonAppConfigStoreTests
         Assert.True(File.Exists(configPath));
         Assert.False(File.Exists(configPath + ".tmp"));
 
-        var text = File.ReadAllText(configPath);
+        string text = File.ReadAllText(configPath);
         using var doc = JsonDocument.Parse(text);
-        var output = doc.RootElement
+        string? output = doc.RootElement
             .GetProperty("Runtime")
             .GetProperty("OutputDirectory")
             .GetString();

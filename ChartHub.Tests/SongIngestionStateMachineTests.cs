@@ -34,7 +34,7 @@ public class SongIngestionStateMachineTests
     [InlineData(3, false)]
     public void RetryPolicy_UsesFixedTwoRetryLimit(int retryCount, bool expected)
     {
-        var canRetry = SongIngestionRetryPolicy.CanRetryDownloadFailure(retryCount);
+        bool canRetry = SongIngestionRetryPolicy.CanRetryDownloadFailure(retryCount);
 
         Assert.Equal(expected, canRetry);
     }

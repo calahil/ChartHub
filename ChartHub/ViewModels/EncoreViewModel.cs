@@ -1,4 +1,7 @@
-using CommunityToolkit.Mvvm.Input;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
@@ -6,9 +9,8 @@ using ChartHub.Services;
 using ChartHub.Services.Transfers;
 using ChartHub.Strings;
 using ChartHub.Utilities;
-using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
+
+using CommunityToolkit.Mvvm.Input;
 
 namespace ChartHub.ViewModels;
 
@@ -400,7 +402,9 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     private void ScheduleStateSave()
     {
         if (_isRestoringState)
+        {
             return;
+        }
 
         CancellationTokenSource cts;
         lock (_stateSaveSync)
@@ -420,8 +424,8 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
         {
             await Task.Delay(350, cancellationToken);
 
-            var snapshot = CaptureState();
-            var result = await _settingsOrchestrator.UpdateAsync(config =>
+            EncoreUiStateConfig snapshot = CaptureState();
+            ConfigValidationResult result = await _settingsOrchestrator.UpdateAsync(config =>
             {
                 config.EncoreUi = snapshot;
             }, cancellationToken);
@@ -443,7 +447,9 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     private void RestoreState(EncoreUiStateConfig? state)
     {
         if (state is null)
+        {
             return;
+        }
 
         _isRestoringState = true;
         try
@@ -513,7 +519,9 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     public async Task RefreshAsync()
     {
         if (IsLoading)
+        {
             return;
+        }
 
         DataItems.Clear();
         NoResults = false;
@@ -524,7 +532,9 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     public async Task LoadMoreAsync()
     {
         if (IsLoading || !_apiService.HasMoreRecords)
+        {
             return;
+        }
 
         _apiService.CurrentPage += 1;
         await ExecuteSearchAsync(reset: false);
@@ -532,11 +542,13 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
 
     public async Task DownloadSongAsync(EncoreSong? song)
     {
-        var selected = song ?? SelectedSong;
+        EncoreSong? selected = song ?? SelectedSong;
         if (selected is null)
+        {
             return;
+        }
 
-        var fileName = BuildEncoreFileName(selected);
+        string fileName = BuildEncoreFileName(selected);
         var proxySong = selected.ToViewSong(fileName);
 
         var downloadItem = new DownloadFile(
@@ -550,7 +562,7 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
         var cts = new CancellationTokenSource();
         _downloadTokens[downloadItem] = cts;
 
-        var result = await _transferOrchestrator.QueueSongDownloadAsync(proxySong, downloadItem, Downloads, cts.Token);
+        TransferResult result = await _transferOrchestrator.QueueSongDownloadAsync(proxySong, downloadItem, Downloads, cts.Token);
         if (result.Success)
         {
             selected.IsInLibrary = false;
@@ -572,9 +584,11 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     private void CancelDownload(DownloadFile? downloadItem)
     {
         if (downloadItem is null)
+        {
             return;
+        }
 
-        if (_downloadTokens.TryGetValue(downloadItem, out var cts))
+        if (_downloadTokens.TryGetValue(downloadItem, out CancellationTokenSource? cts))
         {
             downloadItem.Status = TransferStage.Cancelling.ToString();
             downloadItem.ErrorMessage = null;
@@ -598,12 +612,16 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             }
 
             if (reset)
+            {
                 DataItems.Clear();
+            }
 
-            foreach (var item in results)
+            foreach (EncoreSong item in results)
             {
                 if (!DataItems.Contains(item))
+                {
                     DataItems.Add(item);
+                }
             }
 
             NoResults = DataItems.Count == 0;
@@ -694,16 +712,18 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
 
     private static int? ParseNullableInt(string value)
     {
-        if (int.TryParse(value, out var parsed))
+        if (int.TryParse(value, out int parsed))
+        {
             return parsed;
+        }
 
         return null;
     }
 
     private static string BuildEncoreFileName(EncoreSong song)
     {
-        var artist = string.IsNullOrWhiteSpace(song.Artist) ? "Unknown Artist" : song.Artist;
-        var title = string.IsNullOrWhiteSpace(song.Name) ? "Unknown Song" : song.Name;
+        string artist = string.IsNullOrWhiteSpace(song.Artist) ? "Unknown Artist" : song.Artist;
+        string title = string.IsNullOrWhiteSpace(song.Name) ? "Unknown Song" : song.Name;
         return SafePathHelper.SanitizeFileName($"{artist} - {title}.sng", "encore-chart.sng");
     }
 
@@ -711,7 +731,7 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     {
         _ = task.ContinueWith(t =>
         {
-            var ex = t.Exception?.GetBaseException();
+            Exception? ex = t.Exception?.GetBaseException();
             if (ex is not null)
             {
                 Logger.LogError("App", $"{context} failed", ex);

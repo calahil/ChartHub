@@ -1,11 +1,12 @@
 using System.Collections.ObjectModel;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Services.Transfers;
-using ChartHub.Utilities;
 using ChartHub.Tests.TestInfrastructure;
+using ChartHub.Utilities;
 
 namespace ChartHub.Tests;
 
@@ -16,7 +17,7 @@ public class DownloadViewModelTests
     public async Task CheckAllCommand_AndItemSelection_UpdateCheckedStateFlags()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-checks");
-        using var settings = CreateSettings(temp.RootPath);
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
         var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
 
@@ -49,7 +50,7 @@ public class DownloadViewModelTests
     public async Task DownloadCloudToLocalCommand_WithSelectedFiles_InvokesTransferAndRefreshesWatcher()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-cloud-local");
-        using var settings = CreateSettings(temp.RootPath);
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
         var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
         var refreshWatcher = new ResourceWatcherStub(temp.GetPath("downloads"), sut.DownloadFiles);
@@ -77,7 +78,7 @@ public class DownloadViewModelTests
     public async Task SyncCloudToLocalCommand_InvokesTransferForCurrentCloudFiles_AndRefreshesWatcher()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-sync");
-        using var settings = CreateSettings(temp.RootPath);
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
         var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
         var refreshWatcher = new ResourceWatcherStub(temp.GetPath("downloads"), sut.DownloadFiles);
@@ -105,7 +106,7 @@ public class DownloadViewModelTests
     public async Task CloudCommands_WhenCloudNotLinked_DoNotThrowAndDoNotInvokeTransfers()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-cloud-unlinked");
-        using var settings = CreateSettings(temp.RootPath);
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
         var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient { ChartHubFolderId = string.Empty }, transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
 
@@ -134,7 +135,7 @@ public class DownloadViewModelTests
     public async Task HandleCloudAccountStateChangedAsync_OnUnlink_ClearsCloudFilesAndShowsHint()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-cloud-link-state");
-        using var settings = CreateSettings(temp.RootPath);
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
         var driveClient = new FakeGoogleDriveClient { ChartHubFolderId = "folder-test" };
         var sut = new ViewModels.DownloadViewModel(settings, driveClient, transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
@@ -162,7 +163,7 @@ public class DownloadViewModelTests
     public async Task ToggleInstallLogCommand_TogglesExpandedStateAndLabel()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-log-toggle");
-        using var settings = CreateSettings(temp.RootPath);
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
         var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
 
@@ -191,9 +192,9 @@ public class DownloadViewModelTests
     public async Task InstallSongsCommand_SetsSummary_AndDismissHidesPanel()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-install-summary");
-        using var settings = CreateSettings(temp.RootPath);
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
-        var selectedFilePath = temp.GetPath("song-a.zip");
+        string selectedFilePath = temp.GetPath("song-a.zip");
         await File.WriteAllTextAsync(selectedFilePath, "zip");
         var installStub = new SongInstallServiceStub
         {
@@ -228,9 +229,9 @@ public class DownloadViewModelTests
     public async Task InstallSongsCommand_OnCancellation_SetsCancelledSummary()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-install-cancel");
-        using var settings = CreateSettings(temp.RootPath);
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var transfer = new TransferOrchestratorSpy();
-        var selectedFilePath = temp.GetPath("song-cancel.zip");
+        string selectedFilePath = temp.GetPath("song-cancel.zip");
         await File.WriteAllTextAsync(selectedFilePath, "zip");
         var installStub = new SongInstallServiceStub
         {
@@ -334,7 +335,9 @@ public class DownloadViewModelTests
         public Task<IReadOnlyList<string>> InstallSelectedDownloadsAsync(IEnumerable<string> selectedFilePaths, IProgress<InstallProgressUpdate>? progress = null, CancellationToken cancellationToken = default)
         {
             if (ThrowOnInstall is not null)
+            {
                 throw ThrowOnInstall;
+            }
 
             return Task.FromResult(ResultPaths);
         }

@@ -13,10 +13,10 @@ public class CloneHeroLibraryReconciliationServiceTests
     public async Task ReconcileAsync_MovesUnmanagedDirectoryToQuarantine_AndSkipsCatalogUpsert()
     {
         using var temp = new TemporaryDirectoryFixture("clonehero-reconcile-import");
-        var settings = CreateSettings(temp.RootPath);
-        var songsRoot = settings.CloneHeroSongsDir;
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        string songsRoot = settings.CloneHeroSongsDir;
 
-        var legacyDir = Path.Combine(songsRoot, "legacy-folder");
+        string legacyDir = Path.Combine(songsRoot, "legacy-folder");
         Directory.CreateDirectory(legacyDir);
         await File.WriteAllTextAsync(Path.Combine(legacyDir, "song.ini"), """
 [song]
@@ -33,9 +33,9 @@ charter = Charter Name
             new SongIniMetadataParser(),
             new CloneHeroDirectorySchemaService());
 
-        var result = await sut.ReconcileAsync();
+        CloneHeroReconciliationResult result = await sut.ReconcileAsync();
 
-        var quarantineRoot = Path.Combine(settings.CloneHeroDataDir, "Quarantine");
+        string quarantineRoot = Path.Combine(settings.CloneHeroDataDir, "Quarantine");
         Assert.True(Directory.Exists(quarantineRoot));
         Assert.Single(Directory.GetDirectories(quarantineRoot));
         Assert.False(Directory.Exists(legacyDir));
@@ -45,7 +45,7 @@ charter = Charter Name
         Assert.Equal(1, result.Renamed);
         Assert.Equal(0, result.Failed);
 
-        var remainingEntries = await libraryCatalog.GetEntriesByArtistAsync("Artist Name");
+        IReadOnlyList<LibraryCatalogEntry> remainingEntries = await libraryCatalog.GetEntriesByArtistAsync("Artist Name");
         Assert.Empty(remainingEntries);
     }
 
@@ -53,10 +53,10 @@ charter = Charter Name
     public async Task ReconcileSongDirectoryAsync_PreservesKnownSourceFromExistingCatalogEntry()
     {
         using var temp = new TemporaryDirectoryFixture("clonehero-reconcile-preserve-source");
-        var settings = CreateSettings(temp.RootPath);
-        var songsRoot = settings.CloneHeroSongsDir;
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        string songsRoot = settings.CloneHeroSongsDir;
 
-        var legacyDir = Path.Combine(songsRoot, "legacy-folder-rv");
+        string legacyDir = Path.Combine(songsRoot, "legacy-folder-rv");
         Directory.CreateDirectory(legacyDir);
         await File.WriteAllTextAsync(Path.Combine(legacyDir, "song.ini"), """
 [song]
@@ -67,7 +67,7 @@ charter = Charter Name
         await File.WriteAllTextAsync(Path.Combine(legacyDir, "notes.chart"), "chart-data");
 
         var libraryCatalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
-        var rhythmVerseSourceId = LibraryIdentityService.BuildSourceKey(LibrarySourceNames.RhythmVerse, "rv-42");
+        string rhythmVerseSourceId = LibraryIdentityService.BuildSourceKey(LibrarySourceNames.RhythmVerse, "rv-42");
         await libraryCatalog.UpsertAsync(new LibraryCatalogEntry(
             Source: LibrarySourceNames.RhythmVerse,
             SourceId: rhythmVerseSourceId,
@@ -83,15 +83,15 @@ charter = Charter Name
             new SongIniMetadataParser(),
             new CloneHeroDirectorySchemaService());
 
-        var updated = await sut.ReconcileSongDirectoryAsync(legacyDir);
+        bool updated = await sut.ReconcileSongDirectoryAsync(legacyDir);
 
         Assert.True(updated);
 
-        var expectedPath = Path.Combine(songsRoot, "Artist Name", "Song Title", "Charter Name__rhythmverse");
+        string expectedPath = Path.Combine(songsRoot, "Artist Name", "Song Title", "Charter Name__rhythmverse");
         Assert.True(Directory.Exists(expectedPath));
         Assert.False(Directory.Exists(legacyDir));
 
-        var entry = await libraryCatalog.GetEntryByLocalPathAsync(expectedPath);
+        LibraryCatalogEntry? entry = await libraryCatalog.GetEntryByLocalPathAsync(expectedPath);
         Assert.NotNull(entry);
         Assert.Equal(LibrarySourceNames.RhythmVerse, entry!.Source);
         Assert.Equal(rhythmVerseSourceId, entry.SourceId);
@@ -112,7 +112,7 @@ charter = Charter Name
             },
         };
 
-        foreach (var dir in new[]
+        foreach (string? dir in new[]
         {
             config.Runtime.TempDirectory,
             config.Runtime.DownloadDirectory,

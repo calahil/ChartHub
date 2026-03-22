@@ -1,9 +1,10 @@
+using System.IO.Compression;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
 using ChartHub.Utilities;
-using System.IO.Compression;
 
 namespace ChartHub.Tests;
 
@@ -14,9 +15,9 @@ public class SongInstallServiceTests
     public async Task InstallSelectedDownloadsAsync_ArchiveInstall_PopulatesMetadataAndCanonicalDirectory()
     {
         using var temp = new TemporaryDirectoryFixture("song-install-archive-canonical");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
 
-        var archivePath = Path.Combine(settings.DownloadDir, "archive-song.zip");
+        string archivePath = Path.Combine(settings.DownloadDir, "archive-song.zip");
         CreateArchiveWithSongIni(
             archivePath,
             "Artist Zip",
@@ -27,7 +28,7 @@ public class SongInstallServiceTests
         var libraryCatalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
         var stateMachine = new SongIngestionStateMachine();
 
-        var ingestion = await ingestionCatalog.GetOrCreateIngestionAsync(
+        SongIngestionRecord ingestion = await ingestionCatalog.GetOrCreateIngestionAsync(
             source: LibrarySourceNames.Encore,
             sourceId: "encore-zip-123",
             sourceLink: "https://encore.example/songs/123");
@@ -50,9 +51,9 @@ public class SongInstallServiceTests
             new CloneHeroDirectorySchemaService(),
             libraryCatalog);
 
-        var installedDirectories = await sut.InstallSelectedDownloadsAsync([archivePath]);
+        IReadOnlyList<string> installedDirectories = await sut.InstallSelectedDownloadsAsync([archivePath]);
 
-        var installedDirectory = Assert.Single(installedDirectories);
+        string installedDirectory = Assert.Single(installedDirectories);
         Assert.Contains($"{Path.DirectorySeparatorChar}Artist Zip{Path.DirectorySeparatorChar}", installedDirectory, StringComparison.Ordinal);
         Assert.Contains($"{Path.DirectorySeparatorChar}Title Zip{Path.DirectorySeparatorChar}", installedDirectory, StringComparison.Ordinal);
         Assert.Contains("Charter Zip__encore", installedDirectory, StringComparison.Ordinal);
@@ -60,7 +61,7 @@ public class SongInstallServiceTests
         Assert.True(File.Exists(Path.Combine(installedDirectory, "song.ini")));
         Assert.True(File.Exists(Path.Combine(installedDirectory, "notes.chart")));
 
-        var entry = await libraryCatalog.GetEntryByLocalPathAsync(installedDirectory);
+        LibraryCatalogEntry? entry = await libraryCatalog.GetEntryByLocalPathAsync(installedDirectory);
         Assert.NotNull(entry);
         Assert.Equal(LibrarySourceNames.Encore, entry!.Source);
         Assert.Equal("Artist Zip", entry.Artist);
@@ -72,12 +73,12 @@ public class SongInstallServiceTests
     public async Task InstallSelectedDownloadsAsync_OnyxWithoutSongIni_UsesYamlMetadataForCatalogEntry()
     {
         using var temp = new TemporaryDirectoryFixture("song-install-onyx-yaml-fallback");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
 
-        var downloadFile = Path.Combine(settings.DownloadDir, "yaml-only.con");
+        string downloadFile = Path.Combine(settings.DownloadDir, "yaml-only.con");
         await File.WriteAllTextAsync(downloadFile, "dummy");
 
-        var onyxInstallRoot = Path.Combine(settings.OutputDir, "onyx", "job", "produced");
+        string onyxInstallRoot = Path.Combine(settings.OutputDir, "onyx", "job", "produced");
         Directory.CreateDirectory(onyxInstallRoot);
         await File.WriteAllTextAsync(Path.Combine(onyxInstallRoot, "notes.chart"), "chart-data");
 
@@ -85,7 +86,7 @@ public class SongInstallServiceTests
         var libraryCatalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
         var stateMachine = new SongIngestionStateMachine();
 
-        var ingestion = await ingestionCatalog.GetOrCreateIngestionAsync(
+        SongIngestionRecord ingestion = await ingestionCatalog.GetOrCreateIngestionAsync(
             source: LibrarySourceNames.RhythmVerse,
             sourceId: "rv-123",
             sourceLink: "https://rhythmverse.co/song/rv-123");
@@ -111,14 +112,14 @@ public class SongInstallServiceTests
             new CloneHeroDirectorySchemaService(),
             libraryCatalog);
 
-        var installedDirectories = await sut.InstallSelectedDownloadsAsync([downloadFile]);
+        IReadOnlyList<string> installedDirectories = await sut.InstallSelectedDownloadsAsync([downloadFile]);
 
-        var installedDirectory = Assert.Single(installedDirectories);
+        string installedDirectory = Assert.Single(installedDirectories);
         Assert.Contains($"{Path.DirectorySeparatorChar}Yaml Artist{Path.DirectorySeparatorChar}", installedDirectory, StringComparison.Ordinal);
         Assert.Contains($"{Path.DirectorySeparatorChar}Yaml Title{Path.DirectorySeparatorChar}", installedDirectory, StringComparison.Ordinal);
         Assert.Contains("Yaml Charter__rhythmverse", installedDirectory, StringComparison.Ordinal);
 
-        var entry = await libraryCatalog.GetEntryByLocalPathAsync(installedDirectory);
+        LibraryCatalogEntry? entry = await libraryCatalog.GetEntryByLocalPathAsync(installedDirectory);
         Assert.NotNull(entry);
         Assert.Equal(LibrarySourceNames.RhythmVerse, entry!.Source);
         Assert.Equal("Yaml Artist", entry.Artist);
@@ -141,7 +142,7 @@ public class SongInstallServiceTests
             },
         };
 
-        foreach (var dir in new[]
+        foreach (string? dir in new[]
         {
             config.Runtime.TempDirectory,
             config.Runtime.DownloadDirectory,
@@ -159,15 +160,15 @@ public class SongInstallServiceTests
 
     private static void CreateArchiveWithSongIni(string archivePath, string artist, string title, string charter)
     {
-        using var archive = ZipFile.Open(archivePath, ZipArchiveMode.Create);
+        using ZipArchive archive = ZipFile.Open(archivePath, ZipArchiveMode.Create);
 
-        var songIni = archive.CreateEntry("song.ini");
+        ZipArchiveEntry songIni = archive.CreateEntry("song.ini");
         using (var writer = new StreamWriter(songIni.Open()))
         {
             writer.Write($"[song]\nartist = {artist}\nname = {title}\ncharter = {charter}\n");
         }
 
-        var notes = archive.CreateEntry("notes.chart");
+        ZipArchiveEntry notes = archive.CreateEntry("notes.chart");
         using var notesWriter = new StreamWriter(notes.Open());
         notesWriter.Write("chart-data");
     }

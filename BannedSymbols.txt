@@ -1,0 +1,22 @@
+# Banned APIs for anti-hacky patterns. Each entry format:
+# SymbolId; Guidance message
+
+# Avoid ad-hoc console logging in app/runtime code.
+M:System.Console.Write(System.String); Use structured logging abstractions instead of Console.Write.
+M:System.Console.WriteLine(System.String); Use structured logging abstractions instead of Console.WriteLine.
+
+# Avoid forced process termination from app code.
+M:System.Environment.Exit(System.Int32); Avoid Environment.Exit in app code; return an error path and let the host decide lifecycle.
+
+# Avoid forcing garbage collection.
+M:System.GC.Collect; Avoid GC.Collect; fix allocation/lifetime patterns instead.
+
+# Avoid thread blocking and sync-over-async patterns.
+M:System.Threading.Thread.Sleep(System.Int32); Use asynchronous delay patterns (Task.Delay) with cancellation where appropriate.
+M:System.Threading.Tasks.Task.Wait(); Avoid Task.Wait(); use await instead.
+M:System.Threading.Tasks.Task`1.Wait(); Avoid Task.Wait(); use await instead.
+P:System.Threading.Tasks.Task`1.Result; Avoid Task.Result; use await instead.
+
+# Avoid local-time coupling for persisted/remote/system timestamps.
+P:System.DateTime.Now; Use DateTimeOffset.UtcNow (or injected time provider) for deterministic behavior.
+P:System.DateTimeOffset.Now; Use DateTimeOffset.UtcNow (or injected time provider) for deterministic behavior.

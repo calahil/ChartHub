@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Configuration.Secrets;
@@ -14,7 +15,9 @@ public sealed class SettingsMigrationService(IAppConfigStore appConfigStore, ISe
     public async Task<SettingsMigrationResult> MigrateLegacySecretsAsync(CancellationToken cancellationToken = default)
     {
         if (!File.Exists(_appConfigStore.ConfigPath))
+        {
             return SettingsMigrationResult.None;
+        }
 
         JsonObject? root;
         try
@@ -27,7 +30,9 @@ public sealed class SettingsMigrationService(IAppConfigStore appConfigStore, ISe
         }
 
         if (root is null)
+        {
             return SettingsMigrationResult.None;
+        }
 
         var movedKeys = new List<string>();
         if (root["GoogleDrive"] is JsonObject googleDrive)
@@ -38,16 +43,22 @@ public sealed class SettingsMigrationService(IAppConfigStore appConfigStore, ISe
             await MoveIfPresentAsync(googleDrive, "access_token", SecretKeys.GoogleAccessToken, movedKeys, cancellationToken);
         }
 
-        var hasVersionNode = root["ConfigVersion"] is not null;
+        bool hasVersionNode = root["ConfigVersion"] is not null;
         if (!hasVersionNode)
+        {
             root["ConfigVersion"] = AppConfigRoot.CurrentVersion;
+        }
 
         if (movedKeys.Count == 0 && hasVersionNode)
+        {
             return SettingsMigrationResult.None;
+        }
 
-        var backupPath = $"{_appConfigStore.ConfigPath}.bak";
+        string backupPath = $"{_appConfigStore.ConfigPath}.bak";
         if (!File.Exists(backupPath))
+        {
             File.Copy(_appConfigStore.ConfigPath, backupPath);
+        }
 
         await File.WriteAllTextAsync(
             _appConfigStore.ConfigPath,
@@ -64,9 +75,11 @@ public sealed class SettingsMigrationService(IAppConfigStore appConfigStore, ISe
         List<string> movedKeys,
         CancellationToken cancellationToken)
     {
-        var secretValue = sourceObject[legacyKey]?.GetValue<string>();
+        string? secretValue = sourceObject[legacyKey]?.GetValue<string>();
         if (string.IsNullOrWhiteSpace(secretValue))
+        {
             return;
+        }
 
         await _secretStore.SetAsync(secretKey, secretValue, cancellationToken);
         sourceObject.Remove(legacyKey);

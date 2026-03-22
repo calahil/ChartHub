@@ -1,7 +1,8 @@
+using System.Collections.Generic;
+
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
-using System.Collections.Generic;
 
 namespace ChartHub.Controls;
 

@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Reflection;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
@@ -23,7 +25,7 @@ public class EncoreViewModelTests
             BaseAddress = new Uri("https://api.enchor.us"),
         };
 
-        var api = CreateApiService(catalog, httpClient);
+        EncoreApiService api = CreateApiService(catalog, httpClient);
         var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue())
         {
             AdvancedName = "Song",
@@ -50,7 +52,7 @@ public class EncoreViewModelTests
             BaseAddress = new Uri("https://api.enchor.us"),
         };
 
-        var api = CreateApiService(catalog, httpClient);
+        EncoreApiService api = CreateApiService(catalog, httpClient);
         var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
@@ -64,7 +66,7 @@ public class EncoreViewModelTests
         using var temp = new TemporaryDirectoryFixture("encore-vm-canonical-membership");
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
         const string md5 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        var canonicalSourceId = LibraryIdentityService.BuildEncoreSourceKey(777, md5);
+        string canonicalSourceId = LibraryIdentityService.BuildEncoreSourceKey(777, md5);
         await catalog.UpsertAsync(new LibraryCatalogEntry(
             LibrarySourceNames.Encore,
             canonicalSourceId,
@@ -80,12 +82,12 @@ public class EncoreViewModelTests
             BaseAddress = new Uri("https://api.enchor.us"),
         };
 
-        var api = CreateApiService(catalog, httpClient);
+        EncoreApiService api = CreateApiService(catalog, httpClient);
         var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
-        var song = Assert.Single(sut.DataItems);
+        EncoreSong song = Assert.Single(sut.DataItems);
         Assert.True(song.IsInLibrary);
         Assert.Equal(canonicalSourceId, song.SourceId);
     }
@@ -103,11 +105,11 @@ public class EncoreViewModelTests
             BaseAddress = new Uri("https://api.enchor.us"),
         };
 
-        var api = CreateApiService(catalog, httpClient);
+        EncoreApiService api = CreateApiService(catalog, httpClient);
         var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
-        var song = Assert.Single(sut.DataItems);
+        EncoreSong song = Assert.Single(sut.DataItems);
 
         await sut.DownloadSongAsync(song);
 
@@ -126,12 +128,12 @@ public class EncoreViewModelTests
             BaseAddress = new Uri("https://api.enchor.us"),
         };
 
-        var api = CreateApiService(catalog, httpClient);
+        EncoreApiService api = CreateApiService(catalog, httpClient);
         var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
-        var song = Assert.Single(sut.DataItems);
+        EncoreSong song = Assert.Single(sut.DataItems);
         Assert.Equal(210000, song.SongLengthMs);
         Assert.Equal("3:30", song.FormattedTime);
     }
@@ -162,12 +164,12 @@ public class EncoreViewModelTests
             BaseAddress = new Uri("https://api.enchor.us"),
         };
 
-        var api = CreateApiService(catalog, httpClient);
+        EncoreApiService api = CreateApiService(catalog, httpClient);
         var transfer = new CapturingTransferOrchestrator();
         var sut = new EncoreViewModel(api, transfer, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
-        var song = Assert.Single(sut.DataItems);
+        EncoreSong song = Assert.Single(sut.DataItems);
 
         await sut.DownloadSongAsync(song);
 
@@ -219,12 +221,12 @@ public class EncoreViewModelTests
             BaseAddress = new Uri("https://api.enchor.us"),
         };
 
-        var api = CreateApiService(catalog, httpClient);
+        EncoreApiService api = CreateApiService(catalog, httpClient);
         var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
-        var song = Assert.Single(sut.DataItems);
+        EncoreSong song = Assert.Single(sut.DataItems);
         Assert.Equal($"https://files.enchor.us/{albumArtMd5}.jpg", song.AlbumArtUrl);
     }
 
@@ -241,12 +243,12 @@ public class EncoreViewModelTests
             BaseAddress = new Uri("https://api.enchor.us"),
         };
 
-        var api = CreateApiService(catalog, httpClient);
+        EncoreApiService api = CreateApiService(catalog, httpClient);
         var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
-        var song = Assert.Single(sut.DataItems);
+        EncoreSong song = Assert.Single(sut.DataItems);
         Assert.Equal("avares://ChartHub/Resources/Images/noalbumart.png", song.AlbumArtUrl);
     }
 
@@ -289,7 +291,7 @@ public class EncoreViewModelTests
 
     private static string BuildEncoreResponseJson(int chartId, string md5, string? songOverrides = null)
     {
-        var songJson = string.IsNullOrWhiteSpace(songOverrides)
+        string songJson = string.IsNullOrWhiteSpace(songOverrides)
             ? $$"""
                             "name": "Test Song",
                             "artist": "Test Artist",
@@ -340,7 +342,7 @@ public class EncoreViewModelTests
 
     private static EncoreApiService CreateApiService(LibraryCatalogService catalog, HttpClient httpClient)
     {
-        var constructor = typeof(EncoreApiService).GetConstructor(
+        ConstructorInfo? constructor = typeof(EncoreApiService).GetConstructor(
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
             binder: null,
             [typeof(LibraryCatalogService), typeof(HttpClient)],
@@ -354,7 +356,7 @@ public class EncoreViewModelTests
     {
         public Task<TransferResult> QueueSongDownloadAsync(ViewSong song, DownloadFile? downloadItem, ObservableCollection<DownloadFile> downloads, CancellationToken cancellationToken = default)
         {
-            var item = downloadItem ?? new DownloadFile(song.FileName ?? "song.sng", Path.GetTempPath(), song.DownloadLink ?? string.Empty, song.FileSize)
+            DownloadFile item = downloadItem ?? new DownloadFile(song.FileName ?? "song.sng", Path.GetTempPath(), song.DownloadLink ?? string.Empty, song.FileSize)
             {
                 Finished = true,
                 Status = TransferStage.Completed.ToString(),
@@ -377,7 +379,7 @@ public class EncoreViewModelTests
         public Task<TransferResult> QueueSongDownloadAsync(ViewSong song, DownloadFile? downloadItem, ObservableCollection<DownloadFile> downloads, CancellationToken cancellationToken = default)
         {
             LastSong = song;
-            var item = downloadItem ?? new DownloadFile(song.FileName ?? "song.sng", Path.GetTempPath(), song.DownloadLink ?? string.Empty, song.FileSize)
+            DownloadFile item = downloadItem ?? new DownloadFile(song.FileName ?? "song.sng", Path.GetTempPath(), song.DownloadLink ?? string.Empty, song.FileSize)
             {
                 Finished = true,
                 Status = TransferStage.Completed.ToString(),

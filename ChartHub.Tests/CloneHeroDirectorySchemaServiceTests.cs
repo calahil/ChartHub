@@ -8,9 +8,9 @@ public class CloneHeroDirectorySchemaServiceTests
     public void ResolveUniqueLayout_UsesThreeLevelSchemaAndSanitizesCharter()
     {
         var sut = new CloneHeroDirectorySchemaService();
-        var root = Path.Combine("/tmp", "songs-root");
+        string root = Path.Combine("/tmp", "songs-root");
 
-        var layout = sut.ResolveUniqueLayout(
+        CloneHeroDirectoryLayout layout = sut.ResolveUniqueLayout(
             root,
             new SongMetadata("Tool", "Sober", "Convour/clintilona/nunchuck/DenVaktare"),
             "rhythmverse",
@@ -24,7 +24,7 @@ public class CloneHeroDirectorySchemaServiceTests
     public void ResolveUniqueLayout_WhenExists_AppendsSuffix()
     {
         var sut = new CloneHeroDirectorySchemaService();
-        var root = Path.Combine("/tmp", "songs-root");
+        string root = Path.Combine("/tmp", "songs-root");
 
         var existing = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -32,7 +32,7 @@ public class CloneHeroDirectorySchemaServiceTests
             Path.Combine(root, "Artist", "Song", "Charter__rhythmverse_2"),
         };
 
-        var layout = sut.ResolveUniqueLayout(
+        CloneHeroDirectoryLayout layout = sut.ResolveUniqueLayout(
             root,
             new SongMetadata("Artist", "Song", "Charter"),
             source: LibrarySourceNames.RhythmVerse,
@@ -45,9 +45,9 @@ public class CloneHeroDirectorySchemaServiceTests
     public void ResolveUniqueLayout_EmptySegments_UseUnknownFallbacks()
     {
         var sut = new CloneHeroDirectorySchemaService();
-        var root = Path.Combine("/tmp", "songs-root");
+        string root = Path.Combine("/tmp", "songs-root");
 
-        var layout = sut.ResolveUniqueLayout(
+        CloneHeroDirectoryLayout layout = sut.ResolveUniqueLayout(
             root,
             new SongMetadata("", "   ", null!),
             "rhythmverse",
@@ -63,7 +63,7 @@ public class CloneHeroDirectorySchemaServiceTests
     public void ResolveUniqueLayout_UnknownSources_Throw(string? source)
     {
         var sut = new CloneHeroDirectorySchemaService();
-        var root = Path.Combine("/tmp", "songs-root");
+        string root = Path.Combine("/tmp", "songs-root");
 
         Assert.Throws<ArgumentException>(() => sut.ResolveUniqueLayout(
             root,

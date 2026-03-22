@@ -12,7 +12,7 @@ public class LoggerRedactionTests
     {
         lock (LoggerSync)
         {
-            var logDir = CreateTempLogDirectory();
+            string logDir = CreateTempLogDirectory();
             try
             {
                 Logger.Initialize(logDir);
@@ -24,7 +24,7 @@ public class LoggerRedactionTests
                 });
                 Logger.Shutdown();
 
-                var text = ReadLog(logDir);
+                string text = ReadLog(logDir);
                 Assert.Contains("sourceUrl=https://example.com/download", text, StringComparison.Ordinal);
                 Assert.Contains("authorization=[REDACTED]", text, StringComparison.Ordinal);
                 Assert.Contains("token=[REDACTED]", text, StringComparison.Ordinal);
@@ -43,14 +43,14 @@ public class LoggerRedactionTests
     {
         lock (LoggerSync)
         {
-            var logDir = CreateTempLogDirectory();
+            string logDir = CreateTempLogDirectory();
             try
             {
                 Logger.Initialize(logDir);
                 Logger.LogWarning("Test", "request failed url=https://x.test/p?code=ABC123&z=1 authorization=Bearer SUPERSECRET");
                 Logger.Shutdown();
 
-                var text = ReadLog(logDir);
+                string text = ReadLog(logDir);
                 Assert.Contains("[REDACTED]", text, StringComparison.Ordinal);
                 Assert.DoesNotContain("ABC123", text, StringComparison.Ordinal);
                 Assert.DoesNotContain("SUPERSECRET", text, StringComparison.Ordinal);
@@ -67,7 +67,7 @@ public class LoggerRedactionTests
     {
         lock (LoggerSync)
         {
-            var logDir = CreateTempLogDirectory();
+            string logDir = CreateTempLogDirectory();
             try
             {
                 Logger.Initialize(logDir);
@@ -83,7 +83,7 @@ public class LoggerRedactionTests
 
                 Logger.Shutdown();
 
-                var text = ReadLog(logDir);
+                string text = ReadLog(logDir);
                 Assert.Contains("refresh_token=[REDACTED]", text, StringComparison.Ordinal);
                 Assert.Contains("[REDACTED]", text, StringComparison.Ordinal);
                 Assert.DoesNotContain("rt-123", text, StringComparison.Ordinal);
@@ -98,14 +98,14 @@ public class LoggerRedactionTests
 
     private static string CreateTempLogDirectory()
     {
-        var path = Path.Combine(Path.GetTempPath(), "rv-logger-tests", Guid.NewGuid().ToString("N"));
+        string path = Path.Combine(Path.GetTempPath(), "rv-logger-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
         return path;
     }
 
     private static string ReadLog(string logDir)
     {
-        var logPath = Path.Combine(logDir, "charthub.log");
+        string logPath = Path.Combine(logDir, "charthub.log");
         Assert.True(File.Exists(logPath), "Expected logger output file to exist.");
         return File.ReadAllText(logPath);
     }
@@ -115,7 +115,9 @@ public class LoggerRedactionTests
         try
         {
             if (Directory.Exists(path))
+            {
                 Directory.Delete(path, recursive: true);
+            }
         }
         catch
         {

@@ -5,8 +5,9 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+
 using Avalonia.Threading;
-using CommunityToolkit.Mvvm.Input;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Metadata;
 using ChartHub.Configuration.Models;
@@ -14,6 +15,8 @@ using ChartHub.Configuration.Secrets;
 using ChartHub.Configuration.Stores;
 using ChartHub.Services;
 using ChartHub.Utilities;
+
+using CommunityToolkit.Mvvm.Input;
 
 namespace ChartHub.ViewModels;
 
@@ -54,7 +57,9 @@ public sealed class SettingsFieldViewModel : INotifyPropertyChanged
         set
         {
             if (_stringValue == value)
+            {
                 return;
+            }
 
             _stringValue = value;
             OnPropertyChanged();
@@ -67,7 +72,9 @@ public sealed class SettingsFieldViewModel : INotifyPropertyChanged
         set
         {
             if (_boolValue == value)
+            {
                 return;
+            }
 
             _boolValue = value;
             OnPropertyChanged();
@@ -80,7 +87,9 @@ public sealed class SettingsFieldViewModel : INotifyPropertyChanged
         set
         {
             if (Math.Abs(_numberValue - value) < double.Epsilon)
+            {
                 return;
+            }
 
             _numberValue = value;
             OnPropertyChanged();
@@ -93,7 +102,9 @@ public sealed class SettingsFieldViewModel : INotifyPropertyChanged
         set
         {
             if (_selectedOption == value)
+            {
                 return;
+            }
 
             _selectedOption = value;
             OnPropertyChanged();
@@ -106,7 +117,9 @@ public sealed class SettingsFieldViewModel : INotifyPropertyChanged
         set
         {
             if (_isGroupHeaderVisible == value)
+            {
                 return;
+            }
 
             _isGroupHeaderVisible = value;
             OnPropertyChanged();
@@ -119,7 +132,9 @@ public sealed class SettingsFieldViewModel : INotifyPropertyChanged
         set
         {
             if (_errorMessage == value)
+            {
                 return;
+            }
 
             _errorMessage = value;
             OnPropertyChanged();
@@ -153,7 +168,9 @@ public sealed class SecretFieldViewModel : INotifyPropertyChanged
         set
         {
             if (_value == value)
+            {
                 return;
+            }
 
             _value = value;
             OnPropertyChanged();
@@ -167,7 +184,9 @@ public sealed class SecretFieldViewModel : INotifyPropertyChanged
         set
         {
             if (_hasStoredValue == value)
+            {
                 return;
+            }
 
             _hasStoredValue = value;
             OnPropertyChanged();
@@ -181,7 +200,9 @@ public sealed class SecretFieldViewModel : INotifyPropertyChanged
         set
         {
             if (_isBusy == value)
+            {
                 return;
+            }
 
             _isBusy = value;
             OnPropertyChanged();
@@ -247,7 +268,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_isCloudAccountLinked == value)
+            {
                 return;
+            }
 
             _isCloudAccountLinked = value;
             OnPropertyChanged();
@@ -262,7 +285,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_isCloudAccountBusy == value)
+            {
                 return;
+            }
 
             _isCloudAccountBusy = value;
             OnPropertyChanged();
@@ -277,7 +302,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_cloudAccountStatusMessage == value)
+            {
                 return;
+            }
 
             _cloudAccountStatusMessage = value;
             OnPropertyChanged();
@@ -290,7 +317,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_cloudAccountErrorMessage == value)
+            {
                 return;
+            }
 
             _cloudAccountErrorMessage = value;
             OnPropertyChanged();
@@ -306,7 +335,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (ReferenceEquals(_cloudAuthGateViewModel, value))
+            {
                 return;
+            }
 
             _cloudAuthGateViewModel = value;
             OnPropertyChanged();
@@ -331,7 +362,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             if (_showDeveloperSettings == value)
+            {
                 return;
+            }
 
             _showDeveloperSettings = value;
             OnPropertyChanged();
@@ -347,7 +380,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_currentPairCodeDisplay == value)
+            {
                 return;
+            }
 
             _currentPairCodeDisplay = value;
             OnPropertyChanged();
@@ -360,7 +395,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_pairCodeExpiryDisplay == value)
+            {
                 return;
+            }
 
             _pairCodeExpiryDisplay = value;
             OnPropertyChanged();
@@ -373,7 +410,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_lastPairedDeviceDisplay == value)
+            {
                 return;
+            }
 
             _lastPairedDeviceDisplay = value;
             OnPropertyChanged();
@@ -386,7 +425,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_lastPairedAtDisplay == value)
+            {
                 return;
+            }
 
             _lastPairedAtDisplay = value;
             OnPropertyChanged();
@@ -403,7 +444,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             if (_statusMessage == value)
+            {
                 return;
+            }
 
             _statusMessage = value;
             OnPropertyChanged();
@@ -416,7 +459,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             if (_hasPendingRestartSettings == value)
+            {
                 return;
+            }
 
             _hasPendingRestartSettings = value;
             OnPropertyChanged();
@@ -457,11 +502,16 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
         RebuildFieldsFrom(_settings.Current);
         if (IsDeveloperBuild)
+        {
             BuildSecrets();
+        }
+
         _settings.SettingsChanged += OnSettingsChanged;
         _ = RefreshCloudAccountStateAsync();
         if (IsDeveloperBuild)
+        {
             _ = RefreshSecretStateAsync();
+        }
     }
 
     private bool CanLinkCloudAccount() => !IsCloudAccountBusy && !IsCloudAccountLinked && !IsCloudAuthGateVisible;
@@ -479,10 +529,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
         try
         {
-            var linked = await _cloudAccountService.TryRestoreSessionAsync(cancellationToken);
+            bool linked = await _cloudAccountService.TryRestoreSessionAsync(cancellationToken);
             IsCloudAccountLinked = linked;
             if (linked)
+            {
                 CloudAuthGateViewModel = null;
+            }
+
             CloudAccountStatusMessage = linked
                 ? $"{CloudProviderDisplayName} linked."
                 : $"{CloudProviderDisplayName} is not linked.";
@@ -506,7 +559,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private async Task LinkCloudAccountAsync()
     {
         if (!CanLinkCloudAccount())
+        {
             return;
+        }
 
         CloudAccountErrorMessage = null;
         CloudAccountStatusMessage = $"Awaiting {CloudProviderDisplayName} sign-in...";
@@ -517,7 +572,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private async Task UnlinkCloudAccountAsync()
     {
         if (!CanUnlinkCloudAccount())
+        {
             return;
+        }
 
         IsCloudAccountBusy = true;
         CloudAccountErrorMessage = null;
@@ -557,20 +614,28 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private void DismissCloudAuthGate()
     {
         if (!IsCloudAuthGateVisible)
+        {
             return;
+        }
 
         CloudAuthGateViewModel = null;
         if (!IsCloudAccountLinked)
+        {
             CloudAccountStatusMessage = $"{CloudProviderDisplayName} is not linked.";
+        }
     }
 
     private static string ResolveSecretStorageBackend(ISecretStore secretStore)
     {
         if (secretStore is DesktopSecretStore desktopSecretStore)
+        {
             return $"Desktop ({desktopSecretStore.BackendName})";
+        }
 
         if (OperatingSystem.IsAndroid())
+        {
             return "Android (Keystore)";
+        }
 
         return secretStore.GetType().Name;
     }
@@ -582,8 +647,10 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     private void RebuildFieldsFrom(AppConfigRoot config)
     {
-        foreach (var field in Fields)
+        foreach (SettingsFieldViewModel field in Fields)
+        {
             field.PropertyChanged -= OnFieldPropertyChanged;
+        }
 
         var fieldBuffer = new List<SettingsFieldViewModel>();
         AddSectionFields(fieldBuffer, config.Runtime, "Runtime");
@@ -595,14 +662,14 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             .ToList();
 
         string previousGroup = string.Empty;
-        foreach (var field in fieldBuffer)
+        foreach (SettingsFieldViewModel field in fieldBuffer)
         {
             field.IsGroupHeaderVisible = !string.Equals(previousGroup, field.Group, StringComparison.OrdinalIgnoreCase);
             previousGroup = field.Group;
         }
 
         Fields.Clear();
-        foreach (var field in fieldBuffer)
+        foreach (SettingsFieldViewModel field in fieldBuffer)
         {
             field.PropertyChanged += OnFieldPropertyChanged;
             Fields.Add(field);
@@ -615,25 +682,29 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     private void RefreshPairingDisplay(AppConfigRoot config)
     {
-        var pairCode = config.Runtime.SyncApiPairCode;
+        string pairCode = config.Runtime.SyncApiPairCode;
         CurrentPairCodeDisplay = string.IsNullOrWhiteSpace(pairCode) ? "Not set" : pairCode;
 
-        var issuedAt = DateTimeOffset.TryParse(config.Runtime.SyncApiPairCodeIssuedAtUtc, out var parsedIssued)
+        DateTimeOffset issuedAt = DateTimeOffset.TryParse(config.Runtime.SyncApiPairCodeIssuedAtUtc, out DateTimeOffset parsedIssued)
             ? parsedIssued
             : DateTimeOffset.UtcNow;
-        var ttlMinutes = Math.Clamp(config.Runtime.SyncApiPairCodeTtlMinutes, 1, 1440);
-        var expiresAt = issuedAt.AddMinutes(ttlMinutes).ToLocalTime();
+        int ttlMinutes = Math.Clamp(config.Runtime.SyncApiPairCodeTtlMinutes, 1, 1440);
+        DateTimeOffset expiresAt = issuedAt.AddMinutes(ttlMinutes).ToLocalTime();
         PairCodeExpiryDisplay = expiresAt.ToString("yyyy-MM-dd HH:mm:ss");
 
-        var lastPairedDevice = config.Runtime.SyncApiLastPairedDeviceLabel;
+        string lastPairedDevice = config.Runtime.SyncApiLastPairedDeviceLabel;
         LastPairedDeviceDisplay = string.IsNullOrWhiteSpace(lastPairedDevice)
             ? "Never paired"
             : lastPairedDevice;
 
-        if (DateTimeOffset.TryParse(config.Runtime.SyncApiLastPairedAtUtc, out var lastPairedAt))
+        if (DateTimeOffset.TryParse(config.Runtime.SyncApiLastPairedAtUtc, out DateTimeOffset lastPairedAt))
+        {
             LastPairedAtDisplay = lastPairedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+        }
         else
+        {
             LastPairedAtDisplay = "-";
+        }
 
         RefreshPairingHistory(config.Runtime.SyncApiPairingHistoryJson);
     }
@@ -651,15 +722,19 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
         try
         {
-            var entries = JsonSerializer.Deserialize<List<PairingHistoryEntryPayload>>(pairingHistoryJson, PairingHistoryJsonOptions) ?? [];
-            foreach (var entry in entries)
+            List<PairingHistoryEntryPayload> entries = JsonSerializer.Deserialize<List<PairingHistoryEntryPayload>>(pairingHistoryJson, PairingHistoryJsonOptions) ?? [];
+            foreach (PairingHistoryEntryPayload entry in entries)
             {
                 if (string.IsNullOrWhiteSpace(entry.PairedAtUtc))
+                {
                     continue;
+                }
 
-                var deviceLabel = string.IsNullOrWhiteSpace(entry.DeviceLabel) ? "Unknown device" : entry.DeviceLabel;
-                if (!DateTimeOffset.TryParse(entry.PairedAtUtc, out var pairedAtUtc))
+                string deviceLabel = string.IsNullOrWhiteSpace(entry.DeviceLabel) ? "Unknown device" : entry.DeviceLabel;
+                if (!DateTimeOffset.TryParse(entry.PairedAtUtc, out DateTimeOffset pairedAtUtc))
+                {
                     continue;
+                }
 
                 PairingHistoryEntries.Add(new SyncPairingHistoryEntryViewModel(deviceLabel, pairedAtUtc));
             }
@@ -676,13 +751,17 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private void OnFieldPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (sender is not SettingsFieldViewModel field)
+        {
             return;
+        }
 
         if (e.PropertyName is not nameof(SettingsFieldViewModel.StringValue)
             and not nameof(SettingsFieldViewModel.BoolValue)
             and not nameof(SettingsFieldViewModel.NumberValue)
             and not nameof(SettingsFieldViewModel.SelectedOption))
+        {
             return;
+        }
 
         RevalidateFieldLive(field);
         RefreshSaveState();
@@ -693,7 +772,10 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         if (!field.IsPathPicker)
         {
             if (field.HasError)
+            {
                 field.ErrorMessage = string.Empty;
+            }
+
             return;
         }
 
@@ -725,7 +807,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task RefreshSecretStateAsync()
     {
-        foreach (var secret in Secrets)
+        foreach (SecretFieldViewModel secret in Secrets)
         {
             try
             {
@@ -743,20 +825,22 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     private static void AddSectionFields(List<SettingsFieldViewModel> destination, object section, string sectionName)
     {
-        var properties = section.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
+        IEnumerable<PropertyInfo> properties = section.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
             .Where(p => p.CanRead && p.CanWrite);
 
-        foreach (var property in properties)
+        foreach (PropertyInfo? property in properties)
         {
             if (property.GetCustomAttribute<SettingHiddenAttribute>() is not null)
+            {
                 continue;
+            }
 
-            var display = property.GetCustomAttribute<SettingDisplayAttribute>()?.Label ?? property.Name;
-            var group = property.GetCustomAttribute<SettingGroupAttribute>()?.Name ?? "General";
-            var description = property.GetCustomAttribute<SettingDescriptionAttribute>()?.Text ?? string.Empty;
-            var editorKind = ResolveEditorKind(property);
-            var isHotReloadable = property.GetCustomAttribute<SettingHotReloadableAttribute>()?.IsHotReloadable ?? false;
-            var requiresRestart = property.GetCustomAttribute<SettingRequiresRestartAttribute>() is not null;
+            string display = property.GetCustomAttribute<SettingDisplayAttribute>()?.Label ?? property.Name;
+            string group = property.GetCustomAttribute<SettingGroupAttribute>()?.Name ?? "General";
+            string description = property.GetCustomAttribute<SettingDescriptionAttribute>()?.Text ?? string.Empty;
+            SettingEditorKind editorKind = ResolveEditorKind(property);
+            bool isHotReloadable = property.GetCustomAttribute<SettingHotReloadableAttribute>()?.IsHotReloadable ?? false;
+            bool requiresRestart = property.GetCustomAttribute<SettingRequiresRestartAttribute>() is not null;
 
             var field = new SettingsFieldViewModel
             {
@@ -772,15 +856,23 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 Options = ResolveOptions(property, editorKind),
             };
 
-            var value = property.GetValue(section);
+            object? value = property.GetValue(section);
             if (property.PropertyType == typeof(bool))
+            {
                 field.BoolValue = value is bool b && b;
+            }
             else if (field.EditorKind == SettingEditorKind.Number)
+            {
                 field.NumberValue = ToDouble(value);
+            }
             else if (field.EditorKind == SettingEditorKind.Dropdown)
+            {
                 field.SelectedOption = value?.ToString() ?? field.Options.FirstOrDefault() ?? string.Empty;
+            }
             else
+            {
                 field.StringValue = value?.ToString() ?? string.Empty;
+            }
 
             destination.Add(field);
         }
@@ -788,15 +880,21 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     private static SettingEditorKind ResolveEditorKind(PropertyInfo property)
     {
-        var explicitEditor = property.GetCustomAttribute<SettingEditorAttribute>()?.EditorKind;
+        SettingEditorKind? explicitEditor = property.GetCustomAttribute<SettingEditorAttribute>()?.EditorKind;
         if (explicitEditor.HasValue)
+        {
             return explicitEditor.Value;
+        }
 
         if (property.PropertyType.IsEnum)
+        {
             return SettingEditorKind.Dropdown;
+        }
 
         if (IsNumericType(property.PropertyType))
+        {
             return SettingEditorKind.Number;
+        }
 
         return property.PropertyType == typeof(bool)
             ? SettingEditorKind.Toggle
@@ -806,14 +904,16 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private static IReadOnlyList<string> ResolveOptions(PropertyInfo property, SettingEditorKind editorKind)
     {
         if (editorKind == SettingEditorKind.Dropdown && property.PropertyType.IsEnum)
+        {
             return Enum.GetNames(property.PropertyType);
+        }
 
         return Array.Empty<string>();
     }
 
     private static bool IsNumericType(Type type)
     {
-        var underlying = Nullable.GetUnderlyingType(type) ?? type;
+        Type underlying = Nullable.GetUnderlyingType(type) ?? type;
         return underlying == typeof(byte)
             || underlying == typeof(sbyte)
             || underlying == typeof(short)
@@ -830,7 +930,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private static double ToDouble(object? value)
     {
         if (value is null)
+        {
             return 0;
+        }
 
         try
         {
@@ -845,7 +947,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private async Task SaveAsync()
     {
         if (!CanSave())
+        {
             return;
+        }
 
         var saveStopwatch = Stopwatch.StartNew();
         Logger.LogInfo("Config", "Settings save started", new Dictionary<string, object?>
@@ -858,15 +962,19 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         RefreshSaveState();
         try
         {
-            foreach (var field in Fields)
-                field.ErrorMessage = string.Empty;
-
-            var hasLocalValidationFailures = false;
-            foreach (var field in Fields)
+            foreach (SettingsFieldViewModel field in Fields)
             {
-                var validationError = ValidateDraftField(field);
+                field.ErrorMessage = string.Empty;
+            }
+
+            bool hasLocalValidationFailures = false;
+            foreach (SettingsFieldViewModel field in Fields)
+            {
+                string? validationError = ValidateDraftField(field);
                 if (string.IsNullOrWhiteSpace(validationError))
+                {
                     continue;
+                }
 
                 field.ErrorMessage = validationError;
                 hasLocalValidationFailures = true;
@@ -883,11 +991,11 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 return;
             }
 
-            var requiresReloadAfterSave = Fields.Any(FieldRequiresReloadAfterSave);
+            bool requiresReloadAfterSave = Fields.Any(FieldRequiresReloadAfterSave);
 
-            var result = await _settings.UpdateAsync(config =>
+            ConfigValidationResult result = await _settings.UpdateAsync(config =>
             {
-                foreach (var field in Fields)
+                foreach (SettingsFieldViewModel field in Fields)
                 {
                     ApplyField(config, field);
                 }
@@ -895,11 +1003,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
             if (!result.IsValid)
             {
-                foreach (var failure in result.Failures)
+                foreach (ConfigValidationFailure failure in result.Failures)
                 {
-                    var field = Fields.FirstOrDefault(f => string.Equals(f.Key, failure.Key, StringComparison.Ordinal));
+                    SettingsFieldViewModel? field = Fields.FirstOrDefault(f => string.Equals(f.Key, failure.Key, StringComparison.Ordinal));
                     if (field is not null)
+                    {
                         field.ErrorMessage = failure.Message;
+                    }
                 }
 
                 Logger.LogWarning("Config", "Settings validation failed during save", new Dictionary<string, object?>
@@ -947,12 +1057,14 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private async Task RegeneratePairCodeAsync()
     {
         if (!CanRegeneratePairCode())
+        {
             return;
+        }
 
-        var now = DateTimeOffset.UtcNow;
-        var nextCode = AppGlobalSettings.GenerateSyncPairCode();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        string nextCode = AppGlobalSettings.GenerateSyncPairCode();
 
-        var result = await _settings.UpdateAsync(config =>
+        ConfigValidationResult result = await _settings.UpdateAsync(config =>
         {
             config.Runtime.SyncApiPairCode = nextCode;
             config.Runtime.SyncApiPairCodeIssuedAtUtc = now.ToString("O");
@@ -987,50 +1099,62 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     private static bool FieldHasPendingChange(SettingsFieldViewModel field)
     {
-        var currentValue = field.Property.GetValue(field.SectionRef);
+        object? currentValue = field.Property.GetValue(field.SectionRef);
 
         if (field.Property.PropertyType == typeof(bool))
+        {
             return (currentValue is bool currentBool ? currentBool : false) != field.BoolValue;
+        }
 
         if (field.EditorKind == SettingEditorKind.Number)
         {
-            var draft = field.NumberValue;
-            var current = ToDouble(currentValue);
+            double draft = field.NumberValue;
+            double current = ToDouble(currentValue);
             return Math.Abs(draft - current) > double.Epsilon;
         }
 
         if (field.EditorKind == SettingEditorKind.Dropdown)
         {
-            var draftOption = string.IsNullOrWhiteSpace(field.SelectedOption)
+            string draftOption = string.IsNullOrWhiteSpace(field.SelectedOption)
                 ? field.Options.FirstOrDefault() ?? string.Empty
                 : field.SelectedOption;
-            var currentOption = currentValue?.ToString() ?? string.Empty;
+            string currentOption = currentValue?.ToString() ?? string.Empty;
             return !string.Equals(draftOption, currentOption, StringComparison.OrdinalIgnoreCase);
         }
 
-        var draftText = field.StringValue ?? string.Empty;
-        var currentText = currentValue?.ToString() ?? string.Empty;
+        string draftText = field.StringValue ?? string.Empty;
+        string currentText = currentValue?.ToString() ?? string.Empty;
         return !string.Equals(draftText, currentText, StringComparison.Ordinal);
     }
 
     private static string? ValidateDraftField(SettingsFieldViewModel field)
     {
         if (!field.IsPathPicker)
+        {
             return null;
+        }
 
-        var value = field.StringValue?.Trim() ?? string.Empty;
+        string value = field.StringValue?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(value))
+        {
             return "A path value is required.";
+        }
 
-        if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && !uri.IsFile)
+        if (Uri.TryCreate(value, UriKind.Absolute, out Uri? uri) && !uri.IsFile)
+        {
             return "Path must be a local filesystem path.";
+        }
 
-        var path = value;
+        string path = value;
         if (field.IsDirectoryPicker)
+        {
             return ValidateDirectoryPath(path);
+        }
 
         if (field.IsFilePicker)
+        {
             return ValidateFilePath(path);
+        }
 
         return null;
     }
@@ -1038,14 +1162,20 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private static string? ValidateDirectoryPath(string path)
     {
         if (Directory.Exists(path))
+        {
             return null;
+        }
 
         if (File.Exists(path))
+        {
             return "Expected a directory path, but the path points to a file.";
+        }
 
-        var parent = Path.GetDirectoryName(path);
+        string? parent = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(parent) && Directory.Exists(parent))
+        {
             return null;
+        }
 
         return "Directory does not exist and parent folder is not available.";
     }
@@ -1053,21 +1183,27 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private static string? ValidateFilePath(string path)
     {
         if (File.Exists(path))
+        {
             return null;
+        }
 
         if (Directory.Exists(path))
+        {
             return "Expected a file path, but the path points to a directory.";
+        }
 
-        var parent = Path.GetDirectoryName(path);
+        string? parent = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(parent) && Directory.Exists(parent))
+        {
             return null;
+        }
 
         return "File does not exist and parent folder is not available.";
     }
 
     private static void ApplyField(AppConfigRoot config, SettingsFieldViewModel field)
     {
-        var section = field.Key.StartsWith("Runtime.", StringComparison.Ordinal)
+        object section = field.Key.StartsWith("Runtime.", StringComparison.Ordinal)
             ? (object)config.Runtime
             : config.GoogleAuth;
 
@@ -1085,18 +1221,18 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
         if (field.EditorKind == SettingEditorKind.Number)
         {
-            var targetType = Nullable.GetUnderlyingType(field.Property.PropertyType) ?? field.Property.PropertyType;
-            var converted = Convert.ChangeType(field.NumberValue, targetType, CultureInfo.InvariantCulture);
+            Type targetType = Nullable.GetUnderlyingType(field.Property.PropertyType) ?? field.Property.PropertyType;
+            object converted = Convert.ChangeType(field.NumberValue, targetType, CultureInfo.InvariantCulture);
             field.Property.SetValue(section, converted);
             return;
         }
 
         if (field.EditorKind == SettingEditorKind.Dropdown && field.Property.PropertyType.IsEnum)
         {
-            var option = string.IsNullOrWhiteSpace(field.SelectedOption)
+            string option = string.IsNullOrWhiteSpace(field.SelectedOption)
                 ? field.Options.FirstOrDefault() ?? string.Empty
                 : field.SelectedOption;
-            var parsed = Enum.Parse(field.Property.PropertyType, option, ignoreCase: true);
+            object parsed = Enum.Parse(field.Property.PropertyType, option, ignoreCase: true);
             field.Property.SetValue(section, parsed);
         }
     }
@@ -1104,7 +1240,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private async Task SaveSecretAsync(SecretFieldViewModel? field)
     {
         if (field is null || string.IsNullOrWhiteSpace(field.Value))
+        {
             return;
+        }
 
         field.IsBusy = true;
         try
@@ -1132,7 +1270,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private async Task ClearSecretAsync(SecretFieldViewModel? field)
     {
         if (field is null)
+        {
             return;
+        }
 
         field.IsBusy = true;
         try
@@ -1167,8 +1307,10 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public void Dispose()
     {
         _settings.SettingsChanged -= OnSettingsChanged;
-        foreach (var field in Fields)
+        foreach (SettingsFieldViewModel field in Fields)
+        {
             field.PropertyChanged -= OnFieldPropertyChanged;
+        }
     }
 }
 

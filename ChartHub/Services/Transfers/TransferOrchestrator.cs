@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text.Json;
+
 using ChartHub.Models;
 using ChartHub.Utilities;
 
@@ -40,9 +41,9 @@ public sealed class TransferOrchestrator(
         ObservableCollection<DownloadFile> downloads,
         CancellationToken cancellationToken = default)
     {
-        var transferId = CreateOperationId("trf");
+        string transferId = CreateOperationId("trf");
         var transferStopwatch = Stopwatch.StartNew();
-        var destination = OperatingSystem.IsAndroid()
+        TransferDestinationKind destination = OperatingSystem.IsAndroid()
             ? TransferDestinationKind.GoogleDrive
             : TransferDestinationKind.LocalStorage;
 
@@ -63,16 +64,18 @@ public sealed class TransferOrchestrator(
 
         downloadItem ??= new DownloadFile(request.DisplayName, _settings.TempDir, request.SourceUrl, request.SourceFileSize);
         if (!downloads.Contains(downloadItem))
+        {
             downloads.Add(downloadItem);
+        }
 
-        var songDownloadGate = GetSongDownloadConcurrencyGate();
+        SemaphoreSlim songDownloadGate = GetSongDownloadConcurrencyGate();
         await songDownloadGate.WaitAsync(cancellationToken);
 
         try
         {
-            var sourceName = NormalizeSourceName(song.SourceName);
-            var canonicalSourceId = LibraryIdentityService.NormalizeSourceKey(sourceName, song.SourceId);
-            var ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
+            string sourceName = NormalizeSourceName(song.SourceName);
+            string canonicalSourceId = LibraryIdentityService.NormalizeSourceKey(sourceName, song.SourceId);
+            SongIngestionRecord ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
                 sourceName,
                 canonicalSourceId,
                 request.SourceUrl,
@@ -80,8 +83,8 @@ public sealed class TransferOrchestrator(
                 song.Title,
                 song.Author?.Shortname,
                 cancellationToken);
-            var attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
-            var ingestionState = ingestion.CurrentState;
+            SongIngestionAttemptRecord attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
+            IngestionState ingestionState = ingestion.CurrentState;
 
             if (ingestionState != IngestionState.Queued)
             {
@@ -104,57 +107,189 @@ public sealed class TransferOrchestrator(
                     ["destination"] = request.Destination.ToString(),
                 });
 
-            ingestionState = await SetStageAsync(
-                downloadItem,
-                TransferStage.ResolvingSource,
-                transferId,
-                request.DisplayName,
-                request.Destination,
-                ingestion.Id,
-                attempt.Id,
-                ingestionState,
-                cancellationToken);
-            var source = await _sourceResolver.ResolveAsync(request.SourceUrl, cancellationToken);
-
-            if (request.Destination == TransferDestinationKind.GoogleDrive)
-            {
-                var directCopyResult = await TryCopyDriveFileAsync(
-                    request,
-                    source,
+                ingestionState = await SetStageAsync(
                     downloadItem,
+                    TransferStage.ResolvingSource,
                     transferId,
+                    request.DisplayName,
+                    request.Destination,
                     ingestion.Id,
                     attempt.Id,
                     ingestionState,
                     cancellationToken);
-                if (directCopyResult is not null)
+                ResolvedTransferSource source = await _sourceResolver.ResolveAsync(request.SourceUrl, cancellationToken);
+
+                if (request.Destination == TransferDestinationKind.GoogleDrive)
                 {
-                    Logger.LogInfo("Transfer", "Transfer completed via direct Drive copy", new Dictionary<string, object?>
+                    TransferResult? directCopyResult = await TryCopyDriveFileAsync(
+                        request,
+                        source,
+                        downloadItem,
+                        transferId,
+                        ingestion.Id,
+                        attempt.Id,
+                        ingestionState,
+                        cancellationToken);
+                    if (directCopyResult is not null)
                     {
-                        ["transferId"] = transferId,
-                        ["displayName"] = request.DisplayName,
-                        ["destination"] = request.Destination.ToString(),
-                        ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
+                        Logger.LogInfo("Transfer", "Transfer completed via direct Drive copy", new Dictionary<string, object?>
+                        {
+                            ["transferId"] = transferId,
+                            ["displayName"] = request.DisplayName,
+                            ["destination"] = request.Destination.ToString(),
+                            ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
+                        });
+                        await _ingestionCatalog.UpsertAssetAsync(new SongIngestionAssetEntry(
+                            IngestionId: ingestion.Id,
+                            AttemptId: attempt.Id,
+                            AssetRole: IngestionAssetRole.Downloaded,
+                            Location: directCopyResult.FinalLocation ?? string.Empty,
+                            SizeBytes: request.SourceFileSize,
+                            ContentHash: null,
+                            RecordedAtUtc: DateTimeOffset.UtcNow),
+                            cancellationToken);
+
+                        return directCopyResult;
+                    }
+                }
+
+                if (source.Kind == TransferSourceKind.GoogleDriveFolder && !string.IsNullOrWhiteSpace(source.DriveId))
+                {
+                    ingestionState = await SetStageAsync(
+                        downloadItem,
+                        TransferStage.DownloadingFolder,
+                        transferId,
+                        request.DisplayName,
+                        request.Destination,
+                        ingestion.Id,
+                        attempt.Id,
+                        ingestionState,
+                        cancellationToken);
+                    downloadItem.DownloadProgress = 15;
+                    downloadItem.DisplayName = EnsureZipName(downloadItem.DisplayName);
+                    string folderZipPath = Path.Combine(downloadItem.FilePath, downloadItem.DisplayName);
+                    var stageProgress = new Progress<TransferProgressUpdate>(update =>
+                    {
+                        SetStage(downloadItem, update.Stage, transferId, request.DisplayName, request.Destination);
+                        if (update.ProgressPercent.HasValue)
+                        {
+                            downloadItem.DownloadProgress = Math.Max(downloadItem.DownloadProgress, update.ProgressPercent.Value);
+                        }
                     });
+
+                    await ExecuteDownloadWithRetriesAsync(
+                        async retryCount =>
+                        {
+                            await _googleDriveClient.DownloadFolderAsZipAsync(
+                                source.DriveId,
+                                folderZipPath,
+                                stageProgress,
+                                cancellationToken);
+                        },
+                        async retryCount =>
+                        {
+                            await _ingestionCatalog.RecordStateTransitionAsync(
+                                ingestion.Id,
+                                attempt.Id,
+                                ingestionState,
+                                ingestionState,
+                                BuildTransitionDetails(transferId, "Retrying folder download", retryCount),
+                                cancellationToken);
+                        },
+                        cancellationToken);
+
+                    downloadItem.DownloadProgress = 100;
+                    downloadItem.Finished = true;
+                }
+                else
+                {
+                    ingestionState = await SetStageAsync(
+                        downloadItem,
+                        TransferStage.Downloading,
+                        transferId,
+                        request.DisplayName,
+                        request.Destination,
+                        ingestion.Id,
+                        attempt.Id,
+                        ingestionState,
+                        cancellationToken);
+
+                    await ExecuteDownloadWithRetriesAsync(
+                        async retryCount => await _downloadService.DownloadFileAsync(downloadItem, cancellationToken),
+                        async retryCount =>
+                        {
+                            await _ingestionCatalog.RecordStateTransitionAsync(
+                                ingestion.Id,
+                                attempt.Id,
+                                ingestionState,
+                                ingestionState,
+                                BuildTransitionDetails(transferId, "Retrying download", retryCount),
+                                cancellationToken);
+                        },
+                        cancellationToken);
+                }
+
+                string tempPath = Path.Combine(downloadItem.FilePath, downloadItem.DisplayName);
+                if (!File.Exists(tempPath))
+                {
+                    throw new FileNotFoundException("Downloaded file was not found in temp storage.", tempPath);
+                }
+
+                if (request.Destination == TransferDestinationKind.LocalStorage)
+                {
+                    ingestionState = await SetStageAsync(
+                        downloadItem,
+                        TransferStage.MovingToDestination,
+                        transferId,
+                        request.DisplayName,
+                        request.Destination,
+                        ingestion.Id,
+                        attempt.Id,
+                        ingestionState,
+                        cancellationToken);
+                    DestinationWriteResult localResult = await _localDestinationWriter.WriteFromTempAsync(
+                        tempPath,
+                        downloadItem.DisplayName,
+                        cancellationToken);
+
+                    downloadItem.DisplayName = localResult.FinalName;
+                    downloadItem.FilePath = localResult.DestinationContainer;
+                    ingestionState = await SetStageAsync(
+                        downloadItem,
+                        TransferStage.Completed,
+                        transferId,
+                        request.DisplayName,
+                        request.Destination,
+                        ingestion.Id,
+                        attempt.Id,
+                        ingestionState,
+                        cancellationToken);
+
                     await _ingestionCatalog.UpsertAssetAsync(new SongIngestionAssetEntry(
                         IngestionId: ingestion.Id,
                         AttemptId: attempt.Id,
                         AssetRole: IngestionAssetRole.Downloaded,
-                        Location: directCopyResult.FinalLocation ?? string.Empty,
+                        Location: localResult.FinalLocation,
                         SizeBytes: request.SourceFileSize,
                         ContentHash: null,
                         RecordedAtUtc: DateTimeOffset.UtcNow),
                         cancellationToken);
 
-                    return directCopyResult;
+                    Logger.LogInfo("Transfer", "Transfer completed to local storage", new Dictionary<string, object?>
+                    {
+                        ["transferId"] = transferId,
+                        ["displayName"] = downloadItem.DisplayName,
+                        ["destination"] = request.Destination.ToString(),
+                        ["finalLocation"] = localResult.FinalLocation,
+                        ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
+                    });
+
+                    return new TransferResult(true, TransferStage.Completed, localResult.FinalLocation, null, downloadItem);
                 }
-            }
 
-            if (source.Kind == TransferSourceKind.GoogleDriveFolder && !string.IsNullOrWhiteSpace(source.DriveId))
-            {
                 ingestionState = await SetStageAsync(
                     downloadItem,
-                    TransferStage.DownloadingFolder,
+                    TransferStage.Uploading,
                     transferId,
                     request.DisplayName,
                     request.Destination,
@@ -162,91 +297,16 @@ public sealed class TransferOrchestrator(
                     attempt.Id,
                     ingestionState,
                     cancellationToken);
-                downloadItem.DownloadProgress = 15;
-                downloadItem.DisplayName = EnsureZipName(downloadItem.DisplayName);
-                var folderZipPath = Path.Combine(downloadItem.FilePath, downloadItem.DisplayName);
-                var stageProgress = new Progress<TransferProgressUpdate>(update =>
-                {
-                    SetStage(downloadItem, update.Stage, transferId, request.DisplayName, request.Destination);
-                    if (update.ProgressPercent.HasValue)
-                        downloadItem.DownloadProgress = Math.Max(downloadItem.DownloadProgress, update.ProgressPercent.Value);
-                });
-
-                await ExecuteDownloadWithRetriesAsync(
-                    async retryCount =>
-                    {
-                        await _googleDriveClient.DownloadFolderAsZipAsync(
-                            source.DriveId,
-                            folderZipPath,
-                            stageProgress,
-                            cancellationToken);
-                    },
-                    async retryCount =>
-                    {
-                        await _ingestionCatalog.RecordStateTransitionAsync(
-                            ingestion.Id,
-                            attempt.Id,
-                            ingestionState,
-                            ingestionState,
-                            BuildTransitionDetails(transferId, "Retrying folder download", retryCount),
-                            cancellationToken);
-                    },
-                    cancellationToken);
-
-                downloadItem.DownloadProgress = 100;
-                downloadItem.Finished = true;
-            }
-            else
-            {
-                ingestionState = await SetStageAsync(
-                    downloadItem,
-                    TransferStage.Downloading,
-                    transferId,
-                    request.DisplayName,
-                    request.Destination,
-                    ingestion.Id,
-                    attempt.Id,
-                    ingestionState,
-                    cancellationToken);
-
-                await ExecuteDownloadWithRetriesAsync(
-                    async retryCount => await _downloadService.DownloadFileAsync(downloadItem, cancellationToken),
-                    async retryCount =>
-                    {
-                        await _ingestionCatalog.RecordStateTransitionAsync(
-                            ingestion.Id,
-                            attempt.Id,
-                            ingestionState,
-                            ingestionState,
-                            BuildTransitionDetails(transferId, "Retrying download", retryCount),
-                            cancellationToken);
-                    },
-                    cancellationToken);
-            }
-
-            var tempPath = Path.Combine(downloadItem.FilePath, downloadItem.DisplayName);
-            if (!File.Exists(tempPath))
-                throw new FileNotFoundException("Downloaded file was not found in temp storage.", tempPath);
-
-            if (request.Destination == TransferDestinationKind.LocalStorage)
-            {
-                ingestionState = await SetStageAsync(
-                    downloadItem,
-                    TransferStage.MovingToDestination,
-                    transferId,
-                    request.DisplayName,
-                    request.Destination,
-                    ingestion.Id,
-                    attempt.Id,
-                    ingestionState,
-                    cancellationToken);
-                var localResult = await _localDestinationWriter.WriteFromTempAsync(
+                DestinationWriteResult driveResult = await _googleDriveDestinationWriter.WriteFromTempAsync(
                     tempPath,
                     downloadItem.DisplayName,
                     cancellationToken);
+                File.Delete(tempPath);
 
-                downloadItem.DisplayName = localResult.FinalName;
-                downloadItem.FilePath = localResult.DestinationContainer;
+                downloadItem.DisplayName = driveResult.FinalName;
+                downloadItem.FilePath = driveResult.DestinationContainer;
+                downloadItem.Finished = true;
+                downloadItem.DownloadProgress = 100;
                 ingestionState = await SetStageAsync(
                     downloadItem,
                     TransferStage.Completed,
@@ -262,75 +322,22 @@ public sealed class TransferOrchestrator(
                     IngestionId: ingestion.Id,
                     AttemptId: attempt.Id,
                     AssetRole: IngestionAssetRole.Downloaded,
-                    Location: localResult.FinalLocation,
+                    Location: driveResult.FinalLocation,
                     SizeBytes: request.SourceFileSize,
                     ContentHash: null,
                     RecordedAtUtc: DateTimeOffset.UtcNow),
                     cancellationToken);
 
-                Logger.LogInfo("Transfer", "Transfer completed to local storage", new Dictionary<string, object?>
+                Logger.LogInfo("Transfer", "Transfer completed to Google Drive", new Dictionary<string, object?>
                 {
                     ["transferId"] = transferId,
                     ["displayName"] = downloadItem.DisplayName,
                     ["destination"] = request.Destination.ToString(),
-                    ["finalLocation"] = localResult.FinalLocation,
+                    ["finalLocation"] = driveResult.FinalLocation,
                     ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
                 });
 
-                return new TransferResult(true, TransferStage.Completed, localResult.FinalLocation, null, downloadItem);
-            }
-
-            ingestionState = await SetStageAsync(
-                downloadItem,
-                TransferStage.Uploading,
-                transferId,
-                request.DisplayName,
-                request.Destination,
-                ingestion.Id,
-                attempt.Id,
-                ingestionState,
-                cancellationToken);
-            var driveResult = await _googleDriveDestinationWriter.WriteFromTempAsync(
-                tempPath,
-                downloadItem.DisplayName,
-                cancellationToken);
-            File.Delete(tempPath);
-
-            downloadItem.DisplayName = driveResult.FinalName;
-            downloadItem.FilePath = driveResult.DestinationContainer;
-            downloadItem.Finished = true;
-            downloadItem.DownloadProgress = 100;
-            ingestionState = await SetStageAsync(
-                downloadItem,
-                TransferStage.Completed,
-                transferId,
-                request.DisplayName,
-                request.Destination,
-                ingestion.Id,
-                attempt.Id,
-                ingestionState,
-                cancellationToken);
-
-            await _ingestionCatalog.UpsertAssetAsync(new SongIngestionAssetEntry(
-                IngestionId: ingestion.Id,
-                AttemptId: attempt.Id,
-                AssetRole: IngestionAssetRole.Downloaded,
-                Location: driveResult.FinalLocation,
-                SizeBytes: request.SourceFileSize,
-                ContentHash: null,
-                RecordedAtUtc: DateTimeOffset.UtcNow),
-                cancellationToken);
-
-            Logger.LogInfo("Transfer", "Transfer completed to Google Drive", new Dictionary<string, object?>
-            {
-                ["transferId"] = transferId,
-                ["displayName"] = downloadItem.DisplayName,
-                ["destination"] = request.Destination.ToString(),
-                ["finalLocation"] = driveResult.FinalLocation,
-                ["elapsedMs"] = transferStopwatch.ElapsedMilliseconds,
-            });
-
-            return new TransferResult(true, TransferStage.Completed, driveResult.FinalLocation, null, downloadItem);
+                return new TransferResult(true, TransferStage.Completed, driveResult.FinalLocation, null, downloadItem);
             }
             catch (OperationCanceledException)
             {
@@ -386,14 +393,18 @@ public sealed class TransferOrchestrator(
 
     private SemaphoreSlim GetSongDownloadConcurrencyGate()
     {
-        var desiredLimit = NormalizeSongDownloadConcurrency(_settings.TransferOrchestratorConcurrencyCap);
+        int desiredLimit = NormalizeSongDownloadConcurrency(_settings.TransferOrchestratorConcurrencyCap);
         if (desiredLimit == _songDownloadConcurrencyLimit)
+        {
             return _songDownloadConcurrencyGate;
+        }
 
         lock (_songDownloadConcurrencySync)
         {
             if (desiredLimit == _songDownloadConcurrencyLimit)
+            {
                 return _songDownloadConcurrencyGate;
+            }
 
             _songDownloadConcurrencyGate = new SemaphoreSlim(desiredLimit, desiredLimit);
             _songDownloadConcurrencyLimit = desiredLimit;
@@ -409,10 +420,14 @@ public sealed class TransferOrchestrator(
     private static int NormalizeSongDownloadConcurrency(int value)
     {
         if (value < MinSongDownloadConcurrency)
+        {
             return MinSongDownloadConcurrency;
+        }
 
         if (value > MaxSongDownloadConcurrency)
+        {
             return MaxSongDownloadConcurrency;
+        }
 
         return value;
     }
@@ -429,8 +444,11 @@ public sealed class TransferOrchestrator(
     {
         var copyStopwatch = Stopwatch.StartNew();
         if (source.Kind != TransferSourceKind.GoogleDriveFile || string.IsNullOrWhiteSpace(source.DriveId))
+        {
             return null;
-        var sourceFileId = source.DriveId;
+        }
+
+        string sourceFileId = source.DriveId;
 
         try
         {
@@ -445,13 +463,15 @@ public sealed class TransferOrchestrator(
                     BuildTransitionDetails(transferId, "Attempting Drive copy-first path", 0),
                     cancellationToken);
             }
-            var copyResult = await _googleDriveDestinationWriter.TryCopyDriveFileAsync(
+            DestinationWriteResult? copyResult = await _googleDriveDestinationWriter.TryCopyDriveFileAsync(
                 sourceFileId,
                 request.DisplayName,
                 cancellationToken);
 
             if (copyResult is null)
+            {
                 return null;
+            }
 
             downloadItem.DisplayName = copyResult.FinalName;
             downloadItem.FilePath = copyResult.DestinationContainer;
@@ -505,7 +525,7 @@ public sealed class TransferOrchestrator(
         Func<int, Task> onRetry,
         CancellationToken cancellationToken)
     {
-        var retryCount = 0;
+        int retryCount = 0;
 
         while (true)
         {
@@ -542,8 +562,10 @@ public sealed class TransferOrchestrator(
     {
         SetStage(downloadItem, stage, transferId, displayName, destination);
 
-        if (!TryMapTransferStage(stage, out var targetState))
+        if (!TryMapTransferStage(stage, out IngestionState targetState))
+        {
             return currentState;
+        }
 
         return await TransitionIngestionStateAsync(
             ingestionId,
@@ -563,7 +585,9 @@ public sealed class TransferOrchestrator(
         CancellationToken cancellationToken)
     {
         if (currentState == targetState)
+        {
             return currentState;
+        }
 
         if (_ingestionStateMachine.CanTransition(currentState, targetState))
         {
@@ -650,7 +674,7 @@ public sealed class TransferOrchestrator(
         IEnumerable<WatcherFile> selectedCloudFiles,
         CancellationToken cancellationToken = default)
     {
-        var transferId = CreateOperationId("sync");
+        string transferId = CreateOperationId("sync");
         var selected = selectedCloudFiles.Where(file => !string.IsNullOrWhiteSpace(file.FilePath)).ToList();
         var stopwatch = Stopwatch.StartNew();
         Logger.LogInfo("Transfer", "Cloud-to-local selected download started", new Dictionary<string, object?>
@@ -662,12 +686,12 @@ public sealed class TransferOrchestrator(
         await _googleDriveClient.InitializeAsync(cancellationToken);
         var downloaded = new List<string>();
 
-        foreach (var file in selected)
+        foreach (WatcherFile? file in selected)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var localName = _localDestinationWriter.ResolveUniqueName(file.DisplayName);
+            string localName = _localDestinationWriter.ResolveUniqueName(file.DisplayName);
 
-            var localPath = Path.Combine(_settings.DownloadDir, localName);
+            string localPath = Path.Combine(_settings.DownloadDir, localName);
             await _googleDriveClient.DownloadFileAsync(file.FilePath, localPath);
             downloaded.Add(localPath);
         }
@@ -687,7 +711,7 @@ public sealed class TransferOrchestrator(
         IEnumerable<WatcherFile> currentCloudFiles,
         CancellationToken cancellationToken = default)
     {
-        var transferId = CreateOperationId("sync");
+        string transferId = CreateOperationId("sync");
         var cloudFiles = currentCloudFiles.Where(file => !string.IsNullOrWhiteSpace(file.FilePath)).ToList();
         var stopwatch = Stopwatch.StartNew();
         Logger.LogInfo("Transfer", "Cloud-to-local additive sync started", new Dictionary<string, object?>
@@ -699,13 +723,15 @@ public sealed class TransferOrchestrator(
         await _googleDriveClient.InitializeAsync(cancellationToken);
         var downloaded = new List<string>();
 
-        foreach (var cloudFile in cloudFiles)
+        foreach (WatcherFile? cloudFile in cloudFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var localName = _localDestinationWriter.ResolveUniqueName(cloudFile.DisplayName);
-            var localPath = Path.Combine(_settings.DownloadDir, localName);
+            string localName = _localDestinationWriter.ResolveUniqueName(cloudFile.DisplayName);
+            string localPath = Path.Combine(_settings.DownloadDir, localName);
             if (File.Exists(localPath))
+            {
                 continue;
+            }
 
             await _googleDriveClient.DownloadFileAsync(cloudFile.FilePath, localPath);
             downloaded.Add(localPath);
@@ -729,12 +755,14 @@ public sealed class TransferOrchestrator(
         string displayName,
         TransferDestinationKind destination)
     {
-        var previousStage = downloadItem.Status;
-        var nextStage = stage.ToString();
+        string previousStage = downloadItem.Status;
+        string nextStage = stage.ToString();
         downloadItem.Status = nextStage;
 
         if (string.Equals(previousStage, nextStage, StringComparison.Ordinal))
+        {
             return;
+        }
 
         Logger.LogInfo("Transfer", "Transfer stage changed", new Dictionary<string, object?>
         {

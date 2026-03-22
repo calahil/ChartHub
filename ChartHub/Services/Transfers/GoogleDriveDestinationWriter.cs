@@ -1,3 +1,5 @@
+
+
 namespace ChartHub.Services.Transfers;
 
 public sealed class GoogleDriveDestinationWriter(IGoogleDriveClient googleDriveClient) : IGoogleDriveDestinationWriter
@@ -9,10 +11,10 @@ public sealed class GoogleDriveDestinationWriter(IGoogleDriveClient googleDriveC
         string desiredName,
         CancellationToken cancellationToken = default)
     {
-        var folderId = await GetChartHubFolderIdAsync(cancellationToken);
-        var finalName = await ResolveUniqueNameAsync(folderId, desiredName, cancellationToken);
+        string folderId = await GetChartHubFolderIdAsync(cancellationToken);
+        string finalName = await ResolveUniqueNameAsync(folderId, desiredName, cancellationToken);
 
-        var uploadedFileId = await _googleDriveClient.UploadFileAsync(folderId, tempFilePath, finalName);
+        string uploadedFileId = await _googleDriveClient.UploadFileAsync(folderId, tempFilePath, finalName);
 
         return new DestinationWriteResult(
             FinalName: finalName,
@@ -25,12 +27,12 @@ public sealed class GoogleDriveDestinationWriter(IGoogleDriveClient googleDriveC
         string desiredName,
         CancellationToken cancellationToken = default)
     {
-        var folderId = await GetChartHubFolderIdAsync(cancellationToken);
-        var finalName = await ResolveUniqueNameAsync(folderId, desiredName, cancellationToken);
+        string folderId = await GetChartHubFolderIdAsync(cancellationToken);
+        string finalName = await ResolveUniqueNameAsync(folderId, desiredName, cancellationToken);
 
         try
         {
-            var copiedFileId = await _googleDriveClient.CopyFileIntoFolderAsync(sourceFileId, folderId, finalName);
+            string copiedFileId = await _googleDriveClient.CopyFileIntoFolderAsync(sourceFileId, folderId, finalName);
 
             return new DestinationWriteResult(
                 FinalName: finalName,
@@ -47,7 +49,9 @@ public sealed class GoogleDriveDestinationWriter(IGoogleDriveClient googleDriveC
     {
         await _googleDriveClient.InitializeAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(_googleDriveClient.ChartHubFolderId))
+        {
             throw new InvalidOperationException("Google Drive folder is not initialised.");
+        }
 
         return _googleDriveClient.ChartHubFolderId;
     }
@@ -57,7 +61,7 @@ public sealed class GoogleDriveDestinationWriter(IGoogleDriveClient googleDriveC
         string desiredName,
         CancellationToken cancellationToken)
     {
-        var existing = await _googleDriveClient.ListFilesAsync(folderId);
+        IList<Google.Apis.Drive.v3.Data.File> existing = await _googleDriveClient.ListFilesAsync(folderId);
         var existingNames = existing
             .Where(f => !string.IsNullOrWhiteSpace(f.Name))
             .Select(f => f.Name)

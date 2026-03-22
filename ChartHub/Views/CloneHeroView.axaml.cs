@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+
 using ChartHub.ViewModels;
 
 namespace ChartHub.Views;

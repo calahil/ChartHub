@@ -32,21 +32,23 @@ public sealed class DefaultConfigValidator : IConfigValidator
         string? value,
         string label)
     {
-        var path = value?.Trim() ?? string.Empty;
+        string path = value?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(path))
         {
             failures.Add(new ConfigValidationFailure(key, $"{label} is required."));
             return;
         }
 
-        if (Uri.TryCreate(path, UriKind.Absolute, out var uri) && !uri.IsFile)
+        if (Uri.TryCreate(path, UriKind.Absolute, out Uri? uri) && !uri.IsFile)
         {
             failures.Add(new ConfigValidationFailure(key, $"{label} must be a local filesystem path."));
             return;
         }
 
         if (Directory.Exists(path))
+        {
             return;
+        }
 
         if (File.Exists(path))
         {
@@ -54,9 +56,11 @@ public sealed class DefaultConfigValidator : IConfigValidator
             return;
         }
 
-        var parent = Path.GetDirectoryName(path);
+        string? parent = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(parent) && Directory.Exists(parent))
+        {
             return;
+        }
 
         failures.Add(new ConfigValidationFailure(key, $"{label} is invalid; parent folder does not exist."));
     }
@@ -70,6 +74,8 @@ public sealed class DefaultConfigValidator : IConfigValidator
         string label)
     {
         if (value < min || value > max)
+        {
             failures.Add(new ConfigValidationFailure(key, $"{label} must be between {min} and {max}."));
+        }
     }
 }

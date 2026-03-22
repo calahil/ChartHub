@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
+
 using ChartHub.Models;
 using ChartHub.Utilities;
+
 using SharpCompress.Archives;
 using SharpCompress.Common;
 
@@ -54,29 +56,33 @@ public sealed class SongInstallService : ISongInstallService
 
         var installedDirectories = new List<string>();
         if (files.Count == 0)
-            return installedDirectories;
-
-        for (var index = 0; index < files.Count; index++)
         {
-            var filePath = files[index];
+            return installedDirectories;
+        }
+
+        for (int index = 0; index < files.Count; index++)
+        {
+            string filePath = files[index];
             cancellationToken.ThrowIfCancellationRequested();
 
             if (!File.Exists(filePath))
+            {
                 continue;
+            }
 
-            var overallStart = index * 100d / files.Count;
-            var overallEnd = (index + 1) * 100d / files.Count;
-            var itemName = Path.GetFileName(filePath);
+            double overallStart = index * 100d / files.Count;
+            double overallEnd = (index + 1) * 100d / files.Count;
+            string itemName = Path.GetFileName(filePath);
             progress?.Report(new InstallProgressUpdate(
                 InstallStage.Preparing,
                 $"Preparing install for {itemName}",
                 overallStart,
                 itemName));
 
-            var ingestion = await _ingestionCatalog.GetLatestIngestionByAssetLocationAsync(filePath, cancellationToken);
-            var source = _schemaService.NormalizeSource(ingestion?.Source);
+            SongIngestionRecord? ingestion = await _ingestionCatalog.GetLatestIngestionByAssetLocationAsync(filePath, cancellationToken);
+            string source = _schemaService.NormalizeSource(ingestion?.Source);
             SongIngestionAttemptRecord? attempt = null;
-            var state = ingestion?.CurrentState ?? IngestionState.Downloaded;
+            IngestionState state = ingestion?.CurrentState ?? IngestionState.Downloaded;
 
             if (ingestion is not null)
             {
@@ -93,10 +99,10 @@ public sealed class SongInstallService : ISongInstallService
             try
             {
                 var itemProgress = new ScaledInstallProgress(progress, overallStart, overallEnd, itemName);
-                var installedResults = await InstallFileAsync(filePath, source, itemProgress, cancellationToken);
+                List<InstalledSongResult> installedResults = await InstallFileAsync(filePath, source, itemProgress, cancellationToken);
                 installedDirectories.AddRange(installedResults.Select(result => result.DirectoryPath));
 
-                foreach (var installedResult in installedResults)
+                foreach (InstalledSongResult installedResult in installedResults)
                 {
                     await UpsertLibraryEntryAsync(
                     installedResult.DirectoryPath,
@@ -109,7 +115,7 @@ public sealed class SongInstallService : ISongInstallService
 
                 if (ingestion is not null && attempt is not null)
                 {
-                    foreach (var installedResult in installedResults)
+                    foreach (InstalledSongResult installedResult in installedResults)
                     {
                         await _ingestionCatalog.UpsertAssetAsync(new SongIngestionAssetEntry(
                             IngestionId: ingestion.Id,
@@ -195,17 +201,17 @@ public sealed class SongInstallService : ISongInstallService
         Directory.CreateDirectory(_settings.OutputDir);
 
         var installedDirs = new List<InstalledSongResult>();
-        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        string extension = Path.GetExtension(filePath).ToLowerInvariant();
 
         if (extension is ".zip" or ".rar" or ".7z")
         {
-            var installedDirectory = await InstallArchiveFileAsync(filePath, source, progress, cancellationToken);
+            string installedDirectory = await InstallArchiveFileAsync(filePath, source, progress, cancellationToken);
             installedDirs.Add(new InstalledSongResult(installedDirectory, null));
             return installedDirs;
         }
 
-        var onyxResult = await _onyxPipelineService.InstallAsync(filePath, source, progress, cancellationToken);
-        var canonicalDir = await RehomeInstalledDirectoryAsync(
+        OnyxInstallResult onyxResult = await _onyxPipelineService.InstallAsync(filePath, source, progress, cancellationToken);
+        string canonicalDir = await RehomeInstalledDirectoryAsync(
             onyxResult.FinalInstallDirectory,
             source,
             Path.GetFileNameWithoutExtension(filePath),
@@ -221,17 +227,17 @@ public sealed class SongInstallService : ISongInstallService
         IProgress<InstallProgressUpdate>? progress,
         CancellationToken cancellationToken)
     {
-        var sanitizedName = SafePathHelper.SanitizeFileName(Path.GetFileNameWithoutExtension(filePath), "song");
-        var targetDir = ResolveUniqueDirectory(Path.Combine(_settings.CloneHeroSongsDir, $"{sanitizedName}__{source}"));
+        string sanitizedName = SafePathHelper.SanitizeFileName(Path.GetFileNameWithoutExtension(filePath), "song");
+        string targetDir = ResolveUniqueDirectory(Path.Combine(_settings.CloneHeroSongsDir, $"{sanitizedName}__{source}"));
         Directory.CreateDirectory(targetDir);
 
-        using var archive = FileTools.OpenArchive(filePath);
+        using IArchive archive = FileTools.OpenArchive(filePath);
         var entries = archive.Entries.Where(entry => !entry.IsDirectory).ToList();
-        for (var index = 0; index < entries.Count; index++)
+        for (int index = 0; index < entries.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var entry = entries[index];
-            var progressValue = entries.Count == 0 ? 50 : 10 + ((index + 1) * 70d / entries.Count);
+            IArchiveEntry entry = entries[index];
+            double progressValue = entries.Count == 0 ? 50 : 10 + ((index + 1) * 70d / entries.Count);
             progress?.Report(new InstallProgressUpdate(
                 InstallStage.ExtractingArchive,
                 $"Extracting {entry.Key}",
@@ -239,10 +245,12 @@ public sealed class SongInstallService : ISongInstallService
                 Path.GetFileName(filePath),
                 entry.Key));
 
-            var destinationPath = SafePathHelper.GetSafeArchiveExtractionPath(targetDir, entry.Key, "archive-entry");
-            var destinationDirectory = Path.GetDirectoryName(destinationPath);
+            string destinationPath = SafePathHelper.GetSafeArchiveExtractionPath(targetDir, entry.Key, "archive-entry");
+            string? destinationDirectory = Path.GetDirectoryName(destinationPath);
             if (!string.IsNullOrWhiteSpace(destinationDirectory))
+            {
                 Directory.CreateDirectory(destinationDirectory);
+            }
 
             await Task.Run(() => entry.WriteToFile(destinationPath, new ExtractionOptions
             {
@@ -267,24 +275,28 @@ public sealed class SongInstallService : ISongInstallService
         SongMetadata? fallbackMetadata = null)
     {
         if (!Directory.Exists(currentDirectory))
+        {
             return Task.FromResult(currentDirectory);
+        }
 
-        var songIniPath = Directory
+        string? songIniPath = Directory
             .EnumerateFiles(currentDirectory, "*", SearchOption.AllDirectories)
             .FirstOrDefault(path => Path.GetFileName(path).Equals("song.ini", StringComparison.OrdinalIgnoreCase));
 
-        var metadata = songIniPath is not null
+        SongMetadata metadata = songIniPath is not null
             ? _songIniMetadataParser.ParseFromSongIni(songIniPath)
             : fallbackMetadata ?? new SongMetadata("Unknown Artist", fallbackTitle ?? "Unknown Song", "Unknown Charter");
 
-        var layout = _schemaService.ResolveUniqueLayout(
+        CloneHeroDirectoryLayout layout = _schemaService.ResolveUniqueLayout(
             _settings.CloneHeroSongsDir,
             metadata,
             source,
             exists: path => string.Equals(path, currentDirectory, StringComparison.Ordinal) || Directory.Exists(path));
 
         if (string.Equals(layout.FullPath, currentDirectory, StringComparison.Ordinal))
+        {
             return Task.FromResult(currentDirectory);
+        }
 
         Directory.CreateDirectory(Path.GetDirectoryName(layout.FullPath)!);
         Directory.Move(currentDirectory, layout.FullPath);
@@ -304,27 +316,31 @@ public sealed class SongInstallService : ISongInstallService
         SongMetadata? fallbackMetadata = null)
     {
         if (_libraryCatalog is null)
+        {
             return;
+        }
 
         // Only persist library entries for songs from known, trusted sources.
         // Local file and cloud drive installs must not pollute the library catalog.
         if (!IsTrackableSource(source))
+        {
             return;
+        }
 
-        var songIniPath = Directory
+        string? songIniPath = Directory
             .EnumerateFiles(installDir, "*", SearchOption.AllDirectories)
             .FirstOrDefault(path => Path.GetFileName(path).Equals("song.ini", StringComparison.OrdinalIgnoreCase));
 
-        var metadata = songIniPath is not null
+        SongMetadata metadata = songIniPath is not null
             ? _songIniMetadataParser.ParseFromSongIni(songIniPath)
             : fallbackMetadata ?? new SongMetadata("Unknown Artist", fallbackTitle ?? "Unknown Song", "Unknown Charter");
 
-        var persistedSource = _schemaService.NormalizeSource(source);
-        var contentIdentityHash = await LibraryIdentityService.ComputeInstalledContentIdentityHashAsync(installDir, cancellationToken);
-        var persistedSourceId = string.IsNullOrWhiteSpace(sourceId)
+        string persistedSource = _schemaService.NormalizeSource(source);
+        string contentIdentityHash = await LibraryIdentityService.ComputeInstalledContentIdentityHashAsync(installDir, cancellationToken);
+        string persistedSourceId = string.IsNullOrWhiteSpace(sourceId)
             ? LibraryIdentityService.BuildInternalIdentityKey(contentIdentityHash, metadata)
             : LibraryIdentityService.NormalizeSourceKey(persistedSource, sourceId);
-        var internalIdentityKey = LibraryIdentityService.BuildInternalIdentityKey(contentIdentityHash, metadata);
+        string internalIdentityKey = LibraryIdentityService.BuildInternalIdentityKey(contentIdentityHash, metadata);
 
         await _libraryCatalog.RemoveOtherEntriesByLocalPathAsync(
             installDir,
@@ -347,13 +363,13 @@ public sealed class SongInstallService : ISongInstallService
 
     private async Task WriteManifestAsync(long ingestionId, long attemptId, string installDir, CancellationToken cancellationToken)
     {
-        foreach (var filePath in Directory.GetFiles(installDir, "*", SearchOption.AllDirectories))
+        foreach (string filePath in Directory.GetFiles(installDir, "*", SearchOption.AllDirectories))
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             var fileInfo = new FileInfo(filePath);
-            var relativePath = Path.GetRelativePath(installDir, filePath);
-            var sha256 = await ComputeSha256Async(filePath, cancellationToken);
+            string relativePath = Path.GetRelativePath(installDir, filePath);
+            string sha256 = await ComputeSha256Async(filePath, cancellationToken);
 
             await _ingestionCatalog.UpsertManifestFileAsync(new SongInstalledManifestFileEntry(
                 IngestionId: ingestionId,
@@ -369,9 +385,9 @@ public sealed class SongInstallService : ISongInstallService
 
     private async Task<string> ComputeSha256Async(string filePath, CancellationToken cancellationToken)
     {
-        await using var stream = File.OpenRead(filePath);
+        await using FileStream stream = File.OpenRead(filePath);
         using var sha = SHA256.Create();
-        var hash = await sha.ComputeHashAsync(stream, cancellationToken);
+        byte[] hash = await sha.ComputeHashAsync(stream, cancellationToken);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
@@ -384,7 +400,9 @@ public sealed class SongInstallService : ISongInstallService
         CancellationToken cancellationToken)
     {
         if (currentState == targetState)
+        {
             return currentState;
+        }
 
         if (_ingestionStateMachine.CanTransition(currentState, targetState))
         {
@@ -426,17 +444,21 @@ public sealed class SongInstallService : ISongInstallService
     private static string ResolveUniqueDirectory(string path)
     {
         if (!Directory.Exists(path))
+        {
             return path;
+        }
 
-        var parent = Path.GetDirectoryName(path) ?? string.Empty;
-        var baseName = Path.GetFileName(path);
-        var counter = 2;
+        string parent = Path.GetDirectoryName(path) ?? string.Empty;
+        string baseName = Path.GetFileName(path);
+        int counter = 2;
 
         while (true)
         {
-            var candidate = Path.Combine(parent, $"{baseName}_{counter}");
+            string candidate = Path.Combine(parent, $"{baseName}_{counter}");
             if (!Directory.Exists(candidate))
+            {
                 return candidate;
+            }
 
             counter++;
         }
@@ -464,12 +486,14 @@ public sealed class SongInstallService : ISongInstallService
         public void Report(InstallProgressUpdate value)
         {
             if (_inner is null)
+            {
                 return;
+            }
 
             double? scaledPercent = null;
             if (value.ProgressPercent.HasValue)
             {
-                var normalized = Math.Clamp(value.ProgressPercent.Value, 0, 100);
+                double normalized = Math.Clamp(value.ProgressPercent.Value, 0, 100);
                 scaledPercent = _startPercent + ((_endPercent - _startPercent) * (normalized / 100d));
             }
 

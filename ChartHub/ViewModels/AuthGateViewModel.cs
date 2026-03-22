@@ -1,8 +1,10 @@
-using CommunityToolkit.Mvvm.Input;
-using ChartHub.Services;
-using ChartHub.Utilities;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+
+using ChartHub.Services;
+using ChartHub.Utilities;
+
+using CommunityToolkit.Mvvm.Input;
 
 namespace ChartHub.ViewModels;
 
@@ -18,7 +20,9 @@ public class AuthGateViewModel : INotifyPropertyChanged
         private set
         {
             if (_isBusy == value)
+            {
                 return;
+            }
 
             _isBusy = value;
             OnPropertyChanged();
@@ -69,9 +73,11 @@ public class AuthGateViewModel : INotifyPropertyChanged
     private async Task SignInAsync()
     {
         if (IsBusy)
+        {
             return;
+        }
 
-        var authSessionId = $"auth-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}";
+        string authSessionId = $"auth-{DateTimeOffset.UtcNow:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}";
 
         IsBusy = true;
         ErrorMessage = null;

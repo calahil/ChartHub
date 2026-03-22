@@ -1,5 +1,7 @@
+using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
+
 using Microsoft.Data.Sqlite;
 
 namespace ChartHub.Tests;
@@ -10,9 +12,9 @@ public class SongIngestionCatalogServiceTests
     [Fact]
     public void NormalizeSourceLink_StripsTrackingParameters_AndKeepsMeaningfulOnes()
     {
-        var input = "https://example.com/path/file.zip?utm_source=discord&token=abc123&fbclid=zzz&ref=homepage&id=42";
+        string input = "https://example.com/path/file.zip?utm_source=discord&token=abc123&fbclid=zzz&ref=homepage&id=42";
 
-        var normalized = SongIngestionCatalogService.NormalizeSourceLink(input);
+        string normalized = SongIngestionCatalogService.NormalizeSourceLink(input);
 
         Assert.Equal("https://example.com/path/file.zip?id=42&token=abc123", normalized);
     }
@@ -23,12 +25,12 @@ public class SongIngestionCatalogServiceTests
         using var temp = new TemporaryDirectoryFixture("ingestion-dedupe");
         var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
 
-        var first = await sut.GetOrCreateIngestionAsync(
+        SongIngestionRecord first = await sut.GetOrCreateIngestionAsync(
             source: LibrarySourceNames.RhythmVerse,
             sourceId: "rv-100",
             sourceLink: "https://example.com/song.zip?utm_source=discord&token=abc");
 
-        var second = await sut.GetOrCreateIngestionAsync(
+        SongIngestionRecord second = await sut.GetOrCreateIngestionAsync(
             source: LibrarySourceNames.RhythmVerse,
             sourceId: "rv-100",
             sourceLink: "https://example.com/song.zip?token=abc&gclid=123");
@@ -43,13 +45,13 @@ public class SongIngestionCatalogServiceTests
         using var temp = new TemporaryDirectoryFixture("ingestion-attempts");
         var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
 
-        var ingestion = await sut.GetOrCreateIngestionAsync(
+        SongIngestionRecord ingestion = await sut.GetOrCreateIngestionAsync(
             source: LibrarySourceNames.Encore,
             sourceId: "encore-200",
             sourceLink: "https://files.example.com/encore/song.sng?token=abc");
 
-        var firstAttempt = await sut.StartAttemptAsync(ingestion.Id);
-        var secondAttempt = await sut.StartAttemptAsync(ingestion.Id);
+        SongIngestionAttemptRecord firstAttempt = await sut.StartAttemptAsync(ingestion.Id);
+        SongIngestionAttemptRecord secondAttempt = await sut.StartAttemptAsync(ingestion.Id);
 
         Assert.Equal(1, firstAttempt.AttemptNumber);
         Assert.Equal(2, secondAttempt.AttemptNumber);
@@ -62,11 +64,11 @@ public class SongIngestionCatalogServiceTests
         using var temp = new TemporaryDirectoryFixture("ingestion-state-manifest");
         var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
 
-        var ingestion = await sut.GetOrCreateIngestionAsync(
+        SongIngestionRecord ingestion = await sut.GetOrCreateIngestionAsync(
             source: LibrarySourceNames.RhythmVerse,
             sourceId: "rv-300",
             sourceLink: "https://example.com/song3.zip?token=xyz");
-        var attempt = await sut.StartAttemptAsync(ingestion.Id);
+        SongIngestionAttemptRecord attempt = await sut.StartAttemptAsync(ingestion.Id);
 
         await sut.RecordStateTransitionAsync(
             ingestionId: ingestion.Id,
@@ -99,13 +101,13 @@ public class SongIngestionCatalogServiceTests
     public async Task Initialize_WhenUpgradingExistingSchema_PreservesExistingIngestionData()
     {
         using var temp = new TemporaryDirectoryFixture("ingestion-migration-preserve");
-        var databasePath = Path.Combine(temp.RootPath, "library-catalog.db");
+        string databasePath = Path.Combine(temp.RootPath, "library-catalog.db");
 
         await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
         {
             await connection.OpenAsync();
 
-            await using var command = connection.CreateCommand();
+            await using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 CREATE TABLE schema_metadata (
                     key TEXT PRIMARY KEY,
@@ -229,14 +231,14 @@ public class SongIngestionCatalogServiceTests
 
         var sut = new SongIngestionCatalogService(databasePath);
 
-        var ingestion = await sut.GetIngestionByIdAsync(1);
+        SongIngestionRecord? ingestion = await sut.GetIngestionByIdAsync(1);
         Assert.NotNull(ingestion);
         Assert.Equal("Legacy Artist", ingestion!.Artist);
         Assert.Equal("Legacy Title", ingestion.Title);
         Assert.Equal("Legacy Charter", ingestion.Charter);
         Assert.Null(ingestion.LibrarySource);
 
-        var queueItem = await sut.GetQueueItemByIdAsync(1);
+        IngestionQueueItem? queueItem = await sut.GetQueueItemByIdAsync(1);
         Assert.NotNull(queueItem);
         Assert.Equal("/songs/Legacy Artist/Legacy Title/Legacy Charter__rhythmverse", queueItem!.InstalledLocation);
         Assert.Equal(queueItem.InstalledLocation, queueItem.DesktopLibraryPath);
@@ -244,16 +246,16 @@ public class SongIngestionCatalogServiceTests
         await using var verifyConnection = new SqliteConnection($"Data Source={databasePath}");
         await verifyConnection.OpenAsync();
 
-        await using var versionCommand = verifyConnection.CreateCommand();
+        await using SqliteCommand versionCommand = verifyConnection.CreateCommand();
         versionCommand.CommandText = "SELECT value FROM schema_metadata WHERE key = 'schema_version';";
-        var version = Convert.ToString(await versionCommand.ExecuteScalarAsync());
+        string? version = Convert.ToString(await versionCommand.ExecuteScalarAsync());
         Assert.Equal("5", version);
 
-        await using var pragmaCommand = verifyConnection.CreateCommand();
+        await using SqliteCommand pragmaCommand = verifyConnection.CreateCommand();
         pragmaCommand.CommandText = "PRAGMA table_info(song_ingestions);";
-        await using var reader = await pragmaCommand.ExecuteReaderAsync();
+        await using SqliteDataReader reader = await pragmaCommand.ExecuteReaderAsync();
 
-        var hasLibrarySource = false;
+        bool hasLibrarySource = false;
         while (await reader.ReadAsync())
         {
             if (string.Equals(reader.GetString(1), "library_source", StringComparison.OrdinalIgnoreCase))

@@ -17,7 +17,7 @@ public class SettingsOrchestratorTests
         AppConfigRoot? observed = null;
         sut.SettingsChanged += config => observed = config;
 
-        var result = await sut.UpdateAsync(config =>
+        ConfigValidationResult result = await sut.UpdateAsync(config =>
         {
             config.Runtime.DownloadDirectory = "/tmp/downloads";
             config.Runtime.SyncApiAuthToken = "updated-sync-token";
@@ -39,8 +39,8 @@ public class SettingsOrchestratorTests
         var validator = new RejectingValidator("Runtime.DownloadDirectory", "Download path invalid");
         using var sut = new SettingsOrchestrator(store, validator);
 
-        var original = sut.Current.Runtime.DownloadDirectory;
-        var result = await sut.UpdateAsync(config =>
+        string original = sut.Current.Runtime.DownloadDirectory;
+        ConfigValidationResult result = await sut.UpdateAsync(config =>
         {
             config.Runtime.DownloadDirectory = "/invalid";
         });
@@ -83,8 +83,8 @@ public class SettingsOrchestratorTests
         var validator = new RejectingValidator("Runtime.OutputDirectory", "Output path invalid");
         using var sut = new SettingsOrchestrator(store, validator);
 
-        var beforeDownloadDir = sut.Current.Runtime.DownloadDirectory;
-        var beforeOutputDir = sut.Current.Runtime.OutputDirectory;
+        string beforeDownloadDir = sut.Current.Runtime.DownloadDirectory;
+        string beforeOutputDir = sut.Current.Runtime.OutputDirectory;
 
         _ = await sut.UpdateAsync(config =>
         {

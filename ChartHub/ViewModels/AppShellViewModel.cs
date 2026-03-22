@@ -1,8 +1,11 @@
-using Avalonia;
-using Microsoft.Extensions.DependencyInjection;
-using ChartHub.Services;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+
+using Avalonia;
+
+using ChartHub.Services;
+
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChartHub.ViewModels;
 
@@ -45,7 +48,7 @@ public class AppShellViewModel : INotifyPropertyChanged
 
     private async Task HandlePostSplashAsync()
     {
-        var silentlyInitialized = await _cloudAccountService.TryRestoreSessionAsync();
+        bool silentlyInitialized = await _cloudAccountService.TryRestoreSessionAsync();
         IsSignedIn = silentlyInitialized;
         SwitchToMain();
     }

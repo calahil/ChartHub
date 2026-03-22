@@ -1,6 +1,7 @@
-using Microsoft.Extensions.DependencyInjection;
 using ChartHub.Services;
 using ChartHub.ViewModels;
+
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChartHub.Tests;
 
@@ -14,7 +15,7 @@ public class AuthFlowViewModelTests
         {
             ProviderDisplayName = "Google Drive",
         };
-        var callbackCount = 0;
+        int callbackCount = 0;
         var sut = new AuthGateViewModel(cloudAccountService, () =>
         {
             callbackCount++;
@@ -54,7 +55,7 @@ public class AuthFlowViewModelTests
             LinkException = new InvalidOperationException("network unavailable"),
             ProviderDisplayName = "Google Drive",
         };
-        var callbackCount = 0;
+        int callbackCount = 0;
         var sut = new AuthGateViewModel(cloudAccountService, () =>
         {
             callbackCount++;
@@ -81,7 +82,7 @@ public class AuthFlowViewModelTests
         var serviceProvider = new SingleServiceProvider(typeof(MainViewModel), mainViewModel);
         var sut = new AppShellViewModel(serviceProvider, cloudAccountService);
 
-        var splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
+        SplashViewModel splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
         Assert.False(sut.IsSignedIn);
 
         await splash.RunAsync();
@@ -102,7 +103,7 @@ public class AuthFlowViewModelTests
         var serviceProvider = new SingleServiceProvider(typeof(MainViewModel), mainViewModel);
         var sut = new AppShellViewModel(serviceProvider, cloudAccountService);
 
-        var splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
+        SplashViewModel splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
         await splash.RunAsync();
 
         Assert.Equal(1, cloudAccountService.TryRestoreSessionCallCount);
@@ -132,7 +133,9 @@ public class AuthFlowViewModelTests
         {
             LinkCallCount++;
             if (LinkException is not null)
+            {
                 throw LinkException;
+            }
 
             return Task.CompletedTask;
         }

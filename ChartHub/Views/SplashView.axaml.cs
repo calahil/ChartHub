@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+
 using ChartHub.ViewModels;
 
 namespace ChartHub.Views;
@@ -16,6 +17,8 @@ public partial class SplashView : UserControl
         base.OnAttachedToVisualTree(e);
 
         if (DataContext is SplashViewModel vm)
+        {
             _ = vm.RunAsync();
+        }
     }
 }

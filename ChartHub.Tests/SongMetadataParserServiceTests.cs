@@ -1,7 +1,9 @@
 using System;
 using System.Threading.Tasks;
-using Xunit;
+
 using ChartHub.Services;
+
+using Xunit;
 
 namespace ChartHub.Tests;
 
@@ -12,14 +14,14 @@ public class SongMetadataParserServiceTests
     [Fact]
     public void Parse_ValidIniWithAllFields_ReturnsCorrectMetadata()
     {
-        var content = """
+        string content = """
 [song]
 name = Custom Song Title
 artist = Custom Artist
 charter = Custom Charter
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Custom Song Title", metadata.Title);
         Assert.Equal("Custom Artist", metadata.Artist);
@@ -29,14 +31,14 @@ charter = Custom Charter
     [Fact]
     public void Parse_CaseInsensitiveSectionName_ReturnsCorrectMetadata()
     {
-        var content = """
+        string content = """
 [SONG]
 name = Title
 artist = Artist
 charter = Charter
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Title", metadata.Title);
         Assert.Equal("Artist", metadata.Artist);
@@ -46,14 +48,14 @@ charter = Charter
     [Fact]
     public void Parse_CaseInsensitiveKeys_ReturnsCorrectMetadata()
     {
-        var content = """
+        string content = """
 [song]
 NAME = Title123
 ARTIST = Artist123
 CHARTER = Charter123
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Title123", metadata.Title);
         Assert.Equal("Artist123", metadata.Artist);
@@ -63,14 +65,14 @@ CHARTER = Charter123
     [Fact]
     public void Parse_MixedCaseKeys_ReturnsCorrectMetadata()
     {
-        var content = """
+        string content = """
 [Song]
 Name = MixedTitle
 ArtisT = MixedArtist
 ChArTer = MixedCharter
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("MixedTitle", metadata.Title);
         Assert.Equal("MixedArtist", metadata.Artist);
@@ -80,11 +82,11 @@ ChArTer = MixedCharter
     [Fact]
     public void Parse_MissingAllFields_UsesFallbacks()
     {
-        var content = """
+        string content = """
 [song]
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Unknown Song", metadata.Title);
         Assert.Equal("Unknown Artist", metadata.Artist);
@@ -94,13 +96,13 @@ ChArTer = MixedCharter
     [Fact]
     public void Parse_MissingArtistOnly_UsesFallbackArtist()
     {
-        var content = """
+        string content = """
 [song]
 name = Title
 charter = Charter
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Title", metadata.Title);
         Assert.Equal("Unknown Artist", metadata.Artist);
@@ -110,13 +112,13 @@ charter = Charter
     [Fact]
     public void Parse_MissingTitleOnly_UsesFallbackTitle()
     {
-        var content = """
+        string content = """
 [song]
 artist = Artist
 charter = Charter
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Unknown Song", metadata.Title);
         Assert.Equal("Artist", metadata.Artist);
@@ -126,13 +128,13 @@ charter = Charter
     [Fact]
     public void Parse_MissingCharterOnly_UsesFallbackCharter()
     {
-        var content = """
+        string content = """
 [song]
 name = Title
 artist = Artist
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Title", metadata.Title);
         Assert.Equal("Artist", metadata.Artist);
@@ -142,7 +144,7 @@ artist = Artist
     [Fact]
     public void Parse_IgnoresCommentLines_WithDoubleSlash()
     {
-        var content = """
+        string content = """
 [song]
 // This is a comment
 name = Title
@@ -150,7 +152,7 @@ name = Title
 artist = Artist
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Title", metadata.Title);
         Assert.Equal("Artist", metadata.Artist);
@@ -159,7 +161,7 @@ artist = Artist
     [Fact]
     public void Parse_IgnoresCommentLines_WithSemicolon()
     {
-        var content = """
+        string content = """
 [song]
 ; This is a comment
 name = Title
@@ -167,7 +169,7 @@ name = Title
 artist = Artist
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Title", metadata.Title);
         Assert.Equal("Artist", metadata.Artist);
@@ -176,14 +178,14 @@ artist = Artist
     [Fact]
     public void Parse_SurvivesMalformedLines_WithoutEquals()
     {
-        var content = """
+        string content = """
 [song]
 name = Title
 malformed line without equals
 artist = Artist
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         // Should parse name and artist despite malformed line
         Assert.Equal("Title", metadata.Title);
@@ -193,14 +195,14 @@ artist = Artist
     [Fact]
     public void Parse_SurvivesMalformedLines_WithOnlyEquals()
     {
-        var content = """
+        string content = """
 [song]
 name = Title
 =
 artist = Artist
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         // Should parse name and artist despite malformed line
         Assert.Equal("Title", metadata.Title);
@@ -210,14 +212,14 @@ artist = Artist
     [Fact]
     public void Parse_SurvivesMalformedLines_WithMultipleEquals()
     {
-        var content = """
+        string content = """
 [song]
 name = Title
 artist = A = B
 charter = Charter
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         // Should parse correctly; value is everything after first =
         Assert.Equal("Title", metadata.Title);
@@ -228,7 +230,7 @@ charter = Charter
     [Fact]
     public void Parse_IgnoresEmptyLines()
     {
-        var content = """
+        string content = """
 [song]
 
 name = Title
@@ -239,7 +241,7 @@ charter = Charter
 
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Title", metadata.Title);
         Assert.Equal("Artist", metadata.Artist);
@@ -249,14 +251,14 @@ charter = Charter
     [Fact]
     public void Parse_TrimsWhitespace_AroundKeys()
     {
-        var content = """
+        string content = """
 [song]
   name  = Title
   artist  = Artist
   charter  = Charter
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Title", metadata.Title);
         Assert.Equal("Artist", metadata.Artist);
@@ -266,14 +268,14 @@ charter = Charter
     [Fact]
     public void Parse_TrimsWhitespace_AroundValues()
     {
-        var content = """
+        string content = """
 [song]
 name =   Title   
 artist =   Artist   
 charter =   Charter   
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Title", metadata.Title);
         Assert.Equal("Artist", metadata.Artist);
@@ -283,7 +285,7 @@ charter =   Charter
     [Fact]
     public void Parse_IgnoresKeysOutsideSongSection_Previous()
     {
-        var content = """
+        string content = """
 [metadata]
 name = WrongTitle
 artist = WrongArtist
@@ -292,7 +294,7 @@ name = CorrectTitle
 artist = CorrectArtist
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("CorrectTitle", metadata.Title);
         Assert.Equal("CorrectArtist", metadata.Artist);
@@ -301,7 +303,7 @@ artist = CorrectArtist
     [Fact]
     public void Parse_IgnoresKeysOutsideSongSection_After()
     {
-        var content = """
+        string content = """
 [song]
 name = CorrectTitle
 artist = CorrectArtist
@@ -310,7 +312,7 @@ name = WrongTitle
 artist = WrongArtist
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("CorrectTitle", metadata.Title);
         Assert.Equal("CorrectArtist", metadata.Artist);
@@ -319,7 +321,7 @@ artist = WrongArtist
     [Fact]
     public void Parse_IgnoresUnknownKeys_InSongSection()
     {
-        var content = """
+        string content = """
 [song]
 name = Title
 unknown_key = Unknown Value
@@ -328,7 +330,7 @@ another_unknown = Another Value
 charter = Charter
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Title", metadata.Title);
         Assert.Equal("Artist", metadata.Artist);
@@ -338,9 +340,9 @@ charter = Charter
     [Fact]
     public void Parse_EmptyContent_UsesFallbacks()
     {
-        var content = "";
+        string content = "";
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Unknown Song", metadata.Title);
         Assert.Equal("Unknown Artist", metadata.Artist);
@@ -350,14 +352,14 @@ charter = Charter
     [Fact]
     public void Parse_EmptyValues_UsesFallbacks()
     {
-        var content = """
+        string content = """
 [song]
 name = 
 artist = 
 charter = 
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Unknown Song", metadata.Title);
         Assert.Equal("Unknown Artist", metadata.Artist);
@@ -367,14 +369,14 @@ charter =
     [Fact]
     public void Parse_WhitespaceOnlyValues_UsesFallbacks()
     {
-        var content = """
+        string content = """
 [song]
 name =    
 artist =    
 charter =    
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Unknown Song", metadata.Title);
         Assert.Equal("Unknown Artist", metadata.Artist);
@@ -384,14 +386,14 @@ charter =
     [Fact]
     public void Parse_NoSongSection_UsesFallbacks()
     {
-        var content = """
+        string content = """
 [metadata]
 name = Title
 artist = Artist
 charter = Charter
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Unknown Song", metadata.Title);
         Assert.Equal("Unknown Artist", metadata.Artist);
@@ -401,14 +403,14 @@ charter = Charter
     [Fact]
     public void Parse_SpecialCharactersInValues_PreservesCorrectly()
     {
-        var content = """
+        string content = """
 [song]
 name = Song (Remix) [Expert]
 artist = Band & Friends feat. Guest
 charter = Charte@r_19$!
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Song (Remix) [Expert]", metadata.Title);
         Assert.Equal("Band & Friends feat. Guest", metadata.Artist);
@@ -418,14 +420,14 @@ charter = Charte@r_19$!
     [Fact]
     public void Parse_UnicodeCharacters_PreservesCorrectly()
     {
-        var content = """
+        string content = """
 [song]
 name = Москиткова Песня
 artist = 中文アーティスト
 charter = Чартер
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Москиткова Песня", metadata.Title);
         Assert.Equal("中文アーティスト", metadata.Artist);
@@ -435,7 +437,7 @@ charter = Чартер
     [Fact]
     public void Parse_LinesArray_WorksCorrectly()
     {
-        var lines = new[]
+        string[] lines = new[]
         {
             "[song]",
             "name = Title",
@@ -443,7 +445,7 @@ charter = Чартер
             "charter = Charter"
         };
 
-        var metadata = _parser.Parse(lines);
+        SongMetadata metadata = _parser.Parse(lines);
 
         Assert.Equal("Title", metadata.Title);
         Assert.Equal("Artist", metadata.Artist);
@@ -453,10 +455,10 @@ charter = Чартер
     [Fact]
     public async Task ParseAsync_FileExists_ReadsAndParsesCorrectly()
     {
-        var tempFile = Path.Combine(Path.GetTempPath(), $"test_song_{Guid.NewGuid()}.ini");
+        string tempFile = Path.Combine(Path.GetTempPath(), $"test_song_{Guid.NewGuid()}.ini");
         try
         {
-            var content = """
+            string content = """
 [song]
 name = Title
 artist = Artist
@@ -464,7 +466,7 @@ charter = Charter
 """;
             await File.WriteAllTextAsync(tempFile, content);
 
-            var metadata = await _parser.ParseAsync(tempFile);
+            SongMetadata metadata = await _parser.ParseAsync(tempFile);
 
             Assert.Equal("Title", metadata.Title);
             Assert.Equal("Artist", metadata.Artist);
@@ -482,9 +484,9 @@ charter = Charter
     [Fact]
     public async Task ParseAsync_FileMissing_UsesFallbacks()
     {
-        var nonExistentFile = Path.Combine(Path.GetTempPath(), $"nonexistent_{Guid.NewGuid()}.ini");
+        string nonExistentFile = Path.Combine(Path.GetTempPath(), $"nonexistent_{Guid.NewGuid()}.ini");
 
-        var metadata = await _parser.ParseAsync(nonExistentFile);
+        SongMetadata metadata = await _parser.ParseAsync(nonExistentFile);
 
         Assert.Equal("Unknown Song", metadata.Title);
         Assert.Equal("Unknown Artist", metadata.Artist);
@@ -494,7 +496,7 @@ charter = Charter
     [Fact]
     public void Parse_DuplicateKeys_LastValueWins()
     {
-        var content = """
+        string content = """
 [song]
 name = First Title
 name = Second Title
@@ -502,7 +504,7 @@ artist = First Artist
 artist = Second Artist
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Second Title", metadata.Title);
         Assert.Equal("Second Artist", metadata.Artist);
@@ -511,7 +513,7 @@ artist = Second Artist
     [Fact]
     public void Parse_RealWorldExample_DrumFill()
     {
-        var content = """
+        string content = """
 [song]
 name = Drum Fills
 artist = DrumFill Artist
@@ -520,7 +522,7 @@ offset = 0
 resolution = 480
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Drum Fills", metadata.Title);
         Assert.Equal("DrumFill Artist", metadata.Artist);
@@ -530,7 +532,7 @@ resolution = 480
     [Fact]
     public void Parse_RealWorldExample_WithComments()
     {
-        var content = """
+        string content = """
 ; Clone Hero Song File
 [song]
 ; Song metadata
@@ -543,7 +545,7 @@ resolution = 480
 offset = 0
 """;
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Song Name", metadata.Title);
         Assert.Equal("Song Artist", metadata.Artist);
@@ -553,9 +555,9 @@ offset = 0
     [Fact]
     public void Parse_AllFallbacksWhenNoFieldsSet()
     {
-        var content = "[song]";
+        string content = "[song]";
 
-        var metadata = _parser.ParseContent(content);
+        SongMetadata metadata = _parser.ParseContent(content);
 
         Assert.Equal("Unknown Artist", metadata.Artist);
         Assert.Equal("Unknown Song", metadata.Title);

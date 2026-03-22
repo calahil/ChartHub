@@ -9,19 +9,21 @@ public sealed class TransferSourceResolver : ITransferSourceResolver
     public async Task<ResolvedTransferSource> ResolveAsync(string sourceUrl, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(sourceUrl))
+        {
             return new ResolvedTransferSource(sourceUrl, sourceUrl, TransferSourceKind.Unknown);
+        }
 
-        var finalUrl = await _urlHelper.GetFinalRedirectUrlAsync(sourceUrl);
+        string finalUrl = await _urlHelper.GetFinalRedirectUrlAsync(sourceUrl);
 
         if (finalUrl.StartsWith("https://drive.google.com/drive", StringComparison.OrdinalIgnoreCase))
         {
-            var driveId = UrlExtractor.ExtractIdFromUrl(finalUrl);
+            string driveId = UrlExtractor.ExtractIdFromUrl(finalUrl);
             return new ResolvedTransferSource(sourceUrl, finalUrl, TransferSourceKind.GoogleDriveFolder, driveId);
         }
 
         if (finalUrl.StartsWith("https://drive.google.com/file", StringComparison.OrdinalIgnoreCase))
         {
-            var driveId = UrlExtractor.ExtractIdFromUrl(finalUrl);
+            string driveId = UrlExtractor.ExtractIdFromUrl(finalUrl);
             return new ResolvedTransferSource(sourceUrl, finalUrl, TransferSourceKind.GoogleDriveFile, driveId);
         }
 

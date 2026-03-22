@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Reflection;
+
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Services.Transfers;
@@ -33,9 +34,9 @@ public class GoogleDriveWatcherTests
             new("alpha.zip", "file-a", WatcherFileType.Zip, "alpha.png", 10),
             new("beta.rar", "file-b", WatcherFileType.Rar, "beta.png", 20),
         };
-        var files = CreateFiles(("file-b", "beta.rar", 20), ("file-c", "gamma.7z", 30));
+        IList<Google.Apis.Drive.v3.Data.File> files = CreateFiles(("file-b", "beta.rar", 20), ("file-c", "gamma.7z", 30));
 
-        var merged = await InvokeBuildMergedItemsAsync(current, files);
+        IReadOnlyList<WatcherFile> merged = await InvokeBuildMergedItemsAsync(current, files);
 
         Assert.Equal(2, merged.Count);
         Assert.DoesNotContain(merged, item => item.FilePath == "file-a");
@@ -53,7 +54,7 @@ public class GoogleDriveWatcherTests
         };
 
         using var cts = new CancellationTokenSource();
-        var pollTask = InvokePollAsync(sut, cts.Token);
+        Task pollTask = InvokePollAsync(sut, cts.Token);
         cts.CancelAfter(TimeSpan.FromMilliseconds(25));
 
         await pollTask;
@@ -76,7 +77,7 @@ public class GoogleDriveWatcherTests
         IEnumerable<WatcherFile> currentItems,
         IList<Google.Apis.Drive.v3.Data.File> files)
     {
-        var method = typeof(GoogleDriveWatcher).GetMethod("BuildMergedItemsAsync", BindingFlags.Static | BindingFlags.NonPublic);
+        MethodInfo? method = typeof(GoogleDriveWatcher).GetMethod("BuildMergedItemsAsync", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(method);
 
         var task = method!.Invoke(null, [currentItems, files]) as Task<IReadOnlyList<WatcherFile>>;
@@ -86,7 +87,7 @@ public class GoogleDriveWatcherTests
 
     private static async Task InvokePollAsync(GoogleDriveWatcher watcher, CancellationToken cancellationToken)
     {
-        var method = typeof(GoogleDriveWatcher).GetMethod("PollAsync", BindingFlags.Instance | BindingFlags.NonPublic);
+        MethodInfo? method = typeof(GoogleDriveWatcher).GetMethod("PollAsync", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
 
         var task = method!.Invoke(watcher, [cancellationToken]) as Task;
@@ -125,7 +126,9 @@ public class GoogleDriveWatcherTests
         {
             ListFilesCallCount++;
             if (_responses.Count == 0)
+            {
                 return Task.FromResult<IList<Google.Apis.Drive.v3.Data.File>>(new List<Google.Apis.Drive.v3.Data.File>());
+            }
 
             return Task.FromResult(_responses.Dequeue());
         }

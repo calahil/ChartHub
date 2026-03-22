@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+
 using ChartHub.Models;
 
 namespace ChartHub.Services;
@@ -28,19 +29,21 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
     public async Task<DesktopSyncPairClaimResponse> ClaimPairTokenAsync(string baseUrl, string pairCode, string? deviceLabel = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(pairCode))
+        {
             throw new InvalidOperationException("Pair code is required.");
+        }
 
-        var payload = JsonSerializer.Serialize(new
+        string payload = JsonSerializer.Serialize(new
         {
             pairCode,
             deviceLabel,
         });
 
-        using var request = BuildRequest(HttpMethod.Post, baseUrl, "/api/pair/claim", token: string.Empty);
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, "/api/pair/claim", token: string.Empty);
         request.Content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
 
-        using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
-        var claim = await ReadJsonAsync<PairClaimEnvelope>(response, cancellationToken).ConfigureAwait(false);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        PairClaimEnvelope claim = await ReadJsonAsync<PairClaimEnvelope>(response, cancellationToken).ConfigureAwait(false);
 
         return new DesktopSyncPairClaimResponse(
             Paired: claim.Paired,
@@ -50,9 +53,9 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
 
     public async Task<DesktopSyncVersionResponse> GetVersionAsync(string baseUrl, string token, CancellationToken cancellationToken = default)
     {
-        using var request = BuildRequest(HttpMethod.Get, baseUrl, "/api/version", token);
-        using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
-        var payload = await ReadJsonAsync<VersionEnvelope>(response, cancellationToken).ConfigureAwait(false);
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Get, baseUrl, "/api/version", token);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        VersionEnvelope payload = await ReadJsonAsync<VersionEnvelope>(response, cancellationToken).ConfigureAwait(false);
 
         return new DesktopSyncVersionResponse(
             Api: payload.Api ?? "",
@@ -64,9 +67,9 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
     public async Task<IReadOnlyList<IngestionQueueItem>> GetIngestionsAsync(string baseUrl, string token, int limit = 100, CancellationToken cancellationToken = default)
     {
         limit = Math.Clamp(limit, 1, 500);
-        using var request = BuildRequest(HttpMethod.Get, baseUrl, $"/api/ingestions?limit={limit}", token);
-        using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
-        var payload = await ReadJsonAsync<QueueEnvelope>(response, cancellationToken).ConfigureAwait(false);
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Get, baseUrl, $"/api/ingestions?limit={limit}", token);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        QueueEnvelope payload = await ReadJsonAsync<QueueEnvelope>(response, cancellationToken).ConfigureAwait(false);
 
         return payload.Items?.Select(MapQueueItem).ToList() ?? [];
     }
@@ -88,13 +91,13 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
 
     private static async Task PostActionAsync(string baseUrl, string token, long ingestionId, string action, CancellationToken cancellationToken)
     {
-        using var request = BuildRequest(HttpMethod.Post, baseUrl, $"/api/ingestions/{ingestionId}/actions/{action}", token);
-        using var _ = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, $"/api/ingestions/{ingestionId}/actions/{action}", token);
+        using HttpResponseMessage _ = await SendAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
     private static HttpRequestMessage BuildRequest(HttpMethod method, string baseUrl, string relativePath, string token)
     {
-        var baseUri = ParseBaseUri(baseUrl);
+        Uri baseUri = ParseBaseUri(baseUrl);
         var request = new HttpRequestMessage(method, new Uri(baseUri, relativePath));
 
         if (!string.IsNullOrWhiteSpace(token))
@@ -113,25 +116,31 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
             Timeout = TimeSpan.FromSeconds(10),
         };
 
-        var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (response.IsSuccessStatusCode)
+        {
             return response;
+        }
 
-        var errorBody = await TryReadErrorAsync(response, cancellationToken).ConfigureAwait(false);
+        string errorBody = await TryReadErrorAsync(response, cancellationToken).ConfigureAwait(false);
         throw new InvalidOperationException($"Desktop sync API request failed ({(int)response.StatusCode} {response.ReasonPhrase}): {errorBody}");
     }
 
     private static async Task<string> TryReadErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        var payload = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        string payload = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(payload))
+        {
             return "No error payload.";
+        }
 
         try
         {
-            var envelope = JsonSerializer.Deserialize<ErrorEnvelope>(payload, JsonOptions);
+            ErrorEnvelope? envelope = JsonSerializer.Deserialize<ErrorEnvelope>(payload, JsonOptions);
             if (!string.IsNullOrWhiteSpace(envelope?.Error))
+            {
                 return envelope.Error;
+            }
         }
         catch
         {
@@ -143,19 +152,23 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
 
     private static async Task<T> ReadJsonAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        var payload = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        var result = JsonSerializer.Deserialize<T>(payload, JsonOptions);
+        string payload = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        T? result = JsonSerializer.Deserialize<T>(payload, JsonOptions);
         if (result is null)
+        {
             throw new InvalidOperationException("Desktop sync API returned an empty payload.");
+        }
 
         return result;
     }
 
     private static Uri ParseBaseUri(string baseUrl)
     {
-        var candidate = baseUrl?.Trim() ?? string.Empty;
+        string candidate = baseUrl?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(candidate))
+        {
             throw new InvalidOperationException("Desktop API URL is required.");
+        }
 
         if (!candidate.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
             && !candidate.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
@@ -163,7 +176,7 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
             candidate = $"http://{candidate}";
         }
 
-        if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri)
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out Uri? uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
             || string.IsNullOrWhiteSpace(uri.Host))
         {
@@ -175,9 +188,15 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
 
     private static IngestionQueueItem MapQueueItem(IngestionQueueItemEnvelope item)
     {
-        Enum.TryParse<IngestionState>(item.CurrentState, ignoreCase: true, out var state);
-        Enum.TryParse<DesktopState>(item.DesktopState, ignoreCase: true, out var desktopState);
-        DateTimeOffset.TryParse(item.UpdatedAtUtc, out var updatedAtUtc);
+        IngestionState state = Enum.TryParse<IngestionState>(item.CurrentState, ignoreCase: true, out IngestionState parsedState)
+            ? parsedState
+            : default;
+        DesktopState desktopState = Enum.TryParse<DesktopState>(item.DesktopState, ignoreCase: true, out DesktopState parsedDesktopState)
+            ? parsedDesktopState
+            : default;
+        DateTimeOffset updatedAtUtc = DateTimeOffset.TryParse(item.UpdatedAtUtc, out DateTimeOffset parsedUpdatedAtUtc)
+            ? parsedUpdatedAtUtc
+            : default;
 
         return new IngestionQueueItem
         {

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+
 using ChartHub.Services;
 using ChartHub.Utilities;
 
@@ -122,13 +123,13 @@ public sealed class EncoreSong : INotifyPropertyChanged
 
     public ViewSong ToViewSong(string? fileName = null)
     {
-        var normalizedSongLengthSeconds = SongLengthMs.HasValue
+        long normalizedSongLengthSeconds = SongLengthMs.HasValue
             ? Math.Max(0, SongLengthMs.Value / 1000)
             : 0;
-        var normalizedAuthorName = string.IsNullOrWhiteSpace(ApplicationUsername)
+        string normalizedAuthorName = string.IsNullOrWhiteSpace(ApplicationUsername)
             ? Charter
             : ApplicationUsername;
-        var sourceId = !string.IsNullOrWhiteSpace(SourceId)
+        string sourceId = !string.IsNullOrWhiteSpace(SourceId)
             ? SourceId
             : LibraryIdentityService.BuildEncoreSourceKey(ChartId, Md5);
 

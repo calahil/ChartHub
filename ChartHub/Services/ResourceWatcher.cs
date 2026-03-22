@@ -1,243 +1,250 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+
 using Avalonia.Threading;
+
 using ChartHub.Models;
 using ChartHub.Utilities;
 
-namespace ChartHub.Services
+namespace ChartHub.Services;
+
+public class ResourceWatcher : IResourceWatcher, INotifyPropertyChanged, IDisposable
 {
-    public class ResourceWatcher : IResourceWatcher, INotifyPropertyChanged, IDisposable
+    private ObservableCollection<WatcherFile> _data;
+    public ObservableCollection<WatcherFile> Data
     {
-        private ObservableCollection<WatcherFile> _data;
-        public ObservableCollection<WatcherFile> Data
+        get => _data;
+        set
         {
-            get => _data;
-            set
+            _data = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private string _directoryPath;
+    public string DirectoryPath
+    {
+        get => _directoryPath;
+        set
+        {
+            _directoryPath = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private readonly FileSystemWatcher _fileSystemWatcher;
+    private readonly HashSet<string> _existingEntries;
+    private readonly WatcherType _watcherType;
+
+    public event EventHandler<string>? DirectoryNotFound;
+
+    public ResourceWatcher(string path, WatcherType watcherType)
+    {
+        _directoryPath = path;
+        _watcherType = watcherType;
+        _data = [];
+        _fileSystemWatcher = new FileSystemWatcher();
+        _existingEntries = [];
+        _fileSystemWatcher.Path = DirectoryPath;
+        _fileSystemWatcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName;
+        _fileSystemWatcher.Filter = "*.*";
+        _fileSystemWatcher.Created += OnCreated;
+        _fileSystemWatcher.Deleted += OnDeleted;
+        _fileSystemWatcher.Renamed += OnRenamed;
+        _fileSystemWatcher.EnableRaisingEvents = true;
+    }
+
+    public void LoadItems()
+    {
+        _ = LoadItemsAsync();
+    }
+
+    private async Task LoadItemsAsync()
+    {
+        if (Directory.Exists(DirectoryPath))
+        {
+            string[] items = [];
+
+            switch (_watcherType)
             {
-                _data = value;
-                OnPropertyChanged();
+                case WatcherType.Directory:
+                    items = Directory.GetDirectories(DirectoryPath);
+                    break;
+                case WatcherType.File:
+                    items = Directory.GetFiles(DirectoryPath);
+                    break;
             }
-        }
 
-        private string _directoryPath;
-        public string DirectoryPath
-        {
-            get => _directoryPath;
-            set
+            foreach (string item in items)
             {
-                _directoryPath = value;
-                OnPropertyChanged();
-            }
-        }
-
-        private readonly FileSystemWatcher fileSystemWatcher;
-        private HashSet<string> existingEntries;
-        private readonly WatcherType _watcherType;
-
-        public event EventHandler<string>? DirectoryNotFound;
-
-        public ResourceWatcher(string path, WatcherType watcherType)
-        {
-            _directoryPath = path;
-            _watcherType = watcherType;
-            _data = [];
-            fileSystemWatcher = new FileSystemWatcher();
-            existingEntries = [];
-            fileSystemWatcher.Path = DirectoryPath;
-            fileSystemWatcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName;
-            fileSystemWatcher.Filter = "*.*";
-            fileSystemWatcher.Created += OnCreated;
-            fileSystemWatcher.Deleted += OnDeleted;
-            fileSystemWatcher.Renamed += OnRenamed;
-            fileSystemWatcher.EnableRaisingEvents = true;
-        }
-
-        public void LoadItems()
-        {
-            _ = LoadItemsAsync();
-        }
-
-        private async Task LoadItemsAsync()
-        {
-            if (Directory.Exists(DirectoryPath))
-            {
-                string[] items = [];
-
-                switch (_watcherType)
+                if (!_existingEntries.Contains(item))
                 {
-                    case WatcherType.Directory:
-                        items = Directory.GetDirectories(DirectoryPath);
-                        break;
-                    case WatcherType.File:
-                        items = Directory.GetFiles(DirectoryPath);
-                        break;
-                }
-
-                foreach (var item in items)
-                {
-                    if (!existingEntries.Contains(item))
-                    {
-                        var itemName = Path.GetFileName(item);
-                        await AddItem(itemName, item);
-                    }
+                    string itemName = Path.GetFileName(item);
+                    await AddItem(itemName, item);
                 }
             }
-            else
-            {
-                DirectoryNotFound?.Invoke(this, DirectoryPath);
-            }
         }
-
-        private void OnRenamed(object sender, RenamedEventArgs e)
+        else
         {
-            Dispatcher.UIThread.Post(() =>
-            {
-                var itemName = e.Name ?? Path.GetFileName(e.FullPath);
-                _ = UpdateItem(itemName, e.FullPath, e.OldFullPath);
-            });
+            DirectoryNotFound?.Invoke(this, DirectoryPath);
         }
+    }
 
-        private void OnDeleted(object sender, FileSystemEventArgs e)
+    private void OnRenamed(object sender, RenamedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
         {
-            Dispatcher.UIThread.Post(() =>
-            {
-                try
-                {
-                    var itemName = e.Name ?? Path.GetFileName(e.FullPath);
-                    DeleteItem(itemName, e.FullPath);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError("Watcher", "Resource watcher delete event failed", ex, new Dictionary<string, object?>
-                    {
-                        ["directoryPath"] = DirectoryPath,
-                        ["itemPath"] = e.FullPath,
-                    });
-                }
-            });
-        }
+            string itemName = e.Name ?? Path.GetFileName(e.FullPath);
+            _ = UpdateItem(itemName, e.FullPath, e.OldFullPath);
+        });
+    }
 
-        private void OnCreated(object sender, FileSystemEventArgs e)
-        {
-            Dispatcher.UIThread.Post(async () =>
-            {
-                var itemName = e.Name ?? Path.GetFileName(e.FullPath);
-                await AddItem(itemName, e.FullPath);
-            });
-        }
-
-        private static async Task<WatcherFileType> GetFileTypeAsync(string filePath)
-        {
-            return await WatcherFileTypeResolver.GetFileTypeAsync(filePath);
-        }
-
-        private static string GetIconForFileType(WatcherFileType fileType)
-        {
-            return WatcherFileTypeResolver.GetIconForFileType(fileType);
-        }
-
-        private async Task AddItem(string itemName, string itemPath)
-        {
-            if (!existingEntries.Contains(itemPath))
-            {
-                var fileType = await GetFileTypeAsync(itemPath);
-                var imageFile = GetIconForFileType(fileType);
-                long sizeBytes;
-
-                switch (_watcherType)
-                {
-                    case WatcherType.File:
-                        try
-                        {
-                            var info = new FileInfo(itemPath);
-                            sizeBytes = info.Length;
-                        }
-                        catch (UnauthorizedAccessException)
-                        {
-                            sizeBytes = 0;
-                        }
-                        break;
-                    case WatcherType.Directory:
-                        sizeBytes = FileTools.GetDirectorySize(itemPath);
-                        break;
-                    default:
-                        sizeBytes = 0;
-                        break;
-                }
-
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    if (!existingEntries.Contains(itemPath))
-                    {
-                        Data.Add(new WatcherFile(itemName, itemPath, fileType, imageFile, sizeBytes));
-                        existingEntries.Add(itemPath);
-                    }
-                });
-            }
-        }
-
-        private void DeleteItem(string itemName, string itemPath)
-        {
-            var itemToRemove = Data.FirstOrDefault(file => file.DisplayName == itemName);
-
-            if (itemToRemove != null)
-                Data.Remove(itemToRemove);
-
-            if (existingEntries.Contains(itemPath))
-                existingEntries.Remove(itemPath);
-        }
-
-        private async Task UpdateItem(string itemName, string itemPath, string oldItemPath)
+    private void OnDeleted(object sender, FileSystemEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
         {
             try
             {
-                var fileType = await GetFileTypeAsync(itemPath).ConfigureAwait(false);
-                var imageFile = GetIconForFileType(fileType);
-
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    var itemToEdit = Data.FirstOrDefault(item => item.FilePath == oldItemPath);
-
-                    if (itemToEdit != null)
-                    {
-                        itemToEdit.FileType = fileType;
-                        itemToEdit.ImageFile = imageFile;
-                        itemToEdit.FilePath = itemPath;
-                        itemToEdit.DisplayName = itemName;
-                    }
-
-                    if (existingEntries.Contains(oldItemPath))
-                        existingEntries.Remove(oldItemPath);
-
-                    existingEntries.Add(itemPath);
-                });
+                string itemName = e.Name ?? Path.GetFileName(e.FullPath);
+                DeleteItem(itemName, e.FullPath);
             }
             catch (Exception ex)
             {
-                Logger.LogError("Watcher", "Resource watcher rename update failed", ex, new Dictionary<string, object?>
+                Logger.LogError("Watcher", "Resource watcher delete event failed", ex, new Dictionary<string, object?>
                 {
                     ["directoryPath"] = DirectoryPath,
-                    ["itemPath"] = itemPath,
-                    ["oldItemPath"] = oldItemPath,
+                    ["itemPath"] = e.FullPath,
                 });
             }
-        }
+        });
+    }
 
-        public void Dispose()
+    private void OnCreated(object sender, FileSystemEventArgs e)
+    {
+        Dispatcher.UIThread.Post(async () =>
         {
-            fileSystemWatcher.EnableRaisingEvents = false;
-            fileSystemWatcher.Created -= OnCreated;
-            fileSystemWatcher.Deleted -= OnDeleted;
-            fileSystemWatcher.Renamed -= OnRenamed;
-            fileSystemWatcher.Dispose();
-        }
+            string itemName = e.Name ?? Path.GetFileName(e.FullPath);
+            await AddItem(itemName, e.FullPath);
+        });
+    }
 
-        public event PropertyChangedEventHandler? PropertyChanged;
+    private static async Task<WatcherFileType> GetFileTypeAsync(string filePath)
+    {
+        return await WatcherFileTypeResolver.GetFileTypeAsync(filePath);
+    }
 
-        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    private static string GetIconForFileType(WatcherFileType fileType)
+    {
+        return WatcherFileTypeResolver.GetIconForFileType(fileType);
+    }
+
+    private async Task AddItem(string itemName, string itemPath)
+    {
+        if (!_existingEntries.Contains(itemPath))
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            WatcherFileType fileType = await GetFileTypeAsync(itemPath);
+            string imageFile = GetIconForFileType(fileType);
+            long sizeBytes;
+
+            switch (_watcherType)
+            {
+                case WatcherType.File:
+                    try
+                    {
+                        var info = new FileInfo(itemPath);
+                        sizeBytes = info.Length;
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        sizeBytes = 0;
+                    }
+                    break;
+                case WatcherType.Directory:
+                    sizeBytes = FileTools.GetDirectorySize(itemPath);
+                    break;
+                default:
+                    sizeBytes = 0;
+                    break;
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (!_existingEntries.Contains(itemPath))
+                {
+                    Data.Add(new WatcherFile(itemName, itemPath, fileType, imageFile, sizeBytes));
+                    _existingEntries.Add(itemPath);
+                }
+            });
         }
+    }
+
+    private void DeleteItem(string itemName, string itemPath)
+    {
+        WatcherFile? itemToRemove = Data.FirstOrDefault(file => file.DisplayName == itemName);
+
+        if (itemToRemove != null)
+        {
+            Data.Remove(itemToRemove);
+        }
+
+        if (_existingEntries.Contains(itemPath))
+        {
+            _existingEntries.Remove(itemPath);
+        }
+    }
+
+    private async Task UpdateItem(string itemName, string itemPath, string oldItemPath)
+    {
+        try
+        {
+            WatcherFileType fileType = await GetFileTypeAsync(itemPath).ConfigureAwait(false);
+            string imageFile = GetIconForFileType(fileType);
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                WatcherFile? itemToEdit = Data.FirstOrDefault(item => item.FilePath == oldItemPath);
+
+                if (itemToEdit != null)
+                {
+                    itemToEdit.FileType = fileType;
+                    itemToEdit.ImageFile = imageFile;
+                    itemToEdit.FilePath = itemPath;
+                    itemToEdit.DisplayName = itemName;
+                }
+
+                if (_existingEntries.Contains(oldItemPath))
+                {
+                    _existingEntries.Remove(oldItemPath);
+                }
+
+                _existingEntries.Add(itemPath);
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Watcher", "Resource watcher rename update failed", ex, new Dictionary<string, object?>
+            {
+                ["directoryPath"] = DirectoryPath,
+                ["itemPath"] = itemPath,
+                ["oldItemPath"] = oldItemPath,
+            });
+        }
+    }
+
+    public void Dispose()
+    {
+        _fileSystemWatcher.EnableRaisingEvents = false;
+        _fileSystemWatcher.Created -= OnCreated;
+        _fileSystemWatcher.Deleted -= OnDeleted;
+        _fileSystemWatcher.Renamed -= OnRenamed;
+        _fileSystemWatcher.Dispose();
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }

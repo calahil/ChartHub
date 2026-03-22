@@ -39,19 +39,23 @@ internal static class NameConflictResolver
         originalName = SafePathHelper.SanitizeFileName(originalName, "download.bin");
 
         if (!exists(originalName))
-            return originalName;
-
-        var extension = Path.GetExtension(originalName);
-        var baseName = Path.GetFileNameWithoutExtension(originalName);
-
-        for (var i = 1; i < 10_000; i++)
         {
-            var candidate = string.IsNullOrWhiteSpace(extension)
+            return originalName;
+        }
+
+        string extension = Path.GetExtension(originalName);
+        string baseName = Path.GetFileNameWithoutExtension(originalName);
+
+        for (int i = 1; i < 10_000; i++)
+        {
+            string candidate = string.IsNullOrWhiteSpace(extension)
                 ? $"{baseName} ({i})"
                 : $"{baseName} ({i}){extension}";
 
             if (!exists(candidate))
+            {
                 return candidate;
+            }
         }
 
         throw new IOException($"Unable to resolve a unique file name for '{originalName}'.");

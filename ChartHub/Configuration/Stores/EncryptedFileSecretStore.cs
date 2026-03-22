@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+
 using ChartHub.Configuration.Interfaces;
 
 namespace ChartHub.Configuration.Stores;
@@ -16,13 +17,17 @@ public class EncryptedFileSecretStore : ISecretStore
         _secretFilePath = secretFilePath;
         _masterKeyPath = masterKeyPath;
 
-        var secretDir = Path.GetDirectoryName(secretFilePath);
+        string? secretDir = Path.GetDirectoryName(secretFilePath);
         if (!string.IsNullOrWhiteSpace(secretDir))
+        {
             Directory.CreateDirectory(secretDir);
+        }
 
-        var keyDir = Path.GetDirectoryName(masterKeyPath);
+        string? keyDir = Path.GetDirectoryName(masterKeyPath);
         if (!string.IsNullOrWhiteSpace(keyDir))
+        {
             Directory.CreateDirectory(keyDir);
+        }
     }
 
     public async Task<string?> GetAsync(string key, CancellationToken cancellationToken = default)
@@ -30,8 +35,8 @@ public class EncryptedFileSecretStore : ISecretStore
         await _mutex.WaitAsync(cancellationToken);
         try
         {
-            var store = await LoadStoreAsync(cancellationToken);
-            return store.TryGetValue(key, out var value) ? value : null;
+            Dictionary<string, string> store = await LoadStoreAsync(cancellationToken);
+            return store.TryGetValue(key, out string? value) ? value : null;
         }
         finally
         {
@@ -44,7 +49,7 @@ public class EncryptedFileSecretStore : ISecretStore
         await _mutex.WaitAsync(cancellationToken);
         try
         {
-            var store = await LoadStoreAsync(cancellationToken);
+            Dictionary<string, string> store = await LoadStoreAsync(cancellationToken);
             store[key] = value;
             await SaveStoreAsync(store, cancellationToken);
         }
@@ -59,9 +64,11 @@ public class EncryptedFileSecretStore : ISecretStore
         await _mutex.WaitAsync(cancellationToken);
         try
         {
-            var store = await LoadStoreAsync(cancellationToken);
+            Dictionary<string, string> store = await LoadStoreAsync(cancellationToken);
             if (!store.Remove(key))
+            {
                 return;
+            }
 
             await SaveStoreAsync(store, cancellationToken);
         }
@@ -76,7 +83,7 @@ public class EncryptedFileSecretStore : ISecretStore
         await _mutex.WaitAsync(cancellationToken);
         try
         {
-            var store = await LoadStoreAsync(cancellationToken);
+            Dictionary<string, string> store = await LoadStoreAsync(cancellationToken);
             return store.ContainsKey(key);
         }
         finally
@@ -88,21 +95,25 @@ public class EncryptedFileSecretStore : ISecretStore
     private async Task<Dictionary<string, string>> LoadStoreAsync(CancellationToken cancellationToken)
     {
         if (!File.Exists(_secretFilePath))
+        {
             return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
 
-        var encryptedPayload = await File.ReadAllTextAsync(_secretFilePath, cancellationToken);
+        string encryptedPayload = await File.ReadAllTextAsync(_secretFilePath, cancellationToken);
         if (string.IsNullOrWhiteSpace(encryptedPayload))
+        {
             return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
 
-        var plaintext = Decrypt(encryptedPayload, GetOrCreateMasterKey());
+        string plaintext = Decrypt(encryptedPayload, GetOrCreateMasterKey());
         return JsonSerializer.Deserialize<Dictionary<string, string>>(plaintext)
             ?? new Dictionary<string, string>(StringComparer.Ordinal);
     }
 
     private async Task SaveStoreAsync(Dictionary<string, string> store, CancellationToken cancellationToken)
     {
-        var json = JsonSerializer.Serialize(store);
-        var encryptedPayload = Encrypt(json, GetOrCreateMasterKey());
+        string json = JsonSerializer.Serialize(store);
+        string encryptedPayload = Encrypt(json, GetOrCreateMasterKey());
         await File.WriteAllTextAsync(_secretFilePath, encryptedPayload, cancellationToken);
         TryHardenFilePermissions(_secretFilePath);
     }
@@ -111,11 +122,11 @@ public class EncryptedFileSecretStore : ISecretStore
     {
         if (File.Exists(_masterKeyPath))
         {
-            var existing = File.ReadAllText(_masterKeyPath);
+            string existing = File.ReadAllText(_masterKeyPath);
             return Convert.FromBase64String(existing);
         }
 
-        var key = RandomNumberGenerator.GetBytes(32);
+        byte[] key = RandomNumberGenerator.GetBytes(32);
         File.WriteAllText(_masterKeyPath, Convert.ToBase64String(key));
         TryHardenFilePermissions(_masterKeyPath);
         return key;
@@ -123,15 +134,15 @@ public class EncryptedFileSecretStore : ISecretStore
 
     private static string Encrypt(string plaintext, byte[] key)
     {
-        var nonce = RandomNumberGenerator.GetBytes(12);
-        var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
-        var ciphertext = new byte[plaintextBytes.Length];
-        var tag = new byte[16];
+        byte[] nonce = RandomNumberGenerator.GetBytes(12);
+        byte[] plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
+        byte[] ciphertext = new byte[plaintextBytes.Length];
+        byte[] tag = new byte[16];
 
         using var aes = new AesGcm(key, tagSizeInBytes: 16);
         aes.Encrypt(nonce, plaintextBytes, ciphertext, tag);
 
-        var combined = new byte[nonce.Length + tag.Length + ciphertext.Length];
+        byte[] combined = new byte[nonce.Length + tag.Length + ciphertext.Length];
         Buffer.BlockCopy(nonce, 0, combined, 0, nonce.Length);
         Buffer.BlockCopy(tag, 0, combined, nonce.Length, tag.Length);
         Buffer.BlockCopy(ciphertext, 0, combined, nonce.Length + tag.Length, ciphertext.Length);
@@ -141,14 +152,16 @@ public class EncryptedFileSecretStore : ISecretStore
 
     private static string Decrypt(string encryptedPayload, byte[] key)
     {
-        var combined = Convert.FromBase64String(encryptedPayload);
+        byte[] combined = Convert.FromBase64String(encryptedPayload);
         if (combined.Length < 12 + 16)
+        {
             throw new InvalidDataException("Invalid encrypted secret payload.");
+        }
 
-        var nonce = combined[..12];
-        var tag = combined[12..28];
-        var ciphertext = combined[28..];
-        var plaintext = new byte[ciphertext.Length];
+        byte[] nonce = combined[..12];
+        byte[] tag = combined[12..28];
+        byte[] ciphertext = combined[28..];
+        byte[] plaintext = new byte[ciphertext.Length];
 
         using var aes = new AesGcm(key, tagSizeInBytes: 16);
         aes.Decrypt(nonce, ciphertext, tag, plaintext);

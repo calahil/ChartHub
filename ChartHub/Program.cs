@@ -1,10 +1,13 @@
-using System.Text.Json;
 using System.Runtime.ExceptionServices;
+using System.Text.Json;
+
 using Avalonia;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+
 using ChartHub.Services;
 using ChartHub.Utilities;
+
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChartHub;
 
@@ -14,7 +17,7 @@ class Program
     [STAThread]
     static void Main(string[] args)
     {
-        var serviceProvider = AppBootstrapper.CreateServiceProvider();
+        IServiceProvider serviceProvider = AppBootstrapper.CreateServiceProvider();
         App.ServiceProvider = serviceProvider;
 
         BuildAvaloniaApp()

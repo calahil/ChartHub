@@ -1,4 +1,5 @@
-using Microsoft.Extensions.DependencyInjection;
+using System.Reflection;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Migration;
 using ChartHub.Configuration.Stores;
@@ -6,6 +7,8 @@ using ChartHub.Services;
 using ChartHub.Services.Transfers;
 using ChartHub.Utilities;
 using ChartHub.ViewModels;
+
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChartHub.Tests;
 
@@ -17,7 +20,7 @@ public class AppBootstrapperTests
     {
         using var temp = new TestInfrastructure.TemporaryDirectoryFixture("bootstrapper-resolve");
 
-        var provider = CreateProvider(temp.RootPath, migrationActionOverride: null);
+        IServiceProvider provider = CreateProvider(temp.RootPath, migrationActionOverride: null);
 
         Assert.NotNull(provider.GetService<IAppConfigStore>());
         Assert.NotNull(provider.GetService<ISettingsOrchestrator>());
@@ -31,7 +34,7 @@ public class AppBootstrapperTests
     {
         using var temp = new TestInfrastructure.TemporaryDirectoryFixture("bootstrapper-migration-fail");
 
-        var provider = CreateProvider(
+        IServiceProvider provider = CreateProvider(
             temp.RootPath,
             _ => throw new InvalidOperationException("migration boom"));
 
@@ -41,7 +44,7 @@ public class AppBootstrapperTests
 
     private static IServiceProvider CreateProvider(string configDir, Func<IServiceProvider, Task>? migrationActionOverride)
     {
-        var method = typeof(AppBootstrapper).GetMethod(
+        MethodInfo? method = typeof(AppBootstrapper).GetMethod(
             "CreateServiceProvider",
             System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic,
             binder: null,

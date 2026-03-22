@@ -6,15 +6,15 @@ public sealed class TemporaryDirectoryFixture : IDisposable
 
     public TemporaryDirectoryFixture(string? prefix = null)
     {
-        var directoryName = $"{prefix ?? "rv-tests"}-{Guid.NewGuid():N}";
+        string directoryName = $"{prefix ?? "rv-tests"}-{Guid.NewGuid():N}";
         RootPath = Path.Combine(Path.GetTempPath(), directoryName);
         Directory.CreateDirectory(RootPath);
     }
 
     public string CreateSubdirectory(string? name = null)
     {
-        var directoryName = string.IsNullOrWhiteSpace(name) ? Guid.NewGuid().ToString("N") : name;
-        var path = Path.Combine(RootPath, directoryName);
+        string directoryName = string.IsNullOrWhiteSpace(name) ? Guid.NewGuid().ToString("N") : name;
+        string path = Path.Combine(RootPath, directoryName);
         Directory.CreateDirectory(path);
         return path;
     }
@@ -29,7 +29,9 @@ public sealed class TemporaryDirectoryFixture : IDisposable
         try
         {
             if (Directory.Exists(RootPath))
+            {
                 Directory.Delete(RootPath, recursive: true);
+            }
         }
         catch
         {

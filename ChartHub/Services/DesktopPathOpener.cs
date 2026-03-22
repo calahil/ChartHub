@@ -14,15 +14,21 @@ public sealed class DesktopPathOpener : IDesktopPathOpener
         cancellationToken.ThrowIfCancellationRequested();
 
         if (string.IsNullOrWhiteSpace(directoryPath))
+        {
             throw new ArgumentException("Directory path is required.", nameof(directoryPath));
+        }
 
         if (!Directory.Exists(directoryPath))
+        {
             throw new DirectoryNotFoundException($"Directory does not exist: {directoryPath}");
+        }
 
-        var startInfo = BuildStartInfo(directoryPath);
+        ProcessStartInfo startInfo = BuildStartInfo(directoryPath);
         var process = Process.Start(startInfo);
         if (process is null)
+        {
             throw new InvalidOperationException("Failed to start desktop path opener process.");
+        }
 
         return Task.CompletedTask;
     }

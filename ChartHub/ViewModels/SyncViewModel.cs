@@ -4,10 +4,12 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
-using CommunityToolkit.Mvvm.Input;
+
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Utilities;
+
+using CommunityToolkit.Mvvm.Input;
 
 namespace ChartHub.ViewModels;
 
@@ -43,7 +45,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             if (_desktopApiBaseUrl == value)
+            {
                 return;
+            }
 
             _desktopApiBaseUrl = value;
             OnPropertyChanged();
@@ -60,7 +64,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             if (_syncToken == value)
+            {
                 return;
+            }
 
             _syncToken = value;
             OnPropertyChanged();
@@ -76,7 +82,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_statusMessage == value)
+            {
                 return;
+            }
 
             _statusMessage = value;
             OnPropertyChanged();
@@ -89,7 +97,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_errorMessage == value)
+            {
                 return;
+            }
 
             _errorMessage = value;
             OnPropertyChanged();
@@ -104,16 +114,24 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         get
         {
             if (IsBusy)
+            {
                 return "Working...";
+            }
 
             if (IsConnected)
+            {
                 return "Connected. Use Refresh Queue to pull desktop ingestion updates.";
+            }
 
             if (HasError)
+            {
                 return "Connection failed. Verify desktop URL and credentials, then retry.";
+            }
 
             if (string.IsNullOrWhiteSpace(SyncToken))
+            {
                 return "Use Pair + Connect with the desktop pair code, or paste a sync token then Connect.";
+            }
 
             return "Press Connect to validate token and load the desktop queue.";
         }
@@ -127,7 +145,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_isBusy == value)
+            {
                 return;
+            }
 
             _isBusy = value;
             OnPropertyChanged();
@@ -149,7 +169,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (_isConnected == value)
+            {
                 return;
+            }
 
             _isConnected = value;
             OnPropertyChanged();
@@ -164,9 +186,13 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OpenFolderSelectedCommand.NotifyCanExecuteChanged();
 
             if (_isConnected)
+            {
                 StartAutoRefreshLoop();
+            }
             else
+            {
                 StopAutoRefreshLoop();
+            }
         }
     }
 
@@ -176,7 +202,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             if (_selectedItem == value)
+            {
                 return;
+            }
 
             _selectedItem = value;
             OnPropertyChanged();
@@ -192,7 +220,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             if (_deviceLabel == value)
+            {
                 return;
+            }
 
             _deviceLabel = value;
             OnPropertyChanged();
@@ -207,7 +237,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             if (_pairCode == value)
+            {
                 return;
+            }
 
             _pairCode = value;
             OnPropertyChanged();
@@ -222,7 +254,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         set
         {
             if (_selectedProfile == value)
+            {
                 return;
+            }
 
             _selectedProfile = value;
             OnPropertyChanged();
@@ -249,7 +283,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         private set
         {
             if (ReferenceEquals(_diagnostics, value))
+            {
                 return;
+            }
 
             _diagnostics = value;
             OnPropertyChanged();
@@ -282,7 +318,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         _pairCode = _appGlobalSettings.SyncApiPairCode;
 
         if (!string.IsNullOrWhiteSpace(_appGlobalSettings.SyncApiAuthToken))
+        {
             _syncToken = _appGlobalSettings.SyncApiAuthToken;
+        }
 
         QueueItems.CollectionChanged += OnQueueItemsCollectionChanged;
         LoadProfiles();
@@ -345,13 +383,17 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     {
         await RunOperationAsync(async () =>
         {
-            var claim = await _desktopSyncApiClient.ClaimPairTokenAsync(DesktopApiBaseUrl, PairCode, DeviceLabel);
+            DesktopSyncPairClaimResponse claim = await _desktopSyncApiClient.ClaimPairTokenAsync(DesktopApiBaseUrl, PairCode, DeviceLabel);
             if (!claim.Paired || string.IsNullOrWhiteSpace(claim.Token))
+            {
                 throw new InvalidOperationException("Pairing did not return a usable token.");
+            }
 
             SyncToken = claim.Token;
             if (!string.IsNullOrWhiteSpace(claim.ApiBaseUrl))
+            {
                 DesktopApiBaseUrl = claim.ApiBaseUrl;
+            }
 
             await ConnectAndRefreshAsync();
         }, "Pair-code handshake failed");
@@ -359,9 +401,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task ConnectAndRefreshAsync()
     {
-        var version = await _desktopSyncApiClient.GetVersionAsync(DesktopApiBaseUrl, SyncToken);
+        DesktopSyncVersionResponse version = await _desktopSyncApiClient.GetVersionAsync(DesktopApiBaseUrl, SyncToken);
         if (!version.SupportsIngestions)
+        {
             throw new InvalidOperationException("Desktop host does not support ingestion sync.");
+        }
 
         IsConnected = true;
         _appGlobalSettings.SyncApiAuthToken = SyncToken;
@@ -392,11 +436,13 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task RefreshQueueCoreAsync()
     {
-        var items = await _desktopSyncApiClient.GetIngestionsAsync(DesktopApiBaseUrl, SyncToken, limit: 200);
+        IReadOnlyList<IngestionQueueItem> items = await _desktopSyncApiClient.GetIngestionsAsync(DesktopApiBaseUrl, SyncToken, limit: 200);
 
         QueueItems.Clear();
-        foreach (var item in items)
+        foreach (IngestionQueueItem item in items)
+        {
             QueueItems.Add(item);
+        }
 
         StatusMessage = QueueItems.Count == 0
             ? "Connected. No ingestion items currently queued."
@@ -415,7 +461,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         StopAutoRefreshLoop();
 
         _autoRefreshCancellationTokenSource = new CancellationTokenSource();
-        var cancellationToken = _autoRefreshCancellationTokenSource.Token;
+        CancellationToken cancellationToken = _autoRefreshCancellationTokenSource.Token;
 
         _ = Task.Run(async () =>
         {
@@ -442,7 +488,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
                 await Task.Delay(_autoRefreshInterval, cancellationToken);
 
                 if (cancellationToken.IsCancellationRequested || !IsConnected || IsBusy)
+                {
                     continue;
+                }
 
                 await RefreshQueueAsync();
             }
@@ -456,9 +504,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private async Task RetrySelectedAsync(IngestionQueueItem? item)
     {
         if (item is null)
+        {
             return;
+        }
 
-        var initiatedAt = DateTimeOffset.UtcNow;
+        DateTimeOffset initiatedAt = DateTimeOffset.UtcNow;
         item.LastActionResult = new ActionResult
         {
             ActionType = ActionType.Retry,
@@ -503,9 +553,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private async Task InstallSelectedAsync(IngestionQueueItem? item)
     {
         if (item is null)
+        {
             return;
+        }
 
-        var initiatedAt = DateTimeOffset.UtcNow;
+        DateTimeOffset initiatedAt = DateTimeOffset.UtcNow;
         item.LastActionResult = new ActionResult
         {
             ActionType = ActionType.Install,
@@ -550,9 +602,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private async Task OpenFolderSelectedAsync(IngestionQueueItem? item)
     {
         if (item is null)
+        {
             return;
+        }
 
-        var initiatedAt = DateTimeOffset.UtcNow;
+        DateTimeOffset initiatedAt = DateTimeOffset.UtcNow;
         item.LastActionResult = new ActionResult
         {
             ActionType = ActionType.OpenFolder,
@@ -596,10 +650,12 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private void SaveCurrentProfile()
     {
         if (!CanSaveProfile())
+        {
             return;
+        }
 
-        var name = DeviceLabel.Trim();
-        var existing = SavedProfiles.FirstOrDefault(profile =>
+        string name = DeviceLabel.Trim();
+        SyncConnectionProfile? existing = SavedProfiles.FirstOrDefault(profile =>
             profile.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
         var profile = new SyncConnectionProfile(
@@ -615,7 +671,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
         else
         {
-            var index = SavedProfiles.IndexOf(existing);
+            int index = SavedProfiles.IndexOf(existing);
             SavedProfiles[index] = profile;
         }
 
@@ -628,7 +684,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private void ApplyProfile(SyncConnectionProfile? profile)
     {
         if (profile is null)
+        {
             return;
+        }
 
         DeviceLabel = profile.Name;
         DesktopApiBaseUrl = profile.BaseUrl;
@@ -647,11 +705,15 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private void RemoveProfile(SyncConnectionProfile? profile)
     {
         if (profile is null)
+        {
             return;
+        }
 
         SavedProfiles.Remove(profile);
         if (ReferenceEquals(SelectedProfile, profile))
+        {
             SelectedProfile = null;
+        }
 
         PersistProfiles();
         StatusMessage = $"Removed profile '{profile.Name}'.";
@@ -660,15 +722,17 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
     private void LoadProfiles()
     {
-        var json = _appGlobalSettings.SyncApiSavedConnectionsJson;
+        string json = _appGlobalSettings.SyncApiSavedConnectionsJson;
         if (string.IsNullOrWhiteSpace(json))
+        {
             return;
+        }
 
         try
         {
-            var items = JsonSerializer.Deserialize<List<SyncConnectionProfile>>(json, ProfileJsonOptions) ?? [];
+            List<SyncConnectionProfile> items = JsonSerializer.Deserialize<List<SyncConnectionProfile>>(json, ProfileJsonOptions) ?? [];
             SavedProfiles.Clear();
-            foreach (var item in items.Where(static item => !string.IsNullOrWhiteSpace(item.Name)))
+            foreach (SyncConnectionProfile? item in items.Where(static item => !string.IsNullOrWhiteSpace(item.Name)))
             {
                 SavedProfiles.Add(item);
             }
@@ -681,14 +745,16 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
     private void PersistProfiles()
     {
-        var json = JsonSerializer.Serialize(SavedProfiles.ToList(), ProfileJsonOptions);
+        string json = JsonSerializer.Serialize(SavedProfiles.ToList(), ProfileJsonOptions);
         _appGlobalSettings.SyncApiSavedConnectionsJson = json;
     }
 
     private async Task RunOperationAsync(Func<Task> operation, string context)
     {
         if (IsBusy)
+        {
             return;
+        }
 
         IsBusy = true;
         try
@@ -705,7 +771,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged(nameof(AutoRefreshHint));
 
             // Classify error and update diagnostics
-            var (category, remediation) = ClassifyError(ex);
+            (ErrorCategory category, string? remediation) = ClassifyError(ex);
             Diagnostics = new ConnectionDiagnostics
             {
                 LastAttemptUtc = DateTime.UtcNow,
@@ -730,17 +796,23 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
     private (ErrorCategory category, string remediation) ClassifyError(Exception ex)
     {
-        var message = ex.Message.ToLowerInvariant();
+        string message = ex.Message.ToLowerInvariant();
 
         if (message.Contains("not found") || message.Contains("unreachable") || message.Contains("connection refused")
             || message.Contains("timeout") || message.Contains("no such host"))
+        {
             return (ErrorCategory.NetworkUnreachable, "Verify desktop URL (e.g., http://192.168.1.10:15123) is correct and reachable.");
+        }
 
         if (message.Contains("unauthorized") || message.Contains("invalid token") || message.Contains("authentication"))
+        {
             return (ErrorCategory.AuthenticationFailed, "Regenerate token in Settings or re-pair with desktop.");
+        }
 
         if (message.Contains("does not support") || message.Contains("ingestion") || ex is InvalidOperationException)
+        {
             return (ErrorCategory.UnsupportedVersion, "Upgrade desktop host or check compatibility.");
+        }
 
         return (ErrorCategory.UnknownError, "Check error message above and retry.");
     }

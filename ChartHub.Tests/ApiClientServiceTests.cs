@@ -1,8 +1,13 @@
+using System.Collections.ObjectModel;
 using System.Net;
 using System.Net.Http;
-using Microsoft.Extensions.Configuration;
+using System.Reflection;
+
+using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.ViewModels;
+
+using Microsoft.Extensions.Configuration;
 
 namespace ChartHub.Tests;
 
@@ -17,7 +22,7 @@ public class ApiClientServiceTests
             BaseAddress = new Uri("https://rhythmverse.co"),
         };
 
-        var sut = CreateService(
+        ApiClientService sut = CreateService(
             configurationValues: new Dictionary<string, string?>
             {
                 ["UseMockData"] = "True",
@@ -27,7 +32,7 @@ public class ApiClientServiceTests
             loadEmbeddedMockData: () => BuildMappedSongResponseJson(),
           resolveMockDataPath: () => null);
 
-        var results = await sut.GetSongFilesAsync(
+        ObservableCollection<ViewSong> results = await sut.GetSongFilesAsync(
             search: false,
             searchString: string.Empty,
             sort: "downloads",
@@ -35,7 +40,7 @@ public class ApiClientServiceTests
             instrument: [],
             authorText: string.Empty);
 
-        var song = Assert.Single(results);
+        ViewSong song = Assert.Single(results);
         Assert.Equal("File Artist", song.Artist);
         Assert.Equal("File Title", song.Title);
         Assert.Equal("File Album", song.Album);
@@ -70,7 +75,7 @@ public class ApiClientServiceTests
             BaseAddress = new Uri("https://rhythmverse.co"),
         };
 
-        var sut = CreateService(
+        ApiClientService sut = CreateService(
             configurationValues: new Dictionary<string, string?>
             {
                 ["Runtime:UseMockData"] = "True",
@@ -80,7 +85,7 @@ public class ApiClientServiceTests
             loadEmbeddedMockData: () => BuildMappedSongResponseJson(),
           resolveMockDataPath: () => null);
 
-        var results = await sut.GetSongFilesAsync(
+        ObservableCollection<ViewSong> results = await sut.GetSongFilesAsync(
             search: false,
             searchString: string.Empty,
             sort: "downloads",
@@ -88,7 +93,7 @@ public class ApiClientServiceTests
             instrument: [],
             authorText: string.Empty);
 
-        var song = Assert.Single(results);
+        ViewSong song = Assert.Single(results);
         Assert.Equal("File Artist", song.Artist);
     }
 
@@ -111,7 +116,7 @@ public class ApiClientServiceTests
             BaseAddress = new Uri("https://rhythmverse.co"),
         };
 
-        var sut = CreateService(
+        ApiClientService sut = CreateService(
             configurationValues: new Dictionary<string, string?>
             {
                 ["UseMockData"] = "True",
@@ -121,7 +126,7 @@ public class ApiClientServiceTests
             loadEmbeddedMockData: () => null,
           resolveMockDataPath: () => null);
 
-        var results = await sut.GetSongFilesAsync(
+        ObservableCollection<ViewSong> results = await sut.GetSongFilesAsync(
             search: true,
             searchString: "needle",
             sort: "downloads",
@@ -129,7 +134,7 @@ public class ApiClientServiceTests
             instrument: [new InstrumentItem { Value = "guitar" }],
             authorText: "alice");
 
-        var song = Assert.Single(results);
+        ViewSong song = Assert.Single(results);
         Assert.NotNull(capturedRequest);
         Assert.Equal(HttpMethod.Post, capturedRequest!.Method);
         Assert.Equal("/api/all/songfiles/search/live", capturedRequest.RequestUri!.AbsolutePath);
@@ -171,7 +176,7 @@ public class ApiClientServiceTests
             BaseAddress = new Uri("https://rhythmverse.co"),
         };
 
-        var sut = CreateService(
+        ApiClientService sut = CreateService(
             configurationValues: new Dictionary<string, string?>
             {
                 ["Runtime:UseMockData"] = "False",
@@ -181,7 +186,7 @@ public class ApiClientServiceTests
             loadEmbeddedMockData: () => throw new InvalidOperationException("Mock data should not be loaded when UseMockData is false."),
           resolveMockDataPath: () => throw new InvalidOperationException("Mock data path should not be resolved when UseMockData is false."));
 
-        var results = await sut.GetSongFilesAsync(
+        ObservableCollection<ViewSong> results = await sut.GetSongFilesAsync(
             search: true,
             searchString: string.Empty,
             sort: "downloads",
@@ -191,32 +196,32 @@ public class ApiClientServiceTests
 
         Assert.NotNull(capturedRequest);
         Assert.Equal(HttpMethod.Post, capturedRequest!.Method);
-        var song = Assert.Single(results);
+        ViewSong song = Assert.Single(results);
         Assert.Equal("Live Artist", song.Artist);
     }
 
-      [Fact]
-      public async Task GetSongFilesAsync_WhenLoadingNextPage_AppendsResultsInsteadOfClearing()
-      {
+    [Fact]
+    public async Task GetSongFilesAsync_WhenLoadingNextPage_AppendsResultsInsteadOfClearing()
+    {
         using var httpClient = new HttpClient(new StubHttpMessageHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
-          Content = new StringContent(BuildMappedSongResponseJson()),
+            Content = new StringContent(BuildMappedSongResponseJson()),
         })))
         {
-          BaseAddress = new Uri("https://rhythmverse.co"),
+            BaseAddress = new Uri("https://rhythmverse.co"),
         };
 
-        var sut = CreateService(
+        ApiClientService sut = CreateService(
           configurationValues: new Dictionary<string, string?>
           {
-            ["UseMockData"] = "False",
-            ["rhythmverseToken"] = "token-test",
+              ["UseMockData"] = "False",
+              ["rhythmverseToken"] = "token-test",
           },
           httpClient,
           loadEmbeddedMockData: () => null,
           resolveMockDataPath: () => null);
 
-        var firstPage = await sut.GetSongFilesAsync(
+        ObservableCollection<ViewSong> firstPage = await sut.GetSongFilesAsync(
           search: true,
           searchString: string.Empty,
           sort: "downloads",
@@ -226,7 +231,7 @@ public class ApiClientServiceTests
 
         sut.CurrentPage = 2;
 
-        var secondPage = await sut.GetSongFilesAsync(
+        ObservableCollection<ViewSong> secondPage = await sut.GetSongFilesAsync(
           search: false,
           searchString: string.Empty,
           sort: "downloads",
@@ -237,7 +242,7 @@ public class ApiClientServiceTests
         Assert.Same(firstPage, secondPage);
         Assert.Equal(2, secondPage.Count);
         Assert.Equal(2, sut.CurrentPage);
-      }
+    }
 
     private static ApiClientService CreateService(
         IReadOnlyDictionary<string, string?> configurationValues,
@@ -245,11 +250,11 @@ public class ApiClientServiceTests
         Func<string?> loadEmbeddedMockData,
       Func<string?> resolveMockDataPath)
     {
-        var configuration = new ConfigurationBuilder()
+        IConfigurationRoot configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configurationValues)
             .Build();
 
-        var constructor = typeof(ApiClientService).GetConstructor(
+        ConstructorInfo? constructor = typeof(ApiClientService).GetConstructor(
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
             binder: null,
             [
@@ -406,16 +411,16 @@ public class ApiClientServiceTests
 }
 
 
-    [Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.Unit)]
-    public class ApiClientServiceParsingTests
+[Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.Unit)]
+public class ApiClientServiceParsingTests
+{
+    [Fact]
+    public void JsonParsing_VerifyFileDownloadsField()
     {
-      [Fact]
-      public void JsonParsing_VerifyFileDownloadsField()
-      {
-        var json = """{"status":"ok","data":{"records":{"total_available":1,"total_filtered":1,"returned":1},"pagination":{"start":0,"records":"1","page":"1"},"songs":[{"data":{"artist":"D","downloads":42},"file":{"file_name":"s.zip","download_url":"/x.zip","downloads":10,"file_artist":"FA"}}]}}""";
+        string json = """{"status":"ok","data":{"records":{"total_available":1,"total_filtered":1,"returned":1},"pagination":{"start":0,"records":"1","page":"1"},"songs":[{"data":{"artist":"D","downloads":42},"file":{"file_name":"s.zip","download_url":"/x.zip","downloads":10,"file_artist":"FA"}}]}}""";
         var r = ChartHub.Models.RootResponse.FromJson(json);
-        var song = r.Data.Songs[0];
+        Song song = r.Data.Songs[0];
         Assert.Equal(42, song.Data.DataData?.Downloads);
         Assert.Equal(10, song.File?.Downloads);
-      }
     }
+}

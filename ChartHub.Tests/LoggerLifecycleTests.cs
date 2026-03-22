@@ -12,7 +12,7 @@ public class LoggerLifecycleTests
     {
         lock (LoggerSync)
         {
-            var logDir = CreateTempLogDirectory();
+            string logDir = CreateTempLogDirectory();
             try
             {
                 Logger.Shutdown();
@@ -26,7 +26,7 @@ public class LoggerLifecycleTests
                     ["shutdownReason"] = "test",
                 });
 
-                var text = ReadLog(logDir);
+                string text = ReadLog(logDir);
                 Assert.Contains("Session started", text, StringComparison.Ordinal);
                 Assert.Contains("Session ended", text, StringComparison.Ordinal);
                 Assert.Contains("startupMode=test", text, StringComparison.Ordinal);
@@ -45,29 +45,29 @@ public class LoggerLifecycleTests
     {
         lock (LoggerSync)
         {
-            var logDir = CreateTempLogDirectory();
+            string logDir = CreateTempLogDirectory();
             try
             {
                 Logger.Shutdown();
-                var logPath = Path.Combine(logDir, "charthub.log");
-                var oversized = new string('X', 1_100_000);
+                string logPath = Path.Combine(logDir, "charthub.log");
+                string oversized = new string('X', 1_100_000);
                 File.WriteAllText(logPath, $"preexisting-marker\n{oversized}");
 
                 Logger.Initialize(logDir);
                 Logger.LogInfo("Test", "Post-rotation marker");
                 Logger.Shutdown();
 
-                var archivePath = logPath + ".1";
+                string archivePath = logPath + ".1";
                 Assert.True(File.Exists(archivePath), "Expected rotated archive file to exist.");
 
-                var archiveText = File.ReadAllText(archivePath);
+                string archiveText = File.ReadAllText(archivePath);
                 Assert.Contains("preexisting-marker", archiveText, StringComparison.Ordinal);
 
-                var activeText = ReadLog(logDir);
+                string activeText = ReadLog(logDir);
                 Assert.Contains("Post-rotation marker", activeText, StringComparison.Ordinal);
                 Assert.DoesNotContain("preexisting-marker", activeText, StringComparison.Ordinal);
 
-                var activeSize = new FileInfo(logPath).Length;
+                long activeSize = new FileInfo(logPath).Length;
                 Assert.True(activeSize < 1_048_576, "Expected active log file to be below rotation threshold after write.");
             }
             finally
@@ -82,7 +82,7 @@ public class LoggerLifecycleTests
     {
         lock (LoggerSync)
         {
-            var logDir = CreateTempLogDirectory();
+            string logDir = CreateTempLogDirectory();
             try
             {
                 Logger.Shutdown();
@@ -98,8 +98,8 @@ public class LoggerLifecycleTests
                 Logger.LogError("Concurrency", "Exception payload check", ex);
                 Logger.Shutdown();
 
-                var text = ReadLog(logDir);
-                for (var i = 0; i < entryCount; i++)
+                string text = ReadLog(logDir);
+                for (int i = 0; i < entryCount; i++)
                 {
                     Assert.Contains($"entry-{i:D2}", text, StringComparison.Ordinal);
                 }
@@ -117,14 +117,14 @@ public class LoggerLifecycleTests
 
     private static string CreateTempLogDirectory()
     {
-        var path = Path.Combine(Path.GetTempPath(), "rv-logger-tests", Guid.NewGuid().ToString("N"));
+        string path = Path.Combine(Path.GetTempPath(), "rv-logger-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
         return path;
     }
 
     private static string ReadLog(string logDir)
     {
-        var logPath = Path.Combine(logDir, "charthub.log");
+        string logPath = Path.Combine(logDir, "charthub.log");
         Assert.True(File.Exists(logPath), "Expected logger output file to exist.");
         return File.ReadAllText(logPath);
     }
@@ -134,7 +134,9 @@ public class LoggerLifecycleTests
         try
         {
             if (Directory.Exists(path))
+            {
                 Directory.Delete(path, recursive: true);
+            }
         }
         catch
         {

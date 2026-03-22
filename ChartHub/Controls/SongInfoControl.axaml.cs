@@ -1,10 +1,13 @@
-using Avalonia;
-using Avalonia.Controls;
-using ChartHub.Models;
-using ChartHub.Strings;
 using System.ComponentModel;
 
+using Avalonia;
+using Avalonia.Controls;
+
+using ChartHub.Models;
+using ChartHub.Strings;
+
 namespace ChartHub.Controls;
+
 public partial class SongInfoControl : UserControl
 {
     /// <summary>Song model passed to the control (supports ViewSong or EncoreSong).</summary>

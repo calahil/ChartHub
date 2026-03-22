@@ -1,522 +1,531 @@
-﻿using Google.Apis.Auth.OAuth2;
+﻿using System.ComponentModel;
+using System.Text.RegularExpressions;
+
+using ChartHub.Utilities;
+
+using Google.Apis.Auth.OAuth2;
 using Google.Apis.Download;
 using Google.Apis.Drive.v3;
+using Google.Apis.Drive.v3.Data;
 using Google.Apis.Services;
+
 using HtmlAgilityPack;
-using ChartHub.Utilities;
+
 using SharpCompress.Archives;
 using SharpCompress.Archives.Zip;
 using SharpCompress.Common;
-using System.ComponentModel;
-using System.Text.RegularExpressions;
 
-namespace ChartHub.Services
+namespace ChartHub.Services;
+
+public class DownloadService(IGoogleAuthProvider authProvider)
 {
-    public class DownloadService(IGoogleAuthProvider authProvider)
+    private readonly HttpClient _httpClient = new();
+    private readonly UrlHelper _urlHelper = new();
+    private readonly GoogleDriveService _googleDriveService = new(authProvider);
+    private readonly IProgress<double> _progress = new Progress<double>();
+
+    public async Task DownloadFileAsync(DownloadFile song, CancellationToken cancellationToken = default)
     {
-        private readonly HttpClient _httpClient = new();
-        private readonly UrlHelper _urlHelper = new();
-        private readonly GoogleDriveService _googleDriveService = new(authProvider);
-        private IProgress<double> _progress = new Progress<double>();
+        string finalUrl = await _urlHelper.GetFinalRedirectUrlAsync(song.Url);
+        song.Url = finalUrl;
 
-        public async Task DownloadFileAsync(DownloadFile song, CancellationToken cancellationToken = default)
+        if (song.Url.StartsWith("https://drive.google.com/drive"))
         {
-            string finalUrl = await _urlHelper.GetFinalRedirectUrlAsync(song.Url);
-            song.Url = finalUrl;
+            song.Status = "DownloadingDriveFolder";
+            string fileId = UrlExtractor.ExtractIdFromUrl(song.Url);
+            await _googleDriveService.DownloadFolderAsync(song, fileId, cancellationToken);
+        }
+        else if (song.Url.StartsWith("https://drive.google.com/file"))
+        {
+            song.Status = "DownloadingDriveFile";
+            string fileId = UrlExtractor.ExtractIdFromUrl(song.Url);
+            await _googleDriveService.DownloadFileAsync(song, _progress, fileId, cancellationToken);
+        }
+        else if (song.Url.StartsWith("https://www.mediafire.com") || song.Url.StartsWith("http://www.mediafire.com"))
+        {
+            song.Status = "ResolvingMediaFire";
+            using HttpResponseMessage response = await _httpClient.GetAsync(finalUrl, cancellationToken);
+            response.EnsureSuccessStatusCode();
 
-            if (song.Url.StartsWith("https://drive.google.com/drive"))
+            string content = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            HtmlDocument doc = new();
+            doc.LoadHtml(content);
+
+            HtmlNode linkNode = doc.DocumentNode.SelectSingleNode("//a[@id='downloadButton']");
+
+            if (linkNode != null)
             {
-                song.Status = "DownloadingDriveFolder";
-                var fileId = UrlExtractor.ExtractIdFromUrl(song.Url);
-                await _googleDriveService.DownloadFolderAsync(song, fileId, cancellationToken);
-            }
-            else if (song.Url.StartsWith("https://drive.google.com/file"))
-            {
-                song.Status = "DownloadingDriveFile";
-                var fileId = UrlExtractor.ExtractIdFromUrl(song.Url);
-                await _googleDriveService.DownloadFileAsync(song, _progress, fileId, cancellationToken);
-            }
-            else if (song.Url.StartsWith("https://www.mediafire.com") || song.Url.StartsWith("http://www.mediafire.com"))
-            {
-                song.Status = "ResolvingMediaFire";
-                using var response = await _httpClient.GetAsync(finalUrl, cancellationToken);
-                response.EnsureSuccessStatusCode();
-
-                string content = await response.Content.ReadAsStringAsync(cancellationToken);
-
-                HtmlDocument doc = new();
-                doc.LoadHtml(content);
-
-                var linkNode = doc.DocumentNode.SelectSingleNode("//a[@id='downloadButton']");
-
-                if (linkNode != null)
-                {
-                    string downloadLink = linkNode.GetAttributeValue("href", "");
-                    song.Url = downloadLink;
-                    song.DisplayName = ExtractMediaFireFileName(downloadLink);
-                    await DownloadAsync(song, cancellationToken);
-                }
-                else
-                {
-                    throw new InvalidOperationException("MediaFire download link not found on page.");
-                }
-
+                string downloadLink = linkNode.GetAttributeValue("href", "");
+                song.Url = downloadLink;
+                song.DisplayName = ExtractMediaFireFileName(downloadLink);
+                await DownloadAsync(song, cancellationToken);
             }
             else
             {
-                await DownloadAsync(song, cancellationToken);
+                throw new InvalidOperationException("MediaFire download link not found on page.");
             }
 
-            if (song.DownloadProgress != 100)
-                song.DownloadProgress = 100;
-            song.Finished = true;
         }
-
-        private async Task DownloadAsync(DownloadFile song, CancellationToken cancellationToken)
+        else
         {
-            using var response = await _httpClient.GetAsync(song.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            var totalBytes = response.Content.Headers.ContentLength ?? -1L;
-            var canReportProgress = totalBytes != -1;
-
-            using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            var totalRead = 0L;
-            var buffer = new byte[8192];
-            var isMoreToRead = true;
-            var savePath = SafePathHelper.GetSafeFilePath(song.FilePath, song.DisplayName, "download.bin");
-            song.DisplayName = Path.GetFileName(savePath);
-
-            using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None, buffer.Length, true);
-            do
-            {
-                var read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
-                if (read == 0)
-                {
-                    isMoreToRead = false;
-                    TriggerProgressChanged(song, totalBytes, totalRead);
-                    continue;
-                }
-
-                await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-
-                totalRead += read;
-
-                if (canReportProgress)
-                {
-                    TriggerProgressChanged(song, totalBytes, totalRead);
-                }
-            }
-            while (isMoreToRead);
+            await DownloadAsync(song, cancellationToken);
         }
 
-        private static string ExtractMediaFireFileName(string url)
+        if (song.DownloadProgress != 100)
         {
-            Uri uri = new(url);
-
-            // Get the absolute path of the URL
-            string absolutePath = uri.AbsolutePath;
-
-            // Extract the part after the last "/"
-            return absolutePath[(absolutePath.LastIndexOf('/') + 1)..];
+            song.DownloadProgress = 100;
         }
 
-        private static void TriggerProgressChanged(DownloadFile song, long totalDownloadSize, long totalBytesRead)
-        {
-            if (totalDownloadSize != -1)
-            {
-                song.DownloadProgress = (double)totalBytesRead / totalDownloadSize * 100;
-            }
-        }
+        song.Finished = true;
     }
 
-    public class GoogleDriveService(IGoogleAuthProvider authProvider)
+    private async Task DownloadAsync(DownloadFile song, CancellationToken cancellationToken)
     {
-        private static readonly string[] Scopes = [DriveService.Scope.DriveReadonly, DriveService.Scope.DriveFile];
-        private static readonly string ApplicationName = "ChartHub";
-        private readonly IGoogleAuthProvider _authProvider = authProvider;
-        private DriveService? _driveService;
-        private UserCredential? _credential;
+        using HttpResponseMessage response = await _httpClient.GetAsync(song.Url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
 
-        public async Task<DriveService> GetServiceAsync(CancellationToken cancellationToken = default)
+        long totalBytes = response.Content.Headers.ContentLength ?? -1L;
+        bool canReportProgress = totalBytes != -1;
+
+        using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        long totalRead = 0L;
+        byte[] buffer = new byte[8192];
+        bool isMoreToRead = true;
+        string savePath = SafePathHelper.GetSafeFilePath(song.FilePath, song.DisplayName, "download.bin");
+        song.DisplayName = Path.GetFileName(savePath);
+
+        using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None, buffer.Length, true);
+        do
         {
-            if (_driveService is not null)
-                return _driveService;
-
-            if (_credential is null)
+            int read = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+            if (read == 0)
             {
-                _credential = await _authProvider.TryAuthorizeSilentAsync(Scopes, cancellationToken)
-                    ?? await _authProvider.AuthorizeInteractiveAsync(Scopes, cancellationToken);
+                isMoreToRead = false;
+                TriggerProgressChanged(song, totalBytes, totalRead);
+                continue;
             }
 
-            _driveService = new DriveService(new BaseClientService.Initializer()
-            {
-                HttpClientInitializer = _credential,
-                ApplicationName = ApplicationName,
-            });
+            await fileStream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
 
+            totalRead += read;
+
+            if (canReportProgress)
+            {
+                TriggerProgressChanged(song, totalBytes, totalRead);
+            }
+        }
+        while (isMoreToRead);
+    }
+
+    private static string ExtractMediaFireFileName(string url)
+    {
+        Uri uri = new(url);
+
+        // Get the absolute path of the URL
+        string absolutePath = uri.AbsolutePath;
+
+        // Extract the part after the last "/"
+        return absolutePath[(absolutePath.LastIndexOf('/') + 1)..];
+    }
+
+    private static void TriggerProgressChanged(DownloadFile song, long totalDownloadSize, long totalBytesRead)
+    {
+        if (totalDownloadSize != -1)
+        {
+            song.DownloadProgress = (double)totalBytesRead / totalDownloadSize * 100;
+        }
+    }
+}
+
+public class GoogleDriveService(IGoogleAuthProvider authProvider)
+{
+    private static readonly string[] Scopes = [DriveService.Scope.DriveReadonly, DriveService.Scope.DriveFile];
+    private static readonly string ApplicationName = "ChartHub";
+    private readonly IGoogleAuthProvider _authProvider = authProvider;
+    private DriveService? _driveService;
+    private UserCredential? _credential;
+
+    public async Task<DriveService> GetServiceAsync(CancellationToken cancellationToken = default)
+    {
+        if (_driveService is not null)
+        {
             return _driveService;
         }
 
-        public async Task DownloadFileAsync(DownloadFile downloadFile, IProgress<double> progress, string fileId, CancellationToken cancellationToken = default)
+        if (_credential is null)
         {
-            _driveService ??= await GetServiceAsync();
+            _credential = await _authProvider.TryAuthorizeSilentAsync(Scopes, cancellationToken)
+                ?? await _authProvider.AuthorizeInteractiveAsync(Scopes, cancellationToken);
+        }
 
-            var request = _driveService.Files.Get(fileId);
-            var savePath = SafePathHelper.GetSafeFilePath(downloadFile.FilePath, downloadFile.DisplayName, "download.bin");
-            downloadFile.DisplayName = Path.GetFileName(savePath);
+        _driveService = new DriveService(new BaseClientService.Initializer()
+        {
+            HttpClientInitializer = _credential,
+            ApplicationName = ApplicationName,
+        });
 
-            request.MediaDownloader.ChunkSize = 256 * 1024;
-            request.MediaDownloader.ProgressChanged += progressEvent =>
+        return _driveService;
+    }
+
+    public async Task DownloadFileAsync(DownloadFile downloadFile, IProgress<double> progress, string fileId, CancellationToken cancellationToken = default)
+    {
+        _driveService ??= await GetServiceAsync();
+
+        FilesResource.GetRequest request = _driveService.Files.Get(fileId);
+        string savePath = SafePathHelper.GetSafeFilePath(downloadFile.FilePath, downloadFile.DisplayName, "download.bin");
+        downloadFile.DisplayName = Path.GetFileName(savePath);
+
+        request.MediaDownloader.ChunkSize = 256 * 1024;
+        request.MediaDownloader.ProgressChanged += progressEvent =>
+        {
+            if (progressEvent.Status == Google.Apis.Download.DownloadStatus.Downloading)
             {
-                if (progressEvent.Status == Google.Apis.Download.DownloadStatus.Downloading)
+                if (downloadFile.FileSize is > 0)
                 {
-                    if (downloadFile.FileSize is > 0)
+                    double progressPercentage = (double)progressEvent.BytesDownloaded / downloadFile.FileSize.Value * 100;
+                    progress?.Report(progressPercentage);
+                    downloadFile.DownloadProgress = progressPercentage;
+                }
+            }
+            else if (progressEvent.Status == Google.Apis.Download.DownloadStatus.Completed)
+            {
+                downloadFile.Finished = true;
+                downloadFile.DownloadProgress = 100;
+            }
+        };
+
+        using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None);
+        IDownloadProgress file = await request.DownloadAsync(fileStream, cancellationToken);
+        downloadFile.FileSize = Math.Max(downloadFile.FileSize ?? 0, file.BytesDownloaded);
+    }
+
+    public async Task DownloadFolderAsync(DownloadFile downloadFile, string fileId, CancellationToken cancellationToken = default)
+    {
+        string folderPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(folderPath);
+        string result = await GetFolderNameAsync(fileId);
+
+        string finalPath = SafePathHelper.GetSafeFilePath(folderPath, result, "drive-folder");
+
+        Directory.CreateDirectory(finalPath);
+        await DownloadFilesInFolder(fileId, finalPath, cancellationToken);
+        string zipFile = SafePathHelper.GetSafeFilePath(downloadFile.FilePath, downloadFile.DisplayName, "download.zip");
+        downloadFile.DisplayName = Path.GetFileName(zipFile);
+        CreateZip(folderPath, zipFile);
+
+        Directory.Delete(folderPath, true); // Cleanup the temporary folder
+    }
+
+    private async Task DownloadFilesInFolder(string folderId, string parentFolderPath, CancellationToken cancellationToken = default)
+    {
+        _driveService ??= await GetServiceAsync();
+
+        FilesResource.ListRequest request = _driveService.Files.List();
+        request.Q = $"'{folderId}' in parents";
+        request.Fields = "files(id, name, mimeType)";
+
+        FileList result = await request.ExecuteAsync(cancellationToken);
+
+        foreach (Google.Apis.Drive.v3.Data.File? file in result.Files)
+        {
+            if (file.MimeType == "application/vnd.google-apps.folder")
+            {
+                string subFolderPath = SafePathHelper.GetSafeFilePath(parentFolderPath, file.Name, "folder");
+                Directory.CreateDirectory(subFolderPath);
+                await DownloadFilesInFolder(file.Id, subFolderPath, cancellationToken);
+            }
+            else
+            {
+                using var stream = new MemoryStream();
+                await _driveService.Files.Get(file.Id).DownloadAsync(stream, cancellationToken);
+                stream.Seek(0, SeekOrigin.Begin);
+
+                string filePath = SafePathHelper.GetSafeFilePath(parentFolderPath, file.Name, "download.bin");
+                using FileStream fileStream = System.IO.File.Create(filePath);
+                stream.CopyTo(fileStream);
+            }
+        }
+    }
+
+    public async Task<string> GetFolderNameAsync(string folderId)
+    {
+        _driveService ??= await GetServiceAsync();
+        try
+        {
+            FilesResource.GetRequest request = _driveService.Files.Get(folderId);
+            request.Fields = "name"; // Specify that you only want the 'name' field
+
+            Google.Apis.Drive.v3.Data.File folder = await request.ExecuteAsync();
+            return folder.Name;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Drive", "Failed to resolve Google Drive folder name", ex, new Dictionary<string, object?>
+            {
+                ["folderId"] = folderId,
+            });
+            return string.Empty;
+        }
+    }
+
+
+    private static void CreateZip(string folderPath, string destinationZipFilePath)
+    {
+        using var archive = ZipArchive.Create();
+        // Recursively add files to the archive
+        AddFilesToArchive(archive, folderPath, folderPath);
+
+        // Save the archive to a file
+        using FileStream stream = System.IO.File.OpenWrite(destinationZipFilePath);
+        archive.SaveTo(stream, CompressionType.Deflate);
+    }
+
+    private static void AddFilesToArchive(ZipArchive archive, string rootPath, string currentPath)
+    {
+        // Add files from the current directory to the archive
+        foreach (string filePath in Directory.GetFiles(currentPath))
+        {
+            string relativePath = Path.GetRelativePath(rootPath, filePath);
+            archive.AddEntry(relativePath, filePath);
+        }
+
+        // Recursively add files from subdirectories
+        foreach (string subDirPath in Directory.GetDirectories(currentPath))
+        {
+            AddFilesToArchive(archive, rootPath, subDirPath);
+        }
+    }
+
+}
+
+public class UrlHelper
+{
+    private readonly HttpClient _httpClient;
+
+    public UrlHelper()
+    {
+        _httpClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
+    }
+
+    public async Task<string> GetFinalRedirectUrlAsync(string url)
+    {
+        string finalUrl = url;
+        bool isRedirect;
+
+        do
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Head, finalUrl);
+            using HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+
+            isRedirect = (int)response.StatusCode >= 300 && (int)response.StatusCode < 400;
+            if (response != null)
+            {
+                if (isRedirect)
+                {
+                    if (response.Headers.Location != null)
                     {
-                        double progressPercentage = (double)progressEvent.BytesDownloaded / downloadFile.FileSize.Value * 100;
-                        progress?.Report(progressPercentage);
-                        downloadFile.DownloadProgress = progressPercentage;
+                        finalUrl = response.Headers.Location.IsAbsoluteUri
+                            ? response.Headers.Location.AbsoluteUri
+                            : new Uri(new Uri(finalUrl), response.Headers.Location).AbsoluteUri;
                     }
                 }
-                else if (progressEvent.Status == Google.Apis.Download.DownloadStatus.Completed)
+                else if ((int)response.StatusCode == 200)
                 {
-                    downloadFile.Finished = true;
-                    downloadFile.DownloadProgress = 100;
-                }
-            };
-
-            using var fileStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None);
-            var file = await request.DownloadAsync(fileStream, cancellationToken);
-            downloadFile.FileSize = Math.Max(downloadFile.FileSize ?? 0, file.BytesDownloaded);
-        }
-
-        public async Task DownloadFolderAsync(DownloadFile downloadFile, string fileId, CancellationToken cancellationToken = default)
-        {
-            string folderPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-            Directory.CreateDirectory(folderPath);
-            var result = await GetFolderNameAsync(fileId);
-
-            string finalPath = SafePathHelper.GetSafeFilePath(folderPath, result, "drive-folder");
-
-            Directory.CreateDirectory(finalPath);
-            await DownloadFilesInFolder(fileId, finalPath, cancellationToken);
-            var zipFile = SafePathHelper.GetSafeFilePath(downloadFile.FilePath, downloadFile.DisplayName, "download.zip");
-            downloadFile.DisplayName = Path.GetFileName(zipFile);
-            CreateZip(folderPath, zipFile);
-
-            Directory.Delete(folderPath, true); // Cleanup the temporary folder
-        }
-
-        private async Task DownloadFilesInFolder(string folderId, string parentFolderPath, CancellationToken cancellationToken = default)
-        {
-            _driveService ??= await GetServiceAsync();
-
-            var request = _driveService.Files.List();
-            request.Q = $"'{folderId}' in parents";
-            request.Fields = "files(id, name, mimeType)";
-
-            var result = await request.ExecuteAsync(cancellationToken);
-
-            foreach (var file in result.Files)
-            {
-                if (file.MimeType == "application/vnd.google-apps.folder")
-                {
-                    string subFolderPath = SafePathHelper.GetSafeFilePath(parentFolderPath, file.Name, "folder");
-                    Directory.CreateDirectory(subFolderPath);
-                    await DownloadFilesInFolder(file.Id, subFolderPath, cancellationToken);
+                    break;
                 }
                 else
                 {
-                    using var stream = new MemoryStream();
-                    await _driveService.Files.Get(file.Id).DownloadAsync(stream, cancellationToken);
-                    stream.Seek(0, SeekOrigin.Begin);
-
-                    string filePath = SafePathHelper.GetSafeFilePath(parentFolderPath, file.Name, "download.bin");
-                    using var fileStream = System.IO.File.Create(filePath);
-                    stream.CopyTo(fileStream);
+                    throw new HttpRequestException($"Unexpected response status code: {response.StatusCode}");
                 }
             }
-        }
+        } while (isRedirect);
 
-        public async Task<string> GetFolderNameAsync(string folderId)
+        return finalUrl;
+    }
+}
+
+public class UrlExtractor
+{
+    public static string ExtractIdFromUrl(string url)
+    {
+        // Regex pattern to match file ID in Google Drive URL
+        string filePattern = @"/d/([a-zA-Z0-9_-]+)";
+        string folderPattern = @"/folders/([a-zA-Z0-9_-]+)";
+
+        // Match file ID
+        Match fileMatch = Regex.Match(url, filePattern);
+        if (fileMatch.Success)
         {
-            _driveService ??= await GetServiceAsync();
-            try
-            {
-                var request = _driveService.Files.Get(folderId);
-                request.Fields = "name"; // Specify that you only want the 'name' field
-
-                var folder = await request.ExecuteAsync();
-                return folder.Name;
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError("Drive", "Failed to resolve Google Drive folder name", ex, new Dictionary<string, object?>
-                {
-                    ["folderId"] = folderId,
-                });
-                return string.Empty;
-            }
+            return fileMatch.Groups[1].Value;  // Groups[1] is the first captured group
         }
 
-
-        private static void CreateZip(string folderPath, string destinationZipFilePath)
+        // Match folder ID
+        Match folderMatch = Regex.Match(url, folderPattern);
+        if (folderMatch.Success)
         {
-            using var archive = ZipArchive.Create();
-            // Recursively add files to the archive
-            AddFilesToArchive(archive, folderPath, folderPath);
-
-            // Save the archive to a file
-            using var stream = System.IO.File.OpenWrite(destinationZipFilePath);
-            archive.SaveTo(stream, CompressionType.Deflate);
+            return folderMatch.Groups[1].Value;
         }
 
-        private static void AddFilesToArchive(ZipArchive archive, string rootPath, string currentPath)
-        {
-            // Add files from the current directory to the archive
-            foreach (var filePath in Directory.GetFiles(currentPath))
-            {
-                string relativePath = Path.GetRelativePath(rootPath, filePath);
-                archive.AddEntry(relativePath, filePath);
-            }
-
-            // Recursively add files from subdirectories
-            foreach (var subDirPath in Directory.GetDirectories(currentPath))
-            {
-                AddFilesToArchive(archive, rootPath, subDirPath);
-            }
-        }
-
+        // If no match found, throw an exception
+        throw new ArgumentException("Invalid Google Drive URL");
     }
 
-    public class UrlHelper
+}
+public class DownloadFile(string displayName, string filePath, string urlString, long? fileSize) : INotifyPropertyChanged
+{
+    private string _sourceName = string.Empty;
+    public string SourceName
     {
-        private readonly HttpClient _httpClient;
-
-        public UrlHelper()
+        get => _sourceName;
+        set
         {
-            _httpClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
-        }
-
-        public async Task<string> GetFinalRedirectUrlAsync(string url)
-        {
-            string finalUrl = url;
-            bool isRedirect;
-
-            do
+            if (_sourceName != value)
             {
-                using var request = new HttpRequestMessage(HttpMethod.Head, finalUrl);
-                using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-
-                isRedirect = (int)response.StatusCode >= 300 && (int)response.StatusCode < 400;
-                if (response != null)
-                {
-                    if (isRedirect)
-                    {
-                        if (response.Headers.Location != null)
-                        {
-                            finalUrl = response.Headers.Location.IsAbsoluteUri
-                                ? response.Headers.Location.AbsoluteUri
-                                : new Uri(new Uri(finalUrl), response.Headers.Location).AbsoluteUri;
-                        }
-                    }
-                    else if ((int)response.StatusCode == 200)
-                    {
-                        break;
-                    }
-                    else
-                    {
-                        throw new HttpRequestException($"Unexpected response status code: {response.StatusCode}");
-                    }
-                }
-            } while (isRedirect);
-
-            return finalUrl;
+                _sourceName = value;
+                OnPropertyChanged(nameof(SourceName));
+            }
         }
     }
 
-    public class UrlExtractor
+    private string _displayName = displayName;
+    public string DisplayName
     {
-        public static string ExtractIdFromUrl(string url)
+        get => _displayName;
+        set
         {
-            // Regex pattern to match file ID in Google Drive URL
-            var filePattern = @"/d/([a-zA-Z0-9_-]+)";
-            var folderPattern = @"/folders/([a-zA-Z0-9_-]+)";
-
-            // Match file ID
-            var fileMatch = Regex.Match(url, filePattern);
-            if (fileMatch.Success)
+            if (_displayName != value)
             {
-                return fileMatch.Groups[1].Value;  // Groups[1] is the first captured group
+                _displayName = value;
+                OnPropertyChanged(nameof(DisplayName));
             }
-
-            // Match folder ID
-            var folderMatch = Regex.Match(url, folderPattern);
-            if (folderMatch.Success)
-            {
-                return folderMatch.Groups[1].Value;
-            }
-
-            // If no match found, throw an exception
-            throw new ArgumentException("Invalid Google Drive URL");
         }
-
     }
-    public class DownloadFile(string displayName, string filePath, string urlString, long? fileSize) : INotifyPropertyChanged
+
+    private string _filePath = filePath;
+    public string FilePath
     {
-        private string _sourceName = string.Empty;
-        public string SourceName
+        get => _filePath;
+        set
         {
-            get => _sourceName;
-            set
+            if (_filePath != value)
             {
-                if (_sourceName != value)
-                {
-                    _sourceName = value;
-                    OnPropertyChanged(nameof(SourceName));
-                }
+                _filePath = value;
+                OnPropertyChanged(nameof(FilePath));
             }
         }
+    }
 
-        private string _displayName = displayName;
-        public string DisplayName
+    private string _url = urlString;
+    public string Url
+    {
+        get => _url;
+        set
         {
-            get => _displayName;
-            set
+            if (_url != value)
             {
-                if (_displayName != value)
-                {
-                    _displayName = value;
-                    OnPropertyChanged(nameof(DisplayName));
-                }
+                _url = value;
+                OnPropertyChanged(nameof(Url));
             }
         }
+    }
 
-        private string _filePath = filePath;
-        public string FilePath
+    private double _downloadProgress = 0;
+    public double DownloadProgress
+    {
+        get => _downloadProgress;
+        set
         {
-            get => _filePath;
-            set
-            {
-                if (_filePath != value)
-                {
-                    _filePath = value;
-                    OnPropertyChanged(nameof(FilePath));
-                }
-            }
+            _downloadProgress = value;
+            OnPropertyChanged(nameof(DownloadProgress));
         }
+    }
 
-        private string _url = urlString;
-        public string Url
+    private bool _finished = false;
+    public bool Finished
+    {
+        get => _finished;
+        set
         {
-            get => _url;
-            set
-            {
-                if (_url != value)
-                {
-                    _url = value;
-                    OnPropertyChanged(nameof(Url));
-                }
-            }
+            _finished = value;
+            OnPropertyChanged(nameof(Finished));
+            OnPropertyChanged(nameof(CanCancel));
+            OnPropertyChanged(nameof(CanClear));
         }
+    }
 
-        private double _downloadProgress = 0;
-        public double DownloadProgress
+    private string _status = "Queued";
+    public string Status
+    {
+        get => _status;
+        set
         {
-            get => _downloadProgress;
-            set
+            if (_status != value)
             {
-                _downloadProgress = value;
-                OnPropertyChanged(nameof(DownloadProgress));
-            }
-        }
-
-        private bool _finished = false;
-        public bool Finished
-        {
-            get => _finished;
-            set
-            {
-                _finished = value;
-                OnPropertyChanged(nameof(Finished));
+                _status = value;
+                OnPropertyChanged(nameof(Status));
                 OnPropertyChanged(nameof(CanCancel));
                 OnPropertyChanged(nameof(CanClear));
             }
         }
+    }
 
-        private string _status = "Queued";
-        public string Status
+    public bool CanCancel => !Finished
+        && !string.Equals(Status, "Cancelling", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(Status, "Failed", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(Status, "Completed", StringComparison.OrdinalIgnoreCase);
+
+    public bool CanClear => Finished
+        || string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Status, "Failed", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Status, "Completed", StringComparison.OrdinalIgnoreCase);
+
+    private string? _errorMessage;
+    public string? ErrorMessage
+    {
+        get => _errorMessage;
+        set
         {
-            get => _status;
-            set
+            if (_errorMessage != value)
             {
-                if (_status != value)
-                {
-                    _status = value;
-                    OnPropertyChanged(nameof(Status));
-                    OnPropertyChanged(nameof(CanCancel));
-                    OnPropertyChanged(nameof(CanClear));
-                }
+                _errorMessage = value;
+                OnPropertyChanged(nameof(ErrorMessage));
             }
         }
+    }
 
-        public bool CanCancel => !Finished
-            && !string.Equals(Status, "Cancelling", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(Status, "Failed", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(Status, "Completed", StringComparison.OrdinalIgnoreCase);
-
-        public bool CanClear => Finished
-            || string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(Status, "Failed", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(Status, "Completed", StringComparison.OrdinalIgnoreCase);
-
-        private string? _errorMessage;
-        public string? ErrorMessage
+    private long? _fileSize = fileSize;
+    public long? FileSize
+    {
+        get => _fileSize;
+        set
         {
-            get => _errorMessage;
-            set
+            if (_fileSize != value)
             {
-                if (_errorMessage != value)
-                {
-                    _errorMessage = value;
-                    OnPropertyChanged(nameof(ErrorMessage));
-                }
+                _fileSize = value;
+                OnPropertyChanged(nameof(FileSize));
             }
         }
+    }
 
-        private long? _fileSize = fileSize;
-        public long? FileSize
-        {
-            get => _fileSize;
-            set
-            {
-                if (_fileSize != value)
-                {
-                    _fileSize = value;
-                    OnPropertyChanged(nameof(FileSize));
-                }
-            }
-        }
+    public Action? CancelAction { get; set; }
 
-        public Action? CancelAction { get; set; }
+    public event PropertyChangedEventHandler? PropertyChanged;
 
-        public event PropertyChangedEventHandler? PropertyChanged;
+    protected virtual void OnPropertyChanged(string propertyName)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
-        protected virtual void OnPropertyChanged(string propertyName)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
+    public override string ToString()
+    {
+        return DisplayName;
+    }
 
-        public override string ToString()
-        {
-            return DisplayName;
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(DisplayName, FilePath);
-        }
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(DisplayName, FilePath);
     }
 }
 

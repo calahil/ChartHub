@@ -2,9 +2,9 @@ using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Services;
+using ChartHub.Tests.TestInfrastructure;
 using ChartHub.Utilities;
 using ChartHub.ViewModels;
-using ChartHub.Tests.TestInfrastructure;
 
 namespace ChartHub.Tests;
 
@@ -15,7 +15,7 @@ public class SyncViewModelTests
     public void ConnectionHint_WithoutToken_PromptsPairOrTokenFlow()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-hint-no-token");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient();
 
         var sut = new SyncViewModel(client, settings)
@@ -31,7 +31,7 @@ public class SyncViewModelTests
     public async Task TestConnectionCommand_WithEmptyQueue_ShowsEmptyState()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-empty-state");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient
         {
             GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
@@ -52,10 +52,10 @@ public class SyncViewModelTests
     public async Task RetrySelectedCommand_RefreshesQueueAfterAction()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-retry-refresh");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
 
-        var getIngestionsCalls = 0;
-        var triggerRetryCalls = 0;
+        int getIngestionsCalls = 0;
+        int triggerRetryCalls = 0;
 
         var queueItem = new IngestionQueueItem
         {
@@ -96,7 +96,7 @@ public class SyncViewModelTests
     public async Task TestConnectionCommand_OnFailure_ClearsQueueAndShowsGuidance()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-failure-guidance");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient
         {
             GetVersionHandler = (_, _, _) => throw new InvalidOperationException("invalid token"),
@@ -127,7 +127,7 @@ public class SyncViewModelTests
     public async Task RetrySelectedCommand_SetsSuccessResultOnCompletion()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-retry-result");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
 
         var queueItem = new IngestionQueueItem
         {
@@ -165,7 +165,7 @@ public class SyncViewModelTests
     public async Task InstallSelectedCommand_SetsSuccessResultOnCompletion()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-install-result");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
 
         var queueItem = new IngestionQueueItem
         {
@@ -199,7 +199,7 @@ public class SyncViewModelTests
     public async Task OpenFolderSelectedCommand_SetsSuccessResultOnCompletion()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-openfolder-result");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
 
         var queueItem = new IngestionQueueItem
         {
@@ -233,7 +233,7 @@ public class SyncViewModelTests
     public async Task RetrySelectedCommand_SetsFailedResultOnException()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-retry-failure");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
 
         var queueItem = new IngestionQueueItem
         {
@@ -350,9 +350,9 @@ public class SyncViewModelTests
     public async Task AutoRefresh_ConnectedState_PeriodicallyRefreshesQueue()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-auto-refresh");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
 
-        var getIngestionsCalls = 0;
+        int getIngestionsCalls = 0;
         var client = new StubDesktopSyncApiClient
         {
             GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
@@ -367,7 +367,7 @@ public class SyncViewModelTests
 
         await sut.TestConnectionCommand.ExecuteAsync(null);
 
-        var refreshed = await WaitForConditionAsync(() => Volatile.Read(ref getIngestionsCalls) >= 2, TimeSpan.FromSeconds(2));
+        bool refreshed = await WaitForConditionAsync(() => Volatile.Read(ref getIngestionsCalls) >= 2, TimeSpan.FromSeconds(2));
 
         Assert.True(refreshed);
         Assert.True(sut.IsConnected);
@@ -378,17 +378,19 @@ public class SyncViewModelTests
     public async Task AutoRefresh_RefreshFailure_DisconnectsAndStopsLoop()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-auto-refresh-failure");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
 
-        var getIngestionsCalls = 0;
+        int getIngestionsCalls = 0;
         var client = new StubDesktopSyncApiClient
         {
             GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
             GetIngestionsHandler = (_, _, _, _) =>
             {
-                var callNumber = Interlocked.Increment(ref getIngestionsCalls);
+                int callNumber = Interlocked.Increment(ref getIngestionsCalls);
                 if (callNumber == 1)
+                {
                     return Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]);
+                }
 
                 throw new InvalidOperationException("auto refresh failure");
             },
@@ -398,7 +400,7 @@ public class SyncViewModelTests
 
         await sut.TestConnectionCommand.ExecuteAsync(null);
 
-        var disconnected = await WaitForConditionAsync(() => !sut.IsConnected, TimeSpan.FromSeconds(2));
+        bool disconnected = await WaitForConditionAsync(() => !sut.IsConnected, TimeSpan.FromSeconds(2));
 
         Assert.True(disconnected);
         Assert.False(sut.IsConnected);
@@ -409,11 +411,13 @@ public class SyncViewModelTests
 
     private static async Task<bool> WaitForConditionAsync(Func<bool> predicate, TimeSpan timeout)
     {
-        var startedAt = DateTime.UtcNow;
+        DateTime startedAt = DateTime.UtcNow;
         while (DateTime.UtcNow - startedAt < timeout)
         {
             if (predicate())
+            {
                 return true;
+            }
 
             await Task.Delay(20);
         }
@@ -425,7 +429,7 @@ public class SyncViewModelTests
     public async Task TestConnectionCommand_OnSuccess_CapturesServerInfo()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-diagnostics-success");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient
         {
             GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
@@ -448,7 +452,7 @@ public class SyncViewModelTests
     public async Task TestConnectionCommand_OnNetworkFailure_ClassifiesNetworkError()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-diagnostics-network");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient
         {
             GetVersionHandler = (_, _, _) => throw new HttpRequestException("The host did server not found."),
@@ -468,7 +472,7 @@ public class SyncViewModelTests
     public async Task TestConnectionCommand_OnAuthFailure_ClassifiesAuthError()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-diagnostics-auth");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient
         {
             GetVersionHandler = (_, _, _) => throw new UnauthorizedAccessException("Invalid token or authentication failed."),
@@ -487,7 +491,7 @@ public class SyncViewModelTests
     public async Task TestConnectionCommand_OnUnsupportedVersion_ClassifiesVersionError()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-diagnostics-version");
-        var settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient
         {
             GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("old-api", "0.9.0", false, false)),

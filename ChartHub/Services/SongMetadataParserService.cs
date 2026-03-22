@@ -32,7 +32,7 @@ public class SongMetadataParserService
 
         try
         {
-            var lines = await File.ReadAllLinesAsync(iniFilePath);
+            string[] lines = await File.ReadAllLinesAsync(iniFilePath);
             return ParseLines(lines);
         }
         catch
@@ -56,7 +56,7 @@ public class SongMetadataParserService
     /// </summary>
     public SongMetadata ParseContent(string content)
     {
-        var lines = content.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        string[] lines = content.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
         return Parse(lines);
     }
 
@@ -67,9 +67,9 @@ public class SongMetadataParserService
         string? charter = null;
         bool inSongSection = false;
 
-        foreach (var line in lines)
+        foreach (string line in lines)
         {
-            var trimmed = line.Trim();
+            string trimmed = line.Trim();
 
             // Skip empty lines
             if (string.IsNullOrWhiteSpace(trimmed))
@@ -86,7 +86,7 @@ public class SongMetadataParserService
             // Check for section header [song] (case-insensitive)
             if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
             {
-                var sectionName = trimmed.Substring(1, trimmed.Length - 2).Trim();
+                string sectionName = trimmed.Substring(1, trimmed.Length - 2).Trim();
                 inSongSection = sectionName.Equals("song", StringComparison.OrdinalIgnoreCase);
                 continue;
             }
@@ -98,15 +98,15 @@ public class SongMetadataParserService
             }
 
             // Parse key=value line
-            var equalsIndex = trimmed.IndexOf('=');
+            int equalsIndex = trimmed.IndexOf('=');
             if (equalsIndex <= 0)
             {
                 // Malformed line; skip it
                 continue;
             }
 
-            var key = trimmed.Substring(0, equalsIndex).Trim();
-            var value = trimmed.Substring(equalsIndex + 1).Trim();
+            string key = trimmed.Substring(0, equalsIndex).Trim();
+            string value = trimmed.Substring(equalsIndex + 1).Trim();
 
             // Extract metadata based on key (case-insensitive)
             if (key.Equals("name", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(value))
@@ -125,9 +125,9 @@ public class SongMetadataParserService
         }
 
         // Build result with fallbacks
-        var finalArtist = !string.IsNullOrWhiteSpace(artist) ? artist.Trim() : "Unknown Artist";
-        var finalTitle = !string.IsNullOrWhiteSpace(title) ? title.Trim() : "Unknown Song";
-        var finalCharter = !string.IsNullOrWhiteSpace(charter) ? charter.Trim() : "Unknown Charter";
+        string finalArtist = !string.IsNullOrWhiteSpace(artist) ? artist.Trim() : "Unknown Artist";
+        string finalTitle = !string.IsNullOrWhiteSpace(title) ? title.Trim() : "Unknown Song";
+        string finalCharter = !string.IsNullOrWhiteSpace(charter) ? charter.Trim() : "Unknown Charter";
 
         return new SongMetadata(finalArtist, finalTitle, finalCharter);
     }

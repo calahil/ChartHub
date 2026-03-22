@@ -22,7 +22,7 @@ public class LibraryCatalogServiceTests
             "/tmp/song.zip",
             DateTimeOffset.UtcNow));
 
-        var isPresent = await sut.IsInLibraryAsync(LibrarySourceNames.RhythmVerse, "song-123");
+        bool isPresent = await sut.IsInLibraryAsync(LibrarySourceNames.RhythmVerse, "song-123");
 
         Assert.True(isPresent);
     }
@@ -42,7 +42,7 @@ public class LibraryCatalogServiceTests
             "/tmp/one.sng",
             DateTimeOffset.UtcNow));
 
-        var membership = await sut.GetMembershipMapAsync(LibrarySourceNames.Encore, ["md5-one", "md5-two"]);
+        IReadOnlyDictionary<string, bool> membership = await sut.GetMembershipMapAsync(LibrarySourceNames.Encore, ["md5-one", "md5-two"]);
 
         Assert.True(membership["md5-one"]);
         Assert.False(membership["md5-two"]);
@@ -65,7 +65,7 @@ public class LibraryCatalogServiceTests
 
         await sut.RemoveAsync(LibrarySourceNames.RhythmVerse, "song-123");
 
-        var isPresent = await sut.IsInLibraryAsync(LibrarySourceNames.RhythmVerse, "song-123");
+        bool isPresent = await sut.IsInLibraryAsync(LibrarySourceNames.RhythmVerse, "song-123");
 
         Assert.False(isPresent);
     }
@@ -76,7 +76,7 @@ public class LibraryCatalogServiceTests
         using var temp = new TemporaryDirectoryFixture("library-catalog-reconcile");
         var sut = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
 
-        var existingFile = Path.Combine(temp.RootPath, "existing.sng");
+        string existingFile = Path.Combine(temp.RootPath, "existing.sng");
         await File.WriteAllTextAsync(existingFile, "test");
 
         await sut.UpsertAsync(new LibraryCatalogEntry(
@@ -97,7 +97,7 @@ public class LibraryCatalogServiceTests
             Path.Combine(temp.RootPath, "missing.sng"),
             DateTimeOffset.UtcNow));
 
-        var removed = await sut.RemoveMissingLocalFilesAsync();
+        int removed = await sut.RemoveMissingLocalFilesAsync();
 
         Assert.Equal(1, removed);
         Assert.True(await sut.IsInLibraryAsync(LibrarySourceNames.Encore, "existing"));
@@ -109,7 +109,7 @@ public class LibraryCatalogServiceTests
     {
         using var temp = new TemporaryDirectoryFixture("library-catalog-unique-local-path");
         var sut = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
-        var localPath = Path.Combine(temp.RootPath, "CloneHero", "Songs", "Artist", "Song", "Charter__encore");
+        string localPath = Path.Combine(temp.RootPath, "CloneHero", "Songs", "Artist", "Song", "Charter__encore");
         Directory.CreateDirectory(localPath);
 
         await sut.UpsertAsync(new LibraryCatalogEntry(
@@ -137,7 +137,7 @@ public class LibraryCatalogServiceTests
     {
         using var temp = new TemporaryDirectoryFixture("library-catalog-root-dedupe-noop");
         var sut = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
-        var cloneHeroPath = Path.Combine(temp.RootPath, "CloneHero", "Songs", "Artist", "Song", "Charter__encore");
+        string cloneHeroPath = Path.Combine(temp.RootPath, "CloneHero", "Songs", "Artist", "Song", "Charter__encore");
         Directory.CreateDirectory(cloneHeroPath);
 
         await sut.UpsertAsync(new LibraryCatalogEntry(
@@ -149,7 +149,7 @@ public class LibraryCatalogServiceTests
             cloneHeroPath,
             DateTimeOffset.UtcNow));
 
-        var removed = await sut.RemoveDuplicateLocalPathEntriesUnderRootAsync(Path.Combine(temp.RootPath, "CloneHero", "Songs"));
+        int removed = await sut.RemoveDuplicateLocalPathEntriesUnderRootAsync(Path.Combine(temp.RootPath, "CloneHero", "Songs"));
 
         Assert.Equal(0, removed);
         Assert.True(await sut.IsInLibraryAsync(LibrarySourceNames.Encore, LibraryIdentityService.BuildEncoreSourceKey(42, "clonehero-new")));

@@ -1,9 +1,10 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Interactivity;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.VisualTree;
+
 using ChartHub.Models;
 using ChartHub.ViewModels;
 
@@ -69,33 +70,47 @@ public partial class RhythmVerseView : UserControl
     private void AttachScrollHandlers()
     {
         if (_desktopScrollViewer is not null)
+        {
             _desktopScrollViewer.ScrollChanged -= SongsList_ScrollChanged;
+        }
 
         if (_mobileScrollViewer is not null)
+        {
             _mobileScrollViewer.ScrollChanged -= SongsList_ScrollChanged;
+        }
 
         _desktopScrollViewer = SongsListBox?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
         _mobileScrollViewer = MobileSongsListBox?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
 
         if (_desktopScrollViewer is not null)
+        {
             _desktopScrollViewer.ScrollChanged += SongsList_ScrollChanged;
+        }
 
         if (_mobileScrollViewer is not null)
+        {
             _mobileScrollViewer.ScrollChanged += SongsList_ScrollChanged;
+        }
     }
 
     private async void SongsList_ScrollChanged(object? sender, ScrollChangedEventArgs e)
     {
         if (DataContext is not RhythmVerseViewModel viewModel)
+        {
             return;
+        }
 
         var scrollViewer = sender as ScrollViewer;
         if (scrollViewer is null)
+        {
             return;
+        }
 
-        var remaining = scrollViewer.Extent.Height - scrollViewer.Viewport.Height - scrollViewer.Offset.Y;
+        double remaining = scrollViewer.Extent.Height - scrollViewer.Viewport.Height - scrollViewer.Offset.Y;
         if (remaining > 200)
+        {
             return;
+        }
 
         await viewModel.LoadMoreAsync();
     }
@@ -103,10 +118,14 @@ public partial class RhythmVerseView : UserControl
     private async void SearchTextBox_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter || DataContext is not RhythmVerseViewModel viewModel)
+        {
             return;
+        }
 
         e.Handled = true;
         if (viewModel.RefreshButtonCommand.CanExecute(null))
+        {
             await viewModel.RefreshButtonCommand.ExecuteAsync(null);
+        }
     }
 }
