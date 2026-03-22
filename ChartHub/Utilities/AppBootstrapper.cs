@@ -158,6 +158,12 @@ public static class AppBootstrapper
             services.AddSingleton<IGoogleAuthProvider, DesktopGoogleAuthProvider>();
         }
 
+#if ANDROID
+        services.AddSingleton<IQrCodeScannerService, AndroidQrCodeScannerService>();
+#else
+        services.AddSingleton<IQrCodeScannerService, NoOpQrCodeScannerService>();
+#endif
+
         services.AddSingleton<IGoogleDriveClient, GoogleDriveClient>();
         services.AddSingleton<ICloudStorageAccountService, GoogleCloudStorageAccountService>();
         services.AddSingleton<DownloadService>();
@@ -176,6 +182,8 @@ public static class AppBootstrapper
         services.AddSingleton<ILocalDestinationWriter, LocalDestinationWriter>();
         services.AddSingleton<IGoogleDriveDestinationWriter, GoogleDriveDestinationWriter>();
         services.AddSingleton<ITransferOrchestrator, TransferOrchestrator>();
+        services.AddSingleton<ISyncAdvertisedUrlOptionsProvider, SyncAdvertisedUrlOptionsProvider>();
+        services.AddSingleton<ISyncLanDiscoveryService, SyncLanDiscoveryService>();
         services.AddSingleton<IIngestionSyncApiHost, IngestionSyncApiHost>();
         services.AddSingleton<IDesktopSyncApiClient, DesktopSyncApiClient>();
         services.AddSingleton<DownloadViewModel>();

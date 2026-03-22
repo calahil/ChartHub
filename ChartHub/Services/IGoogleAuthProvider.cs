@@ -253,16 +253,16 @@ public sealed class AndroidGoogleAuthProvider(IConfiguration configuration, ISec
         }
 
 #if ANDROID
-        var redirectUri = ResolveAndroidRedirectUri(androidClientId);
-        var (codeVerifier, codeChallenge) = CreatePkcePair();
-        var state = Guid.NewGuid().ToString("N");
-        var authorizationUri = BuildAuthorizationUri(androidClientId, redirectUri, scopes, codeChallenge, state);
+        string redirectUri = ResolveAndroidRedirectUri(androidClientId);
+        (string codeVerifier, string codeChallenge) = CreatePkcePair();
+        string state = Guid.NewGuid().ToString("N");
+        string authorizationUri = BuildAuthorizationUri(androidClientId, redirectUri, scopes, codeChallenge, state);
 
-        var waitForCode = AndroidOAuthRedirectBridge.WaitForCodeAsync(cancellationToken);
+        Task<string> waitForCode = AndroidOAuthRedirectBridge.WaitForCodeAsync(cancellationToken);
         AndroidOAuthRedirectBridge.LaunchAuthorizationUri(authorizationUri);
 
-        var authCode = await waitForCode;
-        var token = await ExchangeAuthCodeWithPkceAsync(
+        string authCode = await waitForCode;
+        TokenResponse token = await ExchangeAuthCodeWithPkceAsync(
             ResolveTokenUri(),
             androidClientId,
             redirectUri,
@@ -285,11 +285,15 @@ public sealed class AndroidGoogleAuthProvider(IConfiguration configuration, ISec
         try
         {
             if (string.IsNullOrWhiteSpace(ResolveAndroidClientId()))
+            {
                 return null;
+            }
 
-            var token = await LoadCachedTokenAsync(scopes, cancellationToken);
+            TokenResponse? token = await LoadCachedTokenAsync(scopes, cancellationToken);
             if (token is null)
+            {
                 return null;
+            }
 
             return await CreateCredentialFromTokenResponseAsync(token, scopes).ConfigureAwait(false);
         }

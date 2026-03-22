@@ -58,9 +58,29 @@ public sealed class RuntimeAppConfig
 
     [SettingGroup("Sync API")]
     [SettingDisplay("Desktop Sync API URL")]
+    [SettingDescription("Companion default target URL. This is the URL used by the client before pair-claim returns a resolved host.")]
     [SettingEditor(SettingEditorKind.Text)]
     [SettingHotReloadable(true)]
+    [SettingPlatforms(SettingPlatformTargets.Android)]
     public string SyncApiDesktopBaseUrl { get; set; } = "http://127.0.0.1:15123";
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Desktop Sync Listen Prefix")]
+    [SettingDescription("Desktop host binding prefix. Use loopback for local-only mode, or wildcard/host prefixes when enabling LAN pairing.")]
+    [SettingEditor(SettingEditorKind.Text)]
+    [SettingHotReloadable(false)]
+    [SettingRequiresRestart]
+    [SettingPlatforms(SettingPlatformTargets.Desktop)]
+    public string SyncApiListenPrefix { get; set; } = "http://127.0.0.1:15123/";
+
+    [SettingGroup("Sync API")]
+    [SettingDisplay("Desktop Sync Advertised URL Override (Advanced)")]
+    [SettingDescription("Optional override for the URL returned to companions during pairing and QR bootstrap. Leave blank to auto-resolve from listen settings.")]
+    [SettingEditor(SettingEditorKind.Text)]
+    [SettingHotReloadable(false)]
+    [SettingRequiresRestart]
+    [SettingPlatforms(SettingPlatformTargets.Desktop)]
+    public string SyncApiAdvertisedBaseUrl { get; set; } = string.Empty;
 
     [SettingGroup("Sync API")]
     [SettingDisplay("Companion Device Label")]
@@ -78,6 +98,7 @@ public sealed class RuntimeAppConfig
     [SettingDisplay("Pair Code Issued At (UTC)")]
     [SettingEditor(SettingEditorKind.Text)]
     [SettingHotReloadable(true)]
+    [SettingHidden]
     public string SyncApiPairCodeIssuedAtUtc { get; set; } = string.Empty;
 
     [SettingGroup("Sync API")]
@@ -99,36 +120,42 @@ public sealed class RuntimeAppConfig
     [SettingDisplay("Saved Connections JSON")]
     [SettingEditor(SettingEditorKind.Text)]
     [SettingHotReloadable(true)]
+    [SettingHidden]
     public string SyncApiSavedConnectionsJson { get; set; } = "[]";
 
     [SettingGroup("Sync API")]
     [SettingDisplay("Allow Event State Override")]
     [SettingEditor(SettingEditorKind.Toggle)]
     [SettingHotReloadable(true)]
+    [SettingPlatforms(SettingPlatformTargets.Desktop)]
     public bool AllowSyncApiStateOverride { get; set; }
 
     [SettingGroup("Sync API")]
     [SettingDisplay("Max Request Body Bytes")]
     [SettingEditor(SettingEditorKind.Number)]
     [SettingHotReloadable(true)]
+    [SettingPlatforms(SettingPlatformTargets.Desktop)]
     public int SyncApiMaxRequestBodyBytes { get; set; } = 64 * 1024;
 
     [SettingGroup("Sync API")]
     [SettingDisplay("Request Body Timeout (ms)")]
     [SettingEditor(SettingEditorKind.Number)]
     [SettingHotReloadable(true)]
+    [SettingPlatforms(SettingPlatformTargets.Desktop)]
     public int SyncApiBodyReadTimeoutMs { get; set; } = 1000;
 
     [SettingGroup("Sync API")]
     [SettingDisplay("Mutation Wait Timeout (ms)")]
     [SettingEditor(SettingEditorKind.Number)]
     [SettingHotReloadable(true)]
+    [SettingPlatforms(SettingPlatformTargets.Desktop)]
     public int SyncApiMutationWaitTimeoutMs { get; set; } = 250;
 
     [SettingGroup("Sync API")]
     [SettingDisplay("Slow Request Threshold (ms)")]
     [SettingEditor(SettingEditorKind.Number)]
     [SettingHotReloadable(true)]
+    [SettingPlatforms(SettingPlatformTargets.Desktop)]
     public int SyncApiSlowRequestThresholdMs { get; set; } = 500;
 
     [SettingGroup("Transfers")]

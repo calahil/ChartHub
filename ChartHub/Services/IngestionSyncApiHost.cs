@@ -20,13 +20,15 @@ public sealed class IngestionSyncApiHost(
     SongIngestionStateMachine ingestionStateMachine,
     AppGlobalSettings globalSettings,
     ISongInstallService songInstallService,
-    IDesktopPathOpener desktopPathOpener) : IIngestionSyncApiHost, IAsyncDisposable
+    IDesktopPathOpener desktopPathOpener,
+    ISyncLanDiscoveryService syncLanDiscoveryService) : IIngestionSyncApiHost, IAsyncDisposable
 {
     private readonly SongIngestionCatalogService _ingestionCatalog = ingestionCatalog;
     private readonly SongIngestionStateMachine _ingestionStateMachine = ingestionStateMachine;
     private readonly AppGlobalSettings _globalSettings = globalSettings;
     private readonly ISongInstallService _songInstallService = songInstallService;
     private readonly IDesktopPathOpener _desktopPathOpener = desktopPathOpener;
+    private readonly ISyncLanDiscoveryService _syncLanDiscoveryService = syncLanDiscoveryService;
     private readonly HttpListener _listener = new();
     private readonly CancellationTokenSource _cts = new();
     private readonly SemaphoreSlim _mutationGate = new(1, 1);
@@ -41,8 +43,10 @@ public sealed class IngestionSyncApiHost(
     private long _serverErrorsTotal;
     private Task? _listenLoopTask;
     private bool _started;
+    private string _activeListenerPrefix = DefaultListenPrefix;
+    private string _activeApiBaseUrl = DefaultListenPrefix.TrimEnd('/');
 
-    private const string DefaultPrefix = "http://127.0.0.1:15123/";
+    private const string DefaultListenPrefix = "http://127.0.0.1:15123/";
     private const string SyncTokenHeader = "X-ChartHub-Sync-Token";
     private const string ApiContractVersion = "1.0.0";
     private const int MaxQueryLimit = 500;
@@ -57,25 +61,47 @@ public sealed class IngestionSyncApiHost(
     private TimeSpan MaxRequestBodyReadDuration => TimeSpan.FromMilliseconds(_globalSettings.SyncApiBodyReadTimeoutMs);
     private TimeSpan SlowRequestThreshold => TimeSpan.FromMilliseconds(_globalSettings.SyncApiSlowRequestThresholdMs);
 
-    public Task StartAsync(CancellationToken cancellationToken = default)
+    public async Task StartAsync(CancellationToken cancellationToken = default)
     {
         if (_started || OperatingSystem.IsAndroid())
         {
-            return Task.CompletedTask;
+            return;
         }
 
-        _listener.Prefixes.Add(DefaultPrefix);
+        string listenPrefix = NormalizeListenPrefix(_globalSettings.SyncApiListenPrefix);
+        _activeListenerPrefix = listenPrefix;
+        _activeApiBaseUrl = ResolveConfiguredApiBaseUrl(listenPrefix, _globalSettings.SyncApiAdvertisedBaseUrl);
+
+        _listener.Prefixes.Add(listenPrefix);
         _listener.Start();
         _started = true;
 
         Logger.LogInfo("SyncApi", "Ingestion sync API started", new Dictionary<string, object?>
         {
-            ["prefix"] = DefaultPrefix,
+            ["prefix"] = _activeListenerPrefix,
+            ["apiBaseUrl"] = _activeApiBaseUrl,
             ["authTokenConfigured"] = !string.IsNullOrWhiteSpace(_globalSettings.SyncApiAuthToken),
         });
 
+        try
+        {
+            await _syncLanDiscoveryService.StartAdvertisingAsync(_activeApiBaseUrl, _globalSettings.SyncApiDeviceLabel, cancellationToken);
+            Logger.LogInfo("SyncApi", "mDNS LAN advertisement started", new Dictionary<string, object?>
+            {
+                ["serviceType"] = "_charthub-sync._tcp",
+                ["listenerPrefix"] = _activeListenerPrefix,
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning("SyncApi", "mDNS LAN advertisement failed to start", new Dictionary<string, object?>
+            {
+                ["error"] = ex.Message,
+                ["apiBaseUrl"] = _activeApiBaseUrl,
+            });
+        }
+
         _listenLoopTask = Task.Run(() => ListenLoopAsync(_cts.Token), CancellationToken.None);
-        return Task.CompletedTask;
     }
 
     private async Task ListenLoopAsync(CancellationToken cancellationToken)
@@ -191,7 +217,7 @@ public sealed class IngestionSyncApiHost(
                 {
                     paired = true,
                     token = _globalSettings.SyncApiAuthToken,
-                    apiBaseUrl = DefaultPrefix.TrimEnd('/'),
+                    apiBaseUrl = ResolveRequestApiBaseUrl(request),
                     pairedAtUtc,
                 });
                 return;
@@ -901,6 +927,58 @@ public sealed class IngestionSyncApiHost(
         return path.Equals("/api/pair/claim", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static string NormalizeListenPrefix(string? value)
+    {
+        string candidate = value?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return DefaultListenPrefix;
+        }
+
+        if (!candidate.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            && !candidate.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            candidate = $"http://{candidate}";
+        }
+
+        if (!candidate.EndsWith("/", StringComparison.Ordinal))
+        {
+            candidate = $"{candidate}/";
+        }
+
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out Uri? parsed)
+            || string.IsNullOrWhiteSpace(parsed.Host))
+        {
+            return DefaultListenPrefix;
+        }
+
+        return candidate;
+    }
+
+    private static string ResolveConfiguredApiBaseUrl(string listenerPrefix, string? advertisedBaseUrl)
+    {
+        return SyncApiAddressResolver.ResolveAdvertisedApiBaseUrl(listenerPrefix, advertisedBaseUrl);
+    }
+
+    private string ResolveRequestApiBaseUrl(HttpListenerRequest request)
+    {
+        if (!string.IsNullOrWhiteSpace(_activeApiBaseUrl))
+        {
+            return _activeApiBaseUrl;
+        }
+
+        if (request.Url is not null)
+        {
+            string fromRequest = request.Url.GetLeftPart(UriPartial.Authority);
+            if (!string.IsNullOrWhiteSpace(fromRequest))
+            {
+                return fromRequest;
+            }
+        }
+
+        return DefaultListenPrefix.TrimEnd('/');
+    }
+
     private string GetCurrentPairCode()
     {
         lock (_pairCodeSync)
@@ -1084,6 +1162,18 @@ public sealed class IngestionSyncApiHost(
     {
         if (_started)
         {
+            try
+            {
+                await _syncLanDiscoveryService.StopAdvertisingAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning("SyncApi", "mDNS LAN advertisement shutdown failed", new Dictionary<string, object?>
+                {
+                    ["error"] = ex.Message,
+                });
+            }
+
             await _cts.CancelAsync();
             _listener.Close();
 
@@ -1100,7 +1190,7 @@ public sealed class IngestionSyncApiHost(
 
             Logger.LogInfo("SyncApi", "Ingestion sync API stopped", new Dictionary<string, object?>
             {
-                ["prefix"] = DefaultPrefix,
+                ["prefix"] = _activeListenerPrefix,
             });
         }
 

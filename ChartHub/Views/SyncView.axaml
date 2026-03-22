@@ -6,61 +6,39 @@
              mc:Ignorable="d"
              d:DesignWidth="960"
              d:DesignHeight="640"
+             x:Name="Root"
              x:Class="ChartHub.Views.SyncView"
              x:DataType="viewmodels:SyncViewModel">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="16">
-        <TextBlock Grid.Row="0"
-                   Text="Desktop Sync"
-                   FontSize="22"
-                   FontWeight="SemiBold" />
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="16" Spacing="16">
+            <StackPanel Spacing="4">
+                <TextBlock Text="{Binding SyncTitle}"
+                           FontSize="22"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SyncSubtitle}"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+            </StackPanel>
 
-        <Grid Grid.Row="1" ColumnDefinitions="*,*,Auto" Margin="0,10,0,0">
-            <TextBox Grid.Column="0"
-                     Margin="0,0,8,0"
-                     Watermark="Desktop host URL (example: http://192.168.1.10:15123)"
-                     Text="{Binding DesktopApiBaseUrl}" />
-            <TextBox Grid.Column="1"
-                     Margin="0,0,8,0"
-                     Watermark="Sync token"
-                     Text="{Binding SyncToken}" />
-            <Button Grid.Column="2"
-                    MinWidth="130"
-                    Command="{Binding TestConnectionCommand}"
-                    Content="Connect" />
-        </Grid>
+            <StackPanel Spacing="6">
+                <TextBlock Text="{Binding StatusMessage}"
+                           Foreground="{DynamicResource ThemeForegroundBrush}"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ConnectionHint}"
+                           IsVisible="{Binding HasConnectionHint}"
+                           Foreground="{DynamicResource ThemeForegroundLowBrush}"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding AutoRefreshHint}"
+                           IsVisible="{Binding IsCompanionMode}"
+                           Foreground="{DynamicResource ThemeForegroundLowBrush}"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ErrorMessage}"
+                           IsVisible="{Binding HasError}"
+                           Foreground="{DynamicResource SemanticError}"
+                           TextWrapping="Wrap" />
+            </StackPanel>
 
-        <Grid Grid.Row="2" ColumnDefinitions="*,*,Auto,Auto" Margin="0,10,0,0">
-            <TextBox Grid.Column="0"
-                     Margin="0,0,8,0"
-                     Watermark="Device label"
-                     Text="{Binding DeviceLabel}" />
-            <TextBox Grid.Column="1"
-                     Margin="0,0,8,0"
-                     Watermark="Pair code"
-                     Text="{Binding PairCode}" />
-            <Button Grid.Column="2"
-                Margin="0,0,8,0"
-                MinWidth="130"
-                Command="{Binding PairWithCodeCommand}"
-                Content="Pair + Connect" />
-            <Button Grid.Column="3"
-                    MinWidth="130"
-                    Command="{Binding SaveProfileCommand}"
-                    Content="Save Profile" />
-        </Grid>
-
-        <StackPanel Grid.Row="3" Spacing="6" Margin="0,10,0,0">
-            <TextBlock Text="{Binding StatusMessage}"
-                       Foreground="{DynamicResource ThemeForegroundBrush}" />
-            <TextBlock Text="{Binding ConnectionHint}"
-                       IsVisible="{Binding HasConnectionHint}"
-                       Foreground="{DynamicResource ThemeForegroundLowBrush}" />
-            <TextBlock Text="{Binding AutoRefreshHint}"
-                       Foreground="{DynamicResource ThemeForegroundLowBrush}" />
-            <TextBlock Text="{Binding ErrorMessage}"
-                       IsVisible="{Binding HasError}"
-                       Foreground="{DynamicResource SemanticError}" />
             <Border IsVisible="{Binding HasDiagnosticsToDisplay}"
                     Padding="8"
                     BorderThickness="1"
@@ -74,7 +52,7 @@
                                IsVisible="{Binding Diagnostics.HasLastErrorMessage}"
                                Foreground="{DynamicResource SemanticError}"
                                TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding Diagnostics.RemediationHint, StringFormat='💡 {0}'}"
+                    <TextBlock Text="{Binding Diagnostics.RemediationHint, StringFormat='Tip: {0}'}"
                                IsVisible="{Binding Diagnostics.HasRemediationHint}"
                                Foreground="{DynamicResource ThemeForegroundLowBrush}"
                                TextWrapping="Wrap" />
@@ -83,85 +61,158 @@
                                FontSize="11" />
                 </StackPanel>
             </Border>
-            <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" />
-        </StackPanel>
 
-        <Grid Grid.Row="4" ColumnDefinitions="340,*" Margin="0,10,0,0">
-            <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*" Margin="0,0,10,0">
-                <TextBlock Grid.Row="0"
-                           Text="Saved Connections"
-                           FontWeight="SemiBold"
-                           Margin="0,0,0,6" />
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="6" Margin="0,0,0,8">
-                    <Button Content="Apply"
-                            Command="{Binding ApplyProfileCommand}"
-                            CommandParameter="{Binding SelectedProfile}" />
-                    <Button Content="Remove"
-                            Command="{Binding RemoveProfileCommand}"
-                            CommandParameter="{Binding SelectedProfile}" />
-                </StackPanel>
-                <DataGrid Grid.Row="2"
-                          ItemsSource="{Binding SavedProfiles}"
-                          SelectedItem="{Binding SelectedProfile}"
-                          IsReadOnly="True"
-                          AutoGenerateColumns="False"
-                          CanUserResizeColumns="True"
-                          GridLinesVisibility="Horizontal"
-                          HeadersVisibility="Column">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
-                        <DataGridTextColumn Header="Host" Binding="{Binding BaseUrl}" Width="*" />
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Grid>
-
-            <Grid Grid.Column="1" RowDefinitions="Auto,*">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Refresh Queue"
-                            Command="{Binding RefreshQueueCommand}" />
-                    <Button Content="Retry Selected"
-                            Command="{Binding RetrySelectedCommand}"
-                            CommandParameter="{Binding SelectedItem}" />
-                    <Button Content="Install Selected"
-                            Command="{Binding InstallSelectedCommand}"
-                            CommandParameter="{Binding SelectedItem}" />
-                    <Button Content="Open Folder"
-                            Command="{Binding OpenFolderSelectedCommand}"
-                            CommandParameter="{Binding SelectedItem}" />
-                </StackPanel>
-
-                <DataGrid Grid.Row="1"
-                          Margin="0,8,0,0"
-                          ItemsSource="{Binding QueueItems}"
-                          SelectedItem="{Binding SelectedItem}"
-                          IsVisible="{Binding HasQueueItems}"
-                          IsReadOnly="True"
-                          AutoGenerateColumns="False"
-                          CanUserResizeColumns="True"
-                          GridLinesVisibility="Horizontal"
-                          HeadersVisibility="Column">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="ID" Binding="{Binding IngestionId}" Width="90" />
-                        <DataGridTextColumn Header="Title" Binding="{Binding DisplayName}" Width="2*" />
-                        <DataGridTextColumn Header="State" Binding="{Binding CurrentState}" Width="130" />
-                        <DataGridTextColumn Header="Desktop" Binding="{Binding DesktopState}" Width="130" />
-                        <DataGridTextColumn Header="Updated" Binding="{Binding UpdatedText}" Width="190" />
-                        <DataGridTextColumn Header="Last Action" Binding="{Binding ActionResultDisplay}" Width="180" />
-                    </DataGrid.Columns>
-                </DataGrid>
-
-                <Border Grid.Row="1"
-                        Margin="0,8,0,0"
-                        IsVisible="{Binding ShowEmptyQueueState}"
-                        Padding="12"
-                        BorderThickness="1"
-                        BorderBrush="{DynamicResource ThemeBorderMidBrush}"
-                        Background="{DynamicResource ThemeControlLowBrush}">
-                    <TextBlock Text="Connected, but there are no ingestion items queued right now."
+            <Border IsVisible="{Binding ShowDesktopBootstrapSection}"
+                    Padding="12"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource ThemeBorderMidBrush}"
+                    Background="{DynamicResource ThemeControlLowBrush}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Desktop QR Pairing"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource ThemeForegroundBrush}" />
+                    <TextBlock Text="{Binding BootstrapInstructions}"
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource ThemeForegroundLowBrush}" />
-                </Border>
-            </Grid>
-        </Grid>
-    </Grid>
+                    <Border IsVisible="{Binding ShowDesktopBootstrapPlaceholder}"
+                            Padding="10"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                            Background="{DynamicResource ThemeControlMidBrush}">
+                        <TextBlock Text="{Binding BootstrapPlaceholderText}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                    </Border>
+                    <Image IsVisible="{Binding HasBootstrapQrImage}"
+                           Width="220"
+                           Height="220"
+                           HorizontalAlignment="Left"
+                           Source="{Binding BootstrapQrImage}" />
+                    <TextBox Text="{Binding GeneratedBootstrapPayload}"
+                             IsReadOnly="True"
+                             Watermark="Generated bootstrap payload"
+                             TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border IsVisible="{Binding ShowCompanionScanSection}"
+                    Padding="12"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource ThemeBorderMidBrush}"
+                    Background="{DynamicResource ThemeControlLowBrush}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Scan Desktop QR"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource ThemeForegroundBrush}" />
+                    <TextBlock Text="Use the desktop QR to start pairing. After confirmation, the companion connects automatically and opens the queue."
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                    <Button HorizontalAlignment="Left"
+                            MinWidth="180"
+                            Content="Scan Desktop QR"
+                            IsVisible="{Binding SupportsCameraScanning}"
+                            Command="{Binding ScanBootstrapQrCommand}" />
+
+                    <Border IsVisible="{Binding ShowCompanionConfirmationSection}"
+                            Padding="10"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                            Background="{DynamicResource ThemeControlMidBrush}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Ready To Pair"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ThemeForegroundBrush}" />
+                            <TextBlock Text="{Binding PendingQrPairingSummary}"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                            <WrapPanel Orientation="Horizontal"
+                                       ItemHeight="36"
+                                       ItemWidth="150">
+                                <Button Margin="0,0,8,8"
+                                        Content="Confirm Pairing"
+                                        Command="{Binding ConfirmQrPairingCommand}" />
+                                <Button Margin="0,0,8,8"
+                                        Content="Cancel"
+                                        Command="{Binding CancelPendingQrPairingCommand}" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <Border IsVisible="{Binding ShowCompanionQueueSection}"
+                    Padding="12"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource ThemeBorderMidBrush}"
+                    Background="{DynamicResource ThemeControlLowBrush}">
+                <StackPanel Spacing="8">
+                    <WrapPanel Orientation="Horizontal"
+                               ItemHeight="36"
+                               ItemWidth="140">
+                        <Button Margin="0,0,8,8"
+                                Content="Refresh Queue"
+                                Command="{Binding RefreshQueueCommand}" />
+                    </WrapPanel>
+                    <ItemsControl ItemsSource="{Binding QueueItems}"
+                                  IsVisible="{Binding HasQueueItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,10"
+                                        Padding="10"
+                                        BorderThickness="1"
+                                        BorderBrush="{DynamicResource ThemeBorderMidBrush}"
+                                        Background="{DynamicResource ThemeControlMidBrush}">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="{Binding DisplayName}"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource ThemeForegroundBrush}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding IngestionId, StringFormat='ID: {0}'}"
+                                                   Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                                        <TextBlock Text="{Binding CurrentState, StringFormat='State: {0}'}"
+                                                   Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                                        <TextBlock Text="{Binding DesktopState, StringFormat='Desktop: {0}'}"
+                                                   Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                                        <TextBlock Text="{Binding UpdatedText, StringFormat='Updated: {0}'}"
+                                                   Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                                        <TextBlock Text="{Binding ActionResultDisplay, StringFormat='Last action: {0}'}"
+                                                   IsVisible="{Binding HasActionResult}"
+                                                   Foreground="{DynamicResource ThemeForegroundLowBrush}"
+                                                   TextWrapping="Wrap" />
+                                        <WrapPanel Orientation="Horizontal"
+                                                   ItemHeight="36"
+                                                   ItemWidth="150">
+                                            <Button Margin="0,0,8,8"
+                                                    Content="Retry"
+                                                    Command="{Binding #Root.DataContext.RetrySelectedCommand}"
+                                                    CommandParameter="{Binding}" />
+                                            <Button Margin="0,0,8,8"
+                                                    Content="Install"
+                                                    Command="{Binding #Root.DataContext.InstallSelectedCommand}"
+                                                    CommandParameter="{Binding}" />
+                                            <Button Margin="0,0,8,8"
+                                                    Content="Open Folder"
+                                                    Command="{Binding #Root.DataContext.OpenFolderSelectedCommand}"
+                                                    CommandParameter="{Binding}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border IsVisible="{Binding ShowEmptyQueueState}"
+                            Padding="12"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                            Background="{DynamicResource ThemeControlMidBrush}">
+                        <TextBlock Text="Connected, but there are no ingestion items queued right now."
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" />
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

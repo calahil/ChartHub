@@ -1,9 +1,14 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.IO;
+using System.Net;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
+
+using Avalonia.Media.Imaging;
 
 using ChartHub.Models;
 using ChartHub.Services;
@@ -11,30 +16,37 @@ using ChartHub.Utilities;
 
 using CommunityToolkit.Mvvm.Input;
 
+using QRCoder;
+
 namespace ChartHub.ViewModels;
 
 public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 {
-    private static readonly JsonSerializerOptions ProfileJsonOptions = new()
+    private static readonly JsonSerializerOptions SyncJsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
     };
     private static readonly TimeSpan DefaultAutoRefreshInterval = TimeSpan.FromSeconds(15);
+    private const string DefaultDesktopBootstrapLabel = "ChartHub Desktop";
 
     private readonly IDesktopSyncApiClient _desktopSyncApiClient;
+    private readonly IQrCodeScannerService _qrCodeScannerService;
     private readonly AppGlobalSettings _appGlobalSettings;
     private readonly TimeSpan _autoRefreshInterval;
+    private readonly bool _isCompanionMode;
 
     private string _desktopApiBaseUrl = "http://127.0.0.1:15123";
     private string _syncToken = string.Empty;
-    private string _statusMessage = "Enter desktop host URL and token, then test connection.";
+    private string _statusMessage = string.Empty;
     private string? _errorMessage;
     private bool _isBusy;
     private bool _isConnected;
     private IngestionQueueItem? _selectedItem;
     private string _deviceLabel = "Android Companion";
     private string _pairCode = string.Empty;
-    private SyncConnectionProfile? _selectedProfile;
+    private string _generatedBootstrapPayload = string.Empty;
+    private PendingQrPairingRequest? _pendingQrPairing;
+    private Bitmap? _bootstrapQrImage;
     private CancellationTokenSource? _autoRefreshCancellationTokenSource;
     private DateTimeOffset? _lastAutoRefreshUtc;
     private ConnectionDiagnostics _diagnostics = new();
@@ -53,8 +65,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged();
             OnPropertyChanged(nameof(ConnectionHint));
             OnPropertyChanged(nameof(HasConnectionHint));
-            SaveProfileCommand.NotifyCanExecuteChanged();
-            PairWithCodeCommand.NotifyCanExecuteChanged();
+            RegenerateBootstrapQrPayload();
         }
     }
 
@@ -72,7 +83,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged();
             OnPropertyChanged(nameof(ConnectionHint));
             OnPropertyChanged(nameof(HasConnectionHint));
-            SaveProfileCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -113,6 +123,18 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     {
         get
         {
+            if (IsDesktopMode)
+            {
+                if (string.IsNullOrWhiteSpace(PairCode))
+                {
+                    return "Set a pair code in Settings to generate the companion QR code.";
+                }
+
+                return HasBootstrapQrImage
+                    ? "Scan this QR on the companion, then confirm pairing on the phone."
+                    : "Configure a LAN-reachable desktop sync address to generate the companion QR code.";
+            }
+
             if (IsBusy)
             {
                 return "Working...";
@@ -120,20 +142,20 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
             if (IsConnected)
             {
-                return "Connected. Use Refresh Queue to pull desktop ingestion updates.";
+                return "Connected. The queue refreshes automatically while the desktop stays reachable.";
+            }
+
+            if (HasPendingQrPairing)
+            {
+                return "QR scanned. Confirm pairing to connect to the desktop over LAN.";
             }
 
             if (HasError)
             {
-                return "Connection failed. Verify desktop URL and credentials, then retry.";
+                return "Pairing failed. Scan the desktop QR and try again.";
             }
 
-            if (string.IsNullOrWhiteSpace(SyncToken))
-            {
-                return "Use Pair + Connect with the desktop pair code, or paste a sync token then Connect.";
-            }
-
-            return "Press Connect to validate token and load the desktop queue.";
+            return "Scan the desktop QR to start pairing.";
         }
     }
 
@@ -154,8 +176,12 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged(nameof(ConnectionHint));
             OnPropertyChanged(nameof(HasConnectionHint));
             OnPropertyChanged(nameof(ShowEmptyQueueState));
+            OnPropertyChanged(nameof(ShowCompanionScanSection));
+            OnPropertyChanged(nameof(ShowCompanionConfirmationSection));
             TestConnectionCommand.NotifyCanExecuteChanged();
-            PairWithCodeCommand.NotifyCanExecuteChanged();
+            ConfirmQrPairingCommand.NotifyCanExecuteChanged();
+            CancelPendingQrPairingCommand.NotifyCanExecuteChanged();
+            ScanBootstrapQrCommand.NotifyCanExecuteChanged();
             RefreshQueueCommand.NotifyCanExecuteChanged();
             RetrySelectedCommand.NotifyCanExecuteChanged();
             InstallSelectedCommand.NotifyCanExecuteChanged();
@@ -226,8 +252,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
             _deviceLabel = value;
             OnPropertyChanged();
-            SaveProfileCommand.NotifyCanExecuteChanged();
-            PairWithCodeCommand.NotifyCanExecuteChanged();
+            RegenerateBootstrapQrPayload();
         }
     }
 
@@ -243,34 +268,77 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
             _pairCode = value;
             OnPropertyChanged();
-            SaveProfileCommand.NotifyCanExecuteChanged();
-            PairWithCodeCommand.NotifyCanExecuteChanged();
+            RegenerateBootstrapQrPayload();
         }
     }
 
-    public SyncConnectionProfile? SelectedProfile
+    public string GeneratedBootstrapPayload
     {
-        get => _selectedProfile;
-        set
+        get => _generatedBootstrapPayload;
+        private set
         {
-            if (_selectedProfile == value)
+            if (_generatedBootstrapPayload == value)
             {
                 return;
             }
 
-            _selectedProfile = value;
+            _generatedBootstrapPayload = value;
             OnPropertyChanged();
-            ApplyProfileCommand.NotifyCanExecuteChanged();
-            RemoveProfileCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public string PendingQrPairingSummary => _pendingQrPairing is null
+        ? string.Empty
+        : string.IsNullOrWhiteSpace(_pendingQrPairing.DesktopLabel)
+            ? _pendingQrPairing.ApiBaseUrl
+            : $"{_pendingQrPairing.DesktopLabel} ({_pendingQrPairing.ApiBaseUrl})";
+
+    public bool HasPendingQrPairing => _pendingQrPairing is not null;
+
+    public Bitmap? BootstrapQrImage
+    {
+        get => _bootstrapQrImage;
+        private set
+        {
+            if (ReferenceEquals(_bootstrapQrImage, value))
+            {
+                return;
+            }
+
+            _bootstrapQrImage?.Dispose();
+            _bootstrapQrImage = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasBootstrapQrImage));
+            OnPropertyChanged(nameof(ShowDesktopBootstrapPlaceholder));
+            OnPropertyChanged(nameof(ConnectionHint));
+            OnPropertyChanged(nameof(HasConnectionHint));
         }
     }
 
     public ObservableCollection<IngestionQueueItem> QueueItems { get; } = [];
-    public ObservableCollection<SyncConnectionProfile> SavedProfiles { get; } = [];
 
+    public bool IsCompanionMode => _isCompanionMode;
+    public bool IsDesktopMode => !_isCompanionMode;
     public bool HasQueueItems => QueueItems.Count > 0;
+    public bool HasBootstrapQrImage => BootstrapQrImage is not null;
+    public bool SupportsCameraScanning => _qrCodeScannerService.IsSupported;
     public bool ShowEmptyQueueState => IsConnected && !IsBusy && QueueItems.Count == 0;
     public bool IsAutoRefreshActive => IsConnected && _autoRefreshCancellationTokenSource is not null;
+    public bool ShowDesktopBootstrapSection => IsDesktopMode;
+    public bool ShowCompanionScanSection => IsCompanionMode && !IsConnected;
+    public bool ShowCompanionConfirmationSection => IsCompanionMode && !IsConnected && HasPendingQrPairing;
+    public bool ShowCompanionQueueSection => IsCompanionMode && IsConnected;
+    public bool ShowDesktopBootstrapPlaceholder => IsDesktopMode && !HasBootstrapQrImage;
+    public string SyncTitle => IsDesktopMode ? "Desktop Sync Host" : "Desktop Sync Companion";
+    public string SyncSubtitle => IsDesktopMode
+        ? "Keep the desktop app open and present this QR to the companion. The QR must resolve to a LAN-reachable desktop address."
+        : "Scan the desktop QR, confirm the pairing, then the queue opens automatically.";
+    public string BootstrapInstructions => IsDesktopMode
+        ? "Scan this QR on the companion. The raw payload stays visible below for debugging only."
+        : string.Empty;
+    public string BootstrapPlaceholderText => IsDesktopMode
+        ? "Set a pair code and configure a LAN-reachable desktop sync address to generate the companion QR."
+        : string.Empty;
     public string AutoRefreshHint => !IsConnected
         ? "Auto-refresh starts after a successful connection."
         : _lastAutoRefreshUtc is null
@@ -298,24 +366,31 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     public string DiagnosticsSummary => Diagnostics.DiagnosticsSummary;
 
     public IAsyncRelayCommand TestConnectionCommand { get; }
-    public IAsyncRelayCommand PairWithCodeCommand { get; }
+    public IAsyncRelayCommand ConfirmQrPairingCommand { get; }
+    public IAsyncRelayCommand ScanBootstrapQrCommand { get; }
+    public IRelayCommand CancelPendingQrPairingCommand { get; }
     public IAsyncRelayCommand RefreshQueueCommand { get; }
     public IAsyncRelayCommand<IngestionQueueItem?> RetrySelectedCommand { get; }
     public IAsyncRelayCommand<IngestionQueueItem?> InstallSelectedCommand { get; }
     public IAsyncRelayCommand<IngestionQueueItem?> OpenFolderSelectedCommand { get; }
-    public IRelayCommand SaveProfileCommand { get; }
-    public IRelayCommand<SyncConnectionProfile?> ApplyProfileCommand { get; }
-    public IRelayCommand<SyncConnectionProfile?> RemoveProfileCommand { get; }
 
-    public SyncViewModel(IDesktopSyncApiClient desktopSyncApiClient, AppGlobalSettings appGlobalSettings, TimeSpan? autoRefreshInterval = null)
+    public SyncViewModel(
+        IDesktopSyncApiClient desktopSyncApiClient,
+        AppGlobalSettings appGlobalSettings,
+        IQrCodeScannerService? qrCodeScannerService = null,
+        TimeSpan? autoRefreshInterval = null,
+        bool? isCompanionMode = null)
     {
         _desktopSyncApiClient = desktopSyncApiClient;
+        _qrCodeScannerService = qrCodeScannerService ?? new NoOpQrCodeScannerService();
         _appGlobalSettings = appGlobalSettings;
         _autoRefreshInterval = autoRefreshInterval.GetValueOrDefault(DefaultAutoRefreshInterval);
+        _isCompanionMode = isCompanionMode ?? OperatingSystem.IsAndroid();
 
         _desktopApiBaseUrl = _appGlobalSettings.SyncApiDesktopBaseUrl;
         _deviceLabel = _appGlobalSettings.SyncApiDeviceLabel;
         _pairCode = _appGlobalSettings.SyncApiPairCode;
+        _statusMessage = GetInitialStatusMessage();
 
         if (!string.IsNullOrWhiteSpace(_appGlobalSettings.SyncApiAuthToken))
         {
@@ -323,17 +398,16 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
 
         QueueItems.CollectionChanged += OnQueueItemsCollectionChanged;
-        LoadProfiles();
+        RegenerateBootstrapQrPayload();
 
         TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, CanTestConnection);
-        PairWithCodeCommand = new AsyncRelayCommand(PairWithCodeAsync, CanPairWithCode);
+        ConfirmQrPairingCommand = new AsyncRelayCommand(ConfirmQrPairingAsync, CanConfirmQrPairing);
+        ScanBootstrapQrCommand = new AsyncRelayCommand(ScanBootstrapQrAsync, CanScanBootstrapQr);
+        CancelPendingQrPairingCommand = new RelayCommand(CancelPendingQrPairing, CanCancelPendingQrPairing);
         RefreshQueueCommand = new AsyncRelayCommand(RefreshQueueAsync, CanRefreshQueue);
         RetrySelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(RetrySelectedAsync, CanActOnSelectedItem);
         InstallSelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(InstallSelectedAsync, CanActOnSelectedItem);
         OpenFolderSelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(OpenFolderSelectedAsync, CanActOnSelectedItem);
-        SaveProfileCommand = new RelayCommand(SaveCurrentProfile, CanSaveProfile);
-        ApplyProfileCommand = new RelayCommand<SyncConnectionProfile?>(ApplyProfile, CanUseProfile);
-        RemoveProfileCommand = new RelayCommand<SyncConnectionProfile?>(RemoveProfile, CanUseProfile);
     }
 
     private bool CanTestConnection()
@@ -341,16 +415,16 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         return !IsBusy;
     }
 
+    private string GetInitialStatusMessage()
+    {
+        return IsDesktopMode
+            ? "Present this QR on the desktop so the companion can pair over LAN."
+            : "Scan the desktop QR to start pairing.";
+    }
+
     private bool CanRefreshQueue()
     {
         return !IsBusy && IsConnected;
-    }
-
-    private bool CanPairWithCode()
-    {
-        return !IsBusy
-            && !string.IsNullOrWhiteSpace(DesktopApiBaseUrl)
-            && !string.IsNullOrWhiteSpace(PairCode);
     }
 
     private bool CanActOnSelectedItem(IngestionQueueItem? item)
@@ -358,17 +432,64 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         return !IsBusy && IsConnected && item is not null;
     }
 
-    private bool CanSaveProfile()
+    private bool CanScanBootstrapQr()
     {
-        return !IsBusy
-            && !string.IsNullOrWhiteSpace(DesktopApiBaseUrl)
-            && !string.IsNullOrWhiteSpace(SyncToken)
-            && !string.IsNullOrWhiteSpace(DeviceLabel);
+        return !IsBusy && SupportsCameraScanning;
     }
 
-    private bool CanUseProfile(SyncConnectionProfile? profile)
+    private bool CanConfirmQrPairing()
     {
-        return !IsBusy && profile is not null;
+        return !IsBusy && _pendingQrPairing is not null;
+    }
+
+    private bool CanCancelPendingQrPairing()
+    {
+        return !IsBusy && _pendingQrPairing is not null;
+    }
+
+    private async Task ScanBootstrapQrAsync()
+    {
+        await RunOperationAsync(async () =>
+        {
+            string? scannedPayload = await _qrCodeScannerService.ScanAsync();
+            string normalizedPayload = scannedPayload?.Trim() ?? string.Empty;
+            if (normalizedPayload.Length == 0)
+            {
+                StatusMessage = "No QR payload captured.";
+                return;
+            }
+
+            if (!TryParseBootstrapPayload(normalizedPayload, out SyncBootstrapPayload? payload)
+                || payload is null)
+            {
+                throw new InvalidOperationException("The scanned QR payload is invalid.");
+            }
+
+            SetPendingQrPairing(payload);
+            StatusMessage = "QR scanned. Confirm pairing to connect to the desktop.";
+            ErrorMessage = null;
+        }, "QR scan failed");
+    }
+
+    private async Task ConfirmQrPairingAsync()
+    {
+        if (_pendingQrPairing is null)
+        {
+            return;
+        }
+
+        PendingQrPairingRequest pairingRequest = _pendingQrPairing;
+        await RunOperationAsync(async () =>
+        {
+            await PairWithQrAsync(pairingRequest);
+        }, "QR pairing failed");
+    }
+
+    private void CancelPendingQrPairing()
+    {
+        ClearPendingQrPairing();
+        StatusMessage = "Pairing confirmation canceled. Scan the desktop QR to try again.";
+        ErrorMessage = null;
     }
 
     private async Task TestConnectionAsync()
@@ -379,24 +500,24 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }, "Desktop sync connection failed");
     }
 
-    private async Task PairWithCodeAsync()
+    private async Task PairWithQrAsync(PendingQrPairingRequest pairingRequest)
     {
-        await RunOperationAsync(async () =>
+        DesktopSyncPairClaimResponse claim = await _desktopSyncApiClient.ClaimPairTokenAsync(
+            pairingRequest.ApiBaseUrl,
+            pairingRequest.PairCode,
+            DeviceLabel);
+        if (!claim.Paired || string.IsNullOrWhiteSpace(claim.Token))
         {
-            DesktopSyncPairClaimResponse claim = await _desktopSyncApiClient.ClaimPairTokenAsync(DesktopApiBaseUrl, PairCode, DeviceLabel);
-            if (!claim.Paired || string.IsNullOrWhiteSpace(claim.Token))
-            {
-                throw new InvalidOperationException("Pairing did not return a usable token.");
-            }
+            throw new InvalidOperationException("Pairing did not return a usable token.");
+        }
 
-            SyncToken = claim.Token;
-            if (!string.IsNullOrWhiteSpace(claim.ApiBaseUrl))
-            {
-                DesktopApiBaseUrl = claim.ApiBaseUrl;
-            }
+        SyncToken = claim.Token;
+        DesktopApiBaseUrl = ShouldAdoptPairApiBaseUrl(pairingRequest.ApiBaseUrl, claim.ApiBaseUrl)
+            ? claim.ApiBaseUrl
+            : pairingRequest.ApiBaseUrl;
 
-            await ConnectAndRefreshAsync();
-        }, "Pair-code handshake failed");
+        await ConnectAndRefreshAsync();
+        ClearPendingQrPairing();
     }
 
     private async Task ConnectAndRefreshAsync()
@@ -411,12 +532,10 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         _appGlobalSettings.SyncApiAuthToken = SyncToken;
         _appGlobalSettings.SyncApiDesktopBaseUrl = DesktopApiBaseUrl;
         _appGlobalSettings.SyncApiDeviceLabel = DeviceLabel;
-        _appGlobalSettings.SyncApiPairCode = PairCode;
 
         StatusMessage = $"Connected to {version.Api} v{version.Version}.";
         ErrorMessage = null;
 
-        // Update diagnostics with successful connection
         Diagnostics = new ConnectionDiagnostics
         {
             LastAttemptUtc = DateTime.UtcNow,
@@ -647,106 +766,244 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }, "Failed to request folder open");
     }
 
-    private void SaveCurrentProfile()
+    private static bool ShouldAdoptPairApiBaseUrl(string currentBaseUrl, string? claimedBaseUrl)
     {
-        if (!CanSaveProfile())
+        if (string.IsNullOrWhiteSpace(claimedBaseUrl)
+            || !Uri.TryCreate(claimedBaseUrl.Trim(), UriKind.Absolute, out Uri? claimedUri))
         {
-            return;
+            return false;
         }
 
-        string name = DeviceLabel.Trim();
-        SyncConnectionProfile? existing = SavedProfiles.FirstOrDefault(profile =>
-            profile.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-
-        var profile = new SyncConnectionProfile(
-            Name: name,
-            BaseUrl: DesktopApiBaseUrl.Trim(),
-            Token: SyncToken.Trim(),
-            PairCode: PairCode.Trim(),
-            LastConnectedUtc: DateTimeOffset.UtcNow);
-
-        if (existing is null)
+        if (!Uri.TryCreate(currentBaseUrl?.Trim(), UriKind.Absolute, out Uri? currentUri))
         {
-            SavedProfiles.Add(profile);
-        }
-        else
-        {
-            int index = SavedProfiles.IndexOf(existing);
-            SavedProfiles[index] = profile;
+            return true;
         }
 
-        SelectedProfile = profile;
-        PersistProfiles();
-        StatusMessage = $"Saved connection profile '{profile.Name}'.";
-        ErrorMessage = null;
+        bool claimedLoopback = IsLoopbackHost(claimedUri);
+        bool currentLoopback = IsLoopbackHost(currentUri);
+        if (claimedLoopback && !currentLoopback)
+        {
+            return false;
+        }
+
+        return true;
     }
 
-    private void ApplyProfile(SyncConnectionProfile? profile)
+    private static bool IsLoopbackHost(Uri uri)
     {
-        if (profile is null)
+        if (uri.IsLoopback)
         {
-            return;
+            return true;
         }
 
-        DeviceLabel = profile.Name;
-        DesktopApiBaseUrl = profile.BaseUrl;
-        SyncToken = profile.Token;
-        PairCode = profile.PairCode;
-
-        _appGlobalSettings.SyncApiDeviceLabel = DeviceLabel;
-        _appGlobalSettings.SyncApiDesktopBaseUrl = DesktopApiBaseUrl;
-        _appGlobalSettings.SyncApiAuthToken = SyncToken;
-        _appGlobalSettings.SyncApiPairCode = PairCode;
-
-        StatusMessage = $"Applied profile '{profile.Name}'.";
-        ErrorMessage = null;
+        return IPAddress.TryParse(uri.Host, out IPAddress? ipAddress) && IPAddress.IsLoopback(ipAddress);
     }
 
-    private void RemoveProfile(SyncConnectionProfile? profile)
+    private void RegenerateBootstrapQrPayload()
     {
-        if (profile is null)
+        string payload = BuildBootstrapPayload();
+        GeneratedBootstrapPayload = payload;
+        if (string.IsNullOrWhiteSpace(payload))
         {
-            return;
-        }
-
-        SavedProfiles.Remove(profile);
-        if (ReferenceEquals(SelectedProfile, profile))
-        {
-            SelectedProfile = null;
-        }
-
-        PersistProfiles();
-        StatusMessage = $"Removed profile '{profile.Name}'.";
-        ErrorMessage = null;
-    }
-
-    private void LoadProfiles()
-    {
-        string json = _appGlobalSettings.SyncApiSavedConnectionsJson;
-        if (string.IsNullOrWhiteSpace(json))
-        {
+            BootstrapQrImage = null;
             return;
         }
 
         try
         {
-            List<SyncConnectionProfile> items = JsonSerializer.Deserialize<List<SyncConnectionProfile>>(json, ProfileJsonOptions) ?? [];
-            SavedProfiles.Clear();
-            foreach (SyncConnectionProfile? item in items.Where(static item => !string.IsNullOrWhiteSpace(item.Name)))
-            {
-                SavedProfiles.Add(item);
-            }
+            using var generator = new QRCodeGenerator();
+            using QRCodeData data = generator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.Q);
+            var qrCode = new PngByteQRCode(data);
+            byte[] pngBytes = qrCode.GetGraphic(12, drawQuietZones: true);
+
+            using var stream = new MemoryStream(pngBytes);
+            BootstrapQrImage = new Bitmap(stream);
         }
         catch
         {
-            SavedProfiles.Clear();
+            BootstrapQrImage = null;
         }
     }
 
-    private void PersistProfiles()
+    private string BuildBootstrapPayload()
     {
-        string json = JsonSerializer.Serialize(SavedProfiles.ToList(), ProfileJsonOptions);
-        _appGlobalSettings.SyncApiSavedConnectionsJson = json;
+        string pairCode = PairCode?.Trim() ?? string.Empty;
+        string resolvedApiBaseUrl = ResolveBootstrapApiBaseUrl();
+        if (string.IsNullOrWhiteSpace(pairCode)
+            || string.IsNullOrWhiteSpace(resolvedApiBaseUrl))
+        {
+            return string.Empty;
+        }
+
+        var payload = new SyncBootstrapPayload(
+            ApiBaseUrl: resolvedApiBaseUrl,
+            PairCode: pairCode,
+            DeviceLabel: DefaultDesktopBootstrapLabel,
+            Version: 1);
+
+        string json = JsonSerializer.Serialize(payload);
+        string encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(json))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+
+        return $"charthub-sync://bootstrap?d={encoded}";
+    }
+
+    private string ResolveBootstrapApiBaseUrl()
+    {
+        string resolvedFromHostSettings = SyncApiAddressResolver.ResolveAdvertisedApiBaseUrl(
+            _appGlobalSettings.SyncApiListenPrefix,
+            _appGlobalSettings.SyncApiAdvertisedBaseUrl);
+        if (Uri.TryCreate(resolvedFromHostSettings, UriKind.Absolute, out Uri? resolvedUri)
+            && IsLanReachableBootstrapUri(resolvedUri))
+        {
+            return resolvedUri.GetLeftPart(UriPartial.Authority);
+        }
+
+        if (Uri.TryCreate(DesktopApiBaseUrl?.Trim(), UriKind.Absolute, out Uri? baseUri)
+            && IsLanReachableBootstrapUri(baseUri))
+        {
+            return baseUri.GetLeftPart(UriPartial.Authority);
+        }
+
+        return string.Empty;
+    }
+
+    private static bool TryParseBootstrapPayload(string payloadText, out SyncBootstrapPayload? payload)
+    {
+        payload = null;
+
+        string candidate = payloadText?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            return false;
+        }
+
+        if (candidate.StartsWith('{'))
+        {
+            payload = TryDeserializePayload(candidate);
+            return payload is not null;
+        }
+
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out Uri? uri))
+        {
+            return false;
+        }
+
+        if (!uri.Scheme.Equals("charthub-sync", StringComparison.OrdinalIgnoreCase)
+            || !uri.Host.Equals("bootstrap", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string? encodedPayload = ParseQueryValue(uri.Query, "d") ?? ParseQueryValue(uri.Query, "data");
+        if (string.IsNullOrWhiteSpace(encodedPayload))
+        {
+            return false;
+        }
+
+        try
+        {
+            string padded = encodedPayload
+                .Replace('-', '+')
+                .Replace('_', '/');
+            int mod4 = padded.Length % 4;
+            if (mod4 > 0)
+            {
+                padded = padded.PadRight(padded.Length + (4 - mod4), '=');
+            }
+
+            string json = Encoding.UTF8.GetString(Convert.FromBase64String(padded));
+            payload = TryDeserializePayload(json);
+            return payload is not null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static SyncBootstrapPayload? TryDeserializePayload(string json)
+    {
+        try
+        {
+            SyncBootstrapPayload? payload = JsonSerializer.Deserialize<SyncBootstrapPayload>(json, SyncJsonOptions);
+            if (payload is null
+                || string.IsNullOrWhiteSpace(payload.ApiBaseUrl)
+                || string.IsNullOrWhiteSpace(payload.PairCode)
+                || !Uri.TryCreate(payload.ApiBaseUrl.Trim(), UriKind.Absolute, out Uri? parsed)
+                || !IsLanReachableBootstrapUri(parsed))
+            {
+                return null;
+            }
+
+            return payload with
+            {
+                ApiBaseUrl = parsed.GetLeftPart(UriPartial.Authority),
+                PairCode = payload.PairCode.Trim(),
+                DeviceLabel = payload.DeviceLabel?.Trim() ?? string.Empty,
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? ParseQueryValue(string query, string key)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return null;
+        }
+
+        string trimmed = query.TrimStart('?');
+        foreach (string segment in trimmed.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string[] parts = segment.Split('=', 2);
+            if (parts.Length != 2)
+            {
+                continue;
+            }
+
+            string currentKey = Uri.UnescapeDataString(parts[0]);
+            if (!currentKey.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return Uri.UnescapeDataString(parts[1]);
+        }
+
+        return null;
+    }
+
+    private void SetPendingQrPairing(SyncBootstrapPayload payload)
+    {
+        _pendingQrPairing = new PendingQrPairingRequest(payload.ApiBaseUrl, payload.PairCode, payload.DeviceLabel);
+        OnPropertyChanged(nameof(HasPendingQrPairing));
+        OnPropertyChanged(nameof(PendingQrPairingSummary));
+        OnPropertyChanged(nameof(ShowCompanionConfirmationSection));
+        OnPropertyChanged(nameof(ShowCompanionScanSection));
+        ConfirmQrPairingCommand.NotifyCanExecuteChanged();
+        CancelPendingQrPairingCommand.NotifyCanExecuteChanged();
+    }
+
+    private void ClearPendingQrPairing()
+    {
+        if (_pendingQrPairing is null)
+        {
+            return;
+        }
+
+        _pendingQrPairing = null;
+        OnPropertyChanged(nameof(HasPendingQrPairing));
+        OnPropertyChanged(nameof(PendingQrPairingSummary));
+        OnPropertyChanged(nameof(ShowCompanionConfirmationSection));
+        OnPropertyChanged(nameof(ShowCompanionScanSection));
+        ConfirmQrPairingCommand.NotifyCanExecuteChanged();
+        CancelPendingQrPairingCommand.NotifyCanExecuteChanged();
     }
 
     private async Task RunOperationAsync(Func<Task> operation, string context)
@@ -767,10 +1024,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             QueueItems.Clear();
             _lastAutoRefreshUtc = null;
             ErrorMessage = ex.Message;
-            StatusMessage = "Connection failed. Verify desktop URL and credentials, then retry.";
+            StatusMessage = IsCompanionMode
+                ? "Pairing failed. Scan the desktop QR and try again."
+                : "Connection failed. Verify desktop URL and credentials, then retry.";
             OnPropertyChanged(nameof(AutoRefreshHint));
 
-            // Classify error and update diagnostics
             (ErrorCategory category, string? remediation) = ClassifyError(ex);
             Diagnostics = new ConnectionDiagnostics
             {
@@ -827,6 +1085,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     {
         QueueItems.CollectionChanged -= OnQueueItemsCollectionChanged;
         StopAutoRefreshLoop();
+        BootstrapQrImage = null;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -835,14 +1094,37 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
+
+    private sealed class NoOpQrCodeScannerService : IQrCodeScannerService
+    {
+        public bool IsSupported => false;
+
+        public Task<string?> ScanAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<string?>(null);
+        }
+    }
+
+    private static bool IsLanReachableBootstrapUri(Uri uri)
+    {
+        if (uri.IsLoopback
+            || string.IsNullOrWhiteSpace(uri.Host)
+            || string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return !(IPAddress.TryParse(uri.Host, out IPAddress? parsedAddress) && IPAddress.IsLoopback(parsedAddress));
+    }
 }
 
-public sealed record SyncConnectionProfile(
-    string Name,
-    string BaseUrl,
-    string Token,
+public sealed record SyncBootstrapPayload(
+    string ApiBaseUrl,
     string PairCode,
-    DateTimeOffset LastConnectedUtc)
-{
-    public string UpdatedText => LastConnectedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-}
+    string DeviceLabel,
+    int Version);
+
+internal sealed record PendingQrPairingRequest(
+    string ApiBaseUrl,
+    string PairCode,
+    string DesktopLabel);

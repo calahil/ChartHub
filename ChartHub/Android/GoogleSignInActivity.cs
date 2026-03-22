@@ -54,24 +54,24 @@ internal static class AndroidOAuthRedirectBridge
 
     internal static void HandleIntent(Intent? intent)
     {
-        var uri = intent?.Data;
+        Android.Net.Uri? uri = intent?.Data;
         if (uri is null)
         {
             Fail("Google OAuth redirect failed: missing response URI.");
             return;
         }
 
-        var error = uri.GetQueryParameter("error");
+        string? error = uri.GetQueryParameter("error");
         if (!string.IsNullOrWhiteSpace(error))
         {
-            var description = uri.GetQueryParameter("error_description");
+            string? description = uri.GetQueryParameter("error_description");
             Fail(string.IsNullOrWhiteSpace(description)
                 ? $"Google OAuth failed: {error}."
                 : $"Google OAuth failed: {error} ({description}).");
             return;
         }
 
-        var code = uri.GetQueryParameter("code");
+        string? code = uri.GetQueryParameter("code");
         if (string.IsNullOrWhiteSpace(code))
         {
             Fail("Google OAuth failed: missing authorization code in redirect.");

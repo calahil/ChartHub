@@ -1,6 +1,7 @@
 using Android.App;
 using Android.OS;
 using Android.Content.PM;
+
 using Avalonia;
 using Avalonia.Android;
 
@@ -19,7 +20,9 @@ public class MainActivity : AvaloniaMainActivity<App>
 
         // Keep app content inside system bars instead of edge-to-edge drawing.
         if (OperatingSystem.IsAndroidVersionAtLeast(30) && !OperatingSystem.IsAndroidVersionAtLeast(35))
+        {
             Window?.SetDecorFitsSystemWindows(true);
+        }
     }
 
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)

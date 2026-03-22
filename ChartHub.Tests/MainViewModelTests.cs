@@ -48,7 +48,7 @@ public class MainViewModelTests
         Assert.Same(settingsViewModel, sut.SettingsViewModel);
         Assert.Equal(1, downloadWatcher.LoadItemsCallCount);
         Assert.True(sut.IsSettingsTabVisible);
-        Assert.False(sut.IsSyncTabVisible);
+        Assert.True(sut.IsSyncTabVisible);
         Assert.True(sut.IsCloneHeroTabVisible);
         Assert.True(sut.IsDownloadTabVisible);
     }

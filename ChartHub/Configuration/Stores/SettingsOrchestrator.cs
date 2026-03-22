@@ -90,6 +90,8 @@ public sealed class SettingsOrchestrator : ISettingsOrchestrator, IDisposable
                 CloneHeroSongDirectory = source.Runtime.CloneHeroSongDirectory,
                 SyncApiAuthToken = source.Runtime.SyncApiAuthToken,
                 SyncApiDesktopBaseUrl = source.Runtime.SyncApiDesktopBaseUrl,
+                SyncApiListenPrefix = source.Runtime.SyncApiListenPrefix,
+                SyncApiAdvertisedBaseUrl = source.Runtime.SyncApiAdvertisedBaseUrl,
                 SyncApiDeviceLabel = source.Runtime.SyncApiDeviceLabel,
                 SyncApiPairCode = source.Runtime.SyncApiPairCode,
                 SyncApiPairCodeIssuedAtUtc = source.Runtime.SyncApiPairCodeIssuedAtUtc,

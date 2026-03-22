@@ -67,7 +67,10 @@ You can also use the workspace tasks in `.vscode/tasks.json` for `build`, `run`,
 Machine-readable contract: see `openapi.yaml` at repository root.
 Interactive docs: open `docs/swagger-ui.html` in a browser or static host.
 
-- Desktop hosts a loopback API at `http://127.0.0.1:15123/`.
+- Desktop listen prefix defaults to `http://127.0.0.1:15123/` via `Runtime.SyncApiListenPrefix`.
+- Companion-facing base URL can be overridden with `Runtime.SyncApiAdvertisedBaseUrl`.
+- If override is blank, pair and bootstrap URLs are resolved from listen-prefix authority.
+- For wildcard listen hosts (`+`, `*`, `0.0.0.0`, `::`), ChartHub prefers a routable LAN IPv4 for companion-facing URLs.
 - `GET /health` is unauthenticated and returns `{ "status": "ok" }`.
 - `POST /api/pair/claim` is unauthenticated and exchanges a pair code for the sync token.
 - All other `/api/*` endpoints require one of:
@@ -209,13 +212,18 @@ Interactive docs: open `docs/swagger-ui.html` in a browser or static host.
 {
 	"paired": true,
 	"token": "<Runtime.SyncApiAuthToken>",
-	"apiBaseUrl": "http://127.0.0.1:15123",
+	"apiBaseUrl": "http://192.168.1.55:15123",
 	"pairedAtUtc": "2026-03-20T14:22:31.0000000+00:00"
 }
 ```
 
 - Successful claim rotates the desktop pair code immediately.
 - Successful claim also records the pairing event in the desktop Settings "Recent Pairings" panel.
+- `apiBaseUrl` resolution order:
+	- `Runtime.SyncApiAdvertisedBaseUrl` when configured
+	- listen-prefix authority (`Runtime.SyncApiListenPrefix`) when host is explicit
+	- LAN IPv4 auto-resolution when listen host is wildcard
+	- loopback fallback (`http://127.0.0.1:15123`)
 
 ### Error semantics
 

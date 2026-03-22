@@ -302,7 +302,7 @@ public class MainViewModel : INotifyPropertyChanged
         _isCloneHeroTabVisible = supportsCloneHero;
         _isDownloadTabVisible = false;
         _isSettingsTabVisible = true;
-        _isSyncTabVisible = isAndroid;
+        _isSyncTabVisible = true;
 
         if (supportsCloneHero)
         {

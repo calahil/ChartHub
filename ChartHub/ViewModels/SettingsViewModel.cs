@@ -231,7 +231,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private readonly ISettingsOrchestrator _settings;
     private readonly ISecretStore _secretStore;
     private readonly ICloudStorageAccountService _cloudAccountService;
+    private readonly ISyncAdvertisedUrlOptionsProvider _syncAdvertisedUrlOptionsProvider;
     private readonly Action<Action> _postToUi;
+    private readonly bool _isAndroidPlatform;
 
     private string _statusMessage = "";
     private bool _hasPendingRestartSettings;
@@ -477,17 +479,29 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         .Select(g => $"{g.Key}: {g.Count()} issue{(g.Count() == 1 ? string.Empty : "s")}")
         .ToList();
 
-    public SettingsViewModel(ISettingsOrchestrator settings, ISecretStore secretStore, ICloudStorageAccountService cloudAccountService)
-        : this(settings, secretStore, cloudAccountService, action => Dispatcher.UIThread.Post(action))
+    public SettingsViewModel(
+        ISettingsOrchestrator settings,
+        ISecretStore secretStore,
+        ICloudStorageAccountService cloudAccountService,
+        ISyncAdvertisedUrlOptionsProvider syncAdvertisedUrlOptionsProvider)
+        : this(settings, secretStore, cloudAccountService, syncAdvertisedUrlOptionsProvider, action => Dispatcher.UIThread.Post(action), null)
     {
     }
 
-    internal SettingsViewModel(ISettingsOrchestrator settings, ISecretStore secretStore, ICloudStorageAccountService cloudAccountService, Action<Action> postToUi)
+    internal SettingsViewModel(
+        ISettingsOrchestrator settings,
+        ISecretStore secretStore,
+        ICloudStorageAccountService cloudAccountService,
+        ISyncAdvertisedUrlOptionsProvider syncAdvertisedUrlOptionsProvider,
+        Action<Action> postToUi,
+        bool? isAndroidPlatform)
     {
         _settings = settings;
         _secretStore = secretStore;
         _cloudAccountService = cloudAccountService;
+        _syncAdvertisedUrlOptionsProvider = syncAdvertisedUrlOptionsProvider;
         _postToUi = postToUi;
+        _isAndroidPlatform = isAndroidPlatform ?? OperatingSystem.IsAndroid();
         _showDeveloperSettings = false;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
@@ -823,7 +837,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    private static void AddSectionFields(List<SettingsFieldViewModel> destination, object section, string sectionName)
+    private void AddSectionFields(List<SettingsFieldViewModel> destination, object section, string sectionName)
     {
         IEnumerable<PropertyInfo> properties = section.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public)
             .Where(p => p.CanRead && p.CanWrite);
@@ -835,12 +849,28 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 continue;
             }
 
+            if (!IsVisibleOnCurrentPlatform(property))
+            {
+                continue;
+            }
+
             string display = property.GetCustomAttribute<SettingDisplayAttribute>()?.Label ?? property.Name;
             string group = property.GetCustomAttribute<SettingGroupAttribute>()?.Name ?? "General";
             string description = property.GetCustomAttribute<SettingDescriptionAttribute>()?.Text ?? string.Empty;
             SettingEditorKind editorKind = ResolveEditorKind(property);
             bool isHotReloadable = property.GetCustomAttribute<SettingHotReloadableAttribute>()?.IsHotReloadable ?? false;
             bool requiresRestart = property.GetCustomAttribute<SettingRequiresRestartAttribute>() is not null;
+            IReadOnlyList<string> options = ResolveOptions(property, editorKind);
+
+            if (sectionName == "Runtime"
+                && property.Name == nameof(RuntimeAppConfig.SyncApiAdvertisedBaseUrl)
+                && section is RuntimeAppConfig runtimeSection)
+            {
+                editorKind = SettingEditorKind.Dropdown;
+                options = _syncAdvertisedUrlOptionsProvider.GetAdvertisedUrlOptions(
+                    runtimeSection.SyncApiListenPrefix,
+                    runtimeSection.SyncApiAdvertisedBaseUrl);
+            }
 
             var field = new SettingsFieldViewModel
             {
@@ -853,7 +883,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 RequiresRestart = requiresRestart,
                 SectionRef = section,
                 Property = property,
-                Options = ResolveOptions(property, editorKind),
+                Options = options,
             };
 
             object? value = property.GetValue(section);
@@ -867,7 +897,10 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             }
             else if (field.EditorKind == SettingEditorKind.Dropdown)
             {
-                field.SelectedOption = value?.ToString() ?? field.Options.FirstOrDefault() ?? string.Empty;
+                string currentOption = value?.ToString() ?? string.Empty;
+                field.SelectedOption = string.IsNullOrWhiteSpace(currentOption)
+                    ? field.Options.FirstOrDefault() ?? string.Empty
+                    : currentOption;
             }
             else
             {
@@ -876,6 +909,19 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
             destination.Add(field);
         }
+    }
+
+    private bool IsVisibleOnCurrentPlatform(PropertyInfo property)
+    {
+        SettingPlatformsAttribute? platformAttribute = property.GetCustomAttribute<SettingPlatformsAttribute>();
+        if (platformAttribute is null || platformAttribute.Targets is SettingPlatformTargets.Shared)
+        {
+            return true;
+        }
+
+        return _isAndroidPlatform
+            ? platformAttribute.Targets.HasFlag(SettingPlatformTargets.Android)
+            : platformAttribute.Targets.HasFlag(SettingPlatformTargets.Desktop);
     }
 
     private static SettingEditorKind ResolveEditorKind(PropertyInfo property)
@@ -1119,6 +1165,15 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 ? field.Options.FirstOrDefault() ?? string.Empty
                 : field.SelectedOption;
             string currentOption = currentValue?.ToString() ?? string.Empty;
+
+            if (field.Property.PropertyType == typeof(string)
+                && string.IsNullOrWhiteSpace(currentOption)
+                && field.Options.Count > 0
+                && string.Equals(draftOption, field.Options[0], StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
             return !string.Equals(draftOption, currentOption, StringComparison.OrdinalIgnoreCase);
         }
 
@@ -1213,12 +1268,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        if (field.Property.PropertyType == typeof(string))
-        {
-            field.Property.SetValue(section, field.StringValue);
-            return;
-        }
-
         if (field.EditorKind == SettingEditorKind.Number)
         {
             Type targetType = Nullable.GetUnderlyingType(field.Property.PropertyType) ?? field.Property.PropertyType;
@@ -1234,6 +1283,21 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 : field.SelectedOption;
             object parsed = Enum.Parse(field.Property.PropertyType, option, ignoreCase: true);
             field.Property.SetValue(section, parsed);
+            return;
+        }
+
+        if (field.EditorKind == SettingEditorKind.Dropdown && field.Property.PropertyType == typeof(string))
+        {
+            string option = string.IsNullOrWhiteSpace(field.SelectedOption)
+                ? field.Options.FirstOrDefault() ?? string.Empty
+                : field.SelectedOption;
+            field.Property.SetValue(section, option);
+            return;
+        }
+
+        if (field.Property.PropertyType == typeof(string))
+        {
+            field.Property.SetValue(section, field.StringValue);
         }
     }
 

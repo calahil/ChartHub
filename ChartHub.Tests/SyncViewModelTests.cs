@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
@@ -12,19 +14,196 @@ namespace ChartHub.Tests;
 public class SyncViewModelTests
 {
     [Fact]
-    public void ConnectionHint_WithoutToken_PromptsPairOrTokenFlow()
+    public void ConnectionHint_WithoutPendingPairing_PromptsQrScan()
     {
-        using var temp = new TemporaryDirectoryFixture("sync-vm-hint-no-token");
+        using var temp = new TemporaryDirectoryFixture("sync-vm-hint-qr");
         AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient();
 
-        var sut = new SyncViewModel(client, settings)
-        {
-            SyncToken = string.Empty,
-        };
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
 
         Assert.True(sut.HasConnectionHint);
-        Assert.Contains("Pair + Connect", sut.ConnectionHint, StringComparison.Ordinal);
+        Assert.Contains("Scan the desktop QR", sut.ConnectionHint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ScanBootstrapQrCommand_WithValidPayload_SetsPendingConfirmation()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-scan-pending");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        StubDesktopSyncApiClient client = new();
+        StubQrCodeScannerService scanner = CreateScanner("http://192.168.1.99:15123", "PAIR-3141", "Studio Desktop");
+
+        using var sut = new SyncViewModel(client, settings, scanner, isCompanionMode: true);
+
+        await sut.ScanBootstrapQrCommand.ExecuteAsync(null);
+
+        Assert.True(sut.HasPendingQrPairing);
+        Assert.Contains("Studio Desktop", sut.PendingQrPairingSummary, StringComparison.Ordinal);
+        Assert.Contains("192.168.1.99", sut.PendingQrPairingSummary, StringComparison.Ordinal);
+        Assert.False(sut.IsConnected);
+    }
+
+    [Fact]
+    public async Task CancelPendingQrPairingCommand_ClearsPendingState()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-cancel-pending");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        StubDesktopSyncApiClient client = new();
+        StubQrCodeScannerService scanner = CreateScanner("http://192.168.1.99:15123", "PAIR-3141", "Studio Desktop");
+
+        using var sut = new SyncViewModel(client, settings, scanner, isCompanionMode: true);
+
+        await sut.ScanBootstrapQrCommand.ExecuteAsync(null);
+        sut.CancelPendingQrPairingCommand.Execute(null);
+
+        Assert.False(sut.HasPendingQrPairing);
+        Assert.Contains("canceled", sut.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ConfirmQrPairingCommand_UsesClaimedApiBaseUrl_WhenItIsValid()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-confirm-valid-url");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        StubDesktopSyncApiClient client = new()
+        {
+            ClaimPairTokenHandler = (_, _, _, _) => Task.FromResult(new DesktopSyncPairClaimResponse(true, "token-claimed", "http://192.168.1.55:15123")),
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]),
+        };
+        StubQrCodeScannerService scanner = CreateScanner("http://192.168.1.44:15123", "PAIR-1234", "Living Room Desktop");
+
+        using var sut = new SyncViewModel(client, settings, scanner, isCompanionMode: true);
+
+        await sut.ScanBootstrapQrCommand.ExecuteAsync(null);
+        await sut.ConfirmQrPairingCommand.ExecuteAsync(null);
+
+        Assert.Equal("http://192.168.1.55:15123", sut.DesktopApiBaseUrl);
+        Assert.Equal("http://192.168.1.55:15123", settings.SyncApiDesktopBaseUrl);
+        Assert.True(sut.IsConnected);
+        Assert.False(sut.HasPendingQrPairing);
+    }
+
+    [Fact]
+    public async Task ConfirmQrPairingCommand_DoesNotReplaceLanUrl_WithLoopbackClaimUrl()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-confirm-loopback");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        StubDesktopSyncApiClient client = new()
+        {
+            ClaimPairTokenHandler = (_, _, _, _) => Task.FromResult(new DesktopSyncPairClaimResponse(true, "token-claimed", "http://127.0.0.1:15123")),
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]),
+        };
+        const string lanUrl = "http://192.168.1.44:15123";
+        StubQrCodeScannerService scanner = CreateScanner(lanUrl, "PAIR-1234", "Living Room Desktop");
+
+        using var sut = new SyncViewModel(client, settings, scanner, isCompanionMode: true);
+
+        await sut.ScanBootstrapQrCommand.ExecuteAsync(null);
+        await sut.ConfirmQrPairingCommand.ExecuteAsync(null);
+
+        Assert.Equal(lanUrl, sut.DesktopApiBaseUrl);
+        Assert.Equal(lanUrl, settings.SyncApiDesktopBaseUrl);
+    }
+
+    [Fact]
+    public async Task ConfirmQrPairingCommand_LoadsQueueAfterPairing()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-confirm-loads-queue");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        IngestionQueueItem queueItem = CreateQueueItem();
+        StubDesktopSyncApiClient client = new()
+        {
+            ClaimPairTokenHandler = (_, _, _, _) => Task.FromResult(new DesktopSyncPairClaimResponse(true, "token-claimed", "http://192.168.1.55:15123")),
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([queueItem]),
+        };
+        StubQrCodeScannerService scanner = CreateScanner("http://192.168.1.44:15123", "PAIR-1234", "Living Room Desktop");
+
+        using var sut = new SyncViewModel(client, settings, scanner, isCompanionMode: true);
+
+        await sut.ScanBootstrapQrCommand.ExecuteAsync(null);
+        await sut.ConfirmQrPairingCommand.ExecuteAsync(null);
+
+        Assert.True(sut.IsConnected);
+        Assert.True(sut.HasQueueItems);
+        Assert.Single(sut.QueueItems);
+        Assert.Equal("token-claimed", settings.SyncApiAuthToken);
+    }
+
+    [Fact]
+    public void GeneratedBootstrapPayload_UsesAdvertisedBaseUrlOverride()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-bootstrap-override");
+        AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            syncApiListenPrefix: "http://localhost:15123/",
+            syncApiAdvertisedBaseUrl: "http://192.168.1.55:15123");
+        var client = new StubDesktopSyncApiClient();
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: false)
+        {
+            DesktopApiBaseUrl = "http://127.0.0.1:15123",
+            PairCode = "PAIR-5555",
+        };
+
+        SyncBootstrapPayload payload = DecodeBootstrapPayload(sut.GeneratedBootstrapPayload);
+
+        Assert.Equal("http://192.168.1.55:15123", payload.ApiBaseUrl);
+        Assert.Equal("PAIR-5555", payload.PairCode);
+        Assert.Equal("ChartHub Desktop", payload.DeviceLabel);
+    }
+
+    [Fact]
+    public void GeneratedBootstrapPayload_WhenOnlyLoopbackAvailable_IsEmpty()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-bootstrap-loopback-only");
+        AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            syncApiListenPrefix: "http://localhost:15123/");
+        var client = new StubDesktopSyncApiClient();
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: false)
+        {
+            PairCode = "PAIR-7788",
+        };
+
+        Assert.Equal(string.Empty, sut.GeneratedBootstrapPayload);
+        Assert.False(sut.HasBootstrapQrImage);
+    }
+
+    [Fact]
+    public void Constructor_InDesktopMode_ShowsDesktopBootstrapSection()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-desktop-layout");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath, syncApiAdvertisedBaseUrl: "http://192.168.1.55:15123");
+        var client = new StubDesktopSyncApiClient();
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: false);
+        sut.PairCode = "PAIR-1234";
+
+        Assert.True(sut.IsDesktopMode);
+        Assert.False(sut.IsCompanionMode);
+        Assert.True(sut.ShowDesktopBootstrapSection);
+        Assert.Equal("Desktop Sync Host", sut.SyncTitle);
+        Assert.Contains("QR", sut.BootstrapInstructions, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Constructor_InCompanionMode_ShowsScanSectionUntilConnected()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-companion-layout");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        var client = new StubDesktopSyncApiClient();
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+
+        Assert.True(sut.IsCompanionMode);
+        Assert.False(sut.IsDesktopMode);
+        Assert.False(sut.ShowDesktopBootstrapSection);
+        Assert.True(sut.ShowCompanionScanSection);
+        Assert.False(sut.ShowCompanionConfirmationSection);
+        Assert.False(sut.ShowCompanionQueueSection);
     }
 
     [Fact]
@@ -38,7 +217,9 @@ public class SyncViewModelTests
             GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]),
         };
 
-        var sut = new SyncViewModel(client, settings);
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
 
         await sut.TestConnectionCommand.ExecuteAsync(null);
 
@@ -56,17 +237,7 @@ public class SyncViewModelTests
 
         int getIngestionsCalls = 0;
         int triggerRetryCalls = 0;
-
-        var queueItem = new IngestionQueueItem
-        {
-            IngestionId = 42,
-            Source = "googledrive",
-            SourceLink = "https://drive.google.com/file/d/abc/view",
-            DisplayName = "Song",
-            CurrentState = IngestionState.Downloaded,
-            DesktopState = DesktopState.Cloud,
-            UpdatedAtUtc = DateTimeOffset.UtcNow,
-        };
+        IngestionQueueItem queueItem = CreateQueueItem();
 
         var client = new StubDesktopSyncApiClient
         {
@@ -83,7 +254,10 @@ public class SyncViewModelTests
             },
         };
 
-        var sut = new SyncViewModel(client, settings);
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
         await sut.TestConnectionCommand.ExecuteAsync(null);
         await sut.RetrySelectedCommand.ExecuteAsync(queueItem);
 
@@ -93,7 +267,7 @@ public class SyncViewModelTests
     }
 
     [Fact]
-    public async Task TestConnectionCommand_OnFailure_ClearsQueueAndShowsGuidance()
+    public async Task TestConnectionCommand_OnFailure_ClearsQueueAndShowsQrGuidance()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-failure-guidance");
         AppGlobalSettings settings = CreateSettings(temp.RootPath);
@@ -102,25 +276,18 @@ public class SyncViewModelTests
             GetVersionHandler = (_, _, _) => throw new InvalidOperationException("invalid token"),
         };
 
-        var sut = new SyncViewModel(client, settings);
-        sut.QueueItems.Add(new IngestionQueueItem
-        {
-            IngestionId = 42,
-            Source = "googledrive",
-            SourceLink = "https://drive.google.com/file/d/abc/view",
-            DisplayName = "Song",
-            CurrentState = IngestionState.Downloaded,
-            DesktopState = DesktopState.Cloud,
-            UpdatedAtUtc = DateTimeOffset.UtcNow,
-        });
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+        sut.QueueItems.Add(CreateQueueItem());
 
         await sut.TestConnectionCommand.ExecuteAsync(null);
 
         Assert.False(sut.IsConnected);
         Assert.True(sut.HasError);
         Assert.Empty(sut.QueueItems);
-        Assert.Equal("Connection failed. Verify desktop URL and credentials, then retry.", sut.StatusMessage);
-        Assert.Equal("Connection failed. Verify desktop URL and credentials, then retry.", sut.ConnectionHint);
+        Assert.Equal("Pairing failed. Scan the desktop QR and try again.", sut.StatusMessage);
+        Assert.Contains("Scan the desktop QR", sut.ConnectionHint, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -128,17 +295,7 @@ public class SyncViewModelTests
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-retry-result");
         AppGlobalSettings settings = CreateSettings(temp.RootPath);
-
-        var queueItem = new IngestionQueueItem
-        {
-            IngestionId = 42,
-            Source = "googledrive",
-            SourceLink = "https://drive.google.com/file/d/abc/view",
-            DisplayName = "Song",
-            CurrentState = IngestionState.Downloaded,
-            DesktopState = DesktopState.Cloud,
-            UpdatedAtUtc = DateTimeOffset.UtcNow,
-        };
+        IngestionQueueItem queueItem = CreateQueueItem();
 
         var client = new StubDesktopSyncApiClient
         {
@@ -147,11 +304,11 @@ public class SyncViewModelTests
             TriggerRetryHandler = (_, _, _, _) => Task.CompletedTask,
         };
 
-        var sut = new SyncViewModel(client, settings);
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
         await sut.TestConnectionCommand.ExecuteAsync(null);
-
-        Assert.Null(queueItem.LastActionResult);
-
         await sut.RetrySelectedCommand.ExecuteAsync(queueItem);
 
         Assert.NotNull(queueItem.LastActionResult);
@@ -166,17 +323,7 @@ public class SyncViewModelTests
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-install-result");
         AppGlobalSettings settings = CreateSettings(temp.RootPath);
-
-        var queueItem = new IngestionQueueItem
-        {
-            IngestionId = 42,
-            Source = "googledrive",
-            SourceLink = "https://drive.google.com/file/d/abc/view",
-            DisplayName = "Song",
-            CurrentState = IngestionState.Downloaded,
-            DesktopState = DesktopState.Cloud,
-            UpdatedAtUtc = DateTimeOffset.UtcNow,
-        };
+        IngestionQueueItem queueItem = CreateQueueItem();
 
         var client = new StubDesktopSyncApiClient
         {
@@ -185,9 +332,11 @@ public class SyncViewModelTests
             TriggerInstallHandler = (_, _, _, _) => Task.CompletedTask,
         };
 
-        var sut = new SyncViewModel(client, settings);
-        await sut.TestConnectionCommand.ExecuteAsync(null);
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
 
+        await sut.TestConnectionCommand.ExecuteAsync(null);
         await sut.InstallSelectedCommand.ExecuteAsync(queueItem);
 
         Assert.NotNull(queueItem.LastActionResult);
@@ -200,17 +349,7 @@ public class SyncViewModelTests
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-openfolder-result");
         AppGlobalSettings settings = CreateSettings(temp.RootPath);
-
-        var queueItem = new IngestionQueueItem
-        {
-            IngestionId = 42,
-            Source = "googledrive",
-            SourceLink = "https://drive.google.com/file/d/abc/view",
-            DisplayName = "Song",
-            CurrentState = IngestionState.Downloaded,
-            DesktopState = DesktopState.Cloud,
-            UpdatedAtUtc = DateTimeOffset.UtcNow,
-        };
+        IngestionQueueItem queueItem = CreateQueueItem();
 
         var client = new StubDesktopSyncApiClient
         {
@@ -219,9 +358,11 @@ public class SyncViewModelTests
             TriggerOpenFolderHandler = (_, _, _, _) => Task.CompletedTask,
         };
 
-        var sut = new SyncViewModel(client, settings);
-        await sut.TestConnectionCommand.ExecuteAsync(null);
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
 
+        await sut.TestConnectionCommand.ExecuteAsync(null);
         await sut.OpenFolderSelectedCommand.ExecuteAsync(queueItem);
 
         Assert.NotNull(queueItem.LastActionResult);
@@ -234,17 +375,7 @@ public class SyncViewModelTests
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-retry-failure");
         AppGlobalSettings settings = CreateSettings(temp.RootPath);
-
-        var queueItem = new IngestionQueueItem
-        {
-            IngestionId = 42,
-            Source = "googledrive",
-            SourceLink = "https://drive.google.com/file/d/abc/view",
-            DisplayName = "Song",
-            CurrentState = IngestionState.Downloaded,
-            DesktopState = DesktopState.Cloud,
-            UpdatedAtUtc = DateTimeOffset.UtcNow,
-        };
+        IngestionQueueItem queueItem = CreateQueueItem();
 
         var client = new StubDesktopSyncApiClient
         {
@@ -253,9 +384,11 @@ public class SyncViewModelTests
             TriggerRetryHandler = (_, _, _, _) => throw new InvalidOperationException("network error"),
         };
 
-        var sut = new SyncViewModel(client, settings);
-        await sut.TestConnectionCommand.ExecuteAsync(null);
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
 
+        await sut.TestConnectionCommand.ExecuteAsync(null);
         await sut.RetrySelectedCommand.ExecuteAsync(queueItem);
 
         Assert.NotNull(queueItem.LastActionResult);
@@ -363,7 +496,9 @@ public class SyncViewModelTests
             },
         };
 
-        using var sut = new SyncViewModel(client, settings, TimeSpan.FromMilliseconds(30));
+        using var sut = new SyncViewModel(client, settings, autoRefreshInterval: TimeSpan.FromMilliseconds(30), isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
 
         await sut.TestConnectionCommand.ExecuteAsync(null);
 
@@ -396,7 +531,9 @@ public class SyncViewModelTests
             },
         };
 
-        using var sut = new SyncViewModel(client, settings, TimeSpan.FromMilliseconds(30));
+        using var sut = new SyncViewModel(client, settings, autoRefreshInterval: TimeSpan.FromMilliseconds(30), isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
 
         await sut.TestConnectionCommand.ExecuteAsync(null);
 
@@ -407,22 +544,6 @@ public class SyncViewModelTests
         Assert.False(sut.IsAutoRefreshActive);
         Assert.True(sut.HasError);
         Assert.Contains("auto refresh failure", sut.ErrorMessage, StringComparison.Ordinal);
-    }
-
-    private static async Task<bool> WaitForConditionAsync(Func<bool> predicate, TimeSpan timeout)
-    {
-        DateTime startedAt = DateTime.UtcNow;
-        while (DateTime.UtcNow - startedAt < timeout)
-        {
-            if (predicate())
-            {
-                return true;
-            }
-
-            await Task.Delay(20);
-        }
-
-        return predicate();
     }
 
     [Fact]
@@ -436,7 +557,9 @@ public class SyncViewModelTests
             GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]),
         };
 
-        using var sut = new SyncViewModel(client, settings);
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
 
         await sut.TestConnectionCommand.ExecuteAsync(null);
 
@@ -458,7 +581,9 @@ public class SyncViewModelTests
             GetVersionHandler = (_, _, _) => throw new HttpRequestException("The host did server not found."),
         };
 
-        using var sut = new SyncViewModel(client, settings);
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
 
         await sut.TestConnectionCommand.ExecuteAsync(null);
 
@@ -478,7 +603,9 @@ public class SyncViewModelTests
             GetVersionHandler = (_, _, _) => throw new UnauthorizedAccessException("Invalid token or authentication failed."),
         };
 
-        using var sut = new SyncViewModel(client, settings);
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
 
         await sut.TestConnectionCommand.ExecuteAsync(null);
 
@@ -497,7 +624,9 @@ public class SyncViewModelTests
             GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("old-api", "0.9.0", false, false)),
         };
 
-        using var sut = new SyncViewModel(client, settings);
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
 
         await sut.TestConnectionCommand.ExecuteAsync(null);
 
@@ -538,7 +667,40 @@ public class SyncViewModelTests
         Assert.Contains("unreachable", diagnostics.DiagnosticsSummary, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static AppGlobalSettings CreateSettings(string rootPath)
+    private static async Task<bool> WaitForConditionAsync(Func<bool> predicate, TimeSpan timeout)
+    {
+        DateTime startedAt = DateTime.UtcNow;
+        while (DateTime.UtcNow - startedAt < timeout)
+        {
+            if (predicate())
+            {
+                return true;
+            }
+
+            await Task.Delay(20);
+        }
+
+        return predicate();
+    }
+
+    private static IngestionQueueItem CreateQueueItem()
+    {
+        return new IngestionQueueItem
+        {
+            IngestionId = 42,
+            Source = "googledrive",
+            SourceLink = "https://drive.google.com/file/d/abc/view",
+            DisplayName = "Song",
+            CurrentState = IngestionState.Downloaded,
+            DesktopState = DesktopState.Cloud,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+        };
+    }
+
+    private static AppGlobalSettings CreateSettings(
+        string rootPath,
+        string syncApiListenPrefix = "http://127.0.0.1:15123/",
+        string syncApiAdvertisedBaseUrl = "")
     {
         var config = new AppConfigRoot
         {
@@ -551,10 +713,80 @@ public class SyncViewModelTests
                 CloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero"),
                 CloneHeroSongDirectory = Path.Combine(rootPath, "CloneHero", "Songs"),
                 SyncApiDesktopBaseUrl = "http://127.0.0.1:15123",
+                SyncApiListenPrefix = syncApiListenPrefix,
+                SyncApiAdvertisedBaseUrl = syncApiAdvertisedBaseUrl,
             },
         };
 
         return new AppGlobalSettings(new FakeSettingsOrchestrator(config));
+    }
+
+    private static StubQrCodeScannerService CreateScanner(string baseUrl, string pairCode, string desktopLabel)
+    {
+        string payload = BuildBootstrapPayloadString(baseUrl, pairCode, desktopLabel);
+        return new StubQrCodeScannerService
+        {
+            IsSupportedValue = true,
+            ScanHandler = _ => Task.FromResult<string?>(payload),
+        };
+    }
+
+    private static string BuildBootstrapPayloadString(string baseUrl, string pairCode, string desktopLabel)
+    {
+        var payload = new SyncBootstrapPayload(baseUrl, pairCode, desktopLabel, 1);
+        string json = JsonSerializer.Serialize(payload);
+        string encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        return $"charthub-sync://bootstrap?d={encoded}";
+    }
+
+    private static SyncBootstrapPayload DecodeBootstrapPayload(string generatedPayload)
+    {
+        Assert.False(string.IsNullOrWhiteSpace(generatedPayload));
+        Assert.True(Uri.TryCreate(generatedPayload, UriKind.Absolute, out Uri? payloadUri));
+        Assert.NotNull(payloadUri);
+
+        string? encodedPayload = ParseQueryValue(payloadUri.Query, "d");
+        Assert.False(string.IsNullOrWhiteSpace(encodedPayload));
+
+        string padded = encodedPayload!
+            .Replace('-', '+')
+            .Replace('_', '/');
+        int mod4 = padded.Length % 4;
+        if (mod4 > 0)
+        {
+            padded = padded.PadRight(padded.Length + (4 - mod4), '=');
+        }
+
+        string payloadJson = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(padded));
+        SyncBootstrapPayload? payload = JsonSerializer.Deserialize<SyncBootstrapPayload>(payloadJson);
+        Assert.NotNull(payload);
+        return payload!;
+    }
+
+    private static string? ParseQueryValue(string query, string key)
+    {
+        string trimmed = query.TrimStart('?');
+        foreach (string segment in trimmed.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string[] parts = segment.Split('=', 2);
+            if (parts.Length != 2)
+            {
+                continue;
+            }
+
+            string currentKey = Uri.UnescapeDataString(parts[0]);
+            if (!currentKey.Equals(key, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return Uri.UnescapeDataString(parts[1]);
+        }
+
+        return null;
     }
 
     private sealed class FakeSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator
@@ -609,5 +841,16 @@ public class SyncViewModelTests
         public Task TriggerOpenFolderAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default)
             => TriggerOpenFolderHandler?.Invoke(baseUrl, token, ingestionId, cancellationToken)
                 ?? Task.CompletedTask;
+    }
+
+    private sealed class StubQrCodeScannerService : IQrCodeScannerService
+    {
+        public bool IsSupportedValue { get; init; }
+        public Func<CancellationToken, Task<string?>>? ScanHandler { get; init; }
+
+        public bool IsSupported => IsSupportedValue;
+
+        public Task<string?> ScanAsync(CancellationToken cancellationToken = default)
+            => ScanHandler?.Invoke(cancellationToken) ?? Task.FromResult<string?>(null);
     }
 }

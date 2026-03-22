@@ -24,15 +24,17 @@ public class SettingsViewModelTests
         using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
-        Assert.Equal(23, sut.Fields.Count);
+        Assert.Equal(22, sut.Fields.Count);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.UseMockData" && field.IsToggleEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.DownloadDirectory" && field.IsDirectoryPicker);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiDesktopBaseUrl" && field.IsTextEditor);
+        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiDesktopBaseUrl");
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiListenPrefix" && field.IsTextEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiAdvertisedBaseUrl" && field.IsDropdownEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiDeviceLabel" && field.IsTextEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiPairCode" && field.IsTextEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiPairCodeIssuedAtUtc" && field.IsTextEditor);
+        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiPairCodeIssuedAtUtc");
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiPairCodeTtlMinutes" && field.IsNumberEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiSavedConnectionsJson" && field.IsTextEditor);
+        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiSavedConnectionsJson");
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiMaxRequestBodyBytes" && field.IsNumberEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiBodyReadTimeoutMs" && field.IsNumberEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiMutationWaitTimeoutMs" && field.IsNumberEditor);
@@ -46,6 +48,24 @@ public class SettingsViewModelTests
         {
             Assert.Contains(sut.Secrets, secret => secret.Key == SecretKeys.GoogleRefreshToken && secret.HasStoredValue);
         }
+    }
+
+    [Fact]
+    public async Task Constructor_OnAndroid_ShowsAndroidSyncSettingsAndHidesDesktopHostSyncSettings()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-platform-android");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
+
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount, isAndroidPlatform: true);
+        await Task.Yield();
+
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiDesktopBaseUrl" && field.IsTextEditor);
+        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiListenPrefix");
+        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiAdvertisedBaseUrl");
+        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.AllowSyncApiStateOverride");
+        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiMaxRequestBodyBytes");
     }
 
     [Fact]
@@ -88,6 +108,65 @@ public class SettingsViewModelTests
         Assert.Equal(1, orchestrator.UpdateCallCount);
         Assert.Equal("android-client-updated", orchestrator.Current.GoogleAuth.AndroidClientId);
         Assert.Equal("Settings saved.", sut.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Constructor_WhenAdvertisedUrlEmpty_UsesAutoDetectedOptionAsDefaultSelectedItem()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-advertised-default");
+        AppConfigRoot config = CreateConfig(temp.RootPath);
+        config.Runtime.SyncApiAdvertisedBaseUrl = string.Empty;
+
+        var orchestrator = new FakeSettingsOrchestrator(config);
+        var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
+        var advertisedUrlOptions = new FakeSyncAdvertisedUrlOptionsProvider
+        {
+            Options =
+            [
+                "http://192.168.1.55:15123",
+                "http://10.0.0.25:15123",
+            ],
+        };
+
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount, advertisedUrlOptions);
+        await Task.Yield();
+
+        SettingsFieldViewModel field = Assert.Single(sut.Fields, item => item.Key == "Runtime.SyncApiAdvertisedBaseUrl");
+        Assert.True(field.IsDropdownEditor);
+        Assert.Equal("http://192.168.1.55:15123", field.SelectedOption);
+        Assert.Equal(2, field.Options.Count);
+    }
+
+    [Fact]
+    public async Task SaveCommand_WhenAdvertisedUrlSelectionChanges_PersistsSelectedOption()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-advertised-persist");
+        AppConfigRoot config = CreateConfig(temp.RootPath);
+        config.Runtime.SyncApiAdvertisedBaseUrl = string.Empty;
+
+        var orchestrator = new FakeSettingsOrchestrator(config);
+        var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
+        var advertisedUrlOptions = new FakeSyncAdvertisedUrlOptionsProvider
+        {
+            Options =
+            [
+                "http://192.168.1.55:15123",
+                "http://10.0.0.25:15123",
+            ],
+        };
+
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount, advertisedUrlOptions);
+        await Task.Yield();
+
+        SettingsFieldViewModel field = Assert.Single(sut.Fields, item => item.Key == "Runtime.SyncApiAdvertisedBaseUrl");
+        field.SelectedOption = "http://10.0.0.25:15123";
+
+        await sut.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal("http://10.0.0.25:15123", orchestrator.Current.Runtime.SyncApiAdvertisedBaseUrl);
+        Assert.Equal("Settings saved and reloaded from current configuration.", sut.StatusMessage);
     }
 
     [Fact]
@@ -331,7 +410,12 @@ public class SettingsViewModelTests
         };
     }
 
-    private static SettingsViewModel CreateSettingsViewModel(ISettingsOrchestrator orchestrator, ISecretStore secrets, ICloudStorageAccountService cloudAccount)
+    private static SettingsViewModel CreateSettingsViewModel(
+        ISettingsOrchestrator orchestrator,
+        ISecretStore secrets,
+        ICloudStorageAccountService cloudAccount,
+        ISyncAdvertisedUrlOptionsProvider? advertisedUrlOptionsProvider = null,
+        bool? isAndroidPlatform = null)
     {
         ConstructorInfo? constructor = typeof(SettingsViewModel).GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic,
@@ -340,13 +424,32 @@ public class SettingsViewModelTests
                 typeof(ISettingsOrchestrator),
                 typeof(ISecretStore),
                 typeof(ICloudStorageAccountService),
+                typeof(ISyncAdvertisedUrlOptionsProvider),
                 typeof(Action<Action>),
+                typeof(bool?),
             ],
             modifiers: null);
 
         Assert.NotNull(constructor);
 
-        return (SettingsViewModel)constructor.Invoke([orchestrator, secrets, cloudAccount, (Action<Action>)(action => action())]);
+        return (SettingsViewModel)constructor.Invoke([
+            orchestrator,
+            secrets,
+            cloudAccount,
+            advertisedUrlOptionsProvider ?? new FakeSyncAdvertisedUrlOptionsProvider(),
+            (Action<Action>)(action => action()),
+            isAndroidPlatform,
+        ]);
+    }
+
+    private sealed class FakeSyncAdvertisedUrlOptionsProvider : ISyncAdvertisedUrlOptionsProvider
+    {
+        public IReadOnlyList<string> Options { get; set; } = ["http://127.0.0.1:15123"];
+
+        public IReadOnlyList<string> GetAdvertisedUrlOptions(string? listenPrefix, string? currentAdvertisedBaseUrl)
+        {
+            return Options;
+        }
     }
 
     private sealed class FakeSettingsOrchestrator : ISettingsOrchestrator

@@ -3,6 +3,10 @@
         "printf": true,
         "\"$adb_cmd\"": true,
         "set": true,
-        "$adb_cmd": true
+        "$adb_cmd": true,
+        "dotnet build": true,
+        "dotnet restore": true,
+        "dotnet format": true,
+        "dotnet test": true
     }
 }

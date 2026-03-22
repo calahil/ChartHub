@@ -40,6 +40,21 @@ public sealed class SettingHiddenAttribute : Attribute
 {
 }
 
+[Flags]
+public enum SettingPlatformTargets
+{
+    Shared = 0,
+    Desktop = 1,
+    Android = 2,
+    All = Desktop | Android,
+}
+
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class SettingPlatformsAttribute(SettingPlatformTargets targets) : Attribute
+{
+    public SettingPlatformTargets Targets { get; } = targets;
+}
+
 public enum SettingEditorKind
 {
     Text,
