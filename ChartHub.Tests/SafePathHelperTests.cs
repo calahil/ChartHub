@@ -60,4 +60,60 @@ public class SafePathHelperTests
         Assert.StartsWith(rootFull + Path.DirectorySeparatorChar, safeFull, StringComparison.Ordinal);
         Assert.EndsWith(Path.Combine("Artist", "Album", "song.chart"), safeFull, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void SanitizePathSegment_WithValidSegment_ReturnsSegment()
+    {
+        string result = SafePathHelper.SanitizePathSegment("valid-segment");
+
+        Assert.Equal("valid-segment", result);
+    }
+
+    [Fact]
+    public void SanitizePathSegment_WithNullInput_ReturnsFallback()
+    {
+        string result = SafePathHelper.SanitizePathSegment(null, "fallback");
+
+        Assert.Equal("fallback", result);
+    }
+
+    [Fact]
+    public void SanitizePathSegment_WithWhitespaceInput_ReturnsFallback()
+    {
+        string result = SafePathHelper.SanitizePathSegment("   ", "fallback");
+
+        Assert.Equal("fallback", result);
+    }
+
+    [Fact]
+    public void SanitizePathSegment_WithDotDot_ReturnsFallback()
+    {
+        string result = SafePathHelper.SanitizePathSegment("..", "fallback");
+
+        Assert.Equal("fallback", result);
+    }
+
+    [Fact]
+    public void SanitizePathSegment_WithSingleDot_ReturnsFallback()
+    {
+        string result = SafePathHelper.SanitizePathSegment(".", "fallback");
+
+        Assert.Equal("fallback", result);
+    }
+
+    [Fact]
+    public void SanitizePathSegment_WithDirectorySeparator_ReplacesSeparator()
+    {
+        string result = SafePathHelper.SanitizePathSegment("seg/ment");
+
+        Assert.DoesNotContain("/", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SanitizeFileName_WithNullInput_ReturnsFallback()
+    {
+        string result = SafePathHelper.SanitizeFileName(null, "fallback.bin");
+
+        Assert.Equal("fallback.bin", result);
+    }
 }
