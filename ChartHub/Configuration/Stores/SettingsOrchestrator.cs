@@ -53,6 +53,16 @@ public sealed class SettingsOrchestrator : ISettingsOrchestrator, IDisposable
         return ConfigValidationResult.Success;
     }
 
+    public void ApplyInMemory(Action<AppConfigRoot> update)
+    {
+        lock (_sync)
+        {
+            update(Current);
+        }
+
+        SettingsChanged?.Invoke(Current);
+    }
+
     public Task ReloadAsync(CancellationToken cancellationToken = default)
     {
         lock (_sync)

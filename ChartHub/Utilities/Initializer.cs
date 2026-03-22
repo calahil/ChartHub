@@ -389,6 +389,10 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
 
     private void QueueConfigUpdate(Action<AppConfigRoot> update)
     {
+        // Apply to in-memory state immediately so getters reflect the new value right away,
+        // before the async disk write completes.
+        _settingsOrchestrator.ApplyInMemory(update);
+
         _ = Task.Run(async () =>
         {
             await _updateLock.WaitAsync().ConfigureAwait(false);
