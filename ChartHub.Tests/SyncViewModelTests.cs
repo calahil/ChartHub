@@ -134,6 +134,28 @@ public class SyncViewModelTests
     }
 
     [Fact]
+    public async Task ConfirmQrPairingCommand_PersistsCredentials_WhenConnectionCheckFails()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-confirm-persist-on-fail");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        StubDesktopSyncApiClient client = new()
+        {
+            ClaimPairTokenHandler = (_, _, _, _) => Task.FromResult(new DesktopSyncPairClaimResponse(true, "token-claimed", "http://192.168.1.55:15123")),
+            GetVersionHandler = (_, _, _) => throw new InvalidOperationException("Simulated connection failure"),
+        };
+        StubQrCodeScannerService scanner = CreateScanner("http://192.168.1.44:15123", "PAIR-1234", "Living Room Desktop");
+
+        using var sut = new SyncViewModel(client, settings, scanner, isCompanionMode: true);
+
+        await sut.ScanBootstrapQrCommand.ExecuteAsync(null);
+        await sut.ConfirmQrPairingCommand.ExecuteAsync(null);
+
+        Assert.False(sut.IsConnected);
+        Assert.Equal("token-claimed", settings.SyncApiAuthToken);
+        Assert.Equal("http://192.168.1.55:15123", settings.SyncApiDesktopBaseUrl);
+    }
+
+    [Fact]
     public void GeneratedBootstrapPayload_UsesAdvertisedBaseUrlOverride()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-bootstrap-override");

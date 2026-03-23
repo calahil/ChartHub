@@ -389,31 +389,36 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
 
     private void QueueConfigUpdate(Action<AppConfigRoot> update)
     {
-        _ = Task.Run(async () =>
+        // Fire-and-forget: ApplyConfigUpdateAsync catches and logs all exceptions internally,
+        // so no unobserved exceptions can escape. The task is intentionally not awaited here
+        // because callers are synchronous property setters.
+        _ = ApplyConfigUpdateAsync(update);
+    }
+
+    private async Task ApplyConfigUpdateAsync(Action<AppConfigRoot> update)
+    {
+        await _updateLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            await _updateLock.WaitAsync().ConfigureAwait(false);
-            try
+            ConfigValidationResult result = await _settingsOrchestrator.UpdateAsync(update).ConfigureAwait(false);
+            if (!result.IsValid)
             {
-                ConfigValidationResult result = await _settingsOrchestrator.UpdateAsync(update).ConfigureAwait(false);
-                if (!result.IsValid)
+                string errors = string.Join("; ", result.Failures.Select(f => $"{f.Key}: {f.Message}"));
+                Logger.LogWarning("Config", "Invalid settings update ignored", new Dictionary<string, object?>
                 {
-                    string errors = string.Join("; ", result.Failures.Select(f => $"{f.Key}: {f.Message}"));
-                    Logger.LogWarning("Config", "Invalid settings update ignored", new Dictionary<string, object?>
-                    {
-                        ["fieldKeys"] = string.Join(",", result.Failures.Select(f => f.Key)),
-                        ["details"] = errors,
-                    });
-                }
+                    ["fieldKeys"] = string.Join(",", result.Failures.Select(f => f.Key)),
+                    ["details"] = errors,
+                });
             }
-            catch (Exception ex)
-            {
-                Logger.LogError("Config", "Failed to update settings asynchronously", ex);
-            }
-            finally
-            {
-                _updateLock.Release();
-            }
-        });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Config", "Failed to update settings asynchronously", ex);
+        }
+        finally
+        {
+            _updateLock.Release();
+        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

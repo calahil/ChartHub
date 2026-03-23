@@ -516,6 +516,14 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             ? claim.ApiBaseUrl
             : pairingRequest.ApiBaseUrl;
 
+        // Persist credentials immediately after a successful claim so they survive
+        // if the subsequent connection check fails (the desktop already rotated the
+        // pair code at this point, so credentials must be saved before we attempt
+        // to verify the connection).
+        _appGlobalSettings.SyncApiAuthToken = SyncToken;
+        _appGlobalSettings.SyncApiDesktopBaseUrl = DesktopApiBaseUrl;
+        _appGlobalSettings.SyncApiDeviceLabel = DeviceLabel;
+
         await ConnectAndRefreshAsync();
         ClearPendingQrPairing();
     }
