@@ -7,6 +7,8 @@
         "dotnet build": true,
         "dotnet restore": true,
         "dotnet format": true,
-        "dotnet test": true
+        "dotnet test": true,
+        "ss": true,
+        "true": true
     }
 }

@@ -80,7 +80,6 @@ public class SyncViewModelTests
         await sut.ConfirmQrPairingCommand.ExecuteAsync(null);
 
         Assert.Equal("http://192.168.1.55:15123", sut.DesktopApiBaseUrl);
-        Assert.Equal("http://192.168.1.55:15123", settings.SyncApiDesktopBaseUrl);
         Assert.True(sut.IsConnected);
         Assert.False(sut.HasPendingQrPairing);
     }
@@ -105,7 +104,6 @@ public class SyncViewModelTests
         await sut.ConfirmQrPairingCommand.ExecuteAsync(null);
 
         Assert.Equal(lanUrl, sut.DesktopApiBaseUrl);
-        Assert.Equal(lanUrl, settings.SyncApiDesktopBaseUrl);
     }
 
     [Fact]
@@ -134,17 +132,14 @@ public class SyncViewModelTests
     }
 
     [Fact]
-    public void GeneratedBootstrapPayload_UsesAdvertisedBaseUrlOverride()
+    public void GeneratedBootstrapPayload_UsesCompanionDesktopApiBaseUrl_WhenLanReachable()
     {
-        using var temp = new TemporaryDirectoryFixture("sync-vm-bootstrap-override");
-        AppGlobalSettings settings = CreateSettings(
-            temp.RootPath,
-            syncApiListenPrefix: "http://localhost:15123/",
-            syncApiAdvertisedBaseUrl: "http://192.168.1.55:15123");
+        using var temp = new TemporaryDirectoryFixture("sync-vm-bootstrap-lan-url");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient();
         using var sut = new SyncViewModel(client, settings, isCompanionMode: false)
         {
-            DesktopApiBaseUrl = "http://127.0.0.1:15123",
+            DesktopApiBaseUrl = "http://192.168.1.55:15123",
             PairCode = "PAIR-5555",
         };
 
@@ -156,27 +151,33 @@ public class SyncViewModelTests
     }
 
     [Fact]
-    public void GeneratedBootstrapPayload_WhenOnlyLoopbackAvailable_IsEmpty()
+    public void GeneratedBootstrapPayload_WhenDesktopUrlLoopback_FallsBackToHostResolution()
     {
-        using var temp = new TemporaryDirectoryFixture("sync-vm-bootstrap-loopback-only");
-        AppGlobalSettings settings = CreateSettings(
-            temp.RootPath,
-            syncApiListenPrefix: "http://localhost:15123/");
+        using var temp = new TemporaryDirectoryFixture("sync-vm-bootstrap-loopback-fallback");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient();
         using var sut = new SyncViewModel(client, settings, isCompanionMode: false)
         {
+            DesktopApiBaseUrl = "http://127.0.0.1:15123",
             PairCode = "PAIR-7788",
         };
 
-        Assert.Equal(string.Empty, sut.GeneratedBootstrapPayload);
-        Assert.False(sut.HasBootstrapQrImage);
+        string generatedPayload = sut.GeneratedBootstrapPayload;
+        if (string.IsNullOrWhiteSpace(generatedPayload))
+        {
+            Assert.False(sut.HasBootstrapQrImage);
+            return;
+        }
+
+        SyncBootstrapPayload payload = DecodeBootstrapPayload(generatedPayload);
+        Assert.NotEqual("http://127.0.0.1:15123", payload.ApiBaseUrl);
     }
 
     [Fact]
     public void Constructor_InDesktopMode_ShowsDesktopBootstrapSection()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-desktop-layout");
-        AppGlobalSettings settings = CreateSettings(temp.RootPath, syncApiAdvertisedBaseUrl: "http://192.168.1.55:15123");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient();
 
         using var sut = new SyncViewModel(client, settings, isCompanionMode: false);
@@ -713,10 +714,13 @@ public class SyncViewModelTests
     public void PairCode_WhenChanged_RegeneratesBootstrapQr()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-qr-regenerate");
-        AppGlobalSettings settings = CreateSettings(temp.RootPath, syncApiListenPrefix: "http://0.0.0.0:15123/");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient();
 
-        using var sut = new SyncViewModel(client, settings, isCompanionMode: false);
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: false)
+        {
+            DesktopApiBaseUrl = "http://192.168.1.55:15123",
+        };
         sut.PairCode = "PAIR-FIRST";
         string firstPayload = sut.GeneratedBootstrapPayload;
 
@@ -761,9 +765,7 @@ public class SyncViewModelTests
     }
 
     private static AppGlobalSettings CreateSettings(
-        string rootPath,
-        string syncApiListenPrefix = "http://127.0.0.1:15123/",
-        string syncApiAdvertisedBaseUrl = "")
+        string rootPath)
     {
         var config = new AppConfigRoot
         {
@@ -775,9 +777,6 @@ public class SyncViewModelTests
                 OutputDirectory = Path.Combine(rootPath, "Output"),
                 CloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero"),
                 CloneHeroSongDirectory = Path.Combine(rootPath, "CloneHero", "Songs"),
-                SyncApiDesktopBaseUrl = "http://127.0.0.1:15123",
-                SyncApiListenPrefix = syncApiListenPrefix,
-                SyncApiAdvertisedBaseUrl = syncApiAdvertisedBaseUrl,
             },
         };
 

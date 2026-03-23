@@ -10,8 +10,9 @@
              x:Name="SettingsViewRoot"
              x:DataType="viewmodels:SettingsViewModel">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*"
-          Margin="12">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,*"
+            Margin="12">
                 <Grid Grid.Row="0"
                             ColumnDefinitions="Auto,Auto,*">
             <Button Grid.Column="0"
@@ -347,9 +348,8 @@
             </StackPanel>
         </Border>
 
-        <ScrollViewer Grid.Row="8"
-                      VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="8">
+        <StackPanel Grid.Row="8"
+                Spacing="8">
                 <Border Padding="8,6"
                         BorderThickness="1"
                         BorderBrush="{StaticResource ThemeBorderMidBrush}"
@@ -460,7 +460,7 @@
                     </DataTemplate>
                 </ListBox.ItemTemplate>
                 </ListBox>
-            </StackPanel>
-        </ScrollViewer>
+        </StackPanel>
     </Grid>
+    </ScrollViewer>
 </UserControl>

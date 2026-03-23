@@ -231,7 +231,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private readonly ISettingsOrchestrator _settings;
     private readonly ISecretStore _secretStore;
     private readonly ICloudStorageAccountService _cloudAccountService;
-    private readonly ISyncAdvertisedUrlOptionsProvider _syncAdvertisedUrlOptionsProvider;
     private readonly Action<Action> _postToUi;
     private readonly bool _isAndroidPlatform;
 
@@ -482,9 +481,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public SettingsViewModel(
         ISettingsOrchestrator settings,
         ISecretStore secretStore,
-        ICloudStorageAccountService cloudAccountService,
-        ISyncAdvertisedUrlOptionsProvider syncAdvertisedUrlOptionsProvider)
-        : this(settings, secretStore, cloudAccountService, syncAdvertisedUrlOptionsProvider, action => Dispatcher.UIThread.Post(action), null)
+        ICloudStorageAccountService cloudAccountService)
+        : this(settings, secretStore, cloudAccountService, action => Dispatcher.UIThread.Post(action), null)
     {
     }
 
@@ -492,14 +490,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         ISettingsOrchestrator settings,
         ISecretStore secretStore,
         ICloudStorageAccountService cloudAccountService,
-        ISyncAdvertisedUrlOptionsProvider syncAdvertisedUrlOptionsProvider,
         Action<Action> postToUi,
         bool? isAndroidPlatform)
     {
         _settings = settings;
         _secretStore = secretStore;
         _cloudAccountService = cloudAccountService;
-        _syncAdvertisedUrlOptionsProvider = syncAdvertisedUrlOptionsProvider;
         _postToUi = postToUi;
         _isAndroidPlatform = isAndroidPlatform ?? OperatingSystem.IsAndroid();
         _showDeveloperSettings = false;
@@ -861,16 +857,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             bool isHotReloadable = property.GetCustomAttribute<SettingHotReloadableAttribute>()?.IsHotReloadable ?? false;
             bool requiresRestart = property.GetCustomAttribute<SettingRequiresRestartAttribute>() is not null;
             IReadOnlyList<string> options = ResolveOptions(property, editorKind);
-
-            if (sectionName == "Runtime"
-                && property.Name == nameof(RuntimeAppConfig.SyncApiAdvertisedBaseUrl)
-                && section is RuntimeAppConfig runtimeSection)
-            {
-                editorKind = SettingEditorKind.Dropdown;
-                options = _syncAdvertisedUrlOptionsProvider.GetAdvertisedUrlOptions(
-                    runtimeSection.SyncApiListenPrefix,
-                    runtimeSection.SyncApiAdvertisedBaseUrl);
-            }
 
             var field = new SettingsFieldViewModel
             {

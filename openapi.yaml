@@ -9,17 +9,16 @@ info:
     Local sync API hosted by desktop ChartHub for Android-to-desktop ingestion lifecycle operations.
 
     Notes:
-    - API listen prefix defaults to loopback and is configurable via Runtime.SyncApiListenPrefix
-    - Companion-facing API URL can be explicitly set via Runtime.SyncApiAdvertisedBaseUrl
-    - If override is blank, companion API URL is resolved from listen-prefix authority
-    - Wildcard listen hosts may auto-resolve to a routable LAN IPv4 for companion API URL
+    - API listener is fixed to http://0.0.0.0:15123/
+    - Companion-facing API URL is auto-resolved from routable LAN IPv4 when available
+    - If no routable LAN IPv4 is available, companion API URL falls back to loopback
     - /health is unauthenticated
     - /api/pair/claim is unauthenticated and exchanges pair code for auth token
     - successful pair claim rotates the pair code and records pairing metadata/history in desktop runtime settings
     - /api/* endpoints require either X-ChartHub-Sync-Token or Authorization: Bearer
 servers:
-  - url: http://127.0.0.1:15123
-    description: Default desktop loopback host. Companion URL may differ when listen/advertised settings are configured.
+  - url: http://0.0.0.0:15123
+    description: Fixed desktop listener on all interfaces.
 
 tags:
   - name: Health
@@ -230,9 +229,8 @@ components:
         apiBaseUrl:
           type: string
           description: |
-            Companion-facing desktop API base URL resolved by desktop settings.
-            Resolution order: Runtime.SyncApiAdvertisedBaseUrl -> listen-prefix authority ->
-            wildcard LAN IPv4 auto-detection -> loopback fallback.
+            Companion-facing desktop API base URL resolved by desktop host addressing.
+            Resolution order: LAN IPv4 auto-detection -> loopback fallback.
           example: http://192.168.1.55:15123
         pairedAtUtc:
           type: string

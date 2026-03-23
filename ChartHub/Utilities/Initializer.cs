@@ -97,24 +97,6 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         set => QueueConfigUpdate(config => config.Runtime.SyncApiAuthToken = value);
     }
 
-    public string SyncApiDesktopBaseUrl
-    {
-        get => NormalizeSyncApiBaseUrl(Runtime.SyncApiDesktopBaseUrl);
-        set => QueueConfigUpdate(config => config.Runtime.SyncApiDesktopBaseUrl = NormalizeSyncApiBaseUrl(value));
-    }
-
-    public string SyncApiListenPrefix
-    {
-        get => NormalizeSyncApiListenPrefix(Runtime.SyncApiListenPrefix);
-        set => QueueConfigUpdate(config => config.Runtime.SyncApiListenPrefix = NormalizeSyncApiListenPrefix(value));
-    }
-
-    public string SyncApiAdvertisedBaseUrl
-    {
-        get => NormalizeSyncApiAdvertisedBaseUrl(Runtime.SyncApiAdvertisedBaseUrl);
-        set => QueueConfigUpdate(config => config.Runtime.SyncApiAdvertisedBaseUrl = NormalizeSyncApiAdvertisedBaseUrl(value));
-    }
-
     public string SyncApiDeviceLabel
     {
         get => NormalizeSyncDeviceLabel(Runtime.SyncApiDeviceLabel);
@@ -228,9 +210,6 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         string syncApiAuthToken = string.IsNullOrWhiteSpace(Runtime.SyncApiAuthToken)
             ? GenerateSyncApiToken()
             : Runtime.SyncApiAuthToken;
-        string syncApiDesktopBaseUrl = NormalizeSyncApiBaseUrl(Runtime.SyncApiDesktopBaseUrl);
-        string syncApiListenPrefix = NormalizeSyncApiListenPrefix(Runtime.SyncApiListenPrefix);
-        string syncApiAdvertisedBaseUrl = NormalizeSyncApiAdvertisedBaseUrl(Runtime.SyncApiAdvertisedBaseUrl);
         string syncApiDeviceLabel = NormalizeSyncDeviceLabel(Runtime.SyncApiDeviceLabel);
         string syncApiPairCode = string.IsNullOrWhiteSpace(Runtime.SyncApiPairCode)
             ? GenerateSyncPairCode()
@@ -263,9 +242,6 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
             config.Runtime.CloneHeroDataDirectory = cloneHeroDataDir;
             config.Runtime.CloneHeroSongDirectory = cloneHeroSongsDir;
             config.Runtime.SyncApiAuthToken = syncApiAuthToken;
-            config.Runtime.SyncApiDesktopBaseUrl = syncApiDesktopBaseUrl;
-            config.Runtime.SyncApiListenPrefix = syncApiListenPrefix;
-            config.Runtime.SyncApiAdvertisedBaseUrl = syncApiAdvertisedBaseUrl;
             config.Runtime.SyncApiDeviceLabel = syncApiDeviceLabel;
             config.Runtime.SyncApiPairCode = syncApiPairCode;
             config.Runtime.SyncApiPairCodeIssuedAtUtc = syncApiPairCodeIssuedAtUtc;
@@ -299,48 +275,6 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
     private static int ClampSyncApiMaxRequestBodyBytes(int value)
     {
         return Math.Clamp(value, MinSyncApiMaxRequestBodyBytes, MaxSyncApiMaxRequestBodyBytes);
-    }
-
-    private static string NormalizeSyncApiBaseUrl(string? value)
-    {
-        string? candidate = value?.Trim();
-        return string.IsNullOrWhiteSpace(candidate)
-            ? "http://127.0.0.1:15123"
-            : candidate;
-    }
-
-    private static string NormalizeSyncApiListenPrefix(string? value)
-    {
-        string? candidate = value?.Trim();
-        if (string.IsNullOrWhiteSpace(candidate))
-        {
-            return "http://127.0.0.1:15123/";
-        }
-
-        if (!candidate.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-            && !candidate.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = $"http://{candidate}";
-        }
-
-        return candidate.EndsWith('/') ? candidate : $"{candidate}/";
-    }
-
-    private static string NormalizeSyncApiAdvertisedBaseUrl(string? value)
-    {
-        string? candidate = value?.Trim();
-        if (string.IsNullOrWhiteSpace(candidate))
-        {
-            return string.Empty;
-        }
-
-        if (!candidate.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-            && !candidate.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-        {
-            candidate = $"http://{candidate}";
-        }
-
-        return candidate.EndsWith('/') ? candidate[..^1] : candidate;
     }
 
     private static string NormalizeSyncDeviceLabel(string? value)
@@ -428,9 +362,6 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(CloneHeroDataDir));
         OnPropertyChanged(nameof(CloneHeroSongsDir));
         OnPropertyChanged(nameof(SyncApiAuthToken));
-        OnPropertyChanged(nameof(SyncApiDesktopBaseUrl));
-        OnPropertyChanged(nameof(SyncApiListenPrefix));
-        OnPropertyChanged(nameof(SyncApiAdvertisedBaseUrl));
         OnPropertyChanged(nameof(SyncApiDeviceLabel));
         OnPropertyChanged(nameof(SyncApiPairCode));
         OnPropertyChanged(nameof(SyncApiPairCodeIssuedAtUtc));

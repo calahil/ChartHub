@@ -87,17 +87,16 @@ public class IngestionSyncApiHostTests
     }
 
     [Fact]
-    public async Task PairClaimEndpoint_WithConfiguredListenPrefix_ReturnsConfiguredApiBaseUrl()
+    public async Task PairClaimEndpoint_ReturnsResolvedApiBaseUrlOnDefaultPort()
     {
-        using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-listen-prefix");
+        using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-api-base-url");
         await using IngestionSyncApiHost host = CreateHost(
             temp.RootPath,
             "token-pair-prefix",
-            pairCode: "PAIR-1234",
-            listenPrefix: "http://localhost:15123/");
+            pairCode: "PAIR-1234");
         await host.StartAsync();
 
-        using HttpClient client = CreateHttpClient(new Uri("http://localhost:15123/"));
+        using HttpClient client = CreateHttpClient();
         string payload = JsonSerializer.Serialize(new
         {
             pairCode = "PAIR-1234",
@@ -111,36 +110,9 @@ public class IngestionSyncApiHostTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         string body = await response.Content.ReadAsStringAsync();
         using var json = JsonDocument.Parse(body);
-        Assert.Equal("http://localhost:15123", json.RootElement.GetProperty("apiBaseUrl").GetString());
-    }
-
-    [Fact]
-    public async Task PairClaimEndpoint_WithAdvertisedBaseUrlOverride_ReturnsOverride()
-    {
-        using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-advertised-override");
-        await using IngestionSyncApiHost host = CreateHost(
-            temp.RootPath,
-            "token-pair-override",
-            pairCode: "PAIR-1234",
-            listenPrefix: "http://localhost:15123/",
-            advertisedBaseUrl: "http://192.168.1.55:15123");
-        await host.StartAsync();
-
-        using HttpClient client = CreateHttpClient(new Uri("http://localhost:15123/"));
-        string payload = JsonSerializer.Serialize(new
-        {
-            pairCode = "PAIR-1234",
-            deviceLabel = "Pixel Companion",
-        });
-
-        using HttpResponseMessage response = await client.PostAsync(
-            "api/pair/claim",
-            new StringContent(payload, Encoding.UTF8, "application/json"));
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        string body = await response.Content.ReadAsStringAsync();
-        using var json = JsonDocument.Parse(body);
-        Assert.Equal("http://192.168.1.55:15123", json.RootElement.GetProperty("apiBaseUrl").GetString());
+        string? apiBaseUrl = json.RootElement.GetProperty("apiBaseUrl").GetString();
+        Assert.True(Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out Uri? parsedApiBaseUrl));
+        Assert.Equal(15123, parsedApiBaseUrl!.Port);
     }
 
     [Fact]
@@ -1198,9 +1170,7 @@ public class IngestionSyncApiHostTests
         int syncApiBodyReadTimeoutMs = 1000,
         int syncApiMutationWaitTimeoutMs = 250,
         int syncApiSlowRequestThresholdMs = 500,
-        IDesktopPathOpener? opener = null,
-        string? listenPrefix = null,
-        string? advertisedBaseUrl = null)
+        IDesktopPathOpener? opener = null)
     {
         (IngestionSyncApiHost? host, AppGlobalSettings _) = CreateHostWithSettings(
             rootPath,
@@ -1213,9 +1183,7 @@ public class IngestionSyncApiHostTests
             syncApiBodyReadTimeoutMs,
             syncApiMutationWaitTimeoutMs,
             syncApiSlowRequestThresholdMs,
-            opener,
-            listenPrefix,
-            advertisedBaseUrl);
+            opener);
 
         return host;
     }
@@ -1231,9 +1199,7 @@ public class IngestionSyncApiHostTests
         int syncApiBodyReadTimeoutMs = 1000,
         int syncApiMutationWaitTimeoutMs = 250,
         int syncApiSlowRequestThresholdMs = 500,
-        IDesktopPathOpener? opener = null,
-        string? listenPrefix = null,
-        string? advertisedBaseUrl = null)
+        IDesktopPathOpener? opener = null)
     {
         var config = new AppConfigRoot
         {
@@ -1254,8 +1220,6 @@ public class IngestionSyncApiHostTests
                 SyncApiBodyReadTimeoutMs = syncApiBodyReadTimeoutMs,
                 SyncApiMutationWaitTimeoutMs = syncApiMutationWaitTimeoutMs,
                 SyncApiSlowRequestThresholdMs = syncApiSlowRequestThresholdMs,
-                SyncApiListenPrefix = listenPrefix ?? "http://127.0.0.1:15123/",
-                SyncApiAdvertisedBaseUrl = advertisedBaseUrl ?? string.Empty,
             },
         };
 
@@ -1289,8 +1253,7 @@ public class IngestionSyncApiHostTests
             stateMachine,
             settings,
             installer,
-            opener ?? new FakeDesktopPathOpener(),
-            new FakeSyncLanDiscoveryService());
+            opener ?? new FakeDesktopPathOpener());
         return (host, settings);
     }
 
@@ -1324,24 +1287,6 @@ public class IngestionSyncApiHostTests
         public Task ReloadAsync(CancellationToken cancellationToken = default)
         {
             SettingsChanged?.Invoke(Current);
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class FakeSyncLanDiscoveryService : ISyncLanDiscoveryService
-    {
-        public Task<IReadOnlyList<SyncDiscoveryEndpoint>> DiscoverAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<IReadOnlyList<SyncDiscoveryEndpoint>>([]);
-        }
-
-        public Task StartAdvertisingAsync(string baseUrl, string deviceLabel, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task StopAdvertisingAsync(CancellationToken cancellationToken = default)
-        {
             return Task.CompletedTask;
         }
     }

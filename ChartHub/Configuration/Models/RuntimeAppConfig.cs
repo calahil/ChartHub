@@ -57,32 +57,6 @@ public sealed class RuntimeAppConfig
     public string SyncApiAuthToken { get; set; } = string.Empty;
 
     [SettingGroup("Sync API")]
-    [SettingDisplay("Desktop Sync API URL")]
-    [SettingDescription("Companion default target URL. This is the URL used by the client before pair-claim returns a resolved host.")]
-    [SettingEditor(SettingEditorKind.Text)]
-    [SettingHotReloadable(true)]
-    [SettingPlatforms(SettingPlatformTargets.Android)]
-    public string SyncApiDesktopBaseUrl { get; set; } = "http://127.0.0.1:15123";
-
-    [SettingGroup("Sync API")]
-    [SettingDisplay("Desktop Sync Listen Prefix")]
-    [SettingDescription("Desktop host binding prefix. Use loopback for local-only mode, or wildcard/host prefixes when enabling LAN pairing.")]
-    [SettingEditor(SettingEditorKind.Text)]
-    [SettingHotReloadable(false)]
-    [SettingRequiresRestart]
-    [SettingPlatforms(SettingPlatformTargets.Desktop)]
-    public string SyncApiListenPrefix { get; set; } = "http://127.0.0.1:15123/";
-
-    [SettingGroup("Sync API")]
-    [SettingDisplay("Desktop Sync Advertised URL Override (Advanced)")]
-    [SettingDescription("Optional override for the URL returned to companions during pairing and QR bootstrap. Leave blank to auto-resolve from listen settings.")]
-    [SettingEditor(SettingEditorKind.Text)]
-    [SettingHotReloadable(false)]
-    [SettingRequiresRestart]
-    [SettingPlatforms(SettingPlatformTargets.Desktop)]
-    public string SyncApiAdvertisedBaseUrl { get; set; } = string.Empty;
-
-    [SettingGroup("Sync API")]
     [SettingDisplay("Companion Device Label")]
     [SettingEditor(SettingEditorKind.Text)]
     [SettingHotReloadable(true)]

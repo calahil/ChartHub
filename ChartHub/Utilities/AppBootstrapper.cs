@@ -182,8 +182,6 @@ public static class AppBootstrapper
         services.AddSingleton<ILocalDestinationWriter, LocalDestinationWriter>();
         services.AddSingleton<IGoogleDriveDestinationWriter, GoogleDriveDestinationWriter>();
         services.AddSingleton<ITransferOrchestrator, TransferOrchestrator>();
-        services.AddSingleton<ISyncAdvertisedUrlOptionsProvider, SyncAdvertisedUrlOptionsProvider>();
-        services.AddSingleton<ISyncLanDiscoveryService, SyncLanDiscoveryService>();
         services.AddSingleton<IIngestionSyncApiHost, IngestionSyncApiHost>();
         services.AddSingleton<IDesktopSyncApiClient, DesktopSyncApiClient>();
         services.AddSingleton<DownloadViewModel>();

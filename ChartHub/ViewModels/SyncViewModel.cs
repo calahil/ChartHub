@@ -28,6 +28,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     };
     private static readonly TimeSpan DefaultAutoRefreshInterval = TimeSpan.FromSeconds(15);
     private const string DefaultDesktopBootstrapLabel = "ChartHub Desktop";
+    private const string DefaultHostListenPrefix = "http://0.0.0.0:15123/";
 
     private readonly IDesktopSyncApiClient _desktopSyncApiClient;
     private readonly IQrCodeScannerService _qrCodeScannerService;
@@ -387,7 +388,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         _autoRefreshInterval = autoRefreshInterval.GetValueOrDefault(DefaultAutoRefreshInterval);
         _isCompanionMode = isCompanionMode ?? OperatingSystem.IsAndroid();
 
-        _desktopApiBaseUrl = _appGlobalSettings.SyncApiDesktopBaseUrl;
         _deviceLabel = _appGlobalSettings.SyncApiDeviceLabel;
         _pairCode = _appGlobalSettings.SyncApiPairCode;
         _statusMessage = GetInitialStatusMessage();
@@ -531,7 +531,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
         IsConnected = true;
         _appGlobalSettings.SyncApiAuthToken = SyncToken;
-        _appGlobalSettings.SyncApiDesktopBaseUrl = DesktopApiBaseUrl;
         _appGlobalSettings.SyncApiDeviceLabel = DeviceLabel;
 
         StatusMessage = $"Connected to {version.Api} v{version.Version}.";
@@ -853,19 +852,19 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
     private string ResolveBootstrapApiBaseUrl()
     {
-        string resolvedFromHostSettings = SyncApiAddressResolver.ResolveAdvertisedApiBaseUrl(
-            _appGlobalSettings.SyncApiListenPrefix,
-            _appGlobalSettings.SyncApiAdvertisedBaseUrl);
-        if (Uri.TryCreate(resolvedFromHostSettings, UriKind.Absolute, out Uri? resolvedUri)
-            && IsLanReachableBootstrapUri(resolvedUri))
-        {
-            return resolvedUri.GetLeftPart(UriPartial.Authority);
-        }
-
         if (Uri.TryCreate(DesktopApiBaseUrl?.Trim(), UriKind.Absolute, out Uri? baseUri)
             && IsLanReachableBootstrapUri(baseUri))
         {
             return baseUri.GetLeftPart(UriPartial.Authority);
+        }
+
+        string resolvedFromHostSettings = SyncApiAddressResolver.ResolveAdvertisedApiBaseUrl(
+            DefaultHostListenPrefix,
+            string.Empty);
+        if (Uri.TryCreate(resolvedFromHostSettings, UriKind.Absolute, out Uri? resolvedUri)
+            && IsLanReachableBootstrapUri(resolvedUri))
+        {
+            return resolvedUri.GetLeftPart(UriPartial.Authority);
         }
 
         return string.Empty;
@@ -1092,11 +1091,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         else if (e.PropertyName == nameof(AppGlobalSettings.SyncApiDeviceLabel))
         {
             DeviceLabel = _appGlobalSettings.SyncApiDeviceLabel;
-        }
-        else if (e.PropertyName is nameof(AppGlobalSettings.SyncApiListenPrefix)
-            or nameof(AppGlobalSettings.SyncApiAdvertisedBaseUrl))
-        {
-            RegenerateBootstrapQrPayload();
         }
     }
 

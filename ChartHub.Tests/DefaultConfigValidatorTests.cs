@@ -124,59 +124,6 @@ public class DefaultConfigValidatorTests
         Assert.Contains(result.Failures, failure => failure.Key == "Runtime.TransferOrchestratorConcurrencyCap");
     }
 
-    [Fact]
-    public void Validate_WhenDesktopBaseUrlInvalid_ReturnsFailure()
-    {
-        AppConfigRoot config = CreateConfigTemplate();
-        config.Runtime.SyncApiDesktopBaseUrl = "not a url";
-
-        var sut = new DefaultConfigValidator();
-        ConfigValidationResult result = sut.Validate(config);
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Failures, failure => failure.Key == "Runtime.SyncApiDesktopBaseUrl");
-    }
-
-    [Fact]
-    public void Validate_WhenListenPrefixMissingTrailingSlash_ReturnsFailure()
-    {
-        AppConfigRoot config = CreateConfigTemplate();
-        config.Runtime.SyncApiListenPrefix = "http://127.0.0.1:15123";
-
-        var sut = new DefaultConfigValidator();
-        ConfigValidationResult result = sut.Validate(config);
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Failures, failure => failure.Key == "Runtime.SyncApiListenPrefix");
-    }
-
-    [Fact]
-    public void Validate_WhenAdvertisedBaseUrlInvalid_ReturnsFailure()
-    {
-        AppConfigRoot config = CreateConfigTemplate();
-        config.Runtime.SyncApiAdvertisedBaseUrl = "not a url";
-
-        var sut = new DefaultConfigValidator();
-        ConfigValidationResult result = sut.Validate(config);
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Failures, failure => failure.Key == "Runtime.SyncApiAdvertisedBaseUrl");
-    }
-
-    [Fact]
-    public void Validate_WhenAdvertisedBaseUrlPortDiffersFromListenPrefix_ReturnsFailure()
-    {
-        AppConfigRoot config = CreateConfigTemplate();
-        config.Runtime.SyncApiListenPrefix = "http://0.0.0.0:15123/";
-        config.Runtime.SyncApiAdvertisedBaseUrl = "http://192.168.1.55:16123";
-
-        var sut = new DefaultConfigValidator();
-        ConfigValidationResult result = sut.Validate(config);
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Failures, failure => failure.Key == "Runtime.SyncApiAdvertisedBaseUrl");
-    }
-
     private static AppConfigRoot CreateConfigTemplate()
     {
         return new AppConfigRoot

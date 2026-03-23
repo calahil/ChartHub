@@ -202,21 +202,6 @@ public sealed class JsonAppConfigStore : IAppConfigStore
             config.Runtime.SyncApiAuthToken = rootNode["SyncApiAuthToken"]?.GetValue<string>() ?? config.Runtime.SyncApiAuthToken;
         }
 
-        if (rootNode["SyncApiDesktopBaseUrl"] is not null)
-        {
-            config.Runtime.SyncApiDesktopBaseUrl = rootNode["SyncApiDesktopBaseUrl"]?.GetValue<string>() ?? config.Runtime.SyncApiDesktopBaseUrl;
-        }
-
-        if (rootNode["SyncApiListenPrefix"] is not null)
-        {
-            config.Runtime.SyncApiListenPrefix = rootNode["SyncApiListenPrefix"]?.GetValue<string>() ?? config.Runtime.SyncApiListenPrefix;
-        }
-
-        if (rootNode["SyncApiAdvertisedBaseUrl"] is not null)
-        {
-            config.Runtime.SyncApiAdvertisedBaseUrl = rootNode["SyncApiAdvertisedBaseUrl"]?.GetValue<string>() ?? config.Runtime.SyncApiAdvertisedBaseUrl;
-        }
-
         if (rootNode["SyncApiDeviceLabel"] is not null)
         {
             config.Runtime.SyncApiDeviceLabel = rootNode["SyncApiDeviceLabel"]?.GetValue<string>() ?? config.Runtime.SyncApiDeviceLabel;
