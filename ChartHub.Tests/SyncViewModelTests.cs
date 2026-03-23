@@ -667,6 +667,69 @@ public class SyncViewModelTests
         Assert.Contains("unreachable", diagnostics.DiagnosticsSummary, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task ConfirmQrPairing_OnAndroidConnectionFailure_ClassifiesAsNetworkUnreachable()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-qr-connection-failure");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        var client = new StubDesktopSyncApiClient
+        {
+            ClaimPairTokenHandler = (_, _, _, _) => throw new HttpRequestException("Connection failure"),
+        };
+        StubQrCodeScannerService scanner = CreateScanner("http://192.168.1.55:15123", "PAIR-1234", "Studio Desktop");
+
+        using var sut = new SyncViewModel(client, settings, scanner, isCompanionMode: true);
+
+        await sut.ScanBootstrapQrCommand.ExecuteAsync(null);
+        await sut.ConfirmQrPairingCommand.ExecuteAsync(null);
+
+        Assert.False(sut.IsConnected);
+        Assert.Equal(ErrorCategory.NetworkUnreachable, sut.Diagnostics.LastErrorCategory);
+        Assert.Contains("URL", sut.Diagnostics.RemediationHint, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("reachable", sut.Diagnostics.RemediationHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ConfirmQrPairing_OnFailedToConnect_ClassifiesAsNetworkUnreachable()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-qr-failed-to-connect");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        var client = new StubDesktopSyncApiClient
+        {
+            ClaimPairTokenHandler = (_, _, _, _) => throw new HttpRequestException("Failed to connect to /192.168.1.55:15123"),
+        };
+        StubQrCodeScannerService scanner = CreateScanner("http://192.168.1.55:15123", "PAIR-1234", "Studio Desktop");
+
+        using var sut = new SyncViewModel(client, settings, scanner, isCompanionMode: true);
+
+        await sut.ScanBootstrapQrCommand.ExecuteAsync(null);
+        await sut.ConfirmQrPairingCommand.ExecuteAsync(null);
+
+        Assert.False(sut.IsConnected);
+        Assert.Equal(ErrorCategory.NetworkUnreachable, sut.Diagnostics.LastErrorCategory);
+    }
+
+    [Fact]
+    public void PairCode_WhenChanged_RegeneratesBootstrapQr()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-qr-regenerate");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath, syncApiListenPrefix: "http://0.0.0.0:15123/");
+        var client = new StubDesktopSyncApiClient();
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: false);
+        sut.PairCode = "PAIR-FIRST";
+        string firstPayload = sut.GeneratedBootstrapPayload;
+
+        sut.PairCode = "PAIR-SECOND";
+        string secondPayload = sut.GeneratedBootstrapPayload;
+
+        Assert.False(string.IsNullOrWhiteSpace(firstPayload));
+        Assert.False(string.IsNullOrWhiteSpace(secondPayload));
+        Assert.NotEqual(firstPayload, secondPayload);
+        Assert.Contains("PAIR-FIRST", DecodeBootstrapPayload(firstPayload).PairCode);
+        Assert.Contains("PAIR-SECOND", DecodeBootstrapPayload(secondPayload).PairCode);
+    }
+
     private static async Task<bool> WaitForConditionAsync(Func<bool> predicate, TimeSpan timeout)
     {
         DateTime startedAt = DateTime.UtcNow;
