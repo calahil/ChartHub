@@ -158,29 +158,42 @@ public class IngestionSyncApiHostTests
     }
 
     [Fact]
-    public async Task PairClaimEndpoint_WithExpiredCode_ReturnsGone()
+    public async Task PairClaimEndpoint_WithExpiredCode_ReplacesCodeAndRejectsStaleValue()
     {
         using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-expired");
-        await using IngestionSyncApiHost host = CreateHost(
+        (IngestionSyncApiHost host, AppGlobalSettings settings) = CreateHostWithSettings(
             temp.RootPath,
             "token-pair-expired",
             pairCode: "PAIR-1234",
             pairCodeIssuedAtUtc: DateTimeOffset.UtcNow.AddHours(-2).ToString("O"),
             pairCodeTtlMinutes: 10);
-        await host.StartAsync();
-
-        using HttpClient client = CreateHttpClient();
-        string payload = JsonSerializer.Serialize(new
+        await using (host)
         {
-            pairCode = "PAIR-1234",
-            deviceLabel = "Pixel Companion",
-        });
+            await host.StartAsync();
 
-        using HttpResponseMessage response = await client.PostAsync(
-            "api/pair/claim",
-            new StringContent(payload, Encoding.UTF8, "application/json"));
+            using HttpClient client = CreateHttpClient();
+            string stalePayload = JsonSerializer.Serialize(new
+            {
+                pairCode = "PAIR-1234",
+                deviceLabel = "Pixel Companion",
+            });
 
-        Assert.Equal(HttpStatusCode.Gone, response.StatusCode);
+            using HttpResponseMessage staleResponse = await client.PostAsync(
+                "api/pair/claim",
+                new StringContent(stalePayload, Encoding.UTF8, "application/json"));
+            Assert.Equal(HttpStatusCode.Unauthorized, staleResponse.StatusCode);
+
+            string refreshedPayload = JsonSerializer.Serialize(new
+            {
+                pairCode = settings.SyncApiPairCode,
+                deviceLabel = "Pixel Companion",
+            });
+
+            using HttpResponseMessage refreshedResponse = await client.PostAsync(
+                "api/pair/claim",
+                new StringContent(refreshedPayload, Encoding.UTF8, "application/json"));
+            Assert.Equal(HttpStatusCode.OK, refreshedResponse.StatusCode);
+        }
     }
 
     [Fact]

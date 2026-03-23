@@ -205,6 +205,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged(nameof(ConnectionHint));
             OnPropertyChanged(nameof(HasConnectionHint));
             OnPropertyChanged(nameof(ShowEmptyQueueState));
+            OnPropertyChanged(nameof(ShowCompanionScanSection));
+            OnPropertyChanged(nameof(ShowCompanionConfirmationSection));
+            OnPropertyChanged(nameof(ShowCompanionQueueSection));
             OnPropertyChanged(nameof(AutoRefreshHint));
             OnPropertyChanged(nameof(IsAutoRefreshActive));
             RefreshQueueCommand.NotifyCanExecuteChanged();

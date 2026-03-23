@@ -132,6 +132,33 @@ public class SyncViewModelTests
     }
 
     [Fact]
+    public async Task TestConnectionCommand_RaisesCompanionSectionVisibilityNotifications_OnSuccessfulConnect()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-connection-visibility-notify");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([CreateQueueItem()]),
+        };
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
+        List<string?> raisedProperties = [];
+        sut.PropertyChanged += (_, e) => raisedProperties.Add(e.PropertyName);
+
+        await sut.TestConnectionCommand.ExecuteAsync(null);
+
+        Assert.True(sut.IsConnected);
+        Assert.True(sut.ShowCompanionQueueSection);
+        Assert.Contains(nameof(SyncViewModel.ShowCompanionScanSection), raisedProperties, StringComparer.Ordinal);
+        Assert.Contains(nameof(SyncViewModel.ShowCompanionConfirmationSection), raisedProperties, StringComparer.Ordinal);
+        Assert.Contains(nameof(SyncViewModel.ShowCompanionQueueSection), raisedProperties, StringComparer.Ordinal);
+    }
+
+    [Fact]
     public void GeneratedBootstrapPayload_UsesCompanionDesktopApiBaseUrl_WhenLanReachable()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-bootstrap-lan-url");

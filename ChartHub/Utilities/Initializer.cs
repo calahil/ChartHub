@@ -211,11 +211,19 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
             ? GenerateSyncApiToken()
             : Runtime.SyncApiAuthToken;
         string syncApiDeviceLabel = NormalizeSyncDeviceLabel(Runtime.SyncApiDeviceLabel);
-        string syncApiPairCode = string.IsNullOrWhiteSpace(Runtime.SyncApiPairCode)
+        int syncApiPairCodeTtlMinutes = ClampSyncPairCodeTtlMinutes(Runtime.SyncApiPairCodeTtlMinutes);
+        DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
+        DateTimeOffset syncApiPairCodeIssuedAt = DateTimeOffset.TryParse(Runtime.SyncApiPairCodeIssuedAtUtc, out DateTimeOffset parsedIssuedAt)
+            ? parsedIssuedAt
+            : nowUtc;
+        bool shouldRotateSyncPairCode = string.IsNullOrWhiteSpace(Runtime.SyncApiPairCode)
+            || nowUtc > syncApiPairCodeIssuedAt.AddMinutes(syncApiPairCodeTtlMinutes);
+        string syncApiPairCode = shouldRotateSyncPairCode
             ? GenerateSyncPairCode()
             : Runtime.SyncApiPairCode;
-        string syncApiPairCodeIssuedAtUtc = NormalizeSyncPairCodeIssuedAt(Runtime.SyncApiPairCodeIssuedAtUtc);
-        int syncApiPairCodeTtlMinutes = ClampSyncPairCodeTtlMinutes(Runtime.SyncApiPairCodeTtlMinutes);
+        string syncApiPairCodeIssuedAtUtc = shouldRotateSyncPairCode
+            ? nowUtc.ToString("O")
+            : syncApiPairCodeIssuedAt.ToString("O");
         string syncApiLastPairedDeviceLabel = Runtime.SyncApiLastPairedDeviceLabel ?? string.Empty;
         string syncApiLastPairedAtUtc = Runtime.SyncApiLastPairedAtUtc ?? string.Empty;
         string syncApiPairingHistoryJson = NormalizeSyncConnectionsJson(Runtime.SyncApiPairingHistoryJson);
@@ -291,16 +299,6 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         return string.IsNullOrWhiteSpace(candidate)
             ? "[]"
             : candidate;
-    }
-
-    private static string NormalizeSyncPairCodeIssuedAt(string? value)
-    {
-        if (DateTimeOffset.TryParse(value, out _))
-        {
-            return value!;
-        }
-
-        return DateTimeOffset.UtcNow.ToString("O");
     }
 
     public static string GenerateSyncPairCode()
