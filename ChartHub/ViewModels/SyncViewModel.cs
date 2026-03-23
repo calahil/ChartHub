@@ -398,6 +398,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
 
         QueueItems.CollectionChanged += OnQueueItemsCollectionChanged;
+        _appGlobalSettings.PropertyChanged += OnAppGlobalSettingsPropertyChanged;
         RegenerateBootstrapQrPayload();
 
         TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, CanTestConnection);
@@ -1057,7 +1058,8 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         string message = ex.Message.ToLowerInvariant();
 
         if (message.Contains("not found") || message.Contains("unreachable") || message.Contains("connection refused")
-            || message.Contains("timeout") || message.Contains("no such host"))
+            || message.Contains("timeout") || message.Contains("no such host")
+            || message.Contains("connection failure") || message.Contains("failed to connect"))
         {
             return (ErrorCategory.NetworkUnreachable, "Verify desktop URL (e.g., http://192.168.1.10:15123) is correct and reachable.");
         }
@@ -1081,9 +1083,27 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(ShowEmptyQueueState));
     }
 
+    private void OnAppGlobalSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AppGlobalSettings.SyncApiPairCode))
+        {
+            PairCode = _appGlobalSettings.SyncApiPairCode;
+        }
+        else if (e.PropertyName == nameof(AppGlobalSettings.SyncApiDeviceLabel))
+        {
+            DeviceLabel = _appGlobalSettings.SyncApiDeviceLabel;
+        }
+        else if (e.PropertyName is nameof(AppGlobalSettings.SyncApiListenPrefix)
+            or nameof(AppGlobalSettings.SyncApiAdvertisedBaseUrl))
+        {
+            RegenerateBootstrapQrPayload();
+        }
+    }
+
     public void Dispose()
     {
         QueueItems.CollectionChanged -= OnQueueItemsCollectionChanged;
+        _appGlobalSettings.PropertyChanged -= OnAppGlobalSettingsPropertyChanged;
         StopAutoRefreshLoop();
         BootstrapQrImage = null;
     }
