@@ -9,6 +9,39 @@ namespace ChartHub.Tests;
 public class AppGlobalSettingsTests
 {
     [Fact]
+    public async Task Constructor_WhenRuntimeDirectoriesAreFirstInstall_ResolvesAndCreatesLocalStorageDirectories()
+    {
+        AppConfigRoot config = new()
+        {
+            Runtime = new RuntimeAppConfig
+            {
+                TempDirectory = "first_install",
+                DownloadDirectory = "first_install",
+                StagingDirectory = "first_install",
+                OutputDirectory = "first_install",
+                CloneHeroDataDirectory = "first_install",
+                CloneHeroSongDirectory = "first_install",
+            },
+        };
+
+        using var settings = new AppGlobalSettings(new FakeSettingsOrchestrator(config));
+
+        bool initialized = await WaitForConditionAsync(
+            () => !string.IsNullOrWhiteSpace(settings.DownloadDir)
+                && !string.Equals(settings.DownloadDir, "first_install", StringComparison.Ordinal),
+            TimeSpan.FromSeconds(2));
+
+        Assert.True(initialized);
+        Assert.StartsWith(settings.TempDir, settings.DownloadDir, StringComparison.Ordinal);
+        Assert.StartsWith(settings.TempDir, settings.StagingDir, StringComparison.Ordinal);
+        Assert.StartsWith(settings.TempDir, settings.OutputDir, StringComparison.Ordinal);
+        Assert.True(Directory.Exists(settings.TempDir));
+        Assert.True(Directory.Exists(settings.DownloadDir));
+        Assert.True(Directory.Exists(settings.StagingDir));
+        Assert.True(Directory.Exists(settings.OutputDir));
+    }
+
+    [Fact]
     public async Task Constructor_WhenPairCodeExpired_RotatesCodeAndRefreshesIssuedAt()
     {
         using var temp = new TemporaryDirectoryFixture("app-global-settings-expired-pair-code");
@@ -53,6 +86,24 @@ public class AppGlobalSettingsTests
         Assert.True(initialized);
         Assert.Equal(validCode, settings.SyncApiPairCode);
         Assert.Equal(issuedAt.ToString("O"), settings.SyncApiPairCodeIssuedAtUtc);
+    }
+
+    [Fact]
+    public async Task Constructor_WhenSyncApiMaxBodySizeIsLegacyDefault_UpliftsToModernDefault()
+    {
+        using var temp = new TemporaryDirectoryFixture("app-global-settings-sync-api-max-body-uplift");
+
+        AppConfigRoot config = CreateConfig(temp.RootPath);
+        config.Runtime.SyncApiMaxRequestBodyBytes = 64 * 1024;
+
+        using var settings = new AppGlobalSettings(new FakeSettingsOrchestrator(config));
+
+        bool changed = await WaitForConditionAsync(
+            () => settings.SyncApiMaxRequestBodyBytes == 32 * 1024 * 1024,
+            TimeSpan.FromSeconds(2));
+
+        Assert.True(changed);
+        Assert.Equal(32 * 1024 * 1024, settings.SyncApiMaxRequestBodyBytes);
     }
 
     private static AppConfigRoot CreateConfig(string rootPath)

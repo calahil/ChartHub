@@ -20,37 +20,14 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     public bool IsDesktopMode => !OperatingSystem.IsAndroid();
 
     public IResourceWatcher DownloadWatcher { get; set; }
-    public GoogleDriveWatcher GoogleWatcher { get; set; }
 
     public ICommand CheckAllCommand { get; }
     public IAsyncRelayCommand InstallSongs { get; }
-    public IAsyncRelayCommand UploadCloud { get; }
-    public IAsyncRelayCommand DownloadCloudToLocal { get; }
-    public IAsyncRelayCommand SyncCloudToLocal { get; }
+    public IAsyncRelayCommand DeleteSelectedDownloadsCommand { get; }
     public ICommand CancelInstallCommand { get; }
     public ICommand ClearInstallLogCommand { get; }
     public ICommand ToggleInstallLogCommand { get; }
     public ICommand DismissInstallPanelCommand { get; }
-
-    private string _cloudConnectionHint = string.Empty;
-    public string CloudConnectionHint
-    {
-        get => _cloudConnectionHint;
-        private set
-        {
-            if (_cloudConnectionHint == value)
-            {
-                return;
-            }
-
-            _cloudConnectionHint = value;
-            OnPropertyChanged(nameof(CloudConnectionHint));
-            OnPropertyChanged(nameof(HasCloudConnectionHint));
-        }
-    }
-
-    public bool HasCloudConnectionHint => !string.IsNullOrWhiteSpace(CloudConnectionHint);
-    public bool IsCloudConnected => !string.IsNullOrWhiteSpace(_googleDrive.ChartHubFolderId);
 
     private bool _isInstallPanelVisible;
     public bool IsInstallPanelVisible
@@ -226,20 +203,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         }
     }
 
-    private bool _isAnyCloudChecked;
-    public bool IsAnyCloudChecked
-    {
-        get => _isAnyCloudChecked;
-        set
-        {
-            if (_isAnyCloudChecked != value)
-            {
-                _isAnyCloudChecked = value;
-                OnPropertyChanged(nameof(IsAnyCloudChecked));
-            }
-        }
-    }
-
     private WatcherFile? _selectedFile;
     public WatcherFile? SelectedFile
     {
@@ -252,7 +215,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     }
 
     public ObservableCollection<WatcherFile> DownloadFiles { get; set; }
-    public ObservableCollection<WatcherFile> GoogleFiles { get; set; }
     public ObservableCollection<IngestionQueueItem> IngestionQueue { get; }
 
     public IReadOnlyList<string> QueueStateFilters { get; } =
@@ -338,10 +300,10 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         }
     }
 
-    private readonly IGoogleDriveClient _googleDrive;
-    private readonly ITransferOrchestrator _transferOrchestrator;
     private readonly ISongInstallService _songInstallService;
     private readonly SongIngestionCatalogService _ingestionCatalog;
+    private readonly LibraryCatalogService _libraryCatalog;
+    private readonly ILocalFileDeletionService _localFileDeletionService;
     private readonly CloneHeroViewModel? _cloneHeroViewModel;
     private readonly CancellationTokenSource _queueRefreshCts = new();
     private readonly Task? _queueRefreshTask;
@@ -351,30 +313,29 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     private readonly RelayCommand _clearInstallLogCommand;
     private readonly RelayCommand _toggleInstallLogCommand;
     private readonly RelayCommand _dismissInstallPanelCommand;
+    private readonly AsyncRelayCommand _deleteSelectedDownloadsCommand;
 
     public DownloadViewModel(
         AppGlobalSettings settings,
-        IGoogleDriveClient googleDrive,
-        ITransferOrchestrator transferOrchestrator,
         ISongInstallService songInstallService,
         SongIngestionCatalogService ingestionCatalog,
+        LibraryCatalogService libraryCatalog,
+        ILocalFileDeletionService localFileDeletionService,
         CloneHeroViewModel? cloneHeroViewModel = null)
     {
         _globalSettings = settings;
-        _googleDrive = googleDrive;
-        _transferOrchestrator = transferOrchestrator;
         _songInstallService = songInstallService;
         _ingestionCatalog = ingestionCatalog;
+        _libraryCatalog = libraryCatalog;
+        _localFileDeletionService = localFileDeletionService;
         _cloneHeroViewModel = cloneHeroViewModel;
         DownloadWatcher = OperatingSystem.IsAndroid()
             ? new SnapshotResourceWatcher(_globalSettings.DownloadDir, WatcherType.File)
             : new ResourceWatcher(_globalSettings.DownloadDir, WatcherType.File);
-        GoogleWatcher = new GoogleDriveWatcher(_googleDrive);
         CheckAllCommand = new RelayCommand(CheckAllItemsCommand);
         InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
-        UploadCloud = new AsyncRelayCommand(UploadCloudCommand, CanUploadCloud);
-        DownloadCloudToLocal = new AsyncRelayCommand(DownloadCloudToLocalCommand, CanDownloadCloudToLocal);
-        SyncCloudToLocal = new AsyncRelayCommand(SyncCloudToLocalCommand, CanSyncCloudToLocal);
+        _deleteSelectedDownloadsCommand = new AsyncRelayCommand(DeleteSelectedDownloadsAsync, CanDeleteSelectedDownloads);
+        DeleteSelectedDownloadsCommand = _deleteSelectedDownloadsCommand;
         _cancelInstallCommand = new RelayCommand(CancelInstall, CanCancelInstall);
         CancelInstallCommand = _cancelInstallCommand;
         _clearInstallLogCommand = new RelayCommand(ClearInstallLog, CanClearInstallLog);
@@ -384,16 +345,14 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         _dismissInstallPanelCommand = new RelayCommand(DismissInstallPanel, CanDismissInstallPanel);
         DismissInstallPanelCommand = _dismissInstallPanelCommand;
         DownloadFiles = DownloadWatcher.Data;
-        GoogleFiles = GoogleWatcher.Data;
         IngestionQueue = [];
         _pageStrings = new DownloadPageStrings();
         _isInstallLogExpanded = _globalSettings.InstallLogExpanded;
 
         DownloadFiles.CollectionChanged += DownloadFiles_CollectionChanged;
-        GoogleFiles.CollectionChanged += GoogleFiles_CollectionChanged;
         IngestionQueue.CollectionChanged += IngestionQueue_CollectionChanged;
         WireExistingWatcherItems();
-        RefreshCloudConnectionState();
+        DownloadWatcher.LoadItems();
         ObserveBackgroundTask(RefreshIngestionQueueAsync(), "Initial ingestion queue load");
         ObserveBackgroundTask(ReconcileWatcherDataAsync(_queueRefreshCts.Token), "Initial watcher reconciliation");
         _queueRefreshTask = RunQueueRefreshLoopAsync(_queueRefreshCts.Token);
@@ -418,6 +377,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             }
         }
 
+        _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
         ObserveBackgroundTask(RefreshIngestionQueueAsync(_queueRefreshCts.Token), "Queue refresh after local watcher change");
     }
 
@@ -426,37 +386,14 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         if (sender is WatcherFile && e.PropertyName == nameof(WatcherFile.Checked))
         {
             IsAnyChecked = AnyItemChecked();
-            IsAnyCloudChecked = AnyCloudItemChecked();
-            NotifyCloudCommandStateChanged();
+            _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
         }
 
         if (sender is IngestionQueueItem && e.PropertyName == nameof(IngestionQueueItem.Checked))
         {
             IsAnyChecked = AnyItemChecked();
-            NotifyCloudCommandStateChanged();
+            _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
         }
-    }
-
-    private void GoogleFiles_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        if (e.NewItems is not null)
-        {
-            foreach (WatcherFile file in e.NewItems)
-            {
-                file.PropertyChanged += ItemPropertyChanged;
-                ObserveBackgroundTask(ReconcileCloudFileAsync(file, _queueRefreshCts.Token), "Cloud watcher reconciliation");
-            }
-        }
-
-        if (e.OldItems is not null)
-        {
-            foreach (WatcherFile file in e.OldItems)
-            {
-                file.PropertyChanged -= ItemPropertyChanged;
-            }
-        }
-
-        ObserveBackgroundTask(RefreshIngestionQueueAsync(_queueRefreshCts.Token), "Queue refresh after cloud watcher change");
     }
 
     private void IngestionQueue_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -476,136 +413,13 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
                 item.PropertyChanged -= ItemPropertyChanged;
             }
         }
+
+        _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
     }
 
     private void CheckAllItemsCommand()
     {
         IsAllChecked = !IsAllChecked;
-    }
-
-    public async Task UploadCloudCommand()
-    {
-        List<string> items = [];
-        if (!EnsureCloudConnected())
-        {
-            return;
-        }
-
-        CloudConnectionHint = string.Empty;
-
-        foreach (WatcherFile file in DownloadFiles)
-        {
-            if (file.Checked)
-            {
-                try
-                {
-                    if (!File.Exists(file.FilePath))
-                    {
-                        continue;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning("Transfer", "Local file could not be inspected before upload", new Dictionary<string, object?>
-                    {
-                        ["filePath"] = file.FilePath,
-                        ["reason"] = ex.GetType().Name,
-                    });
-                    Logger.LogError("Transfer", "Local file inspection failed before upload", ex, new Dictionary<string, object?>
-                    {
-                        ["filePath"] = file.FilePath,
-                    });
-                    continue;
-                }
-                try
-                {
-                    await _googleDrive.UploadFileAsync(_googleDrive.ChartHubFolderId, file.FilePath);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError("Transfer", "Failed to upload local file to Google Drive", ex, new Dictionary<string, object?>
-                    {
-                        ["filePath"] = file.FilePath,
-                        ["folderId"] = _googleDrive.ChartHubFolderId,
-                    });
-                }
-            }
-
-        }
-    }
-
-    public async Task DownloadCloudToLocalCommand()
-    {
-        if (!EnsureCloudConnected())
-        {
-            return;
-        }
-
-        var selected = GoogleFiles.Where(file => file.Checked).ToList();
-        if (selected.Count == 0)
-        {
-            return;
-        }
-
-        await _transferOrchestrator.DownloadSelectedCloudFilesToLocalAsync(selected);
-        DownloadWatcher.LoadItems();
-        await RefreshIngestionQueueAsync();
-    }
-
-    public async Task SyncCloudToLocalCommand()
-    {
-        if (!EnsureCloudConnected())
-        {
-            return;
-        }
-
-        await _transferOrchestrator.SyncCloudToLocalAdditiveAsync(GoogleFiles);
-        DownloadWatcher.LoadItems();
-        await RefreshIngestionQueueAsync();
-    }
-
-    private bool CanUploadCloud() => IsCloudConnected && IsAnyChecked;
-
-    private bool CanDownloadCloudToLocal() => IsCloudConnected && IsAnyCloudChecked;
-
-    private bool CanSyncCloudToLocal() => IsCloudConnected;
-
-    public async Task HandleCloudAccountStateChangedAsync(bool isLinked, CancellationToken cancellationToken = default)
-    {
-        if (isLinked)
-        {
-            await GoogleWatcher.StartAsync(cancellationToken);
-            GoogleWatcher.LoadItems();
-        }
-        else
-        {
-            GoogleFiles.Clear();
-        }
-
-        RefreshCloudConnectionState();
-        await RefreshIngestionQueueAsync(cancellationToken);
-    }
-
-    private bool EnsureCloudConnected()
-    {
-        RefreshCloudConnectionState();
-        return IsCloudConnected;
-    }
-
-    private void RefreshCloudConnectionState()
-    {
-        CloudConnectionHint = IsCloudConnected
-            ? string.Empty
-            : "Google Drive is not linked. Open Settings and link your Google account.";
-        OnPropertyChanged(nameof(IsCloudConnected));
-        NotifyCloudCommandStateChanged();
-    }
-
-    private void NotifyCloudCommandStateChanged()
-    {
-        UploadCloud.NotifyCanExecuteChanged();
-        DownloadCloudToLocal.NotifyCanExecuteChanged();
-        SyncCloudToLocal.NotifyCanExecuteChanged();
     }
 
     private bool CanCancelInstall() => IsInstallActive;
@@ -824,9 +638,100 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             || IngestionQueue.Any(item => item.Checked);
     }
 
-    public bool AnyCloudItemChecked()
+    private bool CanDeleteSelectedDownloads()
     {
-        return GoogleFiles.Any(item => item.Checked);
+        return DownloadFiles.Any(file => file.Checked)
+            || IngestionQueue.Any(item => item.Checked);
+    }
+
+    private async Task DeleteSelectedDownloadsAsync()
+    {
+        var selectedQueueItems = IngestionQueue
+            .Where(item => item.Checked)
+            .ToList();
+
+        var selectedWatcherFiles = DownloadFiles
+            .Where(file => file.Checked)
+            .ToList();
+
+        if (selectedQueueItems.Count == 0 && selectedWatcherFiles.Count == 0)
+        {
+            return;
+        }
+
+        foreach (IngestionQueueItem item in selectedQueueItems)
+        {
+            await DeleteQueueItemAsync(item).ConfigureAwait(false);
+        }
+
+        foreach (WatcherFile file in selectedWatcherFiles)
+        {
+            await DeleteWatcherFileAsync(file).ConfigureAwait(false);
+        }
+
+        DownloadWatcher.LoadItems();
+        await RefreshIngestionQueueAsync().ConfigureAwait(false);
+        IsAnyChecked = AnyItemChecked();
+        _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
+    }
+
+    private async Task DeleteQueueItemAsync(IngestionQueueItem item)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(item.DownloadedLocation))
+            {
+                await _localFileDeletionService.DeletePathIfExistsAsync(item.DownloadedLocation).ConfigureAwait(false);
+            }
+
+            if (!string.IsNullOrWhiteSpace(item.Source) && !string.IsNullOrWhiteSpace(item.SourceId))
+            {
+                await _libraryCatalog.RemoveAsync(item.Source, item.SourceId).ConfigureAwait(false);
+            }
+
+            await _ingestionCatalog.RemoveIngestionAsync(item.IngestionId).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Download", "Failed to delete selected queue item", ex, new Dictionary<string, object?>
+            {
+                ["ingestionId"] = item.IngestionId,
+                ["source"] = item.Source,
+                ["sourceId"] = item.SourceId,
+            });
+        }
+    }
+
+    private async Task DeleteWatcherFileAsync(WatcherFile file)
+    {
+        try
+        {
+            await _localFileDeletionService.DeletePathIfExistsAsync(file.FilePath).ConfigureAwait(false);
+
+            SongIngestionRecord? linkedIngestion = await _ingestionCatalog
+                .GetLatestIngestionByAssetLocationAsync(file.FilePath)
+                .ConfigureAwait(false);
+
+            if (linkedIngestion is null)
+            {
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(linkedIngestion.Source)
+                && !string.IsNullOrWhiteSpace(linkedIngestion.SourceId))
+            {
+                await _libraryCatalog.RemoveAsync(linkedIngestion.Source, linkedIngestion.SourceId).ConfigureAwait(false);
+            }
+
+            await _ingestionCatalog.RemoveIngestionAsync(linkedIngestion.Id).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Download", "Failed to delete selected local download", ex, new Dictionary<string, object?>
+            {
+                ["path"] = file.FilePath,
+            });
+        }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -841,15 +746,9 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         _installCts?.Cancel();
         _installCts?.Dispose();
         DownloadFiles.CollectionChanged -= DownloadFiles_CollectionChanged;
-        GoogleFiles.CollectionChanged -= GoogleFiles_CollectionChanged;
         IngestionQueue.CollectionChanged -= IngestionQueue_CollectionChanged;
 
         foreach (WatcherFile file in DownloadFiles)
-        {
-            file.PropertyChanged -= ItemPropertyChanged;
-        }
-
-        foreach (WatcherFile file in GoogleFiles)
         {
             file.PropertyChanged -= ItemPropertyChanged;
         }
@@ -876,8 +775,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         {
             disposableWatcher.Dispose();
         }
-
-        await GoogleWatcher.DisposeAsync();
     }
 
     private async Task RefreshIngestionQueueAsync(CancellationToken cancellationToken = default)
@@ -923,11 +820,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         {
             file.PropertyChanged += ItemPropertyChanged;
         }
-
-        foreach (WatcherFile file in GoogleFiles)
-        {
-            file.PropertyChanged += ItemPropertyChanged;
-        }
     }
 
     private async Task ReconcileWatcherDataAsync(CancellationToken cancellationToken)
@@ -936,12 +828,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             await ReconcileLocalFileAsync(file, cancellationToken);
-        }
-
-        foreach (WatcherFile file in GoogleFiles)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await ReconcileCloudFileAsync(file, cancellationToken);
         }
 
         await RefreshIngestionQueueAsync(cancellationToken);
@@ -956,20 +842,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
 
         // Local watcher files are unmanaged unless they were already ingested through trusted sources.
         await Task.CompletedTask;
-    }
-
-    private async Task ReconcileCloudFileAsync(WatcherFile file, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(file.FilePath))
-        {
-            return;
-        }
-
-        SongIngestionRecord? existing = await _ingestionCatalog.GetLatestIngestionByAssetLocationAsync(file.FilePath, cancellationToken);
-        if (existing is null)
-        {
-            return;
-        }
     }
 
     private async Task RunQueueRefreshLoopAsync(CancellationToken cancellationToken)

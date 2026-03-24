@@ -21,7 +21,7 @@ public class MainViewModelTests
         using var temp = new TemporaryDirectoryFixture("main-vm-clonehero");
         var downloadWatcher = new ResourceWatcherStub();
         CloneHeroViewModel cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
-        DownloadViewModel downloadViewModel = CreateDownloadViewModel(downloadWatcher, new FakeGoogleDriveClient(string.Empty));
+        DownloadViewModel downloadViewModel = CreateDownloadViewModel(downloadWatcher);
         RhythmVerseViewModel rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
         EncoreViewModel encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
         var sharedDownloadQueue = new SharedDownloadQueue();
@@ -60,7 +60,7 @@ public class MainViewModelTests
         using var temp = new TemporaryDirectoryFixture("main-vm-android");
         var downloadWatcher = new ResourceWatcherStub();
         CloneHeroViewModel cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
-        DownloadViewModel downloadViewModel = CreateDownloadViewModel(downloadWatcher, new FakeGoogleDriveClient(string.Empty));
+        DownloadViewModel downloadViewModel = CreateDownloadViewModel(downloadWatcher);
         RhythmVerseViewModel rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
         EncoreViewModel encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
         var sharedDownloadQueue = new SharedDownloadQueue();
@@ -82,6 +82,38 @@ public class MainViewModelTests
         Assert.False(sut.IsCloneHeroTabVisible);
         Assert.True(sut.IsDownloadTabVisible);
         Assert.Equal(0, downloadWatcher.LoadItemsCallCount);
+    }
+
+    [Fact]
+    [Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.Unit)]
+    public void CompletedAndroidDownload_ReloadsLocalWatcher()
+    {
+        using var temp = new TemporaryDirectoryFixture("main-vm-android-refresh");
+        var downloadWatcher = new ResourceWatcherStub();
+        CloneHeroViewModel cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
+        DownloadViewModel downloadViewModel = CreateDownloadViewModel(downloadWatcher);
+        RhythmVerseViewModel rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
+        EncoreViewModel encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
+        var sharedDownloadQueue = new SharedDownloadQueue();
+        SettingsViewModel settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
+        SyncViewModel syncViewModel = CreateUninitialized<ViewModels.SyncViewModel>();
+        var activeDownload = new DownloadFile("song.zip", temp.RootPath, "https://example.test/song.zip", 42);
+        sharedDownloadQueue.Downloads.Add(activeDownload);
+
+        _ = CreateMainViewModel(
+            rhythmVerseViewModel,
+            encoreViewModel,
+            sharedDownloadQueue,
+            downloadViewModel,
+            cloneHeroViewModel,
+            syncViewModel,
+            settingsViewModel,
+            action => action(),
+            isAndroid: true);
+
+        activeDownload.Status = "Completed";
+
+        Assert.Equal(1, downloadWatcher.LoadItemsCallCount);
     }
 
     [Fact]
@@ -176,39 +208,20 @@ public class MainViewModelTests
     private static ViewModels.CloneHeroViewModel CreateCloneHeroViewModel(string rootPath)
     {
         var catalog = new LibraryCatalogService(Path.Combine(rootPath, "library-catalog.db"));
-        return new ViewModels.CloneHeroViewModel(catalog, new NoopDesktopPathOpener());
+        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(rootPath, "library-catalog.db"));
+        return new ViewModels.CloneHeroViewModel(catalog, ingestionCatalog, new NoopDesktopPathOpener(), new LocalFileDeletionService());
     }
 
-    private static ViewModels.DownloadViewModel CreateDownloadViewModel(IResourceWatcher watcher, IGoogleDriveClient driveClient)
+    private static ViewModels.DownloadViewModel CreateDownloadViewModel(IResourceWatcher watcher)
     {
         DownloadViewModel viewModel = CreateUninitialized<ViewModels.DownloadViewModel>();
         viewModel.DownloadWatcher = watcher;
-        viewModel.GoogleWatcher = new GoogleDriveWatcher(driveClient);
         return viewModel;
     }
 
     private static T CreateUninitialized<T>() where T : class
     {
         return (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
-    }
-
-    private sealed class FakeGoogleDriveClient(string chartHubFolderId) : IGoogleDriveClient
-    {
-        public string ChartHubFolderId { get; } = chartHubFolderId;
-
-        public Task<string> CreateDirectoryAsync(string directoryName) => Task.FromResult("folder-test");
-        public Task<string> GetDirectoryIdAsync(string directoryName) => Task.FromResult("folder-test");
-        public Task<string> UploadFileAsync(string directoryId, string filePath, string? desiredFileName = null) => Task.FromResult("file-test");
-        public Task<string> CopyFileIntoFolderAsync(string sourceFileId, string destinationFolderId, string desiredFileName) => Task.FromResult("copy-test");
-        public Task DownloadFolderAsZipAsync(string folderId, string zipFilePath, IProgress<Services.Transfers.TransferProgressUpdate>? stageProgress = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task DownloadFileAsync(string fileId, string saveToPath) => Task.CompletedTask;
-        public Task DeleteFileAsync(string fileId) => Task.CompletedTask;
-        public Task<IList<Google.Apis.Drive.v3.Data.File>> ListFilesAsync(string directoryId) => Task.FromResult<IList<Google.Apis.Drive.v3.Data.File>>([]);
-        public Task MonitorDirectoryAsync(string directoryId, TimeSpan pollingInterval, Action<Google.Apis.Drive.v3.Data.File, string> onFileChanged, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<bool> TryInitializeSilentAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
-        public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<ObservableCollection<WatcherFile>> GetFileDataCollectionAsync(string directoryId) => Task.FromResult(new ObservableCollection<WatcherFile>());
     }
 
     private sealed class NoopDesktopPathOpener : IDesktopPathOpener

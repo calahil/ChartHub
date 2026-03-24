@@ -79,7 +79,14 @@ public class SnapshotResourceWatcher : IResourceWatcher, INotifyPropertyChanged
             }
         }
 
-        Dispatcher.UIThread.Post(() => Data = new ObservableCollection<WatcherFile>(files));
+        Dispatcher.UIThread.Post(() =>
+        {
+            Data.Clear();
+            foreach (WatcherFile file in files)
+            {
+                Data.Add(file);
+            }
+        });
     }
 
     protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)

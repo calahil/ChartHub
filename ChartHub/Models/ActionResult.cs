@@ -64,6 +64,7 @@ public sealed class ActionResult : IEquatable<ActionResult>
         ActionType.Retry => "Retry",
         ActionType.Install => "Install",
         ActionType.OpenFolder => "Open folder",
+        ActionType.Push => "Push to desktop",
         _ => "Action"
     };
 
@@ -83,7 +84,8 @@ public enum ActionType
 {
     Retry,
     Install,
-    OpenFolder
+    OpenFolder,
+    Push
 }
 
 public enum ActionResultStatus

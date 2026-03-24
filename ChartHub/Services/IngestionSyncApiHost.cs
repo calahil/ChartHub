@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -13,6 +14,7 @@ namespace ChartHub.Services;
 public interface IIngestionSyncApiHost
 {
     Task StartAsync(CancellationToken cancellationToken = default);
+    string RefreshPairCode();
 }
 
 public sealed class IngestionSyncApiHost(
@@ -83,6 +85,12 @@ public sealed class IngestionSyncApiHost(
 
         _listenLoopTask = Task.Run(() => ListenLoopAsync(_cts.Token), CancellationToken.None);
         return Task.CompletedTask;
+    }
+
+    public string RefreshPairCode()
+    {
+        RotatePairCode();
+        return GetCurrentPairCode();
     }
 
     private async Task ListenLoopAsync(CancellationToken cancellationToken)
@@ -290,6 +298,134 @@ public sealed class IngestionSyncApiHost(
                 }
 
                 await WriteJsonAsync(response, HttpStatusCode.OK, new { item });
+                return;
+            }
+
+            if (request.HttpMethod.Equals("POST", StringComparison.OrdinalIgnoreCase)
+                && path.Equals("/api/ingestions/upload", StringComparison.OrdinalIgnoreCase))
+            {
+                await ExecuteSerializedMutationAsync(async () =>
+                {
+                    UploadedMultipartRequest? uploadRequest = await TryReadUploadRequestAsync(request, response, cancellationToken);
+                    if (uploadRequest is null)
+                    {
+                        return;
+                    }
+
+                    string source = uploadRequest.GetField("source") ?? LibrarySourceNames.RhythmVerse;
+                    try
+                    {
+                        source = LibrarySourceNames.NormalizeTrustedSource(source);
+                    }
+                    catch (ArgumentException)
+                    {
+                        await WriteErrorAsync(response, HttpStatusCode.BadRequest, "source must be rhythmverse or encore");
+                        return;
+                    }
+
+                    string? librarySource = uploadRequest.GetField("librarySource");
+                    if (!string.IsNullOrWhiteSpace(librarySource))
+                    {
+                        try
+                        {
+                            librarySource = LibrarySourceNames.NormalizeTrustedSource(librarySource);
+                        }
+                        catch (ArgumentException)
+                        {
+                            await WriteErrorAsync(response, HttpStatusCode.BadRequest, "librarySource must be rhythmverse or encore");
+                            return;
+                        }
+                    }
+
+                    string displayName = SafePathHelper.SanitizeFileName(
+                        uploadRequest.GetField("displayName") ?? uploadRequest.FileName,
+                        "upload.bin");
+
+                    byte[] hashBytes = SHA256.HashData(uploadRequest.FileContent);
+                    string contentHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+
+                    string sourceLink = uploadRequest.GetField("sourceLink")
+                        ?? $"charthub-local://upload/{contentHash}";
+                    string sourceId = uploadRequest.GetField("sourceId")
+                        ?? $"upload:{contentHash[..16]}";
+
+                    string uploadRoot = Path.Combine(_globalSettings.StagingDir, "sync-upload");
+                    Directory.CreateDirectory(uploadRoot);
+
+                    string uploadFolder = Path.Combine(
+                        uploadRoot,
+                        $"{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}");
+                    Directory.CreateDirectory(uploadFolder);
+
+                    string uploadedPath = SafePathHelper.GetSafeFilePath(uploadFolder, displayName, "upload.bin");
+                    await File.WriteAllBytesAsync(uploadedPath, uploadRequest.FileContent, cancellationToken).ConfigureAwait(false);
+
+                    string canonicalSourceId = LibraryIdentityService.NormalizeSourceKey(source, sourceId);
+                    SongIngestionRecord ingestion = await _ingestionCatalog.GetOrCreateIngestionAsync(
+                        source,
+                        canonicalSourceId,
+                        sourceLink,
+                        uploadRequest.GetField("artist"),
+                        uploadRequest.GetField("title"),
+                        uploadRequest.GetField("charter"),
+                        cancellationToken,
+                        librarySource);
+
+                    SongIngestionAttemptRecord attempt = await _ingestionCatalog.StartAttemptAsync(ingestion.Id, cancellationToken);
+                    IngestionState responseState = ingestion.CurrentState;
+                    if (ingestion.CurrentState != IngestionState.Downloaded)
+                    {
+                        IngestionState fromState = ingestion.CurrentState;
+                        IngestionState targetIngestionState = IngestionState.Downloaded;
+                        IngestionState targetState = _ingestionStateMachine.CanTransition(fromState, targetIngestionState)
+                            ? IngestionState.Downloaded
+                            : IngestionState.Queued;
+
+                        if (targetState == IngestionState.Queued
+                            && targetIngestionState != IngestionState.Queued
+                            && _ingestionStateMachine.CanTransition(IngestionState.Queued, targetIngestionState))
+                        {
+                            await _ingestionCatalog.RecordStateTransitionAsync(
+                                ingestion.Id,
+                                attempt.Id,
+                                fromState,
+                                IngestionState.Queued,
+                                "Sync API upload reset",
+                                cancellationToken);
+
+                            fromState = IngestionState.Queued;
+                            targetState = targetIngestionState;
+                        }
+
+                        await _ingestionCatalog.RecordStateTransitionAsync(
+                            ingestion.Id,
+                            attempt.Id,
+                            fromState,
+                            targetState,
+                            "Sync API upload",
+                            cancellationToken);
+
+                        responseState = targetState;
+                    }
+
+                    await _ingestionCatalog.UpsertAssetAsync(new SongIngestionAssetEntry(
+                        IngestionId: ingestion.Id,
+                        AttemptId: attempt.Id,
+                        AssetRole: IngestionAssetRole.Downloaded,
+                        Location: uploadedPath,
+                        SizeBytes: uploadRequest.FileContent.LongLength,
+                        ContentHash: contentHash,
+                        RecordedAtUtc: DateTimeOffset.UtcNow), cancellationToken);
+
+                    await WriteJsonAsync(response, HttpStatusCode.Accepted, new
+                    {
+                        ingestionId = ingestion.Id,
+                        downloadedLocation = uploadedPath,
+                        sizeBytes = uploadRequest.FileContent.LongLength,
+                        contentHash,
+                        state = responseState.ToString(),
+                    });
+                }, request, response, cancellationToken);
                 return;
             }
 
@@ -762,6 +898,82 @@ public sealed class IngestionSyncApiHost(
             return null;
         }
 
+        byte[]? bodyBytes = await TryReadRequestBodyAsync(request, response, cancellationToken);
+        if (bodyBytes is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<T>(bodyBytes, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+            });
+        }
+        catch (JsonException)
+        {
+            await WriteErrorAsync(response, HttpStatusCode.BadRequest, "Invalid JSON body");
+            return null;
+        }
+    }
+
+    private async Task<UploadedMultipartRequest?> TryReadUploadRequestAsync(
+        HttpListenerRequest request,
+        HttpListenerResponse response,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.ContentType)
+            || !request.ContentType.StartsWith("multipart/form-data", StringComparison.OrdinalIgnoreCase))
+        {
+            await WriteErrorAsync(response, HttpStatusCode.UnsupportedMediaType, "Content-Type must be multipart/form-data");
+            return null;
+        }
+
+        if (!TryGetMultipartBoundary(request.ContentType, out string? boundary))
+        {
+            await WriteErrorAsync(response, HttpStatusCode.BadRequest, "Multipart boundary is required");
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(boundary))
+        {
+            await WriteErrorAsync(response, HttpStatusCode.BadRequest, "Multipart boundary is required");
+            return null;
+        }
+
+        byte[]? bodyBytes = await TryReadRequestBodyAsync(request, response, cancellationToken);
+        if (bodyBytes is null)
+        {
+            return null;
+        }
+
+        if (!TryParseMultipartFormData(bodyBytes, boundary, out UploadedMultipartRequest? uploadRequest))
+        {
+            await WriteErrorAsync(response, HttpStatusCode.BadRequest, "Invalid multipart request body");
+            return null;
+        }
+
+        if (uploadRequest is null || uploadRequest.FileContent.Length == 0)
+        {
+            await WriteErrorAsync(response, HttpStatusCode.BadRequest, "file is required");
+            return null;
+        }
+
+        return uploadRequest;
+    }
+
+    private async Task<byte[]?> TryReadRequestBodyAsync(
+        HttpListenerRequest request,
+        HttpListenerResponse response,
+        CancellationToken cancellationToken)
+    {
+        if (request.ContentLength64 > MaxRequestBodyBytes)
+        {
+            await WriteErrorAsync(response, HttpStatusCode.RequestEntityTooLarge, $"Request body exceeds {MaxRequestBodyBytes} bytes");
+            return null;
+        }
+
         using var readTimeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         readTimeoutCts.CancelAfter(MaxRequestBodyReadDuration);
 
@@ -792,18 +1004,204 @@ public sealed class IngestionSyncApiHost(
             return null;
         }
 
+        return bodyBuffer.ToArray();
+    }
+
+    private static bool TryGetMultipartBoundary(string contentType, out string? boundary)
+    {
+        boundary = null;
         try
         {
-            return JsonSerializer.Deserialize<T>(bodyBuffer.GetBuffer().AsSpan(0, (int)bodyBuffer.Length), new JsonSerializerOptions
+            var parsed = MediaTypeHeaderValue.Parse(contentType);
+            string? quotedBoundary = parsed.Parameters
+                .FirstOrDefault(parameter => parameter.Name?.Equals("boundary", StringComparison.OrdinalIgnoreCase) == true)
+                ?.Value;
+
+            if (string.IsNullOrWhiteSpace(quotedBoundary))
             {
-                PropertyNameCaseInsensitive = true,
-            });
+                return false;
+            }
+
+            boundary = quotedBoundary.Trim('"');
+            return !string.IsNullOrWhiteSpace(boundary);
         }
-        catch (JsonException)
+        catch
         {
-            await WriteErrorAsync(response, HttpStatusCode.BadRequest, "Invalid JSON body");
-            return null;
+            return false;
         }
+    }
+
+    private static bool TryParseMultipartFormData(byte[] bodyBytes, string boundary, out UploadedMultipartRequest? result)
+    {
+        result = null;
+        byte[] delimiter = Encoding.ASCII.GetBytes($"--{boundary}");
+        byte[] delimiterWithCrLf = Encoding.ASCII.GetBytes($"\r\n--{boundary}");
+
+        int position = 0;
+        if (!TryReadLine(bodyBytes, ref position, out byte[]? firstLine))
+        {
+            return false;
+        }
+
+        if (!firstLine.AsSpan().SequenceEqual(delimiter))
+        {
+            return false;
+        }
+
+        string? fileName = null;
+        byte[]? fileContent = null;
+        var fields = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        while (position < bodyBytes.Length)
+        {
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            while (TryReadLine(bodyBytes, ref position, out byte[]? headerLineBytes))
+            {
+                if (headerLineBytes.Length == 0)
+                {
+                    break;
+                }
+
+                string headerLine = Encoding.UTF8.GetString(headerLineBytes);
+                int separatorIndex = headerLine.IndexOf(':');
+                if (separatorIndex <= 0)
+                {
+                    return false;
+                }
+
+                string headerName = headerLine[..separatorIndex].Trim();
+                string headerValue = headerLine[(separatorIndex + 1)..].Trim();
+                headers[headerName] = headerValue;
+            }
+
+            if (!headers.TryGetValue("Content-Disposition", out string? contentDispositionHeader))
+            {
+                return false;
+            }
+
+            ContentDispositionHeaderValue disposition;
+            try
+            {
+                disposition = ContentDispositionHeaderValue.Parse(contentDispositionHeader);
+            }
+            catch
+            {
+                return false;
+            }
+
+            string? fieldName = disposition.Name?.Trim('"');
+            if (string.IsNullOrWhiteSpace(fieldName))
+            {
+                return false;
+            }
+
+            int nextBoundaryIndex = IndexOf(bodyBytes, delimiterWithCrLf, position);
+            if (nextBoundaryIndex < 0)
+            {
+                return false;
+            }
+
+            int contentLength = nextBoundaryIndex - position;
+            byte[] contentBytes = new byte[contentLength];
+            Buffer.BlockCopy(bodyBytes, position, contentBytes, 0, contentLength);
+            position = nextBoundaryIndex + delimiterWithCrLf.Length;
+
+            bool isFinalBoundary;
+            if (position + 1 < bodyBytes.Length && bodyBytes[position] == (byte)'-' && bodyBytes[position + 1] == (byte)'-')
+            {
+                isFinalBoundary = true;
+                position += 2;
+            }
+            else if (position + 1 < bodyBytes.Length && bodyBytes[position] == (byte)'\r' && bodyBytes[position + 1] == (byte)'\n')
+            {
+                isFinalBoundary = false;
+                position += 2;
+            }
+            else
+            {
+                return false;
+            }
+
+            bool isFilePart = !string.IsNullOrWhiteSpace(disposition.FileNameStar)
+                || !string.IsNullOrWhiteSpace(disposition.FileName);
+
+            if (isFilePart)
+            {
+                fileName = disposition.FileNameStar?.Trim('"') ?? disposition.FileName?.Trim('"') ?? "upload.bin";
+                fileContent = contentBytes;
+            }
+            else
+            {
+                fields[fieldName] = Encoding.UTF8.GetString(contentBytes);
+            }
+
+            if (isFinalBoundary)
+            {
+                break;
+            }
+        }
+
+        if (fileContent is null)
+        {
+            return false;
+        }
+
+        result = new UploadedMultipartRequest(fileName ?? "upload.bin", fileContent, fields);
+        return true;
+    }
+
+    private static bool TryReadLine(byte[] source, ref int position, out byte[] line)
+    {
+        line = [];
+        if (position >= source.Length)
+        {
+            return false;
+        }
+
+        int lineStart = position;
+        while (position + 1 < source.Length)
+        {
+            if (source[position] == (byte)'\r' && source[position + 1] == (byte)'\n')
+            {
+                int length = position - lineStart;
+                line = new byte[length];
+                Buffer.BlockCopy(source, lineStart, line, 0, length);
+                position += 2;
+                return true;
+            }
+
+            position++;
+        }
+
+        return false;
+    }
+
+    private static int IndexOf(byte[] haystack, byte[] needle, int startIndex)
+    {
+        if (needle.Length == 0)
+        {
+            return startIndex;
+        }
+
+        for (int i = startIndex; i <= haystack.Length - needle.Length; i++)
+        {
+            bool match = true;
+            for (int j = 0; j < needle.Length; j++)
+            {
+                if (haystack[i + j] != needle[j])
+                {
+                    match = false;
+                    break;
+                }
+            }
+
+            if (match)
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     private static async Task WriteJsonAsync(HttpListenerResponse response, HttpStatusCode statusCode, object payload)
@@ -948,17 +1346,26 @@ public sealed class IngestionSyncApiHost(
         return DefaultListenPrefix.TrimEnd('/');
     }
 
+    private void SyncPairCodeStateFromSettings()
+    {
+        string configuredPairCode = _globalSettings.SyncApiPairCode.Trim();
+        DateTimeOffset configuredIssuedAtUtc = TryParseIssuedAt(_globalSettings.SyncApiPairCodeIssuedAtUtc);
+
+        if (string.Equals(_currentPairCode, configuredPairCode, StringComparison.Ordinal)
+            && _currentPairCodeIssuedAtUtc == configuredIssuedAtUtc)
+        {
+            return;
+        }
+
+        _currentPairCode = configuredPairCode;
+        _currentPairCodeIssuedAtUtc = configuredIssuedAtUtc;
+    }
+
     private string GetCurrentPairCode()
     {
         lock (_pairCodeSync)
         {
-            if (!string.IsNullOrWhiteSpace(_currentPairCode))
-            {
-                return _currentPairCode;
-            }
-
-            _currentPairCode = _globalSettings.SyncApiPairCode.Trim();
-            _currentPairCodeIssuedAtUtc = TryParseIssuedAt(_globalSettings.SyncApiPairCodeIssuedAtUtc);
+            SyncPairCodeStateFromSettings();
             return _currentPairCode;
         }
     }
@@ -967,11 +1374,7 @@ public sealed class IngestionSyncApiHost(
     {
         lock (_pairCodeSync)
         {
-            if (string.IsNullOrWhiteSpace(_currentPairCode))
-            {
-                _currentPairCode = _globalSettings.SyncApiPairCode.Trim();
-                _currentPairCodeIssuedAtUtc = TryParseIssuedAt(_globalSettings.SyncApiPairCodeIssuedAtUtc);
-            }
+            SyncPairCodeStateFromSettings();
 
             int ttlMinutes = Math.Clamp(_globalSettings.SyncApiPairCodeTtlMinutes, 1, 1440);
             DateTimeOffset expiresAt = _currentPairCodeIssuedAtUtc.AddMinutes(ttlMinutes);
@@ -1190,5 +1593,21 @@ public sealed class IngestionSyncApiHost(
 
         [JsonPropertyName("pairedAtUtc")]
         public string PairedAtUtc { get; set; } = string.Empty;
+    }
+
+    private sealed class UploadedMultipartRequest(string fileName, byte[] fileContent, IReadOnlyDictionary<string, string> fields)
+    {
+        public string FileName { get; } = fileName;
+        public byte[] FileContent { get; } = fileContent;
+
+        public string? GetField(string name)
+        {
+            if (!fields.TryGetValue(name, out string? value) || string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return value.Trim();
+        }
     }
 }

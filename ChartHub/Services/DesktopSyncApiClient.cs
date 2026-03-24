@@ -11,6 +11,13 @@ public interface IDesktopSyncApiClient
     Task<DesktopSyncPairClaimResponse> ClaimPairTokenAsync(string baseUrl, string pairCode, string? deviceLabel = null, CancellationToken cancellationToken = default);
     Task<DesktopSyncVersionResponse> GetVersionAsync(string baseUrl, string token, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<IngestionQueueItem>> GetIngestionsAsync(string baseUrl, string token, int limit = 100, CancellationToken cancellationToken = default);
+    Task<long> UploadIngestionFileAsync(
+        string baseUrl,
+        string token,
+        string localPath,
+        string displayName,
+        LocalIngestionUploadMetadata? metadata = null,
+        CancellationToken cancellationToken = default);
     Task TriggerRetryAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default);
     Task TriggerInstallAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default);
     Task TriggerOpenFolderAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default);
@@ -18,9 +25,20 @@ public interface IDesktopSyncApiClient
 
 public sealed record DesktopSyncVersionResponse(string Api, string Version, bool SupportsIngestions, bool SupportsDesktopState);
 public sealed record DesktopSyncPairClaimResponse(bool Paired, string Token, string ApiBaseUrl);
+public sealed record LocalIngestionUploadMetadata(
+    string Source,
+    string? SourceId,
+    string? SourceLink,
+    string? Artist,
+    string? Title,
+    string? Charter,
+    string? LibrarySource);
 
 public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
 {
+    private static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan ActionRequestTimeout = TimeSpan.FromMinutes(5);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -74,6 +92,81 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
         return payload.Items?.Select(MapQueueItem).ToList() ?? [];
     }
 
+    public async Task<long> UploadIngestionFileAsync(
+        string baseUrl,
+        string token,
+        string localPath,
+        string displayName,
+        LocalIngestionUploadMetadata? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(localPath))
+        {
+            throw new InvalidOperationException("Local file path is required.");
+        }
+
+        if (!File.Exists(localPath))
+        {
+            throw new InvalidOperationException("Local file does not exist.");
+        }
+
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            throw new InvalidOperationException("Display name is required.");
+        }
+
+        await using FileStream fileStream = File.OpenRead(localPath);
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, "/api/ingestions/upload", token);
+        using var formData = new MultipartFormDataContent();
+
+        var fileContent = new StreamContent(fileStream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        formData.Add(fileContent, "file", displayName);
+        formData.Add(new StringContent(displayName), "displayName");
+
+        if (!string.IsNullOrWhiteSpace(metadata?.Source))
+        {
+            formData.Add(new StringContent(metadata.Source), "source");
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadata?.SourceId))
+        {
+            formData.Add(new StringContent(metadata.SourceId), "sourceId");
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadata?.SourceLink))
+        {
+            formData.Add(new StringContent(metadata.SourceLink), "sourceLink");
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadata?.Artist))
+        {
+            formData.Add(new StringContent(metadata.Artist), "artist");
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadata?.Title))
+        {
+            formData.Add(new StringContent(metadata.Title), "title");
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadata?.Charter))
+        {
+            formData.Add(new StringContent(metadata.Charter), "charter");
+        }
+
+        if (!string.IsNullOrWhiteSpace(metadata?.LibrarySource))
+        {
+            formData.Add(new StringContent(metadata.LibrarySource), "librarySource");
+        }
+
+        request.Content = formData;
+
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken, ActionRequestTimeout).ConfigureAwait(false);
+        UploadEnvelope payload = await ReadJsonAsync<UploadEnvelope>(response, cancellationToken).ConfigureAwait(false);
+
+        return payload.IngestionId;
+    }
+
     public Task TriggerRetryAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default)
     {
         return PostActionAsync(baseUrl, token, ingestionId, "retry", cancellationToken);
@@ -92,7 +185,7 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
     private static async Task PostActionAsync(string baseUrl, string token, long ingestionId, string action, CancellationToken cancellationToken)
     {
         using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, $"/api/ingestions/{ingestionId}/actions/{action}", token);
-        using HttpResponseMessage _ = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        using HttpResponseMessage _ = await SendAsync(request, cancellationToken, ActionRequestTimeout).ConfigureAwait(false);
     }
 
     private static HttpRequestMessage BuildRequest(HttpMethod method, string baseUrl, string relativePath, string token)
@@ -109,11 +202,14 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
         return request;
     }
 
-    private static async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    private static async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken,
+        TimeSpan? timeout = null)
     {
         using var httpClient = new HttpClient
         {
-            Timeout = TimeSpan.FromSeconds(10),
+            Timeout = timeout ?? DefaultRequestTimeout,
         };
 
         HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -245,6 +341,11 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
         public bool Paired { get; set; }
         public string? Token { get; set; }
         public string? ApiBaseUrl { get; set; }
+    }
+
+    private sealed class UploadEnvelope
+    {
+        public long IngestionId { get; set; }
     }
 
     private sealed class IngestionQueueItemEnvelope

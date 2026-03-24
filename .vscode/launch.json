@@ -43,6 +43,21 @@
             "request": "launch",
             "command": "dotnet build ${workspaceFolder}/ChartHub/ChartHub.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:Device=R5CY10G7DWP -p:RuntimeIdentifier=android-arm64 -p:AndroidSdkDirectory=$HOME/Android/Sdk"
         },
+            {
+                "name": "Android: Debug Phone (R5CY10G7DWP)",
+                "type": "mono",
+                "request": "attach",
+                "preLaunchTask": "run-debug-android-phone",
+                "address": "localhost",
+                "port": 10001
+            },
+            {
+                "name": "Android: Attach To Phone (R5CY10G7DWP)",
+                "type": "mono",
+                "request": "attach",
+                "address": "localhost",
+                "port": 10001
+            },
         {
             "name": "Android: Install To Tablet (8601SFCECH00000272)",
             "type": "node-terminal",

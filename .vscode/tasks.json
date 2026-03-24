@@ -125,6 +125,29 @@
             "problemMatcher": "$msCompile",
             "group": "test"
         },
+            {
+                "label": "run-debug-android-phone",
+                "command": "dotnet",
+                "type": "shell",
+                "args": [
+                    "build",
+                    "${workspaceFolder}/ChartHub/ChartHub.csproj",
+                    "-t:Run",
+                    "-c",
+                    "Debug",
+                    "-p:EnableAndroid=true",
+                    "-f",
+                    "net10.0-android",
+                    "-p:Device=R5CY10G7DWP",
+                    "-p:RuntimeIdentifier=android-arm64",
+                    "-p:AndroidAttachDebugger=true",
+                    "-p:AndroidSdbHostPort=10001",
+                    "-p:AndroidSdbTargetPort=10001",
+                    "-p:AndroidSdkDirectory=${env:HOME}/Android/Sdk"
+                ],
+                "problemMatcher": "$msCompile",
+                "group": "test"
+            },
         {
             "label": "android-logcat-crash",
             "command": "bash",

@@ -5,7 +5,6 @@ namespace ChartHub.Services.Transfers;
 public enum TransferDestinationKind
 {
     LocalStorage,
-    GoogleDrive,
 }
 
 public enum TransferStage
@@ -13,7 +12,6 @@ public enum TransferStage
     Queued,
     ResolvingSource,
     Cancelling,
-    CopyingInGoogleDrive,
     DownloadingFolder,
     ZippingFolder,
     Downloading,

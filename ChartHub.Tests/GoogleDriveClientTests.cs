@@ -65,6 +65,30 @@ public sealed class GoogleDriveClientTests
         Assert.NotSame(firstService, secondService);
     }
 
+    [Fact]
+    public void GetUniqueFilePath_WhenSanitizedNameCollides_AppendsNumericSuffix()
+    {
+        using var temp = new TestInfrastructure.TemporaryDirectoryFixture("drive-helper-collision");
+        string existingPath = Path.Combine(temp.RootPath, "setlist_.zip");
+        File.WriteAllText(existingPath, "existing");
+
+        string resolved = GoogleDriveFolderDownloadHelper.GetUniqueFilePath(temp.RootPath, "setlist_.zip");
+
+        Assert.Equal(Path.Combine(temp.RootPath, "setlist_ (2).zip"), resolved);
+    }
+
+    [Fact]
+    public void TryGetExportDescriptor_ForGoogleDocument_ReturnsPdfDescriptor()
+    {
+        bool resolved = GoogleDriveFolderDownloadHelper.TryGetExportDescriptor(
+            "application/vnd.google-apps.document",
+            out GoogleDriveExportDescriptor descriptor);
+
+        Assert.True(resolved);
+        Assert.Equal("application/pdf", descriptor.ExportMimeType);
+        Assert.Equal(".pdf", descriptor.FileExtension);
+    }
+
     private sealed class CountingGoogleAuthProvider(bool returnSilentCredential) : IGoogleAuthProvider
     {
         private readonly UserCredential _credential = CreateCredential();

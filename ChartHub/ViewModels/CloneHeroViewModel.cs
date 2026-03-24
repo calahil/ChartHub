@@ -14,7 +14,9 @@ namespace ChartHub.ViewModels;
 public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly LibraryCatalogService _libraryCatalog;
+    private readonly SongIngestionCatalogService _ingestionCatalog;
     private readonly IDesktopPathOpener _desktopPathOpener;
+    private readonly ILocalFileDeletionService _localFileDeletionService;
     private readonly ICloneHeroLibraryReconciliationService? _reconciliationService;
 
     private bool _hasInitialized;
@@ -107,6 +109,7 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             _openSongIniCommand.NotifyCanExecuteChanged();
             _reParseMetadataCommand?.NotifyCanExecuteChanged();
             _reconcileThisSongCommand?.NotifyCanExecuteChanged();
+            _deleteSongCommand?.NotifyCanExecuteChanged();
         }
     }
 
@@ -128,6 +131,7 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             _reconcileLibraryCommand.NotifyCanExecuteChanged();
             _reParseMetadataCommand?.NotifyCanExecuteChanged();
             _reconcileThisSongCommand?.NotifyCanExecuteChanged();
+            _deleteSongCommand?.NotifyCanExecuteChanged();
         }
     }
 
@@ -169,13 +173,20 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
     private readonly AsyncRelayCommand _reconcileThisSongCommand;
     public IAsyncRelayCommand ReconcileThisSongCommand => _reconcileThisSongCommand;
 
+    private readonly AsyncRelayCommand _deleteSongCommand;
+    public IAsyncRelayCommand DeleteSongCommand => _deleteSongCommand;
+
     public CloneHeroViewModel(
         LibraryCatalogService libraryCatalog,
+        SongIngestionCatalogService ingestionCatalog,
         IDesktopPathOpener desktopPathOpener,
+        ILocalFileDeletionService localFileDeletionService,
         ICloneHeroLibraryReconciliationService? reconciliationService = null)
     {
         _libraryCatalog = libraryCatalog;
+        _ingestionCatalog = ingestionCatalog;
         _desktopPathOpener = desktopPathOpener;
+        _localFileDeletionService = localFileDeletionService;
         _reconciliationService = reconciliationService;
         PageStrings = new CloneHeroPageStrings();
 
@@ -185,6 +196,7 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
         _reconcileLibraryCommand = new AsyncRelayCommand(ReconcileLibraryAsync, () => !IsReconciling);
         _reParseMetadataCommand = new AsyncRelayCommand(ReParseSelectedSongMetadataAsync, () => SelectedSong is not null && !IsReconciling);
         _reconcileThisSongCommand = new AsyncRelayCommand(ReconcileSelectedSongAsync, () => SelectedSong is not null && !IsReconciling);
+        _deleteSongCommand = new AsyncRelayCommand(DeleteSelectedSongAsync, () => SelectedSong is not null && !IsReconciling);
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
@@ -366,6 +378,48 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
         {
             ReconciliationStatusMessage = $"Failed to reconcile song: {ex.Message}";
             Logger.LogError("CloneHero", "Reconcile this song failed", ex);
+        }
+        finally
+        {
+            IsReconciling = false;
+        }
+    }
+
+    private async Task DeleteSelectedSongAsync()
+    {
+        if (SelectedSong is null)
+        {
+            return;
+        }
+
+        CloneHeroLibrarySongItem selected = SelectedSong;
+        IsReconciling = true;
+        ReconciliationStatusMessage = "Deleting selected song...";
+
+        try
+        {
+            await _localFileDeletionService.DeletePathIfExistsAsync(selected.LocalPath, CancellationToken.None);
+            await _libraryCatalog.RemoveAsync(selected.Source, selected.SourceId, CancellationToken.None);
+
+            SongIngestionRecord? linkedIngestion = await _ingestionCatalog
+                .GetLatestIngestionBySourceKeyAsync(selected.Source, selected.SourceId, CancellationToken.None);
+            if (linkedIngestion is not null)
+            {
+                await _ingestionCatalog.RemoveIngestionAsync(linkedIngestion.Id, CancellationToken.None);
+            }
+
+            ReconciliationStatusMessage = "Selected song deleted from disk and catalog.";
+            await RefreshArtistsAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            ReconciliationStatusMessage = $"Failed to delete song: {ex.Message}";
+            Logger.LogError("CloneHero", "Delete selected song failed", ex, new Dictionary<string, object?>
+            {
+                ["source"] = selected.Source,
+                ["sourceId"] = selected.SourceId,
+                ["localPath"] = selected.LocalPath,
+            });
         }
         finally
         {

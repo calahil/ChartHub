@@ -373,6 +373,125 @@ public class SyncViewModelTests
     }
 
     [Fact]
+    public async Task InstallSelectedCommand_DoesNotExecute_WhenItemIsNotInstallable()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-install-non-installable");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        IngestionQueueItem queueItem = CreateQueueItem(IngestionState.Queued);
+
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([queueItem]),
+        };
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
+        await sut.TestConnectionCommand.ExecuteAsync(null);
+
+        Assert.False(sut.InstallSelectedCommand.CanExecute(queueItem));
+    }
+
+    [Fact]
+    public async Task InstallSelectedCommand_IsEnabled_WhenItemIsInstallable()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-install-installable");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        IngestionQueueItem queueItem = CreateQueueItem(IngestionState.Downloaded);
+
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([queueItem]),
+        };
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
+        await sut.TestConnectionCommand.ExecuteAsync(null);
+
+        Assert.True(sut.InstallSelectedCommand.CanExecute(queueItem));
+    }
+
+    [Fact]
+    public async Task InstallSelectedCommand_WhenCanceled_KeepsCompanionConnected()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-install-canceled");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        IngestionQueueItem queueItem = CreateQueueItem(IngestionState.Downloaded);
+
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([queueItem]),
+            TriggerInstallHandler = (_, _, _, _) => throw new OperationCanceledException("Canceled"),
+        };
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
+        await sut.TestConnectionCommand.ExecuteAsync(null);
+        await sut.InstallSelectedCommand.ExecuteAsync(queueItem);
+
+        Assert.True(sut.IsConnected);
+        Assert.True(sut.HasQueueItems);
+        Assert.NotNull(queueItem.LastActionResult);
+        Assert.Equal(ActionResultStatus.Failed, queueItem.LastActionResult.Status);
+        Assert.Equal("Install request failed.", sut.StatusMessage);
+        Assert.Equal("Canceled", sut.ErrorMessage);
+    }
+
+    [Fact]
+    public void QueueActionCommands_AreDisabled_WhenDisconnected()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-action-disconnected");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        IngestionQueueItem queueItem = CreateQueueItem();
+        var client = new StubDesktopSyncApiClient();
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+
+        Assert.False(sut.RetrySelectedCommand.CanExecute(queueItem));
+        Assert.False(sut.InstallSelectedCommand.CanExecute(queueItem));
+        Assert.False(sut.PushSelectedCommand.CanExecute(queueItem));
+        Assert.False(sut.OpenFolderSelectedCommand.CanExecute(queueItem));
+    }
+
+    [Fact]
+    public async Task RefreshDesktopQrCommand_RegeneratesPairCode_AndExportsImagePath()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-refresh-qr");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        StubDesktopQrImageExportService qrExportService = new();
+
+        using var sut = new SyncViewModel(
+            new StubDesktopSyncApiClient(),
+            settings,
+            isCompanionMode: false,
+            desktopSyncQrImageExportService: qrExportService);
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
+        string originalPairCode = sut.PairCode;
+        string originalPayload = sut.GeneratedBootstrapPayload;
+
+        sut.RefreshDesktopQrCommand.Execute(null);
+
+        bool persisted = await WaitForConditionAsync(
+            () => settings.SyncApiPairCode == sut.PairCode,
+            TimeSpan.FromSeconds(2));
+
+        Assert.True(persisted);
+        Assert.NotEqual(originalPairCode, sut.PairCode);
+        Assert.NotEqual(originalPayload, sut.GeneratedBootstrapPayload);
+        Assert.Equal(qrExportService.ExportPath, sut.BootstrapQrImageExportPath);
+        Assert.True(qrExportService.ExportCalls >= 2);
+    }
+
+    [Fact]
     public async Task OpenFolderSelectedCommand_SetsSuccessResultOnCompletion()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-openfolder-result");
@@ -396,6 +515,174 @@ public class SyncViewModelTests
         Assert.NotNull(queueItem.LastActionResult);
         Assert.Equal(ActionType.OpenFolder, queueItem.LastActionResult.ActionType);
         Assert.Equal(ActionResultStatus.Success, queueItem.LastActionResult.Status);
+    }
+
+    [Fact]
+    public async Task PushSelectedCommand_SetsSuccessResultOnCompletion()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-push-result");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        string localPath = Path.Combine(temp.RootPath, "Downloads", "song.zip");
+        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+        await File.WriteAllTextAsync(localPath, "zip-data");
+
+        IngestionQueueItem queueItem = new()
+        {
+            IngestionId = 42,
+            Source = "googledrive",
+            SourceLink = "https://drive.google.com/file/d/abc/view",
+            DisplayName = "Song",
+            CurrentState = IngestionState.Downloaded,
+            DesktopState = DesktopState.Cloud,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+            DownloadedLocation = localPath,
+        };
+
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([queueItem]),
+        };
+        var pushService = new StubLocalIngestionPushService
+        {
+            PushHandler = (_, _, _, _) => Task.FromResult(777L),
+        };
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true, localIngestionPushService: pushService);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
+        await sut.TestConnectionCommand.ExecuteAsync(null);
+        await sut.PushSelectedCommand.ExecuteAsync(queueItem);
+
+        Assert.NotNull(queueItem.LastActionResult);
+        Assert.Equal(ActionType.Push, queueItem.LastActionResult.ActionType);
+        Assert.Equal(ActionResultStatus.Success, queueItem.LastActionResult.Status);
+        Assert.Contains("777", queueItem.LastActionResult.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PushSelectedCommand_SetsFailedResultOnException()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-push-failure");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        string localPath = Path.Combine(temp.RootPath, "Downloads", "song.zip");
+        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+        await File.WriteAllTextAsync(localPath, "zip-data");
+
+        IngestionQueueItem queueItem = new()
+        {
+            IngestionId = 42,
+            Source = "googledrive",
+            SourceLink = "https://drive.google.com/file/d/abc/view",
+            DisplayName = "Song",
+            CurrentState = IngestionState.Downloaded,
+            DesktopState = DesktopState.Cloud,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+            DownloadedLocation = localPath,
+        };
+
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([queueItem]),
+        };
+        var pushService = new StubLocalIngestionPushService
+        {
+            PushHandler = (_, _, _, _) => throw new InvalidOperationException("push failed"),
+        };
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true, localIngestionPushService: pushService);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
+        await sut.TestConnectionCommand.ExecuteAsync(null);
+        await sut.PushSelectedCommand.ExecuteAsync(queueItem);
+
+        Assert.NotNull(queueItem.LastActionResult);
+        Assert.Equal(ActionType.Push, queueItem.LastActionResult.ActionType);
+        Assert.Equal(ActionResultStatus.Failed, queueItem.LastActionResult.Status);
+        Assert.Contains("push failed", queueItem.LastActionResult.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TestConnectionCommand_LoadsLocalFilesFromCatalog()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-local-files-load");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        WatcherFile localFile = CreateLocalWatcherFile("song-local.zip", Path.Combine(temp.RootPath, "Downloads", "song-local.zip"));
+
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]),
+        };
+        var catalog = new StubLocalDownloadFileCatalogService
+        {
+            GetFilesHandler = (_, _) => Task.FromResult<IReadOnlyList<WatcherFile>>([localFile]),
+        };
+
+        using var sut = new SyncViewModel(
+            client,
+            settings,
+            isCompanionMode: true,
+            localDownloadFileCatalogService: catalog);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
+        await sut.TestConnectionCommand.ExecuteAsync(null);
+
+        Assert.True(sut.HasLocalFiles);
+        Assert.Single(sut.LocalFiles);
+        Assert.Equal("song-local.zip", sut.LocalFiles[0].DisplayName);
+    }
+
+    [Fact]
+    public async Task PushSelectedLocalFilesCommand_PushesCheckedFiles_AndRefreshesQueue()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-push-local-files");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        string localPath = Path.Combine(temp.RootPath, "Downloads", "song-local.zip");
+        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+        await File.WriteAllTextAsync(localPath, "zip-data");
+
+        WatcherFile localFile = CreateLocalWatcherFile("song-local.zip", localPath);
+        localFile.Checked = true;
+
+        int pushCalls = 0;
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]),
+        };
+        var catalog = new StubLocalDownloadFileCatalogService
+        {
+            GetFilesHandler = (_, _) => Task.FromResult<IReadOnlyList<WatcherFile>>([localFile]),
+        };
+        var pushService = new StubLocalIngestionPushService
+        {
+            PushHandler = (_, _, _, _) =>
+            {
+                pushCalls++;
+                return Task.FromResult(500L);
+            },
+        };
+
+        using var sut = new SyncViewModel(
+            client,
+            settings,
+            isCompanionMode: true,
+            localIngestionPushService: pushService,
+            localDownloadFileCatalogService: catalog);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
+        await sut.TestConnectionCommand.ExecuteAsync(null);
+        sut.LocalFiles[0].Checked = true;
+        await sut.PushSelectedLocalFilesCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, pushCalls);
+        Assert.False(sut.HasSelectedLocalFiles);
     }
 
     [Fact]
@@ -777,7 +1064,7 @@ public class SyncViewModelTests
         return predicate();
     }
 
-    private static IngestionQueueItem CreateQueueItem()
+    private static IngestionQueueItem CreateQueueItem(IngestionState state = IngestionState.Downloaded)
     {
         return new IngestionQueueItem
         {
@@ -785,10 +1072,15 @@ public class SyncViewModelTests
             Source = "googledrive",
             SourceLink = "https://drive.google.com/file/d/abc/view",
             DisplayName = "Song",
-            CurrentState = IngestionState.Downloaded,
+            CurrentState = state,
             DesktopState = DesktopState.Cloud,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         };
+    }
+
+    private static WatcherFile CreateLocalWatcherFile(string displayName, string filePath)
+    {
+        return new WatcherFile(displayName, filePath, WatcherFileType.Zip, "avares://ChartHub/Resources/Images/zip.png", 12);
     }
 
     private static AppGlobalSettings CreateSettings(
@@ -903,6 +1195,7 @@ public class SyncViewModelTests
         public Func<string, string, string?, CancellationToken, Task<DesktopSyncPairClaimResponse>>? ClaimPairTokenHandler { get; init; }
         public Func<string, string, CancellationToken, Task<DesktopSyncVersionResponse>>? GetVersionHandler { get; init; }
         public Func<string, string, int, CancellationToken, Task<IReadOnlyList<IngestionQueueItem>>>? GetIngestionsHandler { get; init; }
+        public Func<string, string, string, string, LocalIngestionUploadMetadata?, CancellationToken, Task<long>>? UploadIngestionFileHandler { get; init; }
         public Func<string, string, long, CancellationToken, Task>? TriggerRetryHandler { get; init; }
         public Func<string, string, long, CancellationToken, Task>? TriggerInstallHandler { get; init; }
         public Func<string, string, long, CancellationToken, Task>? TriggerOpenFolderHandler { get; init; }
@@ -919,6 +1212,16 @@ public class SyncViewModelTests
             => GetIngestionsHandler?.Invoke(baseUrl, token, limit, cancellationToken)
                 ?? Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]);
 
+        public Task<long> UploadIngestionFileAsync(
+            string baseUrl,
+            string token,
+            string localPath,
+            string displayName,
+            LocalIngestionUploadMetadata? metadata = null,
+            CancellationToken cancellationToken = default)
+            => UploadIngestionFileHandler?.Invoke(baseUrl, token, localPath, displayName, metadata, cancellationToken)
+                ?? Task.FromResult(1L);
+
         public Task TriggerRetryAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default)
             => TriggerRetryHandler?.Invoke(baseUrl, token, ingestionId, cancellationToken)
                 ?? Task.CompletedTask;
@@ -930,6 +1233,37 @@ public class SyncViewModelTests
         public Task TriggerOpenFolderAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default)
             => TriggerOpenFolderHandler?.Invoke(baseUrl, token, ingestionId, cancellationToken)
                 ?? Task.CompletedTask;
+    }
+
+    private sealed class StubLocalIngestionPushService : ILocalIngestionPushService
+    {
+        public Func<string, string, LocalIngestionEntry, CancellationToken, Task<long>>? PushHandler { get; init; }
+
+        public Task<long> PushAsync(string baseUrl, string token, LocalIngestionEntry entry, CancellationToken cancellationToken = default)
+            => PushHandler?.Invoke(baseUrl, token, entry, cancellationToken)
+                ?? Task.FromResult(1L);
+    }
+
+    private sealed class StubLocalDownloadFileCatalogService : ILocalDownloadFileCatalogService
+    {
+        public Func<string, CancellationToken, Task<IReadOnlyList<WatcherFile>>>? GetFilesHandler { get; init; }
+
+        public Task<IReadOnlyList<WatcherFile>> GetFilesAsync(string rootDirectory, CancellationToken cancellationToken = default)
+            => GetFilesHandler?.Invoke(rootDirectory, cancellationToken)
+                ?? Task.FromResult<IReadOnlyList<WatcherFile>>([]);
+    }
+
+    private sealed class StubDesktopQrImageExportService : IDesktopSyncQrImageExportService
+    {
+        public int ExportCalls { get; private set; }
+
+        public string ExportPath { get; } = "/tmp/chart-hub-desktop-sync-qr.png";
+
+        public string ExportDesktopQrImage(byte[] pngBytes)
+        {
+            ExportCalls++;
+            return ExportPath;
+        }
     }
 
     private sealed class StubQrCodeScannerService : IQrCodeScannerService

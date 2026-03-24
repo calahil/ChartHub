@@ -76,6 +76,8 @@
                             <Separator />
                             <MenuItem Header="Re-parse Metadata" Command="{Binding ReParseMetadataCommand}" />
                             <MenuItem Header="Reconcile This Song" Command="{Binding ReconcileThisSongCommand}" />
+                            <Separator />
+                            <MenuItem Header="Delete Song (File + DB)" Command="{Binding DeleteSongCommand}" />
                         </ContextMenu>
                     </DataGrid.ContextMenu>
                 </DataGrid>

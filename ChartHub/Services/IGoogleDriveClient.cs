@@ -17,25 +17,16 @@ namespace ChartHub.Services;
 
 public interface IGoogleDriveClient
 {
-    Task<string> CreateDirectoryAsync(string directoryName);
-    Task<string> GetDirectoryIdAsync(string directoryName);
-    Task<string> UploadFileAsync(string directoryId, string filePath, string? desiredFileName = null);
-    Task<string> CopyFileIntoFolderAsync(string sourceFileId, string destinationFolderId, string desiredFileName);
+    Task InitializeAsync(CancellationToken cancellationToken = default);
+    Task<bool> TryInitializeSilentAsync(CancellationToken cancellationToken = default);
+    Task SignOutAsync(CancellationToken cancellationToken = default);
+
     Task DownloadFolderAsZipAsync(
         string folderId,
         string zipFilePath,
         IProgress<TransferProgressUpdate>? stageProgress = null,
         CancellationToken cancellationToken = default);
     Task DownloadFileAsync(string fileId, string saveToPath);
-    Task DeleteFileAsync(string fileId);
-    Task<IList<Google.Apis.Drive.v3.Data.File>> ListFilesAsync(string directoryId);
-    Task MonitorDirectoryAsync(string directoryId, TimeSpan pollingInterval, Action<Google.Apis.Drive.v3.Data.File, string> onFileChanged, CancellationToken cancellationToken = default);
-    public string ChartHubFolderId { get; }
-
-    Task<bool> TryInitializeSilentAsync(CancellationToken cancellationToken = default);
-    Task InitializeAsync(CancellationToken cancellationToken = default);
-    Task SignOutAsync(CancellationToken cancellationToken = default);
-    Task<ObservableCollection<WatcherFile>> GetFileDataCollectionAsync(string directoryId);
 }
 
 public class GoogleDriveClient : IGoogleDriveClient, IAsyncDisposable
@@ -401,8 +392,7 @@ public class GoogleDriveClient : IGoogleDriveClient, IAsyncDisposable
                 folderName = folderId;
             }
 
-            string safeFolderName = MakeSafePathName(folderName);
-            string stagedRoot = Path.Combine(tempRoot, safeFolderName);
+            string stagedRoot = GoogleDriveFolderDownloadHelper.GetUniqueDirectoryPath(tempRoot, folderName);
             Directory.CreateDirectory(stagedRoot);
 
             stageProgress?.Report(new TransferProgressUpdate(TransferStage.DownloadingFolder, 35));
@@ -431,19 +421,46 @@ public class GoogleDriveClient : IGoogleDriveClient, IAsyncDisposable
         Google.Apis.Drive.v3.Data.FileList result = await request.ExecuteAsync(cancellationToken);
         foreach (Google.Apis.Drive.v3.Data.File? file in result.Files)
         {
-            string safeName = MakeSafePathName(file.Name);
             if (file.MimeType == "application/vnd.google-apps.folder")
             {
-                string childPath = Path.Combine(destinationFolder, safeName);
+                string childPath = GoogleDriveFolderDownloadHelper.GetUniqueDirectoryPath(destinationFolder, file.Name);
                 Directory.CreateDirectory(childPath);
                 await DownloadFilesInFolderRecursiveAsync(file.Id, childPath, cancellationToken);
                 continue;
             }
 
-            string filePath = Path.Combine(destinationFolder, safeName);
-            using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
-            await _driveService.Files.Get(file.Id).DownloadAsync(fileStream, cancellationToken);
+            await DownloadDriveFileAsync(file, destinationFolder, cancellationToken);
         }
+    }
+
+    private async Task DownloadDriveFileAsync(
+        Google.Apis.Drive.v3.Data.File file,
+        string destinationFolder,
+        CancellationToken cancellationToken)
+    {
+        if (GoogleDriveFolderDownloadHelper.TryGetExportDescriptor(file.MimeType, out GoogleDriveExportDescriptor exportDescriptor))
+        {
+            string exportPath = GoogleDriveFolderDownloadHelper.GetUniqueFilePath(destinationFolder, file.Name, exportDescriptor.FileExtension);
+            using var exportStream = new FileStream(exportPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            await _driveService!.Files.Export(file.Id, exportDescriptor.ExportMimeType)
+                .DownloadAsync(exportStream, cancellationToken);
+            return;
+        }
+
+        if (GoogleDriveFolderDownloadHelper.IsGoogleWorkspaceMimeType(file.MimeType))
+        {
+            Logger.LogWarning("Drive", "Skipping unsupported Google Workspace file during folder download", new Dictionary<string, object?>
+            {
+                ["driveFileId"] = file.Id,
+                ["fileName"] = file.Name,
+                ["mimeType"] = file.MimeType,
+            });
+            return;
+        }
+
+        string filePath = GoogleDriveFolderDownloadHelper.GetUniqueFilePath(destinationFolder, file.Name);
+        using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None);
+        await _driveService!.Files.Get(file.Id).DownloadAsync(fileStream, cancellationToken);
     }
 
     private async Task<string> GetDriveItemNameAsync(string itemId, CancellationToken cancellationToken)
@@ -453,21 +470,6 @@ public class GoogleDriveClient : IGoogleDriveClient, IAsyncDisposable
         request.Fields = "name";
         Google.Apis.Drive.v3.Data.File item = await request.ExecuteAsync(cancellationToken);
         return item.Name ?? string.Empty;
-    }
-
-    private static string MakeSafePathName(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return "untitled";
-        }
-
-        foreach (char ch in Path.GetInvalidFileNameChars())
-        {
-            name = name.Replace(ch, '_');
-        }
-
-        return name;
     }
 
     private static void CreateZip(string sourceFolderPath, string destinationZipFilePath)
@@ -611,5 +613,77 @@ public class GoogleDriveClient : IGoogleDriveClient, IAsyncDisposable
             _serviceInitLock.Release();
             _serviceInitLock.Dispose();
         }
+    }
+}
+
+internal readonly record struct GoogleDriveExportDescriptor(string ExportMimeType, string FileExtension);
+
+internal static class GoogleDriveFolderDownloadHelper
+{
+    private static readonly Dictionary<string, GoogleDriveExportDescriptor> GoogleWorkspaceExportDescriptors = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["application/vnd.google-apps.document"] = new("application/pdf", ".pdf"),
+        ["application/vnd.google-apps.spreadsheet"] = new("application/pdf", ".pdf"),
+        ["application/vnd.google-apps.presentation"] = new("application/pdf", ".pdf"),
+        ["application/vnd.google-apps.drawing"] = new("image/png", ".png"),
+    };
+
+    public static bool IsGoogleWorkspaceMimeType(string? mimeType)
+    {
+        return !string.IsNullOrWhiteSpace(mimeType)
+            && mimeType.StartsWith("application/vnd.google-apps.", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(mimeType, "application/vnd.google-apps.folder", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool TryGetExportDescriptor(string? mimeType, out GoogleDriveExportDescriptor descriptor)
+    {
+        if (!string.IsNullOrWhiteSpace(mimeType)
+            && GoogleWorkspaceExportDescriptors.TryGetValue(mimeType, out descriptor))
+        {
+            return true;
+        }
+
+        descriptor = default;
+        return false;
+    }
+
+    public static string GetUniqueDirectoryPath(string parentDirectory, string? directoryName)
+    {
+        string safeName = SafePathHelper.SanitizePathSegment(directoryName, "untitled");
+        return GetUniqueChildPath(parentDirectory, safeName);
+    }
+
+    public static string GetUniqueFilePath(string parentDirectory, string? fileName, string? requiredExtension = null)
+    {
+        string safeName = SafePathHelper.SanitizeFileName(fileName, "untitled");
+        if (!string.IsNullOrWhiteSpace(requiredExtension)
+            && !safeName.EndsWith(requiredExtension, StringComparison.OrdinalIgnoreCase))
+        {
+            safeName += requiredExtension;
+        }
+
+        return GetUniqueChildPath(parentDirectory, safeName);
+    }
+
+    private static string GetUniqueChildPath(string parentDirectory, string safeName)
+    {
+        string candidatePath = Path.Combine(parentDirectory, safeName);
+        if (!File.Exists(candidatePath) && !Directory.Exists(candidatePath))
+        {
+            return candidatePath;
+        }
+
+        string baseName = Path.GetFileNameWithoutExtension(safeName);
+        string extension = Path.GetExtension(safeName);
+        int suffix = 2;
+
+        do
+        {
+            candidatePath = Path.Combine(parentDirectory, $"{baseName} ({suffix}){extension}");
+            suffix++;
+        }
+        while (File.Exists(candidatePath) || Directory.Exists(candidatePath));
+
+        return candidatePath;
     }
 }

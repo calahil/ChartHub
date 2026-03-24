@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
 
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Migration;
@@ -8,8 +7,6 @@ using ChartHub.Configuration.Stores;
 using ChartHub.Services;
 using ChartHub.Services.Transfers;
 using ChartHub.ViewModels;
-
-using Google.Apis.Drive.v3;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -145,8 +142,6 @@ public static class AppBootstrapper
             }
         }
 
-        SyncGoogleDriveConfig(sourceFilePath, destinationFilePath);
-
         services.AddSingleton<AppGlobalSettings>();
 
         if (OperatingSystem.IsAndroid())
@@ -180,13 +175,26 @@ public static class AppBootstrapper
         services.AddSingleton<IDesktopPathOpener, DesktopPathOpener>();
         services.AddSingleton<ITransferSourceResolver, TransferSourceResolver>();
         services.AddSingleton<ILocalDestinationWriter, LocalDestinationWriter>();
-        services.AddSingleton<IGoogleDriveDestinationWriter, GoogleDriveDestinationWriter>();
         services.AddSingleton<ITransferOrchestrator, TransferOrchestrator>();
         services.AddSingleton<IIngestionSyncApiHost, IngestionSyncApiHost>();
         services.AddSingleton<IDesktopSyncApiClient, DesktopSyncApiClient>();
+        services.AddSingleton<ILocalFileDeletionService, LocalFileDeletionService>();
+        services.AddSingleton<IDesktopSyncQrImageExportService, DesktopSyncQrImageExportService>();
+        services.AddSingleton<ILocalIngestionPushService, LocalIngestionPushService>();
+        services.AddSingleton<ILocalDownloadFileCatalogService, LocalDownloadFileCatalogService>();
         services.AddSingleton<DownloadViewModel>();
         services.AddSingleton<CloneHeroViewModel>();
-        services.AddSingleton<SyncViewModel>();
+        services.AddSingleton<SyncViewModel>(serviceProvider =>
+            new SyncViewModel(
+                serviceProvider.GetRequiredService<IDesktopSyncApiClient>(),
+                serviceProvider.GetRequiredService<AppGlobalSettings>(),
+                serviceProvider.GetRequiredService<IQrCodeScannerService>(),
+                autoRefreshInterval: null,
+                isCompanionMode: null,
+                localIngestionPushService: serviceProvider.GetRequiredService<ILocalIngestionPushService>(),
+                localDownloadFileCatalogService: serviceProvider.GetRequiredService<ILocalDownloadFileCatalogService>(),
+                desktopSyncQrImageExportService: serviceProvider.GetRequiredService<IDesktopSyncQrImageExportService>(),
+                ingestionSyncApiHost: serviceProvider.GetRequiredService<IIngestionSyncApiHost>()));
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<RhythmVerseViewModel>();
         services.AddSingleton<EncoreViewModel>();
@@ -201,55 +209,6 @@ public static class AppBootstrapper
                 serviceProvider.GetRequiredService<SettingsViewModel>()
             )
         );
-        services.AddSingleton<DriveService>();
         services.AddSingleton<Initializer>();
-    }
-
-    private static void SyncGoogleDriveConfig(string sourceFilePath, string destinationFilePath)
-    {
-        if (!File.Exists(destinationFilePath))
-        {
-            return;
-        }
-
-        JsonObject destinationRoot;
-        try
-        {
-            destinationRoot = JsonNode.Parse(File.ReadAllText(destinationFilePath)) as JsonObject ?? [];
-        }
-        catch
-        {
-            destinationRoot = [];
-        }
-
-        JsonObject sourceRoot = [];
-        if (File.Exists(sourceFilePath))
-        {
-            try
-            {
-                sourceRoot = JsonNode.Parse(File.ReadAllText(sourceFilePath)) as JsonObject ?? [];
-            }
-            catch
-            {
-                sourceRoot = [];
-            }
-        }
-
-        JsonObject destinationGoogle = destinationRoot["GoogleDrive"] as JsonObject ?? [];
-        var sourceGoogle = sourceRoot["GoogleDrive"] as JsonObject;
-
-        if (sourceGoogle is not null)
-        {
-            foreach (KeyValuePair<string, JsonNode?> key in sourceGoogle)
-            {
-                if (!destinationGoogle.ContainsKey(key.Key) && key.Value is not null)
-                {
-                    destinationGoogle[key.Key] = key.Value.DeepClone();
-                }
-            }
-        }
-
-        destinationRoot["GoogleDrive"] = destinationGoogle;
-        File.WriteAllText(destinationFilePath, destinationRoot.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
     }
 }

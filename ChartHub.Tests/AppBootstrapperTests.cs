@@ -27,6 +27,8 @@ public class AppBootstrapperTests
         Assert.NotNull(provider.GetService<AppGlobalSettings>());
         Assert.NotNull(provider.GetService<ITransferOrchestrator>());
         Assert.NotNull(provider.GetService<IGoogleDriveClient>());
+        Assert.NotNull(provider.GetService<ILocalIngestionPushService>());
+        Assert.NotNull(provider.GetService<ILocalDownloadFileCatalogService>());
     }
 
     [Fact]

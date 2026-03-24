@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Threading;
 
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 
 using ChartHub.Models;
 using ChartHub.Services;
@@ -31,7 +32,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private const string DefaultHostListenPrefix = "http://0.0.0.0:15123/";
 
     private readonly IDesktopSyncApiClient _desktopSyncApiClient;
+    private readonly IIngestionSyncApiHost? _ingestionSyncApiHost;
+    private readonly ILocalIngestionPushService _localIngestionPushService;
+    private readonly ILocalDownloadFileCatalogService _localDownloadFileCatalogService;
     private readonly IQrCodeScannerService _qrCodeScannerService;
+    private readonly IDesktopSyncQrImageExportService _desktopSyncQrImageExportService;
     private readonly AppGlobalSettings _appGlobalSettings;
     private readonly TimeSpan _autoRefreshInterval;
     private readonly bool _isCompanionMode;
@@ -48,6 +53,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private string _generatedBootstrapPayload = string.Empty;
     private PendingQrPairingRequest? _pendingQrPairing;
     private Bitmap? _bootstrapQrImage;
+    private string? _bootstrapQrImageExportPath;
     private CancellationTokenSource? _autoRefreshCancellationTokenSource;
     private DateTimeOffset? _lastAutoRefreshUtc;
     private ConnectionDiagnostics _diagnostics = new();
@@ -183,9 +189,13 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             ConfirmQrPairingCommand.NotifyCanExecuteChanged();
             CancelPendingQrPairingCommand.NotifyCanExecuteChanged();
             ScanBootstrapQrCommand.NotifyCanExecuteChanged();
+            RefreshDesktopQrCommand.NotifyCanExecuteChanged();
             RefreshQueueCommand.NotifyCanExecuteChanged();
+            RefreshLocalFilesCommand.NotifyCanExecuteChanged();
+            PushSelectedLocalFilesCommand.NotifyCanExecuteChanged();
             RetrySelectedCommand.NotifyCanExecuteChanged();
             InstallSelectedCommand.NotifyCanExecuteChanged();
+            PushSelectedCommand.NotifyCanExecuteChanged();
             OpenFolderSelectedCommand.NotifyCanExecuteChanged();
         }
     }
@@ -208,11 +218,16 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged(nameof(ShowCompanionScanSection));
             OnPropertyChanged(nameof(ShowCompanionConfirmationSection));
             OnPropertyChanged(nameof(ShowCompanionQueueSection));
+            OnPropertyChanged(nameof(ShowCompanionLocalFilesSection));
+            OnPropertyChanged(nameof(ShowNoLocalFilesHint));
             OnPropertyChanged(nameof(AutoRefreshHint));
             OnPropertyChanged(nameof(IsAutoRefreshActive));
             RefreshQueueCommand.NotifyCanExecuteChanged();
+            RefreshLocalFilesCommand.NotifyCanExecuteChanged();
+            PushSelectedLocalFilesCommand.NotifyCanExecuteChanged();
             RetrySelectedCommand.NotifyCanExecuteChanged();
             InstallSelectedCommand.NotifyCanExecuteChanged();
+            PushSelectedCommand.NotifyCanExecuteChanged();
             OpenFolderSelectedCommand.NotifyCanExecuteChanged();
 
             if (_isConnected)
@@ -240,6 +255,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged();
             RetrySelectedCommand.NotifyCanExecuteChanged();
             InstallSelectedCommand.NotifyCanExecuteChanged();
+            PushSelectedCommand.NotifyCanExecuteChanged();
             OpenFolderSelectedCommand.NotifyCanExecuteChanged();
         }
     }
@@ -319,12 +335,32 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
+    public string? BootstrapQrImageExportPath
+    {
+        get => _bootstrapQrImageExportPath;
+        private set
+        {
+            if (_bootstrapQrImageExportPath == value)
+            {
+                return;
+            }
+
+            _bootstrapQrImageExportPath = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasBootstrapQrImageExportPath));
+        }
+    }
+
     public ObservableCollection<IngestionQueueItem> QueueItems { get; } = [];
+    public ObservableCollection<WatcherFile> LocalFiles { get; } = [];
 
     public bool IsCompanionMode => _isCompanionMode;
     public bool IsDesktopMode => !_isCompanionMode;
     public bool HasQueueItems => QueueItems.Count > 0;
+    public bool HasLocalFiles => LocalFiles.Count > 0;
+    public bool HasSelectedLocalFiles => LocalFiles.Any(file => file.Checked);
     public bool HasBootstrapQrImage => BootstrapQrImage is not null;
+    public bool HasBootstrapQrImageExportPath => !string.IsNullOrWhiteSpace(BootstrapQrImageExportPath);
     public bool SupportsCameraScanning => _qrCodeScannerService.IsSupported;
     public bool ShowEmptyQueueState => IsConnected && !IsBusy && QueueItems.Count == 0;
     public bool IsAutoRefreshActive => IsConnected && _autoRefreshCancellationTokenSource is not null;
@@ -332,6 +368,8 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     public bool ShowCompanionScanSection => IsCompanionMode && !IsConnected;
     public bool ShowCompanionConfirmationSection => IsCompanionMode && !IsConnected && HasPendingQrPairing;
     public bool ShowCompanionQueueSection => IsCompanionMode && IsConnected;
+    public bool ShowCompanionLocalFilesSection => IsCompanionMode && IsConnected;
+    public bool ShowNoLocalFilesHint => IsCompanionMode && IsConnected && !HasLocalFiles;
     public bool ShowDesktopBootstrapPlaceholder => IsDesktopMode && !HasBootstrapQrImage;
     public string SyncTitle => IsDesktopMode ? "Desktop Sync Host" : "Desktop Sync Companion";
     public string SyncSubtitle => IsDesktopMode
@@ -373,9 +411,13 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     public IAsyncRelayCommand ConfirmQrPairingCommand { get; }
     public IAsyncRelayCommand ScanBootstrapQrCommand { get; }
     public IRelayCommand CancelPendingQrPairingCommand { get; }
+    public IRelayCommand RefreshDesktopQrCommand { get; }
     public IAsyncRelayCommand RefreshQueueCommand { get; }
+    public IAsyncRelayCommand RefreshLocalFilesCommand { get; }
+    public IAsyncRelayCommand PushSelectedLocalFilesCommand { get; }
     public IAsyncRelayCommand<IngestionQueueItem?> RetrySelectedCommand { get; }
     public IAsyncRelayCommand<IngestionQueueItem?> InstallSelectedCommand { get; }
+    public IAsyncRelayCommand<IngestionQueueItem?> PushSelectedCommand { get; }
     public IAsyncRelayCommand<IngestionQueueItem?> OpenFolderSelectedCommand { get; }
 
     public SyncViewModel(
@@ -383,13 +425,21 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         AppGlobalSettings appGlobalSettings,
         IQrCodeScannerService? qrCodeScannerService = null,
         TimeSpan? autoRefreshInterval = null,
-        bool? isCompanionMode = null)
+        bool? isCompanionMode = null,
+        ILocalIngestionPushService? localIngestionPushService = null,
+        ILocalDownloadFileCatalogService? localDownloadFileCatalogService = null,
+        IDesktopSyncQrImageExportService? desktopSyncQrImageExportService = null,
+        IIngestionSyncApiHost? ingestionSyncApiHost = null)
     {
         _desktopSyncApiClient = desktopSyncApiClient;
+        _ingestionSyncApiHost = ingestionSyncApiHost;
         _qrCodeScannerService = qrCodeScannerService ?? new NoOpQrCodeScannerService();
+        _desktopSyncQrImageExportService = desktopSyncQrImageExportService ?? new DesktopSyncQrImageExportService();
         _appGlobalSettings = appGlobalSettings;
         _autoRefreshInterval = autoRefreshInterval.GetValueOrDefault(DefaultAutoRefreshInterval);
         _isCompanionMode = isCompanionMode ?? OperatingSystem.IsAndroid();
+        _localIngestionPushService = localIngestionPushService ?? new NoOpLocalIngestionPushService();
+        _localDownloadFileCatalogService = localDownloadFileCatalogService ?? new LocalDownloadFileCatalogService();
 
         _deviceLabel = _appGlobalSettings.SyncApiDeviceLabel;
         _pairCode = _appGlobalSettings.SyncApiPairCode;
@@ -401,6 +451,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
 
         QueueItems.CollectionChanged += OnQueueItemsCollectionChanged;
+        LocalFiles.CollectionChanged += OnLocalFilesCollectionChanged;
         _appGlobalSettings.PropertyChanged += OnAppGlobalSettingsPropertyChanged;
         RegenerateBootstrapQrPayload();
 
@@ -408,9 +459,13 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         ConfirmQrPairingCommand = new AsyncRelayCommand(ConfirmQrPairingAsync, CanConfirmQrPairing);
         ScanBootstrapQrCommand = new AsyncRelayCommand(ScanBootstrapQrAsync, CanScanBootstrapQr);
         CancelPendingQrPairingCommand = new RelayCommand(CancelPendingQrPairing, CanCancelPendingQrPairing);
+        RefreshDesktopQrCommand = new RelayCommand(RefreshDesktopQr, CanRefreshDesktopQr);
         RefreshQueueCommand = new AsyncRelayCommand(RefreshQueueAsync, CanRefreshQueue);
+        RefreshLocalFilesCommand = new AsyncRelayCommand(RefreshLocalFilesAsync, CanRefreshQueue);
+        PushSelectedLocalFilesCommand = new AsyncRelayCommand(PushSelectedLocalFilesAsync, CanPushSelectedLocalFiles);
         RetrySelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(RetrySelectedAsync, CanActOnSelectedItem);
-        InstallSelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(InstallSelectedAsync, CanActOnSelectedItem);
+        InstallSelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(InstallSelectedAsync, CanInstallSelectedItem);
+        PushSelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(PushSelectedAsync, CanPushSelectedItem);
         OpenFolderSelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(OpenFolderSelectedAsync, CanActOnSelectedItem);
     }
 
@@ -431,9 +486,31 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         return !IsBusy && IsConnected;
     }
 
+    private bool CanRefreshDesktopQr()
+    {
+        return IsDesktopMode && !IsBusy;
+    }
+
+    private bool CanPushSelectedLocalFiles()
+    {
+        return !IsBusy && IsConnected && HasSelectedLocalFiles;
+    }
+
+    private bool CanInstallSelectedItem(IngestionQueueItem? item)
+    {
+        return CanActOnSelectedItem(item)
+            && item?.CanInstall == true;
+    }
+
     private bool CanActOnSelectedItem(IngestionQueueItem? item)
     {
         return !IsBusy && IsConnected && item is not null;
+    }
+
+    private bool CanPushSelectedItem(IngestionQueueItem? item)
+    {
+        return CanActOnSelectedItem(item)
+            && !string.IsNullOrWhiteSpace(item?.DownloadedLocation);
     }
 
     private bool CanScanBootstrapQr()
@@ -496,6 +573,29 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         ErrorMessage = null;
     }
 
+    private void RefreshDesktopQr()
+    {
+        if (!CanRefreshDesktopQr())
+        {
+            return;
+        }
+
+        string nextCode = _ingestionSyncApiHost?.RefreshPairCode() ?? AppGlobalSettings.GenerateSyncPairCode();
+        PairCode = nextCode;
+
+        if (_ingestionSyncApiHost is null)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            _appGlobalSettings.SyncApiPairCode = nextCode;
+            _appGlobalSettings.SyncApiPairCodeIssuedAtUtc = now.ToString("O");
+        }
+
+        ErrorMessage = null;
+        StatusMessage = BootstrapQrImageExportPath is null
+            ? "Desktop QR refreshed."
+            : $"Desktop QR refreshed and exported to {BootstrapQrImageExportPath}.";
+    }
+
     private async Task TestConnectionAsync()
     {
         await RunOperationAsync(async () =>
@@ -549,11 +649,26 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         };
 
         await RefreshQueueCoreAsync();
+        await RefreshLocalFilesCoreAsync();
     }
 
     private async Task RefreshQueueAsync()
     {
         await RunOperationAsync(RefreshQueueCoreAsync, "Failed to refresh ingestion queue");
+    }
+
+    private async Task RefreshLocalFilesAsync()
+    {
+        await RefreshLocalFilesSnapshotAsync();
+    }
+
+    public async Task RefreshLocalFilesSnapshotAsync()
+    {
+        await RunOperationAsync(
+            RefreshLocalFilesCoreAsync,
+            "Failed to refresh local files",
+            disconnectOnFailure: false,
+            failureStatusMessage: "Failed to refresh local files.");
     }
 
     private async Task RefreshQueueCoreAsync()
@@ -576,6 +691,81 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             _lastAutoRefreshUtc = DateTimeOffset.UtcNow;
             OnPropertyChanged(nameof(AutoRefreshHint));
         }
+    }
+
+    private async Task RefreshLocalFilesCoreAsync()
+    {
+        IReadOnlyList<WatcherFile> files = await _localDownloadFileCatalogService.GetFilesAsync(_appGlobalSettings.DownloadDir);
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            LocalFiles.Clear();
+            foreach (WatcherFile file in files)
+            {
+                LocalFiles.Add(file);
+            }
+
+            OnPropertyChanged(nameof(HasLocalFiles));
+            OnPropertyChanged(nameof(HasSelectedLocalFiles));
+            OnPropertyChanged(nameof(ShowNoLocalFilesHint));
+            PushSelectedLocalFilesCommand.NotifyCanExecuteChanged();
+        }, DispatcherPriority.Background);
+    }
+
+    private void OnLocalFilePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(WatcherFile.Checked))
+        {
+            OnPropertyChanged(nameof(HasSelectedLocalFiles));
+            PushSelectedLocalFilesCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private async Task PushSelectedLocalFilesAsync()
+    {
+        await RunOperationAsync(async () =>
+        {
+            var selectedFiles = LocalFiles.Where(file => file.Checked).ToList();
+            if (selectedFiles.Count == 0)
+            {
+                return;
+            }
+
+            int successCount = 0;
+            List<string> failures = [];
+            foreach (WatcherFile selectedFile in selectedFiles)
+            {
+                try
+                {
+                    _ = await _localIngestionPushService.PushAsync(
+                        DesktopApiBaseUrl,
+                        SyncToken,
+                        new LocalIngestionEntry
+                        {
+                            LocalPath = selectedFile.FilePath,
+                            DisplayName = selectedFile.DisplayName,
+                        });
+
+                    successCount++;
+                    selectedFile.Checked = false;
+                }
+                catch (Exception ex)
+                {
+                    failures.Add($"{selectedFile.DisplayName}: {ex.Message}");
+                }
+            }
+
+            if (failures.Count > 0)
+            {
+                throw new InvalidOperationException($"Pushed {successCount}/{selectedFiles.Count} file(s). Failures: {string.Join("; ", failures)}");
+            }
+
+            StatusMessage = $"Pushed {successCount} file(s) to desktop.";
+            ErrorMessage = null;
+
+            await RefreshQueueCoreAsync();
+            await RefreshLocalFilesCoreAsync();
+        }, "Failed to push selected local files");
     }
 
     private void StartAutoRefreshLoop()
@@ -615,6 +805,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
                 }
 
                 await RefreshQueueAsync();
+                await RefreshLocalFilesCoreAsync();
             }
         }
         catch (OperationCanceledException)
@@ -669,7 +860,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
                 };
                 throw;
             }
-        }, "Failed to trigger retry");
+        }, "Failed to trigger retry", disconnectOnFailure: false, failureStatusMessage: "Retry request failed.");
     }
 
     private async Task InstallSelectedAsync(IngestionQueueItem? item)
@@ -718,7 +909,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
                 };
                 throw;
             }
-        }, "Failed to trigger install");
+        }, "Failed to trigger install", disconnectOnFailure: false, failureStatusMessage: "Install request failed.");
     }
 
     private async Task OpenFolderSelectedAsync(IngestionQueueItem? item)
@@ -766,7 +957,71 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
                 };
                 throw;
             }
-        }, "Failed to request folder open");
+        }, "Failed to request folder open", disconnectOnFailure: false, failureStatusMessage: "Open folder request failed.");
+    }
+
+    private async Task PushSelectedAsync(IngestionQueueItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        DateTimeOffset initiatedAt = DateTimeOffset.UtcNow;
+        item.LastActionResult = new ActionResult
+        {
+            ActionType = ActionType.Push,
+            Status = ActionResultStatus.Pending,
+            Message = "Processing...",
+            InitiatedAtUtc = initiatedAt,
+            CompletedAtUtc = initiatedAt
+        };
+
+        await RunOperationAsync(async () =>
+        {
+            try
+            {
+                long ingestionId = await _localIngestionPushService.PushAsync(
+                    DesktopApiBaseUrl,
+                    SyncToken,
+                    new LocalIngestionEntry
+                    {
+                        LocalPath = item.DownloadedLocation ?? string.Empty,
+                        DisplayName = item.DisplayName,
+                        Source = item.Source,
+                        SourceId = item.SourceId,
+                        SourceLink = item.SourceLink,
+                        Artist = item.Artist,
+                        Title = item.Title,
+                        Charter = item.Charter,
+                        LibrarySource = item.LibrarySource,
+                    });
+
+                item.LastActionResult = new ActionResult
+                {
+                    ActionType = ActionType.Push,
+                    Status = ActionResultStatus.Success,
+                    Message = $"Pushed to desktop ingestion {ingestionId}",
+                    InitiatedAtUtc = initiatedAt,
+                    CompletedAtUtc = DateTimeOffset.UtcNow
+                };
+                StatusMessage = $"Push requested for {item.DisplayName}.";
+                ErrorMessage = null;
+                await RefreshQueueCoreAsync();
+            }
+            catch (Exception ex)
+            {
+                item.LastActionResult = new ActionResult
+                {
+                    ActionType = ActionType.Push,
+                    Status = ActionResultStatus.Failed,
+                    Message = ex.Message,
+                    InitiatedAtUtc = initiatedAt,
+                    CompletedAtUtc = DateTimeOffset.UtcNow
+                };
+                throw;
+            }
+        }, "Failed to push ingestion to desktop", disconnectOnFailure: false, failureStatusMessage: "Push request failed.");
     }
 
     private static bool ShouldAdoptPairApiBaseUrl(string currentBaseUrl, string? claimedBaseUrl)
@@ -809,22 +1064,27 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         if (string.IsNullOrWhiteSpace(payload))
         {
             BootstrapQrImage = null;
+            BootstrapQrImageExportPath = null;
             return;
         }
 
+        string? exportedPath = null;
         try
         {
             using var generator = new QRCodeGenerator();
             using QRCodeData data = generator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.Q);
             var qrCode = new PngByteQRCode(data);
             byte[] pngBytes = qrCode.GetGraphic(12, drawQuietZones: true);
+            exportedPath = _desktopSyncQrImageExportService.ExportDesktopQrImage(pngBytes);
 
             using var stream = new MemoryStream(pngBytes);
             BootstrapQrImage = new Bitmap(stream);
+            BootstrapQrImageExportPath = exportedPath;
         }
         catch
         {
             BootstrapQrImage = null;
+            BootstrapQrImageExportPath = exportedPath;
         }
     }
 
@@ -1009,7 +1269,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         CancelPendingQrPairingCommand.NotifyCanExecuteChanged();
     }
 
-    private async Task RunOperationAsync(Func<Task> operation, string context)
+    private async Task RunOperationAsync(
+        Func<Task> operation,
+        string context,
+        bool disconnectOnFailure = true,
+        string? failureStatusMessage = null)
     {
         if (IsBusy)
         {
@@ -1023,20 +1287,25 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
         catch (Exception ex)
         {
-            IsConnected = false;
-            QueueItems.Clear();
-            _lastAutoRefreshUtc = null;
+            if (disconnectOnFailure)
+            {
+                IsConnected = false;
+                QueueItems.Clear();
+                _lastAutoRefreshUtc = null;
+                OnPropertyChanged(nameof(AutoRefreshHint));
+            }
+
             ErrorMessage = ex.Message;
-            StatusMessage = IsCompanionMode
-                ? "Pairing failed. Scan the desktop QR and try again."
-                : "Connection failed. Verify desktop URL and credentials, then retry.";
-            OnPropertyChanged(nameof(AutoRefreshHint));
+            StatusMessage = failureStatusMessage
+                ?? (IsCompanionMode
+                    ? "Pairing failed. Scan the desktop QR and try again."
+                    : "Connection failed. Verify desktop URL and credentials, then retry.");
 
             (ErrorCategory category, string? remediation) = ClassifyError(ex);
             Diagnostics = new ConnectionDiagnostics
             {
                 LastAttemptUtc = DateTime.UtcNow,
-                ServerInfo = null,
+                ServerInfo = disconnectOnFailure ? null : Diagnostics.ServerInfo,
                 LastErrorMessage = ex.Message,
                 LastErrorCategory = category,
                 RemediationHint = remediation
@@ -1058,6 +1327,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private (ErrorCategory category, string remediation) ClassifyError(Exception ex)
     {
         string message = ex.Message.ToLowerInvariant();
+
+        if (ex is OperationCanceledException || message.Contains("canceled") || message.Contains("cancelled"))
+        {
+            return (ErrorCategory.NetworkUnreachable, "The desktop request timed out or was canceled. Retry and keep the companion paired.");
+        }
 
         if (message.Contains("not found") || message.Contains("unreachable") || message.Contains("connection refused")
             || message.Contains("timeout") || message.Contains("no such host")
@@ -1085,6 +1359,29 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(ShowEmptyQueueState));
     }
 
+    private void OnLocalFilesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (WatcherFile file in e.OldItems)
+            {
+                file.PropertyChanged -= OnLocalFilePropertyChanged;
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (WatcherFile file in e.NewItems)
+            {
+                file.PropertyChanged += OnLocalFilePropertyChanged;
+            }
+        }
+
+        OnPropertyChanged(nameof(HasLocalFiles));
+        OnPropertyChanged(nameof(HasSelectedLocalFiles));
+        PushSelectedLocalFilesCommand.NotifyCanExecuteChanged();
+    }
+
     private void OnAppGlobalSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(AppGlobalSettings.SyncApiPairCode))
@@ -1100,9 +1397,17 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     public void Dispose()
     {
         QueueItems.CollectionChanged -= OnQueueItemsCollectionChanged;
+        LocalFiles.CollectionChanged -= OnLocalFilesCollectionChanged;
         _appGlobalSettings.PropertyChanged -= OnAppGlobalSettingsPropertyChanged;
+
+        foreach (WatcherFile file in LocalFiles)
+        {
+            file.PropertyChanged -= OnLocalFilePropertyChanged;
+        }
+
         StopAutoRefreshLoop();
         BootstrapQrImage = null;
+        BootstrapQrImageExportPath = null;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -1119,6 +1424,14 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         public Task<string?> ScanAsync(CancellationToken cancellationToken = default)
         {
             return Task.FromResult<string?>(null);
+        }
+    }
+
+    private sealed class NoOpLocalIngestionPushService : ILocalIngestionPushService
+    {
+        public Task<long> PushAsync(string baseUrl, string token, LocalIngestionEntry entry, CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("Local ingestion push service is not configured.");
         }
     }
 

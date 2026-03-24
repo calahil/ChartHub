@@ -68,6 +68,7 @@ public class CloneHeroViewModelTests
     {
         using var temp = new TemporaryDirectoryFixture("clonehero-vm-artist-filter");
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
 
         await catalog.UpsertAsync(new LibraryCatalogEntry(
             Source: LibrarySourceNames.RhythmVerse,
@@ -87,7 +88,8 @@ public class CloneHeroViewModelTests
             LocalPath: Path.Combine(temp.RootPath, "songs", "Artist B", "Song Two", "Charter B__rhythmverse"),
             AddedAtUtc: DateTimeOffset.UtcNow));
 
-        var sut = new CloneHeroViewModel(catalog, new NoopDesktopPathOpener(), new ImmediateReconciliationService());
+        var sut = new CloneHeroViewModel(catalog, ingestionCatalog, new NoopDesktopPathOpener(), new LocalFileDeletionService(), new ImmediateReconciliationService());
+
         await sut.InitializeAsync();
 
         Assert.Equal(2, sut.Artists.Count);
@@ -115,7 +117,8 @@ public class CloneHeroViewModelTests
             LocalPath: songDir, AddedAtUtc: DateTimeOffset.UtcNow));
 
         var opener = new NoopDesktopPathOpener();
-        var sut = new CloneHeroViewModel(catalog, opener, new ImmediateReconciliationService());
+        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var sut = new CloneHeroViewModel(catalog, ingestionCatalog, opener, new LocalFileDeletionService(), new ImmediateReconciliationService());
         await sut.InitializeAsync();
 
         // SelectedSong should now be set (at least one artist/song was seeded)
@@ -126,11 +129,48 @@ public class CloneHeroViewModelTests
         Assert.Contains("Metadata updated", sut.ReconciliationStatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task DeleteSongCommand_DeletesLocalPathAndRemovesCatalogEntries()
+    {
+        using var temp = new TemporaryDirectoryFixture("clonehero-vm-delete-song");
+        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        string songDir = Path.Combine(temp.RootPath, "songs", "Delete Artist", "Delete Song", "Delete Charter__rhythmverse");
+        Directory.CreateDirectory(songDir);
+        File.WriteAllText(Path.Combine(songDir, "song.ini"), "[song]\nartist = Delete Artist\ntitle = Delete Song\ncharter = Delete Charter\n");
+
+        await catalog.UpsertAsync(new LibraryCatalogEntry(
+            Source: LibrarySourceNames.RhythmVerse,
+            SourceId: "delete-source-id",
+            Title: "Delete Song",
+            Artist: "Delete Artist",
+            Charter: "Delete Charter",
+            LocalPath: songDir,
+            AddedAtUtc: DateTimeOffset.UtcNow));
+
+        SongIngestionRecord ingestion = await ingestionCatalog.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "delete-source-id",
+            sourceLink: "https://example.com/delete-song");
+
+        var sut = new CloneHeroViewModel(catalog, ingestionCatalog, new NoopDesktopPathOpener(), new LocalFileDeletionService(), new ImmediateReconciliationService());
+        await sut.InitializeAsync();
+
+        Assert.NotNull(sut.SelectedSong);
+        await sut.DeleteSongCommand.ExecuteAsync(null);
+
+        Assert.False(Directory.Exists(songDir));
+        Assert.False(await catalog.IsInLibraryAsync(LibrarySourceNames.RhythmVerse, "delete-source-id"));
+        Assert.Null(await ingestionCatalog.GetIngestionByIdAsync(ingestion.Id));
+    }
+
     private static CloneHeroViewModel CreateViewModel(string rootPath, ICloneHeroLibraryReconciliationService reconciliationService)
     {
         var catalog = new LibraryCatalogService(Path.Combine(rootPath, "library-catalog.db"));
+        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(rootPath, "library-catalog.db"));
         var opener = new NoopDesktopPathOpener();
-        return new CloneHeroViewModel(catalog, opener, reconciliationService);
+        return new CloneHeroViewModel(catalog, ingestionCatalog, opener, new LocalFileDeletionService(), reconciliationService);
     }
 
     private sealed class NoopDesktopPathOpener : IDesktopPathOpener

@@ -4,7 +4,6 @@ using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Services;
-using ChartHub.Services.Transfers;
 using ChartHub.Tests.TestInfrastructure;
 using ChartHub.Utilities;
 
@@ -18,8 +17,13 @@ public class DownloadViewModelTests
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-checks");
         using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        var transfer = new TransferOrchestratorSpy();
-        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
+        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var sut = new ViewModels.DownloadViewModel(
+            settings,
+            new SongInstallServiceStub(),
+            ingestionCatalog,
+            new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")),
+            new LocalFileDeletionService());
 
         try
         {
@@ -47,125 +51,17 @@ public class DownloadViewModelTests
     }
 
     [Fact]
-    public async Task DownloadCloudToLocalCommand_WithSelectedFiles_InvokesTransferAndRefreshesWatcher()
-    {
-        using var temp = new TemporaryDirectoryFixture("download-vm-cloud-local");
-        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        var transfer = new TransferOrchestratorSpy();
-        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
-        var refreshWatcher = new ResourceWatcherStub(temp.GetPath("downloads"), sut.DownloadFiles);
-
-        try
-        {
-            sut.DownloadWatcher = refreshWatcher;
-            sut.GoogleFiles.Add(CreateWatcherFile("alpha.zip", "drive-file-a", checkedState: true));
-            sut.GoogleFiles.Add(CreateWatcherFile("beta.zip", "drive-file-b", checkedState: false));
-
-            await sut.DownloadCloudToLocal.ExecuteAsync(null);
-
-            Assert.Equal(1, transfer.DownloadSelectedCallCount);
-            Assert.Single(transfer.LastSelectedCloudFiles!);
-            Assert.Equal("drive-file-a", transfer.LastSelectedCloudFiles![0].FilePath);
-            Assert.Equal(1, refreshWatcher.LoadItemsCallCount);
-        }
-        finally
-        {
-            await sut.DisposeAsync();
-        }
-    }
-
-    [Fact]
-    public async Task SyncCloudToLocalCommand_InvokesTransferForCurrentCloudFiles_AndRefreshesWatcher()
-    {
-        using var temp = new TemporaryDirectoryFixture("download-vm-sync");
-        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        var transfer = new TransferOrchestratorSpy();
-        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
-        var refreshWatcher = new ResourceWatcherStub(temp.GetPath("downloads"), sut.DownloadFiles);
-
-        try
-        {
-            sut.DownloadWatcher = refreshWatcher;
-            sut.GoogleFiles.Add(CreateWatcherFile("alpha.zip", "drive-file-a", checkedState: false));
-            sut.GoogleFiles.Add(CreateWatcherFile("beta.zip", "drive-file-b", checkedState: true));
-
-            await sut.SyncCloudToLocal.ExecuteAsync(null);
-
-            Assert.Equal(1, transfer.SyncCallCount);
-            Assert.NotNull(transfer.LastCurrentCloudFiles);
-            Assert.Equal(2, transfer.LastCurrentCloudFiles!.Count);
-            Assert.Equal(1, refreshWatcher.LoadItemsCallCount);
-        }
-        finally
-        {
-            await sut.DisposeAsync();
-        }
-    }
-
-    [Fact]
-    public async Task CloudCommands_WhenCloudNotLinked_DoNotThrowAndDoNotInvokeTransfers()
-    {
-        using var temp = new TemporaryDirectoryFixture("download-vm-cloud-unlinked");
-        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        var transfer = new TransferOrchestratorSpy();
-        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient { ChartHubFolderId = string.Empty }, transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
-
-        try
-        {
-            sut.DownloadFiles.Add(CreateWatcherFile("alpha.zip", temp.GetPath("alpha.zip"), checkedState: true));
-            sut.GoogleFiles.Add(CreateWatcherFile("beta.zip", "drive-file-b", checkedState: true));
-
-            await sut.UploadCloud.ExecuteAsync(null);
-            await sut.DownloadCloudToLocal.ExecuteAsync(null);
-            await sut.SyncCloudToLocal.ExecuteAsync(null);
-
-            Assert.False(sut.IsCloudConnected);
-            Assert.True(sut.HasCloudConnectionHint);
-            Assert.Equal("Google Drive is not linked. Open Settings and link your Google account.", sut.CloudConnectionHint);
-            Assert.Equal(0, transfer.DownloadSelectedCallCount);
-            Assert.Equal(0, transfer.SyncCallCount);
-        }
-        finally
-        {
-            await sut.DisposeAsync();
-        }
-    }
-
-    [Fact]
-    public async Task HandleCloudAccountStateChangedAsync_OnUnlink_ClearsCloudFilesAndShowsHint()
-    {
-        using var temp = new TemporaryDirectoryFixture("download-vm-cloud-link-state");
-        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        var transfer = new TransferOrchestratorSpy();
-        var driveClient = new FakeGoogleDriveClient { ChartHubFolderId = "folder-test" };
-        var sut = new ViewModels.DownloadViewModel(settings, driveClient, transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
-
-        try
-        {
-            sut.GoogleFiles.Add(CreateWatcherFile("alpha.zip", "drive-file-a", checkedState: true));
-            Assert.Single(sut.GoogleFiles);
-
-            driveClient.ChartHubFolderId = string.Empty;
-            await sut.HandleCloudAccountStateChangedAsync(isLinked: false);
-
-            Assert.Empty(sut.GoogleFiles);
-            Assert.False(sut.IsCloudConnected);
-            Assert.True(sut.HasCloudConnectionHint);
-            Assert.Equal("Google Drive is not linked. Open Settings and link your Google account.", sut.CloudConnectionHint);
-        }
-        finally
-        {
-            await sut.DisposeAsync();
-        }
-    }
-
-    [Fact]
     public async Task ToggleInstallLogCommand_TogglesExpandedStateAndLabel()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-log-toggle");
         using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        var transfer = new TransferOrchestratorSpy();
-        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, new SongInstallServiceStub(), new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
+        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var sut = new ViewModels.DownloadViewModel(
+            settings,
+            new SongInstallServiceStub(),
+            ingestionCatalog,
+            new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")),
+            new LocalFileDeletionService());
 
         try
         {
@@ -193,14 +89,19 @@ public class DownloadViewModelTests
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-install-summary");
         using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        var transfer = new TransferOrchestratorSpy();
         string selectedFilePath = temp.GetPath("song-a.zip");
         await File.WriteAllTextAsync(selectedFilePath, "zip");
         var installStub = new SongInstallServiceStub
         {
             ResultPaths = [Path.Combine(temp.RootPath, "CloneHero", "Songs", "Song A")],
         };
-        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, installStub, new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
+        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var sut = new ViewModels.DownloadViewModel(
+            settings,
+            installStub,
+            ingestionCatalog,
+            new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")),
+            new LocalFileDeletionService());
 
         try
         {
@@ -230,14 +131,19 @@ public class DownloadViewModelTests
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-install-cancel");
         using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        var transfer = new TransferOrchestratorSpy();
         string selectedFilePath = temp.GetPath("song-cancel.zip");
         await File.WriteAllTextAsync(selectedFilePath, "zip");
         var installStub = new SongInstallServiceStub
         {
             ThrowOnInstall = new OperationCanceledException(),
         };
-        var sut = new ViewModels.DownloadViewModel(settings, new FakeGoogleDriveClient(), transfer, installStub, new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")));
+        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var sut = new ViewModels.DownloadViewModel(
+            settings,
+            installStub,
+            ingestionCatalog,
+            new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")),
+            new LocalFileDeletionService());
 
         try
         {
@@ -248,6 +154,71 @@ public class DownloadViewModelTests
             Assert.Equal("Install cancelled.", sut.InstallSummaryText);
             Assert.True(sut.IsInstallPanelVisible);
             Assert.False(sut.IsInstallActive);
+        }
+        finally
+        {
+            await sut.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task DeleteSelectedDownloadsCommand_DeletesFileAndRemovesCatalogEntries()
+    {
+        using var temp = new TemporaryDirectoryFixture("download-vm-delete-selected");
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var libraryCatalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var sut = new ViewModels.DownloadViewModel(
+            settings,
+            new SongInstallServiceStub(),
+            ingestionCatalog,
+            libraryCatalog,
+            new LocalFileDeletionService());
+
+        string downloadFilePath = temp.GetPath("to-delete.zip");
+        await File.WriteAllTextAsync(downloadFilePath, "zip-data");
+
+        SongIngestionRecord ingestion = await ingestionCatalog.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "delete-me-id",
+            sourceLink: "https://example.com/delete-me");
+        await ingestionCatalog.UpsertAssetAsync(new SongIngestionAssetEntry(
+            IngestionId: ingestion.Id,
+            AttemptId: null,
+            AssetRole: IngestionAssetRole.Downloaded,
+            Location: downloadFilePath,
+            SizeBytes: null,
+            ContentHash: null,
+            RecordedAtUtc: DateTimeOffset.UtcNow));
+        await libraryCatalog.UpsertAsync(new LibraryCatalogEntry(
+            Source: LibrarySourceNames.RhythmVerse,
+            SourceId: "delete-me-id",
+            Title: "Delete Me",
+            Artist: "Artist",
+            Charter: "Charter",
+            LocalPath: Path.Combine(temp.RootPath, "CloneHero", "Songs", "Delete Me"),
+            AddedAtUtc: DateTimeOffset.UtcNow));
+
+        try
+        {
+            sut.IngestionQueue.Add(new IngestionQueueItem
+            {
+                IngestionId = ingestion.Id,
+                Source = LibrarySourceNames.RhythmVerse,
+                SourceId = "delete-me-id",
+                SourceLink = "https://example.com/delete-me",
+                CurrentState = IngestionState.Downloaded,
+                DownloadedLocation = downloadFilePath,
+                DisplayName = "to-delete.zip",
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+                Checked = true,
+            });
+
+            await sut.DeleteSelectedDownloadsCommand.ExecuteAsync(null);
+
+            Assert.False(File.Exists(downloadFilePath));
+            Assert.False(await libraryCatalog.IsInLibraryAsync(LibrarySourceNames.RhythmVerse, "delete-me-id"));
+            Assert.Null(await ingestionCatalog.GetIngestionByIdAsync(ingestion.Id));
         }
         finally
         {
@@ -279,52 +250,6 @@ public class DownloadViewModelTests
         });
 
         return new AppGlobalSettings(orchestrator);
-    }
-
-    private sealed class TransferOrchestratorSpy : ITransferOrchestrator
-    {
-        public int DownloadSelectedCallCount { get; private set; }
-        public int SyncCallCount { get; private set; }
-        public List<WatcherFile>? LastSelectedCloudFiles { get; private set; }
-        public List<WatcherFile>? LastCurrentCloudFiles { get; private set; }
-
-        public Task<TransferResult> QueueSongDownloadAsync(ViewSong song, DownloadFile? downloadItem, ObservableCollection<DownloadFile> downloads, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task<IReadOnlyList<string>> DownloadSelectedCloudFilesToLocalAsync(IEnumerable<WatcherFile> selectedCloudFiles, CancellationToken cancellationToken = default)
-        {
-            DownloadSelectedCallCount++;
-            LastSelectedCloudFiles = selectedCloudFiles.ToList();
-            return Task.FromResult<IReadOnlyList<string>>([]);
-        }
-
-        public Task<IReadOnlyList<string>> SyncCloudToLocalAdditiveAsync(IEnumerable<WatcherFile> currentCloudFiles, CancellationToken cancellationToken = default)
-        {
-            SyncCallCount++;
-            LastCurrentCloudFiles = currentCloudFiles.ToList();
-            return Task.FromResult<IReadOnlyList<string>>([]);
-        }
-    }
-
-    private sealed class FakeGoogleDriveClient : IGoogleDriveClient
-    {
-        public string ChartHubFolderId { get; set; } = "folder-test";
-
-        public Task<string> CreateDirectoryAsync(string directoryName) => Task.FromResult("folder-test");
-        public Task<string> GetDirectoryIdAsync(string directoryName) => Task.FromResult("folder-test");
-        public Task<string> UploadFileAsync(string directoryId, string filePath, string? desiredFileName = null) => Task.FromResult("file-test");
-        public Task<string> CopyFileIntoFolderAsync(string sourceFileId, string destinationFolderId, string desiredFileName) => Task.FromResult("copy-test");
-        public Task DownloadFolderAsZipAsync(string folderId, string zipFilePath, IProgress<TransferProgressUpdate>? stageProgress = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task DownloadFileAsync(string fileId, string saveToPath) => Task.CompletedTask;
-        public Task DeleteFileAsync(string fileId) => Task.CompletedTask;
-        public Task<IList<Google.Apis.Drive.v3.Data.File>> ListFilesAsync(string directoryId) => Task.FromResult<IList<Google.Apis.Drive.v3.Data.File>>(new List<Google.Apis.Drive.v3.Data.File>());
-        public Task MonitorDirectoryAsync(string directoryId, TimeSpan pollingInterval, Action<Google.Apis.Drive.v3.Data.File, string> onFileChanged, CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<bool> TryInitializeSilentAsync(CancellationToken cancellationToken = default) => Task.FromResult(false);
-        public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task SignOutAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<ObservableCollection<WatcherFile>> GetFileDataCollectionAsync(string directoryId) => Task.FromResult(new ObservableCollection<WatcherFile>());
     }
 
     private sealed class SongInstallServiceStub : ISongInstallService

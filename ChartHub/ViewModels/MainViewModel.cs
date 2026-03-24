@@ -15,14 +15,16 @@ namespace ChartHub.ViewModels;
 
 public class MainViewModel : INotifyPropertyChanged
 {
+    private readonly bool _isAndroidMode;
+
     public enum SidePaneMode
     {
         Filters,
         Downloads,
     }
 
-    public bool IsCompanionMode => OperatingSystem.IsAndroid();
-    public bool IsDesktopMode => !OperatingSystem.IsAndroid();
+    public bool IsCompanionMode => _isAndroidMode;
+    public bool IsDesktopMode => !_isAndroidMode;
 
     private RhythmVerseViewModel _rhythmVerseViewModel = null!;
     private EncoreViewModel _encoreViewModel = null!;
@@ -285,13 +287,17 @@ public class MainViewModel : INotifyPropertyChanged
     {
         _rhythmVerseViewModel = rhythmVerseViewModel;
         _encoreViewModel = encoreViewModel;
+        _isAndroidMode = isAndroid;
         _sharedDownloadQueue = sharedDownloadQueue;
         _sharedDownloadQueue.Downloads.CollectionChanged += SharedDownloads_CollectionChanged;
+        foreach (DownloadFile item in _sharedDownloadQueue.Downloads)
+        {
+            item.PropertyChanged += SharedDownloadItem_PropertyChanged;
+        }
         _downloadViewModel = downloadViewModel;
         _cloneHeroViewModel = cloneHeroViewModel;
         _syncViewModel = syncViewModel;
         _settingsViewModel = settingsViewModel;
-        _settingsViewModel.PropertyChanged += SettingsViewModel_PropertyChanged;
         ShowFiltersPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Filters));
         ShowDownloadsPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Downloads));
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
@@ -313,26 +319,12 @@ public class MainViewModel : INotifyPropertyChanged
         {
             _downloadViewModel.DownloadWatcher.LoadItems();
         }
-
-        ObserveBackgroundTask(_downloadViewModel.GoogleWatcher.StartAsync(), "Google watcher startup");
         postToUi(() => IsDownloadTabVisible = true);
     }
 
     private async Task InitializeCloneHeroAsync(Action<Action> postToUi)
     {
         await _cloneHeroViewModel.InitializeAsync();
-    }
-
-    private void SettingsViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName != nameof(SettingsViewModel.IsCloudAccountLinked))
-        {
-            return;
-        }
-
-        ObserveBackgroundTask(
-            _downloadViewModel.HandleCloudAccountStateChangedAsync(_settingsViewModel.IsCloudAccountLinked),
-            "Google watcher refresh after cloud account state change");
     }
 
     private static void CancelSharedDownload(DownloadFile? item)
@@ -368,8 +360,46 @@ public class MainViewModel : INotifyPropertyChanged
 
     private void SharedDownloads_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        if (e.NewItems is not null)
+        {
+            foreach (DownloadFile item in e.NewItems)
+            {
+                item.PropertyChanged += SharedDownloadItem_PropertyChanged;
+            }
+        }
+
+        if (e.OldItems is not null)
+        {
+            foreach (DownloadFile item in e.OldItems)
+            {
+                item.PropertyChanged -= SharedDownloadItem_PropertyChanged;
+            }
+        }
+
         OnPropertyChanged(nameof(HasSharedDownloads));
         OnPropertyChanged(nameof(NoSharedDownloads));
+    }
+
+    private void SharedDownloadItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (!IsCompanionMode
+            || sender is not DownloadFile item
+            || e.PropertyName != nameof(DownloadFile.Status)
+            || !string.Equals(item.Status, "Completed", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _downloadViewModel.DownloadWatcher.LoadItems();
+
+        if (_syncViewModel.IsCompanionMode
+            && _syncViewModel.IsConnected
+            && !_syncViewModel.IsBusy)
+        {
+            ObserveBackgroundTask(
+                _syncViewModel.RefreshLocalFilesSnapshotAsync(),
+                "Sync local file refresh after completed download");
+        }
     }
 
     private static void ObserveBackgroundTask(Task task, string context)

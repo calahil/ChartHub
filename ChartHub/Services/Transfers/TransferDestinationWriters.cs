@@ -17,21 +17,6 @@ public interface ILocalDestinationWriter
     string ResolveUniqueName(string desiredName);
 }
 
-public interface IGoogleDriveDestinationWriter
-{
-    Task<DestinationWriteResult> WriteFromTempAsync(
-        string tempFilePath,
-        string desiredName,
-        CancellationToken cancellationToken = default);
-
-    Task<DestinationWriteResult?> TryCopyDriveFileAsync(
-        string sourceFileId,
-        string desiredName,
-        CancellationToken cancellationToken = default);
-
-    Task<string> GetChartHubFolderIdAsync(CancellationToken cancellationToken = default);
-}
-
 internal static class NameConflictResolver
 {
     public static string ResolveUniqueName(string originalName, Func<string, bool> exists)

@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:models="clr-namespace:ChartHub.Models"
              xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
              mc:Ignorable="d"
              d:DesignWidth="960"
@@ -74,6 +75,10 @@
                     <TextBlock Text="{Binding BootstrapInstructions}"
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                    <Button HorizontalAlignment="Left"
+                        MinWidth="180"
+                        Content="Refresh QR"
+                        Command="{Binding RefreshDesktopQrCommand}" />
                     <Border IsVisible="{Binding ShowDesktopBootstrapPlaceholder}"
                             Padding="10"
                             BorderThickness="1"
@@ -88,6 +93,11 @@
                            Height="220"
                            HorizontalAlignment="Left"
                            Source="{Binding BootstrapQrImage}" />
+                          <TextBox Text="{Binding BootstrapQrImageExportPath}"
+                             IsReadOnly="True"
+                             IsVisible="{Binding HasBootstrapQrImageExportPath}"
+                             Watermark="Generated QR image path"
+                             TextWrapping="Wrap" />
                     <TextBox Text="{Binding GeneratedBootstrapPayload}"
                              IsReadOnly="True"
                              Watermark="Generated bootstrap payload"
@@ -152,11 +162,53 @@
                         <Button Margin="0,0,8,8"
                                 Content="Refresh Queue"
                                 Command="{Binding RefreshQueueCommand}" />
+                        <Button Margin="0,0,8,8"
+                                Content="Refresh Local"
+                                Command="{Binding RefreshLocalFilesCommand}" />
+                        <Button Margin="0,0,8,8"
+                                Content="Push Selected"
+                                Command="{Binding PushSelectedLocalFilesCommand}" />
                     </WrapPanel>
+
+                    <Border IsVisible="{Binding ShowCompanionLocalFilesSection}"
+                            Padding="8"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                            Background="{DynamicResource ThemeControlMidBrush}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Local Files"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ThemeForegroundBrush}" />
+                            <ItemsControl ItemsSource="{Binding LocalFiles}"
+                                          IsVisible="{Binding HasLocalFiles}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,2,0,2">
+                                            <CheckBox Grid.Column="0"
+                                                      IsChecked="{Binding Checked}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Margin="8,0,8,0"
+                                                       Text="{Binding DisplayName}"
+                                                       TextWrapping="Wrap"
+                                                       Foreground="{DynamicResource ThemeForegroundBrush}" />
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding FileSize}"
+                                                       Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="No local files detected in the download directory."
+                                       IsVisible="{Binding #Root.DataContext.ShowNoLocalFilesHint}"
+                                       Foreground="{DynamicResource ThemeForegroundLowBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
                     <ItemsControl ItemsSource="{Binding QueueItems}"
                                   IsVisible="{Binding HasQueueItems}">
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate>
+                            <DataTemplate x:DataType="models:IngestionQueueItem">
                                 <Border Margin="0,0,0,10"
                                         Padding="10"
                                         BorderThickness="1"
@@ -184,15 +236,19 @@
                                                    ItemWidth="150">
                                             <Button Margin="0,0,8,8"
                                                     Content="Retry"
-                                                    Command="{Binding #Root.DataContext.RetrySelectedCommand}"
+                                                Command="{Binding #Root.((viewmodels:SyncViewModel)DataContext).RetrySelectedCommand}"
                                                     CommandParameter="{Binding}" />
                                             <Button Margin="0,0,8,8"
                                                     Content="Install"
-                                                    Command="{Binding #Root.DataContext.InstallSelectedCommand}"
+                                                Command="{Binding #Root.((viewmodels:SyncViewModel)DataContext).InstallSelectedCommand}"
+                                                    CommandParameter="{Binding}" />
+                                            <Button Margin="0,0,8,8"
+                                                    Content="Push"
+                                                Command="{Binding #Root.((viewmodels:SyncViewModel)DataContext).PushSelectedCommand}"
                                                     CommandParameter="{Binding}" />
                                             <Button Margin="0,0,8,8"
                                                     Content="Open Folder"
-                                                    Command="{Binding #Root.DataContext.OpenFolderSelectedCommand}"
+                                                Command="{Binding #Root.((viewmodels:SyncViewModel)DataContext).OpenFolderSelectedCommand}"
                                                     CommandParameter="{Binding}" />
                                         </WrapPanel>
                                     </StackPanel>

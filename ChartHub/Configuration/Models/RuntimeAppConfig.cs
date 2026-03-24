@@ -109,14 +109,14 @@ public sealed class RuntimeAppConfig
     [SettingEditor(SettingEditorKind.Number)]
     [SettingHotReloadable(true)]
     [SettingPlatforms(SettingPlatformTargets.Desktop)]
-    public int SyncApiMaxRequestBodyBytes { get; set; } = 64 * 1024;
+    public int SyncApiMaxRequestBodyBytes { get; set; } = 32 * 1024 * 1024;
 
     [SettingGroup("Sync API")]
     [SettingDisplay("Request Body Timeout (ms)")]
     [SettingEditor(SettingEditorKind.Number)]
     [SettingHotReloadable(true)]
     [SettingPlatforms(SettingPlatformTargets.Desktop)]
-    public int SyncApiBodyReadTimeoutMs { get; set; } = 1000;
+    public int SyncApiBodyReadTimeoutMs { get; set; } = 30_000;
 
     [SettingGroup("Sync API")]
     [SettingDisplay("Mutation Wait Timeout (ms)")]

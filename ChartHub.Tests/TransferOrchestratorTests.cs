@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Reflection;
 
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
@@ -127,75 +126,44 @@ public class TransferOrchestratorTests
     }
 
     [Fact]
-    public async Task TryCopyDriveFileAsync_WhenCopySucceeds_ReturnsCompletedResult()
+    public async Task QueueSongDownloadAsync_UsesLocalDestinationWriter_ForGoogleFolderSource()
     {
-        using var temp = new TemporaryDirectoryFixture("transfer-copy-success");
-        var destinationWriter = new GoogleDriveDestinationWriterCopySuccessStub();
+        using var temp = new TemporaryDirectoryFixture("transfer-local-writer");
+        string settingsRoot = temp.CreateSubdirectory("settings-root");
+        string localDestinationRoot = temp.CreateSubdirectory("local-destination");
+        var localWriter = new LocalDestinationWriterSpy(localDestinationRoot);
         TransferOrchestrator sut = CreateOrchestrator(
-            temp.RootPath,
-            new ResolverSuccessStub(),
-            googleDriveDestinationWriter: destinationWriter);
+            settingsRoot,
+            new ResolverGoogleFolderStub("folder-456"),
+            new GoogleDriveClientCreatesZipStub(),
+            localWriter);
 
-        var request = new TransferRequest(
-            DisplayName: "song.zip",
-            SourceUrl: "https://drive.google.com/file/d/file-123/view",
-            SourceFileSize: 100,
-            Destination: TransferDestinationKind.GoogleDrive);
-        var source = new ResolvedTransferSource(
-            OriginalUrl: request.SourceUrl,
-            FinalUrl: request.SourceUrl,
-            Kind: TransferSourceKind.GoogleDriveFile,
-            DriveId: "file-123");
-        var downloadItem = new DownloadFile("song.zip", temp.RootPath, request.SourceUrl, 100);
+        var downloads = new ObservableCollection<DownloadFile>();
+        var song = new ViewSong
+        {
+            FileName = "phase2.bundle",
+            DownloadLink = "https://drive.google.com/drive/folders/folder-456",
+            FileSize = 42,
+            SourceName = LibrarySourceNames.RhythmVerse,
+            SourceId = "phase2-folder",
+        };
 
-        TransferResult? result = await InvokeTryCopyDriveFileAsync(sut, request, source, downloadItem);
+        TransferResult result = await sut.QueueSongDownloadAsync(song, null, downloads);
 
-        Assert.NotNull(result);
-        Assert.True(result!.Success);
+        Assert.True(result.Success);
+        Assert.Equal(1, localWriter.WriteCallCount);
         Assert.Equal(TransferStage.Completed, result.FinalStage);
-        Assert.Equal("copied-file-id", result.FinalLocation);
-        Assert.Equal("song.zip", downloadItem.DisplayName);
-        Assert.Equal("folder-test", downloadItem.FilePath);
-        Assert.Equal(100, downloadItem.DownloadProgress);
-        Assert.True(downloadItem.Finished);
-        Assert.Equal(TransferStage.Completed.ToString(), downloadItem.Status);
-    }
-
-    [Fact]
-    public async Task TryCopyDriveFileAsync_WhenCopyThrows_ReturnsNullForFallback()
-    {
-        using var temp = new TemporaryDirectoryFixture("transfer-copy-fallback");
-        var destinationWriter = new GoogleDriveDestinationWriterCopyThrowsStub();
-        TransferOrchestrator sut = CreateOrchestrator(
-            temp.RootPath,
-            new ResolverSuccessStub(),
-            googleDriveDestinationWriter: destinationWriter);
-
-        var request = new TransferRequest(
-            DisplayName: "song.zip",
-            SourceUrl: "https://drive.google.com/file/d/file-123/view",
-            SourceFileSize: 100,
-            Destination: TransferDestinationKind.GoogleDrive);
-        var source = new ResolvedTransferSource(
-            OriginalUrl: request.SourceUrl,
-            FinalUrl: request.SourceUrl,
-            Kind: TransferSourceKind.GoogleDriveFile,
-            DriveId: "file-123");
-        var downloadItem = new DownloadFile("song.zip", temp.RootPath, request.SourceUrl, 100);
-
-        TransferResult? result = await InvokeTryCopyDriveFileAsync(sut, request, source, downloadItem);
-
-        Assert.Null(result);
-        Assert.Equal(TransferStage.CopyingInGoogleDrive.ToString(), downloadItem.Status);
-        Assert.False(downloadItem.Finished);
+        Assert.NotNull(localWriter.LastTempFilePath);
+        Assert.NotNull(localWriter.LastDesiredName);
+        Assert.True(File.Exists(result.FinalLocation!));
+        Assert.Equal(localDestinationRoot, result.DownloadItem.FilePath);
     }
 
     private static TransferOrchestrator CreateOrchestrator(
         string rootPath,
         ITransferSourceResolver resolver,
         IGoogleDriveClient? googleDriveClient = null,
-        ILocalDestinationWriter? localDestinationWriter = null,
-        IGoogleDriveDestinationWriter? googleDriveDestinationWriter = null)
+        ILocalDestinationWriter? localDestinationWriter = null)
     {
         var orchestrator = new FakeSettingsOrchestrator(rootPath);
         var settings = new AppGlobalSettings(orchestrator);
@@ -206,24 +174,8 @@ public class TransferOrchestratorTests
             googleDriveClient ?? new GoogleDriveClientStub(),
             resolver,
             localDestinationWriter ?? new LocalDestinationWriterStub(),
-            googleDriveDestinationWriter ?? new GoogleDriveDestinationWriterStub(),
             new SongIngestionCatalogService(Path.Combine(rootPath, "library-catalog.db")),
             new SongIngestionStateMachine());
-    }
-
-    private static async Task<TransferResult?> InvokeTryCopyDriveFileAsync(
-        TransferOrchestrator sut,
-        TransferRequest request,
-        ResolvedTransferSource source,
-        DownloadFile downloadItem)
-    {
-        MethodInfo? method = typeof(TransferOrchestrator).GetMethod("TryCopyDriveFileAsync", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(method);
-
-        var task = method!.Invoke(sut, [request, source, downloadItem, "trf-test", 0L, 0L, IngestionState.Queued, CancellationToken.None]) as Task<TransferResult?>;
-        Assert.NotNull(task);
-
-        return await task!;
     }
 
     private sealed class ResolverSuccessStub : ITransferSourceResolver
@@ -273,63 +225,6 @@ public class TransferOrchestratorTests
         }
     }
 
-    private sealed class GoogleDriveDestinationWriterStub : IGoogleDriveDestinationWriter
-    {
-        public Task<DestinationWriteResult> WriteFromTempAsync(string tempFilePath, string desiredName, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task<DestinationWriteResult?> TryCopyDriveFileAsync(string sourceFileId, string desiredName, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<DestinationWriteResult?>(null);
-        }
-
-        public Task<string> GetChartHubFolderIdAsync(CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult("folder-test");
-        }
-    }
-
-    private sealed class GoogleDriveDestinationWriterCopySuccessStub : IGoogleDriveDestinationWriter
-    {
-        public Task<DestinationWriteResult> WriteFromTempAsync(string tempFilePath, string desiredName, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task<DestinationWriteResult?> TryCopyDriveFileAsync(string sourceFileId, string desiredName, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult<DestinationWriteResult?>(new DestinationWriteResult(
-                FinalName: desiredName,
-                FinalLocation: "copied-file-id",
-                DestinationContainer: "folder-test"));
-        }
-
-        public Task<string> GetChartHubFolderIdAsync(CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult("folder-test");
-        }
-    }
-
-    private sealed class GoogleDriveDestinationWriterCopyThrowsStub : IGoogleDriveDestinationWriter
-    {
-        public Task<DestinationWriteResult> WriteFromTempAsync(string tempFilePath, string desiredName, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public Task<DestinationWriteResult?> TryCopyDriveFileAsync(string sourceFileId, string desiredName, CancellationToken cancellationToken = default)
-        {
-            throw new IOException("copy failed");
-        }
-
-        public Task<string> GetChartHubFolderIdAsync(CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult("folder-test");
-        }
-    }
-
     private class GoogleDriveClientStub : IGoogleDriveClient
     {
         public string ChartHubFolderId => "folder-test";
@@ -371,6 +266,38 @@ public class TransferOrchestratorTests
 
         public Task<DestinationWriteResult> WriteFromTempAsync(string tempFilePath, string desiredName, CancellationToken cancellationToken = default)
         {
+            Directory.CreateDirectory(_destinationRoot);
+            string finalPath = Path.Combine(_destinationRoot, desiredName);
+            File.Move(tempFilePath, finalPath, overwrite: false);
+
+            return Task.FromResult(new DestinationWriteResult(
+                FinalName: desiredName,
+                FinalLocation: finalPath,
+                DestinationContainer: _destinationRoot));
+        }
+
+        public string ResolveUniqueName(string desiredName)
+        {
+            return desiredName;
+        }
+    }
+
+    private sealed class LocalDestinationWriterSpy(string destinationRoot) : ILocalDestinationWriter
+    {
+        private readonly string _destinationRoot = destinationRoot;
+
+        public int WriteCallCount { get; private set; }
+
+        public string? LastTempFilePath { get; private set; }
+
+        public string? LastDesiredName { get; private set; }
+
+        public Task<DestinationWriteResult> WriteFromTempAsync(string tempFilePath, string desiredName, CancellationToken cancellationToken = default)
+        {
+            WriteCallCount++;
+            LastTempFilePath = tempFilePath;
+            LastDesiredName = desiredName;
+
             Directory.CreateDirectory(_destinationRoot);
             string finalPath = Path.Combine(_destinationRoot, desiredName);
             File.Move(tempFilePath, finalPath, overwrite: false);

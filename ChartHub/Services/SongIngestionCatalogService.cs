@@ -405,6 +405,76 @@ public sealed class SongIngestionCatalogService
         }
     }
 
+    public async Task<SongIngestionRecord?> GetLatestIngestionBySourceKeyAsync(
+        string source,
+        string sourceId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(sourceId))
+        {
+            return null;
+        }
+
+        string normalizedSource = LibrarySourceNames.NormalizeTrustedSource(source);
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using SqliteConnection connection = CreateConnection();
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            await using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT
+                    id,
+                    source,
+                    source_id,
+                    source_link,
+                    normalized_link,
+                    artist,
+                    title,
+                    charter,
+                    desktop_state,
+                    current_state,
+                    created_at_utc,
+                    updated_at_utc,
+                    library_source
+                FROM song_ingestions
+                WHERE source = $source
+                  AND source_id = $sourceId
+                ORDER BY updated_at_utc DESC
+                LIMIT 1;
+                """;
+            command.Parameters.AddWithValue("$source", normalizedSource);
+            command.Parameters.AddWithValue("$sourceId", sourceId);
+
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            if (!await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                return null;
+            }
+
+            return new SongIngestionRecord(
+                Id: reader.GetInt64(0),
+                Source: reader.GetString(1),
+                SourceId: reader.IsDBNull(2) ? null : reader.GetString(2),
+                SourceLink: reader.GetString(3),
+                NormalizedLink: reader.GetString(4),
+                Artist: reader.IsDBNull(5) ? null : reader.GetString(5),
+                Title: reader.IsDBNull(6) ? null : reader.GetString(6),
+                Charter: reader.IsDBNull(7) ? null : reader.GetString(7),
+                DesktopState: Enum.Parse<DesktopState>(reader.GetString(8), ignoreCase: true),
+                CurrentState: Enum.Parse<IngestionState>(reader.GetString(9), ignoreCase: true),
+                CreatedAtUtc: DateTimeOffset.Parse(reader.GetString(10)),
+                UpdatedAtUtc: DateTimeOffset.Parse(reader.GetString(11)),
+                LibrarySource: reader.IsDBNull(12) ? null : reader.GetString(12));
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task<string?> GetLatestAssetLocationAsync(
         long ingestionId,
         IngestionAssetRole assetRole,
@@ -869,6 +939,33 @@ public sealed class SongIngestionCatalogService
             command.Parameters.AddWithValue("$sizeBytes", (object?)entry.SizeBytes ?? DBNull.Value);
             command.Parameters.AddWithValue("$contentHash", (object?)entry.ContentHash ?? DBNull.Value);
             command.Parameters.AddWithValue("$recordedAtUtc", entry.RecordedAtUtc.UtcDateTime.ToString("O"));
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task RemoveIngestionAsync(long ingestionId, CancellationToken cancellationToken = default)
+    {
+        if (ingestionId <= 0)
+        {
+            return;
+        }
+
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using SqliteConnection connection = CreateConnection();
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+            await using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                DELETE FROM song_ingestions
+                WHERE id = $ingestionId;
+                """;
+            command.Parameters.AddWithValue("$ingestionId", ingestionId);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
         finally

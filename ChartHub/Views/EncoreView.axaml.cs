@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 
 using ChartHub.ViewModels;
@@ -9,7 +10,8 @@ namespace ChartHub.Views;
 
 public partial class EncoreView : UserControl
 {
-    private ScrollViewer? _scrollViewer;
+    private ScrollViewer? _desktopScrollViewer;
+    private ScrollViewer? _mobileScrollViewer;
 
     public EncoreView()
     {
@@ -19,20 +21,43 @@ public partial class EncoreView : UserControl
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        AttachScrollHandler();
+        ScheduleAttachScrollHandlers();
     }
 
-    private void AttachScrollHandler()
+    protected override void OnDataContextChanged(EventArgs e)
     {
-        if (_scrollViewer is not null)
+        base.OnDataContextChanged(e);
+        ScheduleAttachScrollHandlers();
+    }
+
+    private void ScheduleAttachScrollHandlers()
+    {
+        Dispatcher.UIThread.Post(AttachScrollHandlers, DispatcherPriority.Loaded);
+    }
+
+    private void AttachScrollHandlers()
+    {
+        if (_desktopScrollViewer is not null)
         {
-            _scrollViewer.ScrollChanged -= ScrollViewer_ScrollChanged;
+            _desktopScrollViewer.ScrollChanged -= ScrollViewer_ScrollChanged;
         }
 
-        _scrollViewer = EncoreSongsListBox?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
-        if (_scrollViewer is not null)
+        if (_mobileScrollViewer is not null)
         {
-            _scrollViewer.ScrollChanged += ScrollViewer_ScrollChanged;
+            _mobileScrollViewer.ScrollChanged -= ScrollViewer_ScrollChanged;
+        }
+
+        _desktopScrollViewer = EncoreSongsListBox?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        _mobileScrollViewer = MobileSongsListBox?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+
+        if (_desktopScrollViewer is not null)
+        {
+            _desktopScrollViewer.ScrollChanged += ScrollViewer_ScrollChanged;
+        }
+
+        if (_mobileScrollViewer is not null)
+        {
+            _mobileScrollViewer.ScrollChanged += ScrollViewer_ScrollChanged;
         }
     }
 

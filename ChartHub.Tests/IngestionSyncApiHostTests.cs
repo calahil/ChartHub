@@ -283,8 +283,8 @@ public class IngestionSyncApiHostTests
         Assert.True(json.RootElement.GetProperty("supports").GetProperty("desktopState").GetBoolean());
         JsonElement runtime = json.RootElement.GetProperty("runtime");
         Assert.False(runtime.GetProperty("allowSyncApiStateOverride").GetBoolean());
-        Assert.Equal(65536, runtime.GetProperty("maxRequestBodyBytes").GetInt32());
-        Assert.Equal(1000, runtime.GetProperty("bodyReadTimeoutMs").GetInt32());
+        Assert.Equal(33554432, runtime.GetProperty("maxRequestBodyBytes").GetInt32());
+        Assert.Equal(30000, runtime.GetProperty("bodyReadTimeoutMs").GetInt32());
         Assert.Equal(250, runtime.GetProperty("mutationWaitTimeoutMs").GetInt32());
         Assert.Equal(500, runtime.GetProperty("slowRequestThresholdMs").GetInt32());
 
@@ -455,7 +455,7 @@ public class IngestionSyncApiHostTests
     public async Task CreateIngestion_WithOversizedBody_ReturnsRequestEntityTooLarge()
     {
         using var temp = new TemporaryDirectoryFixture("sync-api-create-oversized");
-        await using IngestionSyncApiHost host = CreateHost(temp.RootPath, "token-create-oversized");
+        await using IngestionSyncApiHost host = CreateHost(temp.RootPath, "token-create-oversized", syncApiMaxRequestBodyBytes: 64 * 1024);
         await host.StartAsync();
 
         using HttpClient client = CreateHttpClient();
@@ -544,6 +544,64 @@ public class IngestionSyncApiHostTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         string body = await response.Content.ReadAsStringAsync();
         Assert.Contains("librarySource must be rhythmverse or encore", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UploadIngestion_WithMultipartPayload_CreatesDownloadedIngestionAndWritesFile()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-upload-multipart");
+        await using IngestionSyncApiHost host = CreateHost(temp.RootPath, "token-upload-multipart");
+        await host.StartAsync();
+
+        using HttpClient client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-upload-multipart");
+
+        byte[] payloadBytes = Encoding.UTF8.GetBytes("chart-bytes-content");
+        using MultipartFormDataContent content = CreateUploadMultipartContent(payloadBytes, "Song Upload.zip", "encore", "encore-upload-1", "encore", "Song Upload", "Artist Upload");
+
+        using HttpResponseMessage uploadResponse = await client.PostAsync("api/ingestions/upload", content);
+        Assert.Equal(HttpStatusCode.Accepted, uploadResponse.StatusCode);
+
+        string uploadBody = await uploadResponse.Content.ReadAsStringAsync();
+        using var uploadJson = JsonDocument.Parse(uploadBody);
+        long ingestionId = uploadJson.RootElement.GetProperty("ingestionId").GetInt64();
+        string downloadedLocation = uploadJson.RootElement.GetProperty("downloadedLocation").GetString()!;
+        string uploadState = uploadJson.RootElement.GetProperty("state").GetString()!;
+
+        Assert.True(File.Exists(downloadedLocation));
+        byte[] storedBytes = await File.ReadAllBytesAsync(downloadedLocation);
+        Assert.Equal(payloadBytes, storedBytes);
+
+        using HttpResponseMessage ingestionResponse = await client.GetAsync($"api/ingestions/{ingestionId}");
+        Assert.Equal(HttpStatusCode.OK, ingestionResponse.StatusCode);
+
+        string ingestionBody = await ingestionResponse.Content.ReadAsStringAsync();
+        using var ingestionJson = JsonDocument.Parse(ingestionBody);
+        JsonElement item = ingestionJson.RootElement.GetProperty("item");
+
+        Assert.Equal(uploadState, item.GetProperty("CurrentState").GetString());
+        Assert.Equal("encore", item.GetProperty("Source").GetString());
+        Assert.Equal("Song Upload.zip", item.GetProperty("DisplayName").GetString());
+        Assert.Equal("encore", item.GetProperty("LibrarySource").GetString());
+        Assert.Equal("Artist Upload", item.GetProperty("Artist").GetString());
+        Assert.Equal("Song Upload", item.GetProperty("Title").GetString());
+    }
+
+    [Fact]
+    public async Task UploadIngestion_WithUnsupportedMediaType_ReturnsUnsupportedMediaType()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-upload-unsupported-content-type");
+        await using IngestionSyncApiHost host = CreateHost(temp.RootPath, "token-upload-unsupported-content-type");
+        await host.StartAsync();
+
+        using HttpClient client = CreateHttpClient();
+        client.DefaultRequestHeaders.Add("X-ChartHub-Sync-Token", "token-upload-unsupported-content-type");
+
+        using HttpResponseMessage response = await client.PostAsync(
+            "api/ingestions/upload",
+            new StringContent("not-multipart", Encoding.UTF8, "text/plain"));
+
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
     }
 
     [Fact]
@@ -886,7 +944,7 @@ public class IngestionSyncApiHostTests
     public async Task EventEndpoint_WithOversizedBody_ReturnsRequestEntityTooLarge()
     {
         using var temp = new TemporaryDirectoryFixture("sync-api-event-oversized");
-        await using IngestionSyncApiHost host = CreateHost(temp.RootPath, "token-event-oversized");
+        await using IngestionSyncApiHost host = CreateHost(temp.RootPath, "token-event-oversized", syncApiMaxRequestBodyBytes: 64 * 1024);
         await host.StartAsync();
 
         using HttpClient client = CreateHttpClient();
@@ -1161,6 +1219,41 @@ public class IngestionSyncApiHostTests
         return createJson.RootElement.GetProperty("ingestionId").GetInt64();
     }
 
+    private static MultipartFormDataContent CreateUploadMultipartContent(
+        byte[] fileContent,
+        string fileName,
+        string source,
+        string sourceId,
+        string? librarySource = null,
+        string? title = null,
+        string? artist = null)
+    {
+        var content = new MultipartFormDataContent();
+        var filePart = new ByteArrayContent(fileContent);
+        filePart.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        content.Add(filePart, "file", fileName);
+        content.Add(new StringContent(fileName), "displayName");
+        content.Add(new StringContent(source), "source");
+        content.Add(new StringContent(sourceId), "sourceId");
+
+        if (!string.IsNullOrWhiteSpace(librarySource))
+        {
+            content.Add(new StringContent(librarySource), "librarySource");
+        }
+
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            content.Add(new StringContent(title), "title");
+        }
+
+        if (!string.IsNullOrWhiteSpace(artist))
+        {
+            content.Add(new StringContent(artist), "artist");
+        }
+
+        return content;
+    }
+
     private static string CreateTestZip(string rootPath, string fileName)
     {
         Directory.CreateDirectory(rootPath);
@@ -1179,8 +1272,8 @@ public class IngestionSyncApiHostTests
         string? pairCodeIssuedAtUtc = null,
         int pairCodeTtlMinutes = 10,
         bool allowStateOverride = false,
-        int syncApiMaxRequestBodyBytes = 64 * 1024,
-        int syncApiBodyReadTimeoutMs = 1000,
+        int syncApiMaxRequestBodyBytes = 32 * 1024 * 1024,
+        int syncApiBodyReadTimeoutMs = 30000,
         int syncApiMutationWaitTimeoutMs = 250,
         int syncApiSlowRequestThresholdMs = 500,
         IDesktopPathOpener? opener = null)
@@ -1208,8 +1301,8 @@ public class IngestionSyncApiHostTests
         string? pairCodeIssuedAtUtc = null,
         int pairCodeTtlMinutes = 10,
         bool allowStateOverride = false,
-        int syncApiMaxRequestBodyBytes = 64 * 1024,
-        int syncApiBodyReadTimeoutMs = 1000,
+        int syncApiMaxRequestBodyBytes = 32 * 1024 * 1024,
+        int syncApiBodyReadTimeoutMs = 30000,
         int syncApiMutationWaitTimeoutMs = 250,
         int syncApiSlowRequestThresholdMs = 500,
         IDesktopPathOpener? opener = null)

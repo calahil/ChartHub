@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 
 using ChartHub.Models;
@@ -25,7 +26,7 @@ public partial class RhythmVerseView : UserControl
     {
         base.OnAttachedToVisualTree(e);
 
-        AttachScrollHandlers();
+        ScheduleAttachScrollHandlers();
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -44,7 +45,12 @@ public partial class RhythmVerseView : UserControl
             viewModel.PropertyChanged += ViewModel_PropertyChanged;
         }
 
-        AttachScrollHandlers();
+        ScheduleAttachScrollHandlers();
+    }
+
+    private void ScheduleAttachScrollHandlers()
+    {
+        Dispatcher.UIThread.Post(AttachScrollHandlers, DispatcherPriority.Loaded);
     }
 
     private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

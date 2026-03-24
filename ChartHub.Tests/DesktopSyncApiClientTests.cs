@@ -43,6 +43,22 @@ public sealed class DesktopSyncApiClientTests
     }
 
     [Fact]
+    public async Task UploadIngestionFileAsync_WithMissingLocalFile_Throws()
+    {
+        var client = new DesktopSyncApiClient();
+
+        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.UploadIngestionFileAsync(
+                "http://127.0.0.1:15123",
+                "token",
+                "/tmp/this-file-should-not-exist.zip",
+                "song.zip",
+                cancellationToken: CancellationToken.None));
+
+        Assert.Equal("Local file does not exist.", ex.Message);
+    }
+
+    [Fact]
     public async Task TryReadErrorAsync_WithJsonError_ReturnsMessage()
     {
         using var response = new HttpResponseMessage(HttpStatusCode.BadRequest)
