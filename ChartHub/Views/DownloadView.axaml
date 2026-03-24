@@ -139,18 +139,71 @@
                 <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
                         BorderThickness="1"
                         Padding="10">
-                    <DataGrid ItemsSource="{Binding DownloadFiles}"
-                              CanUserSortColumns="True"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="False">
-                        <DataGrid.Columns>
-                            <DataGridCheckBoxColumn Header="Select" Binding="{Binding Checked}" Width="80" />
-                            <DataGridTextColumn Header="Name" Binding="{Binding DisplayName}" Width="220" />
-                            <DataGridTextColumn Header="Type" Binding="{Binding FileType}" Width="120" />
-                            <DataGridTextColumn Header="Size" Binding="{Binding FileSize}" Width="120" />
-                            <DataGridTextColumn Header="Path" Binding="{Binding FilePath}" Width="*" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <Grid>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      IsVisible="{Binding HasLocalDownloadFiles}">
+                            <ItemsControl ItemsSource="{Binding DownloadFiles}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,6"
+                                            Padding="10"
+                                                CornerRadius="10"
+                                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                BorderThickness="1"
+                                                Background="{StaticResource ThemeControlLowBrush}">
+                                            <Grid ColumnDefinitions="Auto,*"
+                                                  RowDefinitions="Auto,Auto,Auto,Auto">
+                                                <CheckBox Grid.RowSpan="4"
+                                                          IsChecked="{Binding Checked}"
+                                                          VerticalAlignment="Top"
+                                                          Margin="0,1,10,0" />
+                                                <TextBlock Grid.Column="1"
+                                                           Grid.Row="0"
+                                                           Text="{Binding DisplayName}"
+                                                           FontWeight="SemiBold"
+                                                           Margin="0,0,0,4"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Grid.Column="1"
+                                                           Grid.Row="1"
+                                                           Text="{Binding FileType, StringFormat=Type: {0}}"
+                                                           Margin="0,0,0,4"
+                                                           Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Grid.Row="2"
+                                                           Text="{Binding FileSize, StringFormat=Size: {0}}"
+                                                           Margin="0,0,0,4"
+                                                           Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                <TextBlock Grid.Column="1"
+                                                           Grid.Row="3"
+                                                           Text="{Binding FilePath, StringFormat=Path: {0}}"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <Border IsVisible="{Binding ShowLocalEmptyState}"
+                                Padding="10"
+                                CornerRadius="10"
+                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                BorderThickness="1"
+                                Background="{StaticResource ThemeControlLowBrush}">
+                            <StackPanel Spacing="4">
+                                <TextBlock IsVisible="{Binding IsDesktopMode}"
+                                           Text="No local downloads found. Add files to your Downloads folder to populate this list."
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                <TextBlock IsVisible="{Binding IsCompanionMode}"
+                                           Text="No local files yet. Add files to Downloads to see them here."
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource ThemeForegroundLowBrush}"
+                                           FontSize="12" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                 </Border>
             </TabItem>
 
@@ -178,24 +231,92 @@
                     </StackPanel>
 
                         <Border Grid.Row="1"
-                            Margin="0,8,0,0"
-                            BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                            BorderThickness="1"
-                            Padding="10">
-                        <DataGrid ItemsSource="{Binding IngestionQueue}"
-                                  CanUserSortColumns="False"
-                                  AutoGenerateColumns="False"
-                                  IsReadOnly="False">
-                            <DataGrid.Columns>
-                                <DataGridCheckBoxColumn Header="Install" Binding="{Binding Checked}" Width="80" />
-                                <DataGridTextColumn Header="Name" Binding="{Binding DisplayName}" Width="220" />
-                                <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="110" />
-                                <DataGridTextColumn Header="State" Binding="{Binding CurrentState}" Width="120" />
-                                <DataGridTextColumn Header="Updated" Binding="{Binding UpdatedText}" Width="170" />
-                                <DataGridTextColumn Header="Downloaded Asset" Binding="{Binding DownloadedLocation}" Width="260" />
-                                <DataGridTextColumn Header="Installed Dir" Binding="{Binding InstalledLocation}" Width="260" />
-                            </DataGrid.Columns>
-                        </DataGrid>
+                                Margin="0,8,0,0"
+                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                BorderThickness="1"
+                                Padding="10">
+                            <Grid>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              IsVisible="{Binding HasIngestionQueueItems}">
+                                    <ItemsControl ItemsSource="{Binding IngestionQueue}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="0,0,0,6"
+                                                    Padding="10"
+                                                        CornerRadius="10"
+                                                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                        BorderThickness="1"
+                                                        Background="{StaticResource ThemeControlLowBrush}">
+                                                    <Grid ColumnDefinitions="Auto,*"
+                                                          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                                                        <CheckBox Grid.RowSpan="7"
+                                                                  IsChecked="{Binding Checked}"
+                                                                  VerticalAlignment="Top"
+                                                                  Margin="0,1,10,0" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Grid.Row="0"
+                                                                   Text="{Binding DisplayName}"
+                                                                   FontWeight="SemiBold"
+                                                                   Margin="0,0,0,4"
+                                                                   TextWrapping="Wrap" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Grid.Row="1"
+                                                                   Text="{Binding Source, StringFormat=Source: {0}}"
+                                                                   Margin="0,0,0,4"
+                                                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Grid.Row="2"
+                                                                   Text="{Binding CurrentState, StringFormat=State: {0}}"
+                                                                   Margin="0,0,0,4"
+                                                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Grid.Row="3"
+                                                                   Text="{Binding UpdatedText, StringFormat=Updated: {0}}"
+                                                                   Margin="0,0,0,4"
+                                                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Grid.Row="4"
+                                                                   Text="{Binding DownloadedLocation, StringFormat=Downloaded Asset: {0}}"
+                                                                   Margin="0,0,0,4"
+                                                                   TextWrapping="Wrap"
+                                                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Grid.Row="5"
+                                                                   Text="{Binding InstalledLocation, StringFormat=Installed Dir: {0}}"
+                                                                   Margin="0,0,0,4"
+                                                                   TextWrapping="Wrap"
+                                                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                        <TextBlock Grid.Column="1"
+                                                                   Grid.Row="6"
+                                                                   Text="{Binding ActionResultStatusBadge, StringFormat=Status: {0}}"
+                                                                   IsVisible="{Binding HasPendingActionResult}"
+                                                                   Foreground="{StaticResource ThemeAccentBrush}" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                                <Border IsVisible="{Binding ShowQueueEmptyState}"
+                                        Padding="10"
+                                        CornerRadius="10"
+                                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                        BorderThickness="1"
+                                        Background="{StaticResource ThemeControlLowBrush}">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock IsVisible="{Binding IsDesktopMode}"
+                                                   Text="No queue items match the current filters."
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                        <TextBlock IsVisible="{Binding IsCompanionMode}"
+                                                   Text="No queue items right now."
+                                                   TextWrapping="Wrap"
+                                                   Foreground="{StaticResource ThemeForegroundLowBrush}"
+                                                   FontSize="12" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
                     </Border>
                 </Grid>
             </TabItem>

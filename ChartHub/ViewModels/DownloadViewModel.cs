@@ -216,6 +216,10 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
 
     public ObservableCollection<WatcherFile> DownloadFiles { get; set; }
     public ObservableCollection<IngestionQueueItem> IngestionQueue { get; }
+    public bool HasLocalDownloadFiles => DownloadFiles.Count > 0;
+    public bool HasIngestionQueueItems => IngestionQueue.Count > 0;
+    public bool ShowLocalEmptyState => !HasLocalDownloadFiles;
+    public bool ShowQueueEmptyState => !HasIngestionQueueItems;
 
     public IReadOnlyList<string> QueueStateFilters { get; } =
     [
@@ -378,6 +382,8 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         }
 
         _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(HasLocalDownloadFiles));
+        OnPropertyChanged(nameof(ShowLocalEmptyState));
         ObserveBackgroundTask(RefreshIngestionQueueAsync(_queueRefreshCts.Token), "Queue refresh after local watcher change");
     }
 
@@ -415,6 +421,8 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         }
 
         _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(HasIngestionQueueItems));
+        OnPropertyChanged(nameof(ShowQueueEmptyState));
     }
 
     private void CheckAllItemsCommand()

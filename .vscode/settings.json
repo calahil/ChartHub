@@ -9,6 +9,7 @@
         "dotnet format": true,
         "dotnet test": true,
         "ss": true,
-        "true": true
+        "true": true,
+        "git blame": true
     }
 }

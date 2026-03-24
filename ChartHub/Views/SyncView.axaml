@@ -156,6 +156,28 @@
                     BorderBrush="{DynamicResource ThemeBorderMidBrush}"
                     Background="{DynamicResource ThemeControlLowBrush}">
                 <StackPanel Spacing="8">
+                    <Border IsVisible="{Binding ShowCompanionActivityStrip}"
+                            Padding="8"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                            Background="{DynamicResource ThemeControlMidBrush}">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding CompanionActivitySummary}"
+                                       Foreground="{DynamicResource ThemeForegroundBrush}"
+                                       TextWrapping="Wrap" />
+                            <ProgressBar IsVisible="{Binding IsLocalPushInProgress}"
+                                         Minimum="0"
+                                         Maximum="{Binding LocalPushProgressMaximum}"
+                                         Value="{Binding LocalPushProgressValue}"
+                                         Height="6" />
+                            <TextBlock Text="{Binding LocalPushCurrentFileName, StringFormat='Current file: {0}'}"
+                                       IsVisible="{Binding HasLocalPushCurrentFileName}"
+                                       Foreground="{DynamicResource ThemeForegroundLowBrush}"
+                                       FontSize="11"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
                     <WrapPanel Orientation="Horizontal"
                                ItemHeight="36"
                                ItemWidth="140">
@@ -227,10 +249,18 @@
                                                    Foreground="{DynamicResource ThemeForegroundLowBrush}" />
                                         <TextBlock Text="{Binding UpdatedText, StringFormat='Updated: {0}'}"
                                                    Foreground="{DynamicResource ThemeForegroundLowBrush}" />
-                                        <TextBlock Text="{Binding ActionResultDisplay, StringFormat='Last action: {0}'}"
-                                                   IsVisible="{Binding HasActionResult}"
-                                                   Foreground="{DynamicResource ThemeForegroundLowBrush}"
-                                                   TextWrapping="Wrap" />
+                                             <WrapPanel Orientation="Horizontal"
+                                                  IsVisible="{Binding HasActionResult}">
+                                              <TextBlock Text="{Binding ActionResultStatusBadge}"
+                                                      Margin="0,0,6,0"
+                                                      Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                                              <TextBlock Text="{Binding ActionResultDisplay, StringFormat='Last action: {0}'}"
+                                                      Foreground="{DynamicResource ThemeForegroundLowBrush}"
+                                                      TextWrapping="Wrap" />
+                                             </WrapPanel>
+                                             <ProgressBar IsVisible="{Binding HasPendingActionResult}"
+                                                    IsIndeterminate="True"
+                                                    Height="4" />
                                         <WrapPanel Orientation="Horizontal"
                                                    ItemHeight="36"
                                                    ItemWidth="150">
@@ -241,10 +271,6 @@
                                             <Button Margin="0,0,8,8"
                                                     Content="Install"
                                                 Command="{Binding #Root.((viewmodels:SyncViewModel)DataContext).InstallSelectedCommand}"
-                                                    CommandParameter="{Binding}" />
-                                            <Button Margin="0,0,8,8"
-                                                    Content="Push"
-                                                Command="{Binding #Root.((viewmodels:SyncViewModel)DataContext).PushSelectedCommand}"
                                                     CommandParameter="{Binding}" />
                                             <Button Margin="0,0,8,8"
                                                     Content="Open Folder"

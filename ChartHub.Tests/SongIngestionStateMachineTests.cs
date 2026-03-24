@@ -19,6 +19,7 @@ public class SongIngestionStateMachineTests
         var sut = new SongIngestionStateMachine();
 
         Assert.True(sut.CanTransition(IngestionState.Queued, IngestionState.ResolvingSource));
+        Assert.True(sut.CanTransition(IngestionState.Queued, IngestionState.Downloaded));
         Assert.True(sut.CanTransition(IngestionState.ResolvingSource, IngestionState.Downloading));
         Assert.True(sut.CanTransition(IngestionState.Downloading, IngestionState.Downloaded));
         Assert.True(sut.CanTransition(IngestionState.Downloaded, IngestionState.Converting));

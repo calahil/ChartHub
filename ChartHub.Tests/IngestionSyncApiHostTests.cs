@@ -386,10 +386,9 @@ public class IngestionSyncApiHostTests
 
         Assert.Equal(ingestionId, item.GetProperty("IngestionId").GetInt64());
         Assert.Equal("rhythmverse", item.GetProperty("Source").GetString());
-        // Accept either Queued or Downloaded, depending on what POST /api/ingestions left it as
-        Assert.Contains(item.GetProperty("CurrentState").GetString(), new[] { "Queued", "Downloaded" });
+        Assert.Equal("Downloaded", item.GetProperty("CurrentState").GetString());
         Assert.Equal(LibraryIdentityService.BuildSourceKey("rhythmverse", "drive-id-single"), item.GetProperty("SourceId").GetString());
-        Assert.Contains(item.GetProperty("DesktopState").GetString(), new[] { "Cloud", "Downloaded" });
+        Assert.Equal("Downloaded", item.GetProperty("DesktopState").GetString());
     }
 
     [Fact]
@@ -455,7 +454,7 @@ public class IngestionSyncApiHostTests
     public async Task CreateIngestion_WithOversizedBody_ReturnsRequestEntityTooLarge()
     {
         using var temp = new TemporaryDirectoryFixture("sync-api-create-oversized");
-        await using IngestionSyncApiHost host = CreateHost(temp.RootPath, "token-create-oversized", syncApiMaxRequestBodyBytes: 64 * 1024);
+        await using IngestionSyncApiHost host = CreateHost(temp.RootPath, "token-create-oversized", syncApiMaxRequestBodyBytes: 63 * 1024);
         await host.StartAsync();
 
         using HttpClient client = CreateHttpClient();
@@ -569,6 +568,7 @@ public class IngestionSyncApiHostTests
         string uploadState = uploadJson.RootElement.GetProperty("state").GetString()!;
 
         Assert.True(File.Exists(downloadedLocation));
+        Assert.StartsWith(Path.Combine(temp.RootPath, "Downloads") + Path.DirectorySeparatorChar, downloadedLocation, StringComparison.Ordinal);
         byte[] storedBytes = await File.ReadAllBytesAsync(downloadedLocation);
         Assert.Equal(payloadBytes, storedBytes);
 
@@ -676,7 +676,7 @@ public class IngestionSyncApiHostTests
         using var json = JsonDocument.Parse(body);
         Assert.Equal(ingestionId, json.RootElement.GetProperty("ingestionId").GetInt64());
         string? fromState = json.RootElement.GetProperty("fromState").GetString();
-        Assert.Contains(fromState, new[] { "Queued", "Downloaded" });
+        Assert.Equal("Downloaded", fromState);
         Assert.Equal("ResolvingSource", json.RootElement.GetProperty("toState").GetString());
     }
 
@@ -944,7 +944,7 @@ public class IngestionSyncApiHostTests
     public async Task EventEndpoint_WithOversizedBody_ReturnsRequestEntityTooLarge()
     {
         using var temp = new TemporaryDirectoryFixture("sync-api-event-oversized");
-        await using IngestionSyncApiHost host = CreateHost(temp.RootPath, "token-event-oversized", syncApiMaxRequestBodyBytes: 64 * 1024);
+        await using IngestionSyncApiHost host = CreateHost(temp.RootPath, "token-event-oversized", syncApiMaxRequestBodyBytes: 63 * 1024);
         await host.StartAsync();
 
         using HttpClient client = CreateHttpClient();

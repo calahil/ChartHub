@@ -59,6 +59,8 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
             _lastActionResult = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(HasActionResult));
+            OnPropertyChanged(nameof(HasPendingActionResult));
+            OnPropertyChanged(nameof(ActionResultStatusBadge));
             OnPropertyChanged(nameof(ActionResultDisplay));
         }
     }
@@ -67,6 +69,16 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
     /// True if an action result exists (successful or failed).
     /// </summary>
     public bool HasActionResult => LastActionResult is not null;
+
+    /// <summary>
+    /// True if the most recent action is still pending.
+    /// </summary>
+    public bool HasPendingActionResult => LastActionResult?.Status == ActionResultStatus.Pending;
+
+    /// <summary>
+    /// Badge icon/text for action status.
+    /// </summary>
+    public string ActionResultStatusBadge => LastActionResult?.StatusBadge ?? string.Empty;
 
     /// <summary>
     /// Display text for the UI showing action status and message.

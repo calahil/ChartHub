@@ -349,15 +349,8 @@ public sealed class IngestionSyncApiHost(
                     string sourceId = uploadRequest.GetField("sourceId")
                         ?? $"upload:{contentHash[..16]}";
 
-                    string uploadRoot = Path.Combine(_globalSettings.StagingDir, "sync-upload");
-                    Directory.CreateDirectory(uploadRoot);
-
-                    string uploadFolder = Path.Combine(
-                        uploadRoot,
-                        $"{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}");
-                    Directory.CreateDirectory(uploadFolder);
-
-                    string uploadedPath = SafePathHelper.GetSafeFilePath(uploadFolder, displayName, "upload.bin");
+                    Directory.CreateDirectory(_globalSettings.DownloadDir);
+                    string uploadedPath = SafePathHelper.GetSafeFilePath(_globalSettings.DownloadDir, displayName, "upload.bin");
                     await File.WriteAllBytesAsync(uploadedPath, uploadRequest.FileContent, cancellationToken).ConfigureAwait(false);
 
                     string canonicalSourceId = LibraryIdentityService.NormalizeSourceKey(source, sourceId);

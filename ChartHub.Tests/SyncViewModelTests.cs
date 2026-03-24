@@ -125,10 +125,15 @@ public class SyncViewModelTests
         await sut.ScanBootstrapQrCommand.ExecuteAsync(null);
         await sut.ConfirmQrPairingCommand.ExecuteAsync(null);
 
+        bool tokenPersisted = await WaitForConditionAsync(
+            () => settings.SyncApiAuthToken == sut.SyncToken,
+            TimeSpan.FromSeconds(2));
+
         Assert.True(sut.IsConnected);
         Assert.True(sut.HasQueueItems);
         Assert.Single(sut.QueueItems);
-        Assert.Equal("token-claimed", settings.SyncApiAuthToken);
+        Assert.True(tokenPersisted);
+        Assert.Equal("token-claimed", sut.SyncToken);
     }
 
     [Fact]
@@ -457,7 +462,6 @@ public class SyncViewModelTests
 
         Assert.False(sut.RetrySelectedCommand.CanExecute(queueItem));
         Assert.False(sut.InstallSelectedCommand.CanExecute(queueItem));
-        Assert.False(sut.PushSelectedCommand.CanExecute(queueItem));
         Assert.False(sut.OpenFolderSelectedCommand.CanExecute(queueItem));
     }
 
@@ -480,11 +484,6 @@ public class SyncViewModelTests
 
         sut.RefreshDesktopQrCommand.Execute(null);
 
-        bool persisted = await WaitForConditionAsync(
-            () => settings.SyncApiPairCode == sut.PairCode,
-            TimeSpan.FromSeconds(2));
-
-        Assert.True(persisted);
         Assert.NotEqual(originalPairCode, sut.PairCode);
         Assert.NotEqual(originalPayload, sut.GeneratedBootstrapPayload);
         Assert.Equal(qrExportService.ExportPath, sut.BootstrapQrImageExportPath);
@@ -515,94 +514,6 @@ public class SyncViewModelTests
         Assert.NotNull(queueItem.LastActionResult);
         Assert.Equal(ActionType.OpenFolder, queueItem.LastActionResult.ActionType);
         Assert.Equal(ActionResultStatus.Success, queueItem.LastActionResult.Status);
-    }
-
-    [Fact]
-    public async Task PushSelectedCommand_SetsSuccessResultOnCompletion()
-    {
-        using var temp = new TemporaryDirectoryFixture("sync-vm-push-result");
-        AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        string localPath = Path.Combine(temp.RootPath, "Downloads", "song.zip");
-        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
-        await File.WriteAllTextAsync(localPath, "zip-data");
-
-        IngestionQueueItem queueItem = new()
-        {
-            IngestionId = 42,
-            Source = "googledrive",
-            SourceLink = "https://drive.google.com/file/d/abc/view",
-            DisplayName = "Song",
-            CurrentState = IngestionState.Downloaded,
-            DesktopState = DesktopState.Cloud,
-            UpdatedAtUtc = DateTimeOffset.UtcNow,
-            DownloadedLocation = localPath,
-        };
-
-        var client = new StubDesktopSyncApiClient
-        {
-            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
-            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([queueItem]),
-        };
-        var pushService = new StubLocalIngestionPushService
-        {
-            PushHandler = (_, _, _, _) => Task.FromResult(777L),
-        };
-
-        using var sut = new SyncViewModel(client, settings, isCompanionMode: true, localIngestionPushService: pushService);
-        sut.SyncToken = "persisted-token";
-        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
-
-        await sut.TestConnectionCommand.ExecuteAsync(null);
-        await sut.PushSelectedCommand.ExecuteAsync(queueItem);
-
-        Assert.NotNull(queueItem.LastActionResult);
-        Assert.Equal(ActionType.Push, queueItem.LastActionResult.ActionType);
-        Assert.Equal(ActionResultStatus.Success, queueItem.LastActionResult.Status);
-        Assert.Contains("777", queueItem.LastActionResult.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task PushSelectedCommand_SetsFailedResultOnException()
-    {
-        using var temp = new TemporaryDirectoryFixture("sync-vm-push-failure");
-        AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        string localPath = Path.Combine(temp.RootPath, "Downloads", "song.zip");
-        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
-        await File.WriteAllTextAsync(localPath, "zip-data");
-
-        IngestionQueueItem queueItem = new()
-        {
-            IngestionId = 42,
-            Source = "googledrive",
-            SourceLink = "https://drive.google.com/file/d/abc/view",
-            DisplayName = "Song",
-            CurrentState = IngestionState.Downloaded,
-            DesktopState = DesktopState.Cloud,
-            UpdatedAtUtc = DateTimeOffset.UtcNow,
-            DownloadedLocation = localPath,
-        };
-
-        var client = new StubDesktopSyncApiClient
-        {
-            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
-            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([queueItem]),
-        };
-        var pushService = new StubLocalIngestionPushService
-        {
-            PushHandler = (_, _, _, _) => throw new InvalidOperationException("push failed"),
-        };
-
-        using var sut = new SyncViewModel(client, settings, isCompanionMode: true, localIngestionPushService: pushService);
-        sut.SyncToken = "persisted-token";
-        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
-
-        await sut.TestConnectionCommand.ExecuteAsync(null);
-        await sut.PushSelectedCommand.ExecuteAsync(queueItem);
-
-        Assert.NotNull(queueItem.LastActionResult);
-        Assert.Equal(ActionType.Push, queueItem.LastActionResult.ActionType);
-        Assert.Equal(ActionResultStatus.Failed, queueItem.LastActionResult.Status);
-        Assert.Contains("push failed", queueItem.LastActionResult.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -791,7 +702,20 @@ public class SyncViewModelTests
 
         Assert.NotNull(item.LastActionResult);
         Assert.True(item.HasActionResult);
+        Assert.False(item.HasPendingActionResult);
         Assert.Equal("Install completed", item.ActionResultDisplay);
+
+        item.LastActionResult = new ActionResult
+        {
+            ActionType = ActionType.Install,
+            Status = ActionResultStatus.Pending,
+            Message = "Installing",
+            InitiatedAtUtc = DateTimeOffset.UtcNow,
+            CompletedAtUtc = DateTimeOffset.UtcNow,
+        };
+
+        Assert.True(item.HasPendingActionResult);
+        Assert.Equal("⏳", item.ActionResultStatusBadge);
     }
 
     [Fact]

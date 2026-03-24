@@ -19,6 +19,8 @@ using CommunityToolkit.Mvvm.Input;
 
 using QRCoder;
 
+using AvaloniaApp = global::Avalonia.Application;
+
 namespace ChartHub.ViewModels;
 
 public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
@@ -57,6 +59,10 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private CancellationTokenSource? _autoRefreshCancellationTokenSource;
     private DateTimeOffset? _lastAutoRefreshUtc;
     private ConnectionDiagnostics _diagnostics = new();
+    private bool _isLocalPushInProgress;
+    private int _localPushTotalCount;
+    private int _localPushCompletedCount;
+    private string? _localPushCurrentFileName;
 
     public string DesktopApiBaseUrl
     {
@@ -195,7 +201,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             PushSelectedLocalFilesCommand.NotifyCanExecuteChanged();
             RetrySelectedCommand.NotifyCanExecuteChanged();
             InstallSelectedCommand.NotifyCanExecuteChanged();
-            PushSelectedCommand.NotifyCanExecuteChanged();
             OpenFolderSelectedCommand.NotifyCanExecuteChanged();
         }
     }
@@ -227,7 +232,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             PushSelectedLocalFilesCommand.NotifyCanExecuteChanged();
             RetrySelectedCommand.NotifyCanExecuteChanged();
             InstallSelectedCommand.NotifyCanExecuteChanged();
-            PushSelectedCommand.NotifyCanExecuteChanged();
             OpenFolderSelectedCommand.NotifyCanExecuteChanged();
 
             if (_isConnected)
@@ -255,7 +259,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged();
             RetrySelectedCommand.NotifyCanExecuteChanged();
             InstallSelectedCommand.NotifyCanExecuteChanged();
-            PushSelectedCommand.NotifyCanExecuteChanged();
             OpenFolderSelectedCommand.NotifyCanExecuteChanged();
         }
     }
@@ -370,6 +373,21 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     public bool ShowCompanionQueueSection => IsCompanionMode && IsConnected;
     public bool ShowCompanionLocalFilesSection => IsCompanionMode && IsConnected;
     public bool ShowNoLocalFilesHint => IsCompanionMode && IsConnected && !HasLocalFiles;
+    public bool IsLocalPushInProgress => _isLocalPushInProgress;
+    public bool HasLocalPushCurrentFileName => !string.IsNullOrWhiteSpace(_localPushCurrentFileName);
+    public string LocalPushCurrentFileName => _localPushCurrentFileName ?? string.Empty;
+    public int LocalPushTotalCount => _localPushTotalCount;
+    public int LocalPushCompletedCount => _localPushCompletedCount;
+    public int PendingQueueActionCount => QueueItems.Count(item => item.LastActionResult?.Status == ActionResultStatus.Pending);
+    public bool HasPendingQueueActions => PendingQueueActionCount > 0;
+    public bool ShowCompanionActivityStrip => IsCompanionMode && IsConnected && (IsLocalPushInProgress || HasPendingQueueActions);
+    public double LocalPushProgressMaximum => Math.Max(1, LocalPushTotalCount);
+    public double LocalPushProgressValue => LocalPushCompletedCount;
+    public string CompanionActivitySummary => IsLocalPushInProgress
+        ? $"Pushing files: {LocalPushCompletedCount}/{LocalPushTotalCount} complete"
+        : HasPendingQueueActions
+            ? $"Desktop actions in progress: {PendingQueueActionCount}"
+            : string.Empty;
     public bool ShowDesktopBootstrapPlaceholder => IsDesktopMode && !HasBootstrapQrImage;
     public string SyncTitle => IsDesktopMode ? "Desktop Sync Host" : "Desktop Sync Companion";
     public string SyncSubtitle => IsDesktopMode
@@ -417,7 +435,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     public IAsyncRelayCommand PushSelectedLocalFilesCommand { get; }
     public IAsyncRelayCommand<IngestionQueueItem?> RetrySelectedCommand { get; }
     public IAsyncRelayCommand<IngestionQueueItem?> InstallSelectedCommand { get; }
-    public IAsyncRelayCommand<IngestionQueueItem?> PushSelectedCommand { get; }
     public IAsyncRelayCommand<IngestionQueueItem?> OpenFolderSelectedCommand { get; }
 
     public SyncViewModel(
@@ -465,7 +482,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         PushSelectedLocalFilesCommand = new AsyncRelayCommand(PushSelectedLocalFilesAsync, CanPushSelectedLocalFiles);
         RetrySelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(RetrySelectedAsync, CanActOnSelectedItem);
         InstallSelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(InstallSelectedAsync, CanInstallSelectedItem);
-        PushSelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(PushSelectedAsync, CanPushSelectedItem);
         OpenFolderSelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(OpenFolderSelectedAsync, CanActOnSelectedItem);
     }
 
@@ -479,6 +495,21 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         return IsDesktopMode
             ? "Present this QR on the desktop so the companion can pair over LAN."
             : "Scan the desktop QR to start pairing.";
+    }
+
+    private bool CanConfirmQrPairing()
+    {
+        return !IsBusy && HasPendingQrPairing;
+    }
+
+    private bool CanScanBootstrapQr()
+    {
+        return !IsBusy && IsCompanionMode && SupportsCameraScanning;
+    }
+
+    private bool CanCancelPendingQrPairing()
+    {
+        return !IsBusy && HasPendingQrPairing;
     }
 
     private bool CanRefreshQueue()
@@ -507,25 +538,77 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         return !IsBusy && IsConnected && item is not null;
     }
 
-    private bool CanPushSelectedItem(IngestionQueueItem? item)
+    private void BeginLocalPush(int totalCount)
     {
-        return CanActOnSelectedItem(item)
-            && !string.IsNullOrWhiteSpace(item?.DownloadedLocation);
+        _isLocalPushInProgress = true;
+        _localPushTotalCount = Math.Max(0, totalCount);
+        _localPushCompletedCount = 0;
+        _localPushCurrentFileName = null;
+        RaiseCompanionActivityChanged();
     }
 
-    private bool CanScanBootstrapQr()
+    private void UpdateLocalPushProgress(int completedCount, string? currentFileName)
     {
-        return !IsBusy && SupportsCameraScanning;
+        _localPushCompletedCount = Math.Clamp(completedCount, 0, Math.Max(0, _localPushTotalCount));
+        _localPushCurrentFileName = currentFileName;
+        RaiseCompanionActivityChanged();
     }
 
-    private bool CanConfirmQrPairing()
+    private void EndLocalPush()
     {
-        return !IsBusy && _pendingQrPairing is not null;
+        _isLocalPushInProgress = false;
+        _localPushTotalCount = 0;
+        _localPushCompletedCount = 0;
+        _localPushCurrentFileName = null;
+        RaiseCompanionActivityChanged();
     }
 
-    private bool CanCancelPendingQrPairing()
+    private void RaiseCompanionActivityChanged()
     {
-        return !IsBusy && _pendingQrPairing is not null;
+        OnPropertyChanged(nameof(IsLocalPushInProgress));
+        OnPropertyChanged(nameof(HasLocalPushCurrentFileName));
+        OnPropertyChanged(nameof(LocalPushCurrentFileName));
+        OnPropertyChanged(nameof(LocalPushTotalCount));
+        OnPropertyChanged(nameof(LocalPushCompletedCount));
+        OnPropertyChanged(nameof(LocalPushProgressMaximum));
+        OnPropertyChanged(nameof(LocalPushProgressValue));
+        OnPropertyChanged(nameof(PendingQueueActionCount));
+        OnPropertyChanged(nameof(HasPendingQueueActions));
+        OnPropertyChanged(nameof(ShowCompanionActivityStrip));
+        OnPropertyChanged(nameof(CompanionActivitySummary));
+    }
+
+    private void OnQueueItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(IngestionQueueItem.LastActionResult)
+            || e.PropertyName == nameof(IngestionQueueItem.HasPendingActionResult)
+            || e.PropertyName == nameof(IngestionQueueItem.ActionResultDisplay))
+        {
+            RaiseCompanionActivityChanged();
+        }
+    }
+
+    private void OnQueueItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (IngestionQueueItem item in e.OldItems)
+            {
+                item.PropertyChanged -= OnQueueItemPropertyChanged;
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (IngestionQueueItem item in e.NewItems)
+            {
+                item.PropertyChanged += OnQueueItemPropertyChanged;
+            }
+        }
+
+        OnPropertyChanged(nameof(HasQueueItems));
+        OnPropertyChanged(nameof(ShowEmptyQueueState));
+        RaiseCompanionActivityChanged();
     }
 
     private async Task ScanBootstrapQrAsync()
@@ -697,19 +780,30 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     {
         IReadOnlyList<WatcherFile> files = await _localDownloadFileCatalogService.GetFilesAsync(_appGlobalSettings.DownloadDir);
 
+        if (AvaloniaApp.Current is null)
+        {
+            ApplyLocalFilesSnapshot(files);
+            return;
+        }
+
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            LocalFiles.Clear();
-            foreach (WatcherFile file in files)
-            {
-                LocalFiles.Add(file);
-            }
-
-            OnPropertyChanged(nameof(HasLocalFiles));
-            OnPropertyChanged(nameof(HasSelectedLocalFiles));
-            OnPropertyChanged(nameof(ShowNoLocalFilesHint));
-            PushSelectedLocalFilesCommand.NotifyCanExecuteChanged();
+            ApplyLocalFilesSnapshot(files);
         }, DispatcherPriority.Background);
+    }
+
+    private void ApplyLocalFilesSnapshot(IReadOnlyList<WatcherFile> files)
+    {
+        LocalFiles.Clear();
+        foreach (WatcherFile file in files)
+        {
+            LocalFiles.Add(file);
+        }
+
+        OnPropertyChanged(nameof(HasLocalFiles));
+        OnPropertyChanged(nameof(HasSelectedLocalFiles));
+        OnPropertyChanged(nameof(ShowNoLocalFilesHint));
+        PushSelectedLocalFilesCommand.NotifyCanExecuteChanged();
     }
 
     private void OnLocalFilePropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -731,40 +825,55 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
                 return;
             }
 
+            BeginLocalPush(selectedFiles.Count);
+
             int successCount = 0;
             List<string> failures = [];
-            foreach (WatcherFile selectedFile in selectedFiles)
+            try
             {
-                try
+                foreach (WatcherFile selectedFile in selectedFiles)
                 {
-                    _ = await _localIngestionPushService.PushAsync(
-                        DesktopApiBaseUrl,
-                        SyncToken,
-                        new LocalIngestionEntry
-                        {
-                            LocalPath = selectedFile.FilePath,
-                            DisplayName = selectedFile.DisplayName,
-                        });
+                    UpdateLocalPushProgress(_localPushCompletedCount, selectedFile.DisplayName);
 
-                    successCount++;
-                    selectedFile.Checked = false;
+                    try
+                    {
+                        _ = await _localIngestionPushService.PushAsync(
+                            DesktopApiBaseUrl,
+                            SyncToken,
+                            new LocalIngestionEntry
+                            {
+                                LocalPath = selectedFile.FilePath,
+                                DisplayName = selectedFile.DisplayName,
+                            });
+
+                        successCount++;
+                        selectedFile.Checked = false;
+                    }
+                    catch (Exception ex)
+                    {
+                        failures.Add($"{selectedFile.DisplayName}: {ex.Message}");
+                    }
+                    finally
+                    {
+                        UpdateLocalPushProgress(_localPushCompletedCount + 1, selectedFile.DisplayName);
+                    }
                 }
-                catch (Exception ex)
+
+                if (failures.Count > 0)
                 {
-                    failures.Add($"{selectedFile.DisplayName}: {ex.Message}");
+                    throw new InvalidOperationException($"Pushed {successCount}/{selectedFiles.Count} file(s). Failures: {string.Join("; ", failures)}");
                 }
+
+                StatusMessage = $"Pushed {successCount} file(s) to desktop.";
+                ErrorMessage = null;
+
+                await RefreshQueueCoreAsync();
+                await RefreshLocalFilesCoreAsync();
             }
-
-            if (failures.Count > 0)
+            finally
             {
-                throw new InvalidOperationException($"Pushed {successCount}/{selectedFiles.Count} file(s). Failures: {string.Join("; ", failures)}");
+                EndLocalPush();
             }
-
-            StatusMessage = $"Pushed {successCount} file(s) to desktop.";
-            ErrorMessage = null;
-
-            await RefreshQueueCoreAsync();
-            await RefreshLocalFilesCoreAsync();
         }, "Failed to push selected local files");
     }
 
@@ -958,70 +1067,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
                 throw;
             }
         }, "Failed to request folder open", disconnectOnFailure: false, failureStatusMessage: "Open folder request failed.");
-    }
-
-    private async Task PushSelectedAsync(IngestionQueueItem? item)
-    {
-        if (item is null)
-        {
-            return;
-        }
-
-        DateTimeOffset initiatedAt = DateTimeOffset.UtcNow;
-        item.LastActionResult = new ActionResult
-        {
-            ActionType = ActionType.Push,
-            Status = ActionResultStatus.Pending,
-            Message = "Processing...",
-            InitiatedAtUtc = initiatedAt,
-            CompletedAtUtc = initiatedAt
-        };
-
-        await RunOperationAsync(async () =>
-        {
-            try
-            {
-                long ingestionId = await _localIngestionPushService.PushAsync(
-                    DesktopApiBaseUrl,
-                    SyncToken,
-                    new LocalIngestionEntry
-                    {
-                        LocalPath = item.DownloadedLocation ?? string.Empty,
-                        DisplayName = item.DisplayName,
-                        Source = item.Source,
-                        SourceId = item.SourceId,
-                        SourceLink = item.SourceLink,
-                        Artist = item.Artist,
-                        Title = item.Title,
-                        Charter = item.Charter,
-                        LibrarySource = item.LibrarySource,
-                    });
-
-                item.LastActionResult = new ActionResult
-                {
-                    ActionType = ActionType.Push,
-                    Status = ActionResultStatus.Success,
-                    Message = $"Pushed to desktop ingestion {ingestionId}",
-                    InitiatedAtUtc = initiatedAt,
-                    CompletedAtUtc = DateTimeOffset.UtcNow
-                };
-                StatusMessage = $"Push requested for {item.DisplayName}.";
-                ErrorMessage = null;
-                await RefreshQueueCoreAsync();
-            }
-            catch (Exception ex)
-            {
-                item.LastActionResult = new ActionResult
-                {
-                    ActionType = ActionType.Push,
-                    Status = ActionResultStatus.Failed,
-                    Message = ex.Message,
-                    InitiatedAtUtc = initiatedAt,
-                    CompletedAtUtc = DateTimeOffset.UtcNow
-                };
-                throw;
-            }
-        }, "Failed to push ingestion to desktop", disconnectOnFailure: false, failureStatusMessage: "Push request failed.");
     }
 
     private static bool ShouldAdoptPairApiBaseUrl(string currentBaseUrl, string? claimedBaseUrl)
@@ -1351,12 +1396,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
 
         return (ErrorCategory.UnknownError, "Check error message above and retry.");
-    }
-
-    private void OnQueueItemsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        OnPropertyChanged(nameof(HasQueueItems));
-        OnPropertyChanged(nameof(ShowEmptyQueueState));
     }
 
     private void OnLocalFilesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)

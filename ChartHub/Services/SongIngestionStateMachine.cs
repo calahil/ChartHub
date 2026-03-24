@@ -14,7 +14,7 @@ public sealed class SongIngestionStateMachine
 {
     private static readonly Dictionary<IngestionState, HashSet<IngestionState>> AllowedTransitions = new()
     {
-        [IngestionState.Queued] = [IngestionState.ResolvingSource, IngestionState.Cancelled, IngestionState.Failed],
+        [IngestionState.Queued] = [IngestionState.ResolvingSource, IngestionState.Downloaded, IngestionState.Cancelled, IngestionState.Failed],
         [IngestionState.ResolvingSource] = [IngestionState.Queued, IngestionState.Downloading, IngestionState.Failed, IngestionState.Cancelled],
         [IngestionState.Downloading] = [IngestionState.Queued, IngestionState.Downloaded, IngestionState.Failed, IngestionState.Cancelled],
         [IngestionState.Downloaded] = [IngestionState.Queued, IngestionState.Staged, IngestionState.Converting, IngestionState.Installing, IngestionState.Failed],
