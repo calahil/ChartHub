@@ -12,6 +12,9 @@
         "true": true,
         "git blame": true,
         "timeout": true,
-        "${HOME}/Android/Sdk/platform-tools/adb": true
+        "${HOME}/Android/Sdk/platform-tools/adb": true,
+        "dotnet new": true,
+        "dotnet sln": true,
+        "dotnet ef": true
     }
 }

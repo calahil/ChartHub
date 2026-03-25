@@ -363,8 +363,7 @@ curl -s -X POST "http://127.0.0.1:15123/api/ingestions/${INGESTION_ID}/actions/o
 
 ## Notes
 
-- The app name has been migrated to ChartHub in project identity and package IDs.
-- Some backend/API references still intentionally use RhythmVerse naming where tied to the remote service contract.
+- None
 
 ## License
 
