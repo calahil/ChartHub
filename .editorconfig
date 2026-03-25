@@ -106,6 +106,9 @@ dotnet_diagnostic.CA2227.severity = suggestion
 [ChartHub.Tests/*.cs]
 dotnet_diagnostic.CA1707.severity = none
 
+[ChartHub.BackupApi.Tests/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+
 [ChartHub/Models/APIRootResponse.cs]
 generated_code = true
 

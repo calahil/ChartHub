@@ -1,0 +1,16 @@
+@ChartHub.BackupApi_HostAddress = http://localhost:5147
+
+GET {{ChartHub.BackupApi_HostAddress}}/health
+Accept: application/json
+
+###
+
+GET {{ChartHub.BackupApi_HostAddress}}/api/rhythmverse/songs?page=1&records=25
+Accept: application/json
+
+###
+
+GET {{ChartHub.BackupApi_HostAddress}}/api/schemas/rhythmverse-song-list.json
+Accept: application/schema+json
+
+###
