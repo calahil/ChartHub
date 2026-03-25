@@ -31,6 +31,17 @@
             "group": "build"
         },
         {
+            "label": "build-backup-api",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "build",
+                "${workspaceFolder}/ChartHub.BackupApi/ChartHub.BackupApi.csproj"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "build"
+        },
+        {
             "label": "run",
             "command": "dotnet",
             "type": "shell",
