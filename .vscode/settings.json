@@ -10,6 +10,8 @@
         "dotnet test": true,
         "ss": true,
         "true": true,
-        "git blame": true
+        "git blame": true,
+        "timeout": true,
+        "${HOME}/Android/Sdk/platform-tools/adb": true
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -59,6 +60,8 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
 
     public ObservableCollection<EncoreSong> DataItems { get; } = [];
     public ObservableCollection<DownloadFile> Downloads { get; private set; } = [];
+    public bool HasActiveDownloads => Downloads.Count > 0;
+    public bool NoActiveDownloads => Downloads.Count == 0;
 
     public List<string?> Instruments { get; } = [null, "guitar", "bass", "drums", "vocals", "keys"];
     public List<string?> Difficulties { get; } = [null, "0", "1", "2", "3", "4", "5", "6"];
@@ -376,6 +379,7 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     public IAsyncRelayCommand<EncoreSong?> DownloadSongCommand { get; }
     public IRelayCommand ToggleAdvancedCommand { get; }
     public IRelayCommand<DownloadFile?> CancelDownloadCommand { get; }
+    public IRelayCommand<DownloadFile?> ClearDownloadCommand { get; }
 
     public EncoreViewModel(
         EncoreApiService apiService,
@@ -395,8 +399,48 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
         DownloadSongCommand = new AsyncRelayCommand<EncoreSong?>(DownloadSongAsync);
         ToggleAdvancedCommand = new RelayCommand(() => IsAdvancedVisible = !IsAdvancedVisible);
         CancelDownloadCommand = new RelayCommand<DownloadFile?>(CancelDownload);
+        ClearDownloadCommand = new RelayCommand<DownloadFile?>(ClearDownload);
+
+        Downloads.CollectionChanged += Downloads_CollectionChanged;
+        foreach (DownloadFile item in Downloads)
+        {
+            item.PropertyChanged += DownloadItem_PropertyChanged;
+        }
 
         ObserveBackgroundTask(RefreshAsync(), "Encore initial load");
+    }
+
+    private void Downloads_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems is not null)
+        {
+            foreach (DownloadFile item in e.NewItems)
+            {
+                item.PropertyChanged += DownloadItem_PropertyChanged;
+            }
+        }
+
+        if (e.OldItems is not null)
+        {
+            foreach (DownloadFile item in e.OldItems)
+            {
+                item.PropertyChanged -= DownloadItem_PropertyChanged;
+            }
+        }
+
+        OnPropertyChanged(nameof(HasActiveDownloads));
+        OnPropertyChanged(nameof(NoActiveDownloads));
+    }
+
+    private void DownloadItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DownloadFile.Status)
+            || e.PropertyName == nameof(DownloadFile.DownloadProgress)
+            || e.PropertyName == nameof(DownloadFile.ErrorMessage))
+        {
+            OnPropertyChanged(nameof(HasActiveDownloads));
+            OnPropertyChanged(nameof(NoActiveDownloads));
+        }
     }
 
     private void ScheduleStateSave()
@@ -594,6 +638,16 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             downloadItem.ErrorMessage = null;
             cts.Cancel();
         }
+    }
+
+    private void ClearDownload(DownloadFile? downloadItem)
+    {
+        if (downloadItem is null)
+        {
+            return;
+        }
+
+        Downloads.Remove(downloadItem);
     }
 
     private async Task ExecuteSearchAsync(bool reset)

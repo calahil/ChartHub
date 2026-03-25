@@ -122,6 +122,11 @@
                             Content="Scan Desktop QR"
                             IsVisible="{Binding SupportsCameraScanning}"
                             Command="{Binding ScanBootstrapQrCommand}" />
+                        <Button HorizontalAlignment="Left"
+                            MinWidth="220"
+                            Content="{Binding ManualReconnectButtonLabel}"
+                            IsVisible="{Binding ShowManualReconnectButton}"
+                            Command="{Binding ManualReconnectCommand}" />
 
                     <Border IsVisible="{Binding ShowCompanionConfirmationSection}"
                             Padding="10"

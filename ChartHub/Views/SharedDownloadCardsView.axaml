@@ -1,0 +1,121 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:views="clr-namespace:ChartHub.Views"
+             xmlns:services="clr-namespace:ChartHub.Services"
+             mc:Ignorable="d"
+             x:Class="ChartHub.Views.SharedDownloadCardsView"
+             x:Name="Root"
+             x:DataType="views:SharedDownloadCardsView">
+
+    <UserControl.Styles>
+        <Style Selector="Border.download-card-root">
+            <Setter Property="Padding" Value="10" />
+        </Style>
+        <Style Selector="Border.download-card-item">
+            <Setter Property="Padding" Value="10" />
+            <Setter Property="Background" Value="{DynamicResource ThemeControlLowBrush}" />
+        </Style>
+        <Style Selector="ProgressBar.download-progress">
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Margin" Value="0,8,0,0" />
+        </Style>
+
+        <Style Selector="UserControl.compact Border.download-card-root">
+            <Setter Property="Padding" Value="8" />
+        </Style>
+        <Style Selector="UserControl.compact Border.download-card-item">
+            <Setter Property="Padding" Value="8" />
+        </Style>
+        <Style Selector="UserControl.compact ProgressBar.download-progress">
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Margin" Value="0,6,0,0" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border Classes="download-card-root"
+            BorderBrush="{StaticResource ThemeBorderMidBrush}"
+            BorderThickness="1"
+            IsVisible="{Binding HasActiveDownloads, ElementName=Root}">
+        <StackPanel Spacing="8">
+            <TextBlock Text="{Binding Title, ElementName=Root}"
+                       FontWeight="SemiBold" />
+
+            <ItemsControl ItemsSource="{Binding Downloads, ElementName=Root}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="services:DownloadFile">
+                        <Border Classes="download-card-item"
+                                Margin="0,0,0,6"
+                                BorderThickness="1"
+                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                CornerRadius="8">
+                            <Grid RowDefinitions="Auto,Auto,Auto"
+                                  ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Row="0"
+                                            Grid.Column="0"
+                                            Spacing="4">
+                                    <TextBlock Text="{Binding DisplayName}"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Status}"
+                                               FontSize="11"
+                                               Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                </StackPanel>
+
+                                <Panel Grid.Row="0"
+                                       Grid.Column="1">
+                                    <Button Width="24"
+                                            Height="24"
+                                            Command="{Binding CancelCommand, ElementName=Root}"
+                                            CommandParameter="{Binding}"
+                                            IsVisible="{Binding CanCancel}">
+                                        <Button.Content>
+                                            <TextBlock Text="X"
+                                                       FontSize="11"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Button.Content>
+                                    </Button>
+                                    <Button Width="24"
+                                            Height="24"
+                                            Command="{Binding ClearCommand, ElementName=Root}"
+                                            CommandParameter="{Binding}"
+                                            IsVisible="{Binding CanClear}">
+                                        <Button.Content>
+                                            <TextBlock Text="X"
+                                                       FontSize="11"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Button.Content>
+                                    </Button>
+                                </Panel>
+
+                                <ProgressBar Grid.Row="1"
+                                             Grid.ColumnSpan="2"
+                                             Classes="download-progress"
+                                             Maximum="100"
+                                             Value="{Binding DownloadProgress}" />
+
+                                <Grid Grid.Row="2"
+                                      Grid.ColumnSpan="2"
+                                      Margin="0,8,0,0"
+                                      ColumnDefinitions="Auto,*">
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding DownloadProgress, StringFormat='{}{0:F0}%'}"
+                                               FontSize="11"
+                                               Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                    <TextBlock Grid.Column="1"
+                                               Margin="10,0,0,0"
+                                               Text="{Binding ErrorMessage}"
+                                               TextWrapping="Wrap"
+                                               Foreground="{StaticResource SemanticError}" />
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Border>
+</UserControl>

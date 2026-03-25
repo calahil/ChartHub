@@ -86,11 +86,20 @@
                                 </Grid>
                                 <Grid Grid.Row="1"
                                       ColumnDefinitions="*,Auto"
-                                      RowDefinitions="*"
+                                      RowDefinitions="Auto,*"
                                       Margin="0,10,0,10"
                                       IsVisible="{Binding HasResults}" >
+                                        <views:SharedDownloadCardsView Grid.Row="0"
+                                                                       Grid.Column="0"
+                                                                       Margin="0,0,0,10"
+                                                                       Downloads="{Binding Downloads}"
+                                                                       HasActiveDownloads="{Binding HasActiveDownloads}"
+                                                                       CancelCommand="{Binding CancelDownloadCommand}"
+                                                                       ClearCommand="{Binding ClearDownloadCommand}" />
+
                                         <!-- Song List -->
                                         <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                Grid.Row="1"
                                                 Grid.Column="0"
                                                 BorderThickness="1"
                                                 Padding="10">
@@ -356,16 +365,26 @@
                                                            HorizontalAlignment="Center"/>
                                         </Grid>
 
-                                        <Border IsVisible="{Binding HasResults}"
-                                                BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                                                BorderThickness="1"
-                                                Padding="8">
-                                                <ListBox ItemsSource="{Binding DataItems}"
-                                                         SelectionMode="Single"
-                                                         SelectedItem="{Binding SelectedFile}"
-                                                         Background="{StaticResource ListBoxBackground}"
-                                                         x:Name="MobileSongsListBox"
-                                                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                        <Grid IsVisible="{Binding HasResults}"
+                                              RowDefinitions="Auto,*">
+                                                <views:SharedDownloadCardsView Grid.Row="0"
+                                                                               Margin="0,0,0,8"
+                                                                               IsCompact="True"
+                                                                               Downloads="{Binding Downloads}"
+                                                                               HasActiveDownloads="{Binding HasActiveDownloads}"
+                                                                               CancelCommand="{Binding CancelDownloadCommand}"
+                                                                               ClearCommand="{Binding ClearDownloadCommand}" />
+
+                                                <Border Grid.Row="1"
+                                                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                        BorderThickness="1"
+                                                        Padding="8">
+                                                        <ListBox ItemsSource="{Binding DataItems}"
+                                                                 SelectionMode="Single"
+                                                                 SelectedItem="{Binding SelectedFile}"
+                                                                 Background="{StaticResource ListBoxBackground}"
+                                                                 x:Name="MobileSongsListBox"
+                                                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
                                                         <ListBox.ItemTemplate>
                                                                 <DataTemplate>
                                                                         <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
@@ -434,8 +453,9 @@
                                                                         </Border>
                                                                 </DataTemplate>
                                                         </ListBox.ItemTemplate>
-                                                </ListBox>
-                                        </Border>
+                                                        </ListBox>
+                                                </Border>
+                                        </Grid>
                                 </Grid>
                         </Grid>
                 </Grid>

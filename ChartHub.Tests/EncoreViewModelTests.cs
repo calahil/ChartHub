@@ -252,6 +252,53 @@ public class EncoreViewModelTests
         Assert.Equal("avares://ChartHub/Resources/Images/noalbumart.png", song.AlbumArtUrl);
     }
 
+    [Fact]
+    public void HasActiveDownloads_TracksSharedQueueItems()
+    {
+        using var temp = new TemporaryDirectoryFixture("encore-vm-active-download-state");
+        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var handler = new RecordingHttpHandler();
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.enchor.us"),
+        };
+
+        EncoreApiService api = CreateApiService(catalog, httpClient);
+        var sharedQueue = new SharedDownloadQueue();
+        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), sharedQueue);
+
+        Assert.False(sut.HasActiveDownloads);
+        Assert.True(sut.NoActiveDownloads);
+
+        sharedQueue.Downloads.Add(new DownloadFile("Song", temp.RootPath, "https://example.test/song", 10));
+
+        Assert.True(sut.HasActiveDownloads);
+        Assert.False(sut.NoActiveDownloads);
+    }
+
+    [Fact]
+    public void ClearDownloadCommand_RemovesDownloadFromSharedQueue()
+    {
+        using var temp = new TemporaryDirectoryFixture("encore-vm-clear-download");
+        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var handler = new RecordingHttpHandler();
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.enchor.us"),
+        };
+
+        EncoreApiService api = CreateApiService(catalog, httpClient);
+        var sharedQueue = new SharedDownloadQueue();
+        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), sharedQueue);
+        var item = new DownloadFile("Song", temp.RootPath, "https://example.test/song", 10);
+        sharedQueue.Downloads.Add(item);
+
+        sut.ClearDownloadCommand.Execute(item);
+
+        Assert.Empty(sharedQueue.Downloads);
+        Assert.True(sut.NoActiveDownloads);
+    }
+
     private sealed class RecordingHttpHandler : HttpMessageHandler
     {
         private static readonly string EmptyResponseJson = """

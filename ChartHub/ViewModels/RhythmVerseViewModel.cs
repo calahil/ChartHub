@@ -1,9 +1,11 @@
 ﻿using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
 using Avalonia.Controls;
+using Avalonia.Threading;
 
 using ChartHub.Models;
 using ChartHub.Services;
@@ -83,6 +85,9 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
 
     private readonly ITransferOrchestrator _transferOrchestrator;
     private readonly LibraryCatalogService _libraryCatalog;
+    private readonly SemaphoreSlim _loadDataGate = new(1, 1);
+    private int _loadMoreGate;
+    private readonly Func<Action, Task> _uiInvoke;
 
     private ApiClientService _apiClient;
     public ApiClientService ApiClient
@@ -284,6 +289,9 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool HasActiveDownloads => Downloads.Count > 0;
+    public bool NoActiveDownloads => Downloads.Count == 0;
+
     private ViewSong? _selectedFile;
     public ViewSong? SelectedFile
     {
@@ -306,6 +314,7 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
     public IAsyncRelayCommand LoadMoreCommand { get; }
     public IAsyncRelayCommand<ViewSong?> ViewCreatorCommand { get; }
     public IRelayCommand<DownloadFile?> CancelDownloadCommand { get; }
+    public IRelayCommand<DownloadFile?> ClearDownloadCommand { get; }
 
     private readonly Dictionary<DownloadFile, CancellationTokenSource> _downloadTokens = [];
 
@@ -316,11 +325,29 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         ITransferOrchestrator transferOrchestrator,
         LibraryCatalogService libraryCatalog,
         SharedDownloadQueue sharedDownloadQueue)
+        : this(
+            new ApiClientService(configuration),
+            transferOrchestrator,
+            libraryCatalog,
+            sharedDownloadQueue,
+            loadInitialData: true,
+            uiInvoke: async action => await Dispatcher.UIThread.InvokeAsync(action))
     {
+    }
+
+    internal RhythmVerseViewModel(
+        ApiClientService apiClient,
+        ITransferOrchestrator transferOrchestrator,
+        LibraryCatalogService libraryCatalog,
+        SharedDownloadQueue sharedDownloadQueue,
+        bool loadInitialData,
+        Func<Action, Task> uiInvoke)
+    {
+        _uiInvoke = uiInvoke;
         _transferOrchestrator = transferOrchestrator;
         _libraryCatalog = libraryCatalog;
         PageStrings = new RhythmVersePageStrings();
-        _apiClient = new ApiClientService(configuration);
+        _apiClient = apiClient;
         _dataItems = [];
         _downloads = sharedDownloadQueue.Downloads;
         Filters = PageStrings.Filters;
@@ -340,6 +367,7 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         LoadMoreCommand = new AsyncRelayCommand(LoadMoreAsync);
         ViewCreatorCommand = new AsyncRelayCommand<ViewSong?>(ViewCreator);
         CancelDownloadCommand = new RelayCommand<DownloadFile?>(CancelDownload);
+        ClearDownloadCommand = new RelayCommand<DownloadFile?>(ClearDownload);
         _activePane = PaneMode.None;
         ShowFilterPaneCommand = new RelayCommand(() =>
         {
@@ -371,7 +399,48 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         _selectedInstruments = [Instruments[0]];
 
         _apiClient.PropertyChanged += ApiClient_PropertyChanged;
-        ObserveBackgroundTask(LoadDataAsync(true), "RhythmVerse initial load");
+        _downloads.CollectionChanged += Downloads_CollectionChanged;
+        foreach (DownloadFile item in _downloads)
+        {
+            item.PropertyChanged += DownloadItem_PropertyChanged;
+        }
+        if (loadInitialData)
+        {
+            ObserveBackgroundTask(LoadDataAsync(true), "RhythmVerse initial load");
+        }
+    }
+
+    private void Downloads_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems is not null)
+        {
+            foreach (DownloadFile item in e.NewItems)
+            {
+                item.PropertyChanged += DownloadItem_PropertyChanged;
+            }
+        }
+
+        if (e.OldItems is not null)
+        {
+            foreach (DownloadFile item in e.OldItems)
+            {
+                item.PropertyChanged -= DownloadItem_PropertyChanged;
+            }
+        }
+
+        OnPropertyChanged(nameof(HasActiveDownloads));
+        OnPropertyChanged(nameof(NoActiveDownloads));
+    }
+
+    private void DownloadItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ChartHub.Services.DownloadFile.Status)
+            || e.PropertyName == nameof(ChartHub.Services.DownloadFile.DownloadProgress)
+            || e.PropertyName == nameof(ChartHub.Services.DownloadFile.ErrorMessage))
+        {
+            OnPropertyChanged(nameof(HasActiveDownloads));
+            OnPropertyChanged(nameof(NoActiveDownloads));
+        }
     }
 
     private static void ObserveBackgroundTask(Task task, string context)
@@ -463,6 +532,16 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             cts.Cancel();
         }
     }
+
+    private void ClearDownload(DownloadFile? downloadItem)
+    {
+        if (downloadItem is null)
+        {
+            return;
+        }
+
+        Downloads.Remove(downloadItem);
+    }
     public async Task ViewCreator(ViewSong? song)
     {
         ViewSong? file = song ?? SelectedFile;
@@ -482,21 +561,34 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             return;
         }
 
-        ApiClient.CurrentPage = (ApiClient.CurrentPage ?? 1) + 1;
-        OnPropertyChanged(nameof(CurrentPage));
-        await LoadDataAsync(false);
-    }
-
-    public async Task LoadDataAsync(bool search)
-    {
-        if (IsLoading)
+        if (Interlocked.CompareExchange(ref _loadMoreGate, 1, 0) != 0)
         {
             return;
         }
 
-        IsLoading = true;
         try
         {
+            ApiClient.CurrentPage = (ApiClient.CurrentPage ?? 1) + 1;
+            OnPropertyChanged(nameof(CurrentPage));
+            await LoadDataAsync(false);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _loadMoreGate, 0);
+        }
+    }
+
+    public async Task LoadDataAsync(bool search)
+    {
+        if (!await _loadDataGate.WaitAsync(0).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        try
+        {
+            await _uiInvoke(() => IsLoading = true);
+
             if (search)
             {
                 // Ensure new searches always execute a payload fetch, even after previous pagination exhaustion.
@@ -518,21 +610,45 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             string filter = Toolbox.ConvertFilter(SelectedFilter);
             string order = Toolbox.GetSortOrder(filter, SelectedOrder);
             var instrument = SelectedInstruments.ToList();
-            DataItems = await ApiClient.GetSongFilesAsync(search, SearchText.ToLower(), filter, order, instrument, SearchAuthorText);
-            await ApplyLibraryMembershipAsync(DataItems);
+            IReadOnlyList<ViewSong> pageItems = await ApiClient.GetSongFilesAsync(search, SearchText.ToLower(), filter, order, instrument, SearchAuthorText).ConfigureAwait(false);
+            await ApplyLibraryMembershipAsync(pageItems).ConfigureAwait(false);
 
-            NoResults = DataItems.Count < 1;
+            await _uiInvoke(() =>
+            {
+                if (search)
+                {
+                    DataItems = new ObservableCollection<ViewSong>(pageItems);
+                }
+                else
+                {
+                    DataItems ??= [];
+                    foreach (ViewSong song in pageItems)
+                    {
+                        if (!DataItems.Contains(song))
+                        {
+                            DataItems.Add(song);
+                        }
+                    }
+                }
+
+                NoResults = DataItems.Count < 1;
+            });
+
         }
         finally
         {
-            IsLoading = false;
-            IsPlaceholder = false;
+            await _uiInvoke(() =>
+            {
+                IsLoading = false;
+                IsPlaceholder = false;
+            });
+            _loadDataGate.Release();
         }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    private async Task ApplyLibraryMembershipAsync(IEnumerable<ViewSong> songs)
+    private async Task ApplyLibraryMembershipAsync(IReadOnlyList<ViewSong> songs)
     {
         var keyedSongs = songs
             .Where(song => !string.IsNullOrWhiteSpace(song.SourceName) && !string.IsNullOrWhiteSpace(song.SourceId))
@@ -543,22 +659,25 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             })
             .ToArray();
 
-        foreach (var keyedSong in keyedSongs)
-        {
-            keyedSong.Song.SourceId = keyedSong.SourceKey;
-        }
-
         string[] sourceIds = keyedSongs
             .Select(item => item.SourceKey)
             .ToArray();
 
-        IReadOnlyDictionary<string, bool> membership = await _libraryCatalog.GetMembershipMapAsync(LibrarySourceNames.RhythmVerse, sourceIds);
-        foreach (ViewSong song in songs)
+        IReadOnlyDictionary<string, bool> membership = await _libraryCatalog.GetMembershipMapAsync(LibrarySourceNames.RhythmVerse, sourceIds).ConfigureAwait(false);
+        await _uiInvoke(() =>
         {
-            song.IsInLibrary = !string.IsNullOrWhiteSpace(song.SourceId)
-                && membership.TryGetValue(song.SourceId, out bool isPresent)
-                && isPresent;
-        }
+            foreach (var keyedSong in keyedSongs)
+            {
+                keyedSong.Song.SourceId = keyedSong.SourceKey;
+            }
+
+            foreach (ViewSong song in songs)
+            {
+                song.IsInLibrary = !string.IsNullOrWhiteSpace(song.SourceId)
+                    && membership.TryGetValue(song.SourceId, out bool isPresent)
+                    && isPresent;
+            }
+        });
     }
 
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)

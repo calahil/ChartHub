@@ -1,5 +1,4 @@
 ﻿
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
@@ -50,16 +49,6 @@ public class ApiClientService : INotifyPropertyChanged
         "\u2B24\u2B24\u2B24\u2B24\uebb5",
     };
 
-    private ObservableCollection<ViewSong>? _dataItems;
-    public ObservableCollection<ViewSong>? DataItems
-    {
-        get => _dataItems;
-        set
-        {
-            _dataItems = value;
-            OnPropertyChanged();
-        }
-    }
     public long? RecordsPerPage { get; } = 25;
 
 
@@ -160,11 +149,10 @@ public class ApiClientService : INotifyPropertyChanged
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
         }
 
-        DataItems = new ObservableCollection<ViewSong>();
         _currentPage = 1;
     }
 
-    public async Task<ObservableCollection<ViewSong>> GetSongFilesAsync(bool search, string searchString, string sort, string order, List<InstrumentItem> instrument, string authorText)
+    public async Task<IReadOnlyList<ViewSong>> GetSongFilesAsync(bool search, string searchString, string sort, string order, List<InstrumentItem> instrument, string authorText)
     {
         if (search)
         {
@@ -187,14 +175,7 @@ public class ApiClientService : INotifyPropertyChanged
             try
             {
 
-                if (DataItems == null)
-                {
-                    DataItems = [];
-                }
-                else if (search)
-                {
-                    DataItems.Clear();
-                }
+                var pageItems = new List<ViewSong>();
 
                 var collection = new List<KeyValuePair<string, string>>();
                 foreach (InstrumentItem item in instrument)
@@ -394,10 +375,7 @@ public class ApiClientService : INotifyPropertyChanged
                                     songView.Gameformat = value[1];
                                 }
 
-                                if (!DataItems.Contains(songView))
-                                {
-                                    DataItems.Add(songView);
-                                }
+                                pageItems.Add(songView);
                             }
                         }
                     }
@@ -409,13 +387,13 @@ public class ApiClientService : INotifyPropertyChanged
                 {
                     HasMoreRecords = false;
                 }
-                return DataItems;
+                return pageItems;
             }
 
             catch (HttpRequestException e)
             {
                 Logger.LogError("Api", "Request error while loading song data", e);
-                return [];
+                return Array.Empty<ViewSong>();
             }
         }
 
@@ -423,7 +401,7 @@ public class ApiClientService : INotifyPropertyChanged
         catch (Exception ex)
         {
             Logger.LogError("Api", "Unexpected error while loading song data", ex);
-            return [];
+            return Array.Empty<ViewSong>();
         }
     }
 

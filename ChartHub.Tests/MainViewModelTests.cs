@@ -1,7 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 
+using ChartHub.Configuration.Interfaces;
+using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
@@ -117,6 +120,148 @@ public class MainViewModelTests
     }
 
     [Fact]
+    [Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.Unit)]
+    public void AndroidFiltersCommand_EntersFlyoutFiltersMode()
+    {
+        using var temp = new TemporaryDirectoryFixture("main-vm-android-filters");
+        var downloadWatcher = new ResourceWatcherStub();
+        CloneHeroViewModel cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
+        DownloadViewModel downloadViewModel = CreateDownloadViewModel(downloadWatcher);
+        RhythmVerseViewModel rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
+        EncoreViewModel encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
+        var sharedDownloadQueue = new SharedDownloadQueue();
+        SettingsViewModel settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
+        SyncViewModel syncViewModel = CreateUninitialized<ViewModels.SyncViewModel>();
+
+        MainViewModel sut = CreateMainViewModel(
+            rhythmVerseViewModel,
+            encoreViewModel,
+            sharedDownloadQueue,
+            downloadViewModel,
+            cloneHeroViewModel,
+            syncViewModel,
+            settingsViewModel,
+            action => action(),
+            isAndroid: true);
+
+        sut.ShowAndroidFiltersInFlyoutCommand.Execute(null);
+
+        Assert.True(sut.IsAndroidNavPaneOpen);
+        Assert.True(sut.IsAndroidFlyoutFiltersMode);
+        Assert.False(sut.IsAndroidNavListMode);
+    }
+
+    [Fact]
+    [Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.Unit)]
+    public void AndroidNavigationCommand_SelectsTab_AndClosesFlyout()
+    {
+        using var temp = new TemporaryDirectoryFixture("main-vm-android-nav");
+        var downloadWatcher = new ResourceWatcherStub();
+        CloneHeroViewModel cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
+        DownloadViewModel downloadViewModel = CreateDownloadViewModel(downloadWatcher);
+        RhythmVerseViewModel rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
+        EncoreViewModel encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
+        var sharedDownloadQueue = new SharedDownloadQueue();
+        SettingsViewModel settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
+        SyncViewModel syncViewModel = CreateUninitialized<ViewModels.SyncViewModel>();
+
+        MainViewModel sut = CreateMainViewModel(
+            rhythmVerseViewModel,
+            encoreViewModel,
+            sharedDownloadQueue,
+            downloadViewModel,
+            cloneHeroViewModel,
+            syncViewModel,
+            settingsViewModel,
+            action => action(),
+            isAndroid: true);
+
+        sut.ShowAndroidFiltersInFlyoutCommand.Execute(null);
+        sut.GoSyncCommand.Execute(null);
+
+        Assert.Equal(4, sut.SelectedMainTabIndex);
+        Assert.False(sut.IsAndroidNavPaneOpen);
+        Assert.False(sut.IsAndroidFlyoutFiltersMode);
+        Assert.True(sut.IsAndroidNavListMode);
+    }
+
+    [Fact]
+    [Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.Unit)]
+    public void GoSyncCommand_TriggersSyncActivationAttempt()
+    {
+        using var temp = new TemporaryDirectoryFixture("main-vm-sync-activation");
+        var downloadWatcher = new ResourceWatcherStub();
+        CloneHeroViewModel cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
+        DownloadViewModel downloadViewModel = CreateDownloadViewModel(downloadWatcher);
+        RhythmVerseViewModel rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
+        EncoreViewModel encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
+        var sharedDownloadQueue = new SharedDownloadQueue();
+        SettingsViewModel settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
+
+        int getVersionCalls = 0;
+        SyncViewModel syncViewModel = CreateSyncViewModelForActivation(temp.RootPath, () => getVersionCalls++);
+
+        MainViewModel sut = CreateMainViewModel(
+            rhythmVerseViewModel,
+            encoreViewModel,
+            sharedDownloadQueue,
+            downloadViewModel,
+            cloneHeroViewModel,
+            syncViewModel,
+            settingsViewModel,
+            action => action(),
+            isAndroid: true);
+
+        sut.GoSyncCommand.Execute(null);
+
+        bool activationAttempted = SpinWait.SpinUntil(() => Volatile.Read(ref getVersionCalls) > 0, TimeSpan.FromSeconds(2));
+        Assert.True(activationAttempted);
+    }
+
+    [Fact]
+    [Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.IntegrationLite)]
+    public void AndroidFlyoutSequence_NavToFiltersBackThenNavigate_WorksAsExpected()
+    {
+        using var temp = new TemporaryDirectoryFixture("main-vm-android-flyout-sequence");
+        var downloadWatcher = new ResourceWatcherStub();
+        CloneHeroViewModel cloneHeroViewModel = CreateCloneHeroViewModel(temp.RootPath);
+        DownloadViewModel downloadViewModel = CreateDownloadViewModel(downloadWatcher);
+        RhythmVerseViewModel rhythmVerseViewModel = CreateUninitialized<ViewModels.RhythmVerseViewModel>();
+        EncoreViewModel encoreViewModel = CreateUninitialized<ViewModels.EncoreViewModel>();
+        var sharedDownloadQueue = new SharedDownloadQueue();
+        SettingsViewModel settingsViewModel = CreateUninitialized<ViewModels.SettingsViewModel>();
+        SyncViewModel syncViewModel = CreateUninitialized<ViewModels.SyncViewModel>();
+
+        MainViewModel sut = CreateMainViewModel(
+            rhythmVerseViewModel,
+            encoreViewModel,
+            sharedDownloadQueue,
+            downloadViewModel,
+            cloneHeroViewModel,
+            syncViewModel,
+            settingsViewModel,
+            action => action(),
+            isAndroid: true);
+
+        sut.ToggleAndroidNavPaneCommand.Execute(null);
+        Assert.True(sut.IsAndroidNavPaneOpen);
+        Assert.True(sut.IsAndroidNavListMode);
+
+        sut.ShowAndroidFiltersInFlyoutCommand.Execute(null);
+        Assert.True(sut.IsAndroidFlyoutFiltersMode);
+
+        sut.ShowAndroidNavListCommand.Execute(null);
+        Assert.True(sut.IsAndroidNavListMode);
+        Assert.False(sut.IsAndroidFlyoutFiltersMode);
+
+        sut.GoDownloadsCommand.Execute(null);
+
+        Assert.Equal(2, sut.SelectedMainTabIndex);
+        Assert.False(sut.IsAndroidNavPaneOpen);
+        Assert.True(sut.IsAndroidNavListMode);
+    }
+
+    [Fact]
     [Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.IntegrationLite)]
     public void ObserveBackgroundTask_WhenTaskFaults_LogsFailure()
     {
@@ -224,12 +369,112 @@ public class MainViewModelTests
         return (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
     }
 
+    private static SyncViewModel CreateSyncViewModelForActivation(string rootPath, Action onGetVersion)
+    {
+        AppGlobalSettings settings = CreateSyncSettings(
+            rootPath,
+            syncToken: "persisted-token",
+            savedConnectionsJson: JsonSerializer.Serialize(new[]
+            {
+                new
+                {
+                    apiBaseUrl = "http://192.168.1.55:15123",
+                    desktopLabel = "Studio Desktop",
+                    lastConnectedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+                },
+            }));
+
+        return new SyncViewModel(
+            new StubDesktopSyncApiClient
+            {
+                GetVersionHandler = (_, _, _) =>
+                {
+                    onGetVersion();
+                    return Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true));
+                },
+                GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]),
+            },
+            settings,
+            isCompanionMode: true);
+    }
+
+    private static AppGlobalSettings CreateSyncSettings(string rootPath, string syncToken, string savedConnectionsJson)
+    {
+        var config = new AppConfigRoot
+        {
+            Runtime = new RuntimeAppConfig
+            {
+                TempDirectory = Path.Combine(rootPath, "Temp"),
+                DownloadDirectory = Path.Combine(rootPath, "Downloads"),
+                StagingDirectory = Path.Combine(rootPath, "Staging"),
+                OutputDirectory = Path.Combine(rootPath, "Output"),
+                CloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero"),
+                CloneHeroSongDirectory = Path.Combine(rootPath, "CloneHero", "Songs"),
+                SyncApiAuthToken = syncToken,
+                SyncApiSavedConnectionsJson = savedConnectionsJson,
+            },
+        };
+
+        return new AppGlobalSettings(new FakeSettingsOrchestrator(config));
+    }
+
     private sealed class NoopDesktopPathOpener : IDesktopPathOpener
     {
         public Task OpenDirectoryAsync(string directoryPath, CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator
+    {
+        public AppConfigRoot Current { get; private set; } = current;
+
+        public event Action<AppConfigRoot>? SettingsChanged;
+
+        public Task<ConfigValidationResult> UpdateAsync(Action<AppConfigRoot> update, CancellationToken cancellationToken = default)
+        {
+            update(Current);
+            SettingsChanged?.Invoke(Current);
+            return Task.FromResult(ConfigValidationResult.Success);
+        }
+
+        public Task ReloadAsync(CancellationToken cancellationToken = default)
+        {
+            SettingsChanged?.Invoke(Current);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class StubDesktopSyncApiClient : IDesktopSyncApiClient
+    {
+        public Func<string, string, string?, CancellationToken, Task<DesktopSyncPairClaimResponse>>? ClaimPairTokenHandler { get; init; }
+        public Func<string, string, CancellationToken, Task<DesktopSyncVersionResponse>>? GetVersionHandler { get; init; }
+        public Func<string, string, int, CancellationToken, Task<IReadOnlyList<IngestionQueueItem>>>? GetIngestionsHandler { get; init; }
+
+        public Task<DesktopSyncPairClaimResponse> ClaimPairTokenAsync(string baseUrl, string pairCode, string? deviceLabel = null, CancellationToken cancellationToken = default)
+            => ClaimPairTokenHandler?.Invoke(baseUrl, pairCode, deviceLabel, cancellationToken)
+                ?? Task.FromResult(new DesktopSyncPairClaimResponse(true, "token", baseUrl));
+
+        public Task<DesktopSyncVersionResponse> GetVersionAsync(string baseUrl, string token, CancellationToken cancellationToken = default)
+            => GetVersionHandler?.Invoke(baseUrl, token, cancellationToken)
+                ?? Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true));
+
+        public Task<IReadOnlyList<IngestionQueueItem>> GetIngestionsAsync(string baseUrl, string token, int limit = 100, CancellationToken cancellationToken = default)
+            => GetIngestionsHandler?.Invoke(baseUrl, token, limit, cancellationToken)
+                ?? Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]);
+
+        public Task<long> UploadIngestionFileAsync(string baseUrl, string token, string localPath, string displayName, LocalIngestionUploadMetadata? metadata = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(1L);
+
+        public Task TriggerRetryAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task TriggerInstallAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task TriggerOpenFolderAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private sealed class ResourceWatcherStub : IResourceWatcher

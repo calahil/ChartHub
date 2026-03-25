@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
@@ -32,7 +31,7 @@ public class ApiClientServiceTests
             loadEmbeddedMockData: () => BuildMappedSongResponseJson(),
           resolveMockDataPath: () => null);
 
-        ObservableCollection<ViewSong> results = await sut.GetSongFilesAsync(
+        IReadOnlyList<ViewSong> results = await sut.GetSongFilesAsync(
             search: false,
             searchString: string.Empty,
             sort: "downloads",
@@ -85,7 +84,7 @@ public class ApiClientServiceTests
             loadEmbeddedMockData: () => BuildMappedSongResponseJson(),
           resolveMockDataPath: () => null);
 
-        ObservableCollection<ViewSong> results = await sut.GetSongFilesAsync(
+        IReadOnlyList<ViewSong> results = await sut.GetSongFilesAsync(
             search: false,
             searchString: string.Empty,
             sort: "downloads",
@@ -126,7 +125,7 @@ public class ApiClientServiceTests
             loadEmbeddedMockData: () => null,
           resolveMockDataPath: () => null);
 
-        ObservableCollection<ViewSong> results = await sut.GetSongFilesAsync(
+        IReadOnlyList<ViewSong> results = await sut.GetSongFilesAsync(
             search: true,
             searchString: "needle",
             sort: "downloads",
@@ -186,7 +185,7 @@ public class ApiClientServiceTests
             loadEmbeddedMockData: () => throw new InvalidOperationException("Mock data should not be loaded when UseMockData is false."),
           resolveMockDataPath: () => throw new InvalidOperationException("Mock data path should not be resolved when UseMockData is false."));
 
-        ObservableCollection<ViewSong> results = await sut.GetSongFilesAsync(
+        IReadOnlyList<ViewSong> results = await sut.GetSongFilesAsync(
             search: true,
             searchString: string.Empty,
             sort: "downloads",
@@ -201,7 +200,7 @@ public class ApiClientServiceTests
     }
 
     [Fact]
-    public async Task GetSongFilesAsync_WhenLoadingNextPage_AppendsResultsInsteadOfClearing()
+    public async Task GetSongFilesAsync_WhenLoadingNextPage_ReturnsCurrentPageDataOnly()
     {
         using var httpClient = new HttpClient(new StubHttpMessageHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -221,7 +220,7 @@ public class ApiClientServiceTests
           loadEmbeddedMockData: () => null,
           resolveMockDataPath: () => null);
 
-        ObservableCollection<ViewSong> firstPage = await sut.GetSongFilesAsync(
+        IReadOnlyList<ViewSong> firstPage = await sut.GetSongFilesAsync(
           search: true,
           searchString: string.Empty,
           sort: "downloads",
@@ -231,7 +230,7 @@ public class ApiClientServiceTests
 
         sut.CurrentPage = 2;
 
-        ObservableCollection<ViewSong> secondPage = await sut.GetSongFilesAsync(
+        IReadOnlyList<ViewSong> secondPage = await sut.GetSongFilesAsync(
           search: false,
           searchString: string.Empty,
           sort: "downloads",
@@ -239,8 +238,9 @@ public class ApiClientServiceTests
           instrument: [],
           authorText: string.Empty);
 
-        Assert.Same(firstPage, secondPage);
-        Assert.Equal(2, secondPage.Count);
+        Assert.NotSame(firstPage, secondPage);
+        Assert.Single(firstPage);
+        Assert.Single(secondPage);
         Assert.Equal(2, sut.CurrentPage);
     }
 

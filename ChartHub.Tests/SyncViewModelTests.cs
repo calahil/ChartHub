@@ -14,6 +14,105 @@ namespace ChartHub.Tests;
 public class SyncViewModelTests
 {
     [Fact]
+    public async Task EnsureActivatedAsync_WithSavedCredentials_AutoConnects()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-auto-activate");
+        AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            syncApiAuthToken: "persisted-token",
+            syncApiSavedConnectionsJson: BuildSavedConnectionsJson("http://192.168.1.55:15123", "Studio Desktop"));
+
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([CreateQueueItem()]),
+        };
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+
+        await sut.EnsureActivatedAsync();
+
+        Assert.True(sut.IsConnected);
+        Assert.True(sut.HasQueueItems);
+        Assert.True(sut.RefreshQueueCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task EnsureActivatedAsync_WhenAutoConnectFails_ShowsManualReconnectFallback()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-auto-activate-fallback");
+        AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            syncApiAuthToken: "persisted-token",
+            syncApiSavedConnectionsJson: BuildSavedConnectionsJson("http://192.168.1.55:15123", "Studio Desktop"));
+
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (_, _, _) => throw new HttpRequestException("network unreachable"),
+        };
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+
+        await sut.EnsureActivatedAsync();
+
+        Assert.False(sut.IsConnected);
+        Assert.True(sut.ShowManualReconnectButton);
+        Assert.Equal("Connect to Studio Desktop (192.168.1.55)", sut.ManualReconnectButtonLabel);
+        Assert.Contains("Auto-connect failed", sut.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ManualReconnectCommand_ReconnectsAfterDisconnectedState()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-manual-reconnect");
+        AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            syncApiAuthToken: "persisted-token",
+            syncApiSavedConnectionsJson: BuildSavedConnectionsJson("http://192.168.1.55:15123", "Studio Desktop"));
+
+        Func<string, string, CancellationToken, Task<DesktopSyncVersionResponse>> getVersion = (_, _, _) =>
+            throw new HttpRequestException("network unreachable");
+
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (baseUrl, token, cancellationToken) => getVersion(baseUrl, token, cancellationToken),
+            GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]),
+        };
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+
+        await sut.EnsureActivatedAsync();
+        Assert.False(sut.IsConnected);
+        Assert.True(sut.ManualReconnectCommand.CanExecute(null));
+
+        getVersion = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true));
+
+        await sut.ManualReconnectCommand.ExecuteAsync(null);
+
+        Assert.True(sut.IsConnected);
+        Assert.True(sut.RefreshQueueCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task TestConnectionCommand_OnFailure_StatusAndHintDoNotDuplicate()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-status-hint-distinct");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        var client = new StubDesktopSyncApiClient
+        {
+            GetVersionHandler = (_, _, _) => throw new InvalidOperationException("invalid token"),
+        };
+
+        using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
+        sut.SyncToken = "persisted-token";
+        sut.DesktopApiBaseUrl = "http://192.168.1.55:15123";
+
+        await sut.TestConnectionCommand.ExecuteAsync(null);
+
+        Assert.NotEqual(sut.StatusMessage, sut.ConnectionHint);
+    }
+
+    [Fact]
     public void ConnectionHint_WithoutPendingPairing_PromptsQrScan()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-hint-qr");
@@ -320,7 +419,7 @@ public class SyncViewModelTests
         Assert.True(sut.HasError);
         Assert.Empty(sut.QueueItems);
         Assert.Equal("Pairing failed. Scan the desktop QR and try again.", sut.StatusMessage);
-        Assert.Contains("Scan the desktop QR", sut.ConnectionHint, StringComparison.Ordinal);
+        Assert.Contains("scan the desktop qr", sut.ConnectionHint, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1008,7 +1107,10 @@ public class SyncViewModelTests
     }
 
     private static AppGlobalSettings CreateSettings(
-        string rootPath)
+        string rootPath,
+        string? syncApiAuthToken = null,
+        string? syncApiSavedConnectionsJson = null,
+        string? syncApiLastPairedDeviceLabel = null)
     {
         var config = new AppConfigRoot
         {
@@ -1020,10 +1122,26 @@ public class SyncViewModelTests
                 OutputDirectory = Path.Combine(rootPath, "Output"),
                 CloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero"),
                 CloneHeroSongDirectory = Path.Combine(rootPath, "CloneHero", "Songs"),
+                SyncApiAuthToken = syncApiAuthToken ?? string.Empty,
+                SyncApiSavedConnectionsJson = syncApiSavedConnectionsJson ?? "[]",
+                SyncApiLastPairedDeviceLabel = syncApiLastPairedDeviceLabel ?? string.Empty,
             },
         };
 
         return new AppGlobalSettings(new FakeSettingsOrchestrator(config));
+    }
+
+    private static string BuildSavedConnectionsJson(string apiBaseUrl, string desktopLabel)
+    {
+        return JsonSerializer.Serialize(new[]
+        {
+            new
+            {
+                apiBaseUrl,
+                desktopLabel,
+                lastConnectedAtUtc = DateTimeOffset.UtcNow.ToString("O"),
+            },
+        });
     }
 
     private static StubQrCodeScannerService CreateScanner(string baseUrl, string pairCode, string desktopLabel)

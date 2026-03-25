@@ -17,12 +17,6 @@ public class MainViewModel : INotifyPropertyChanged
 {
     private readonly bool _isAndroidMode;
 
-    public enum SidePaneMode
-    {
-        Filters,
-        Downloads,
-    }
-
     public bool IsCompanionMode => _isAndroidMode;
     public bool IsDesktopMode => !_isAndroidMode;
 
@@ -33,8 +27,9 @@ public class MainViewModel : INotifyPropertyChanged
     private CloneHeroViewModel _cloneHeroViewModel = null!;
     private SyncViewModel _syncViewModel = null!;
     private SettingsViewModel _settingsViewModel = null!;
-    private SidePaneMode _activeSidePaneMode = SidePaneMode.Filters;
     private MainViewPageStrings _pageStrings = new MainViewPageStrings();
+    private bool _isAndroidNavPaneOpen;
+    private bool _isAndroidFlyoutFiltersMode;
 
     public RhythmVerseViewModel RhythmVerseViewModel
     {
@@ -157,6 +152,8 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(ShowRhythmVerseFilters));
             OnPropertyChanged(nameof(ShowEncoreFilters));
             OnPropertyChanged(nameof(ShowFilterFallback));
+            OnPropertyChanged(nameof(SelectedMainContentViewModel));
+            OnPropertyChanged(nameof(CurrentMainTabTitle));
         }
     }
 
@@ -173,33 +170,47 @@ public class MainViewModel : INotifyPropertyChanged
             _isFilterPaneOpen = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsFilterModeActive));
-            OnPropertyChanged(nameof(IsDownloadModeActive));
-        }
-    }
-
-    public SidePaneMode ActiveSidePaneMode
-    {
-        get => _activeSidePaneMode;
-        set
-        {
-            if (_activeSidePaneMode == value)
-            {
-                return;
-            }
-
-            _activeSidePaneMode = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(IsFiltersPaneVisible));
-            OnPropertyChanged(nameof(IsDownloadsPaneVisible));
             OnPropertyChanged(nameof(ShowRhythmVerseFilters));
             OnPropertyChanged(nameof(ShowEncoreFilters));
             OnPropertyChanged(nameof(ShowFilterFallback));
         }
     }
 
-    public bool IsFiltersPaneVisible => ActiveSidePaneMode == SidePaneMode.Filters;
+    public bool IsAndroidNavPaneOpen
+    {
+        get => _isAndroidNavPaneOpen;
+        set
+        {
+            if (_isAndroidNavPaneOpen == value)
+            {
+                return;
+            }
 
-    public bool IsDownloadsPaneVisible => ActiveSidePaneMode == SidePaneMode.Downloads;
+            _isAndroidNavPaneOpen = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool IsAndroidFlyoutFiltersMode
+    {
+        get => _isAndroidFlyoutFiltersMode;
+        set
+        {
+            if (_isAndroidFlyoutFiltersMode == value)
+            {
+                return;
+            }
+
+            _isAndroidFlyoutFiltersMode = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsAndroidNavListMode));
+            OnPropertyChanged(nameof(ShowRhythmVerseFilters));
+            OnPropertyChanged(nameof(ShowEncoreFilters));
+            OnPropertyChanged(nameof(ShowFilterFallback));
+        }
+    }
+
+    public bool IsAndroidNavListMode => !IsAndroidFlyoutFiltersMode;
 
     public bool IsRhythmVerseTabActive => SelectedMainTabIndex == 0;
 
@@ -207,19 +218,46 @@ public class MainViewModel : INotifyPropertyChanged
 
     public bool IsSourceFilterFallbackVisible => !IsRhythmVerseTabActive && !IsEncoreTabActive;
 
-    public bool ShowRhythmVerseFilters => IsFiltersPaneVisible && IsRhythmVerseTabActive;
+    public bool ShowRhythmVerseFilters => IsRhythmVerseTabActive && ((IsDesktopMode && IsFilterPaneOpen) || (IsCompanionMode && IsAndroidFlyoutFiltersMode));
 
-    public bool ShowEncoreFilters => IsFiltersPaneVisible && IsEncoreTabActive;
+    public bool ShowEncoreFilters => IsEncoreTabActive && ((IsDesktopMode && IsFilterPaneOpen) || (IsCompanionMode && IsAndroidFlyoutFiltersMode));
 
-    public bool ShowFilterFallback => IsFiltersPaneVisible && IsSourceFilterFallbackVisible;
+    public bool ShowFilterFallback => IsSourceFilterFallbackVisible && ((IsDesktopMode && IsFilterPaneOpen) || (IsCompanionMode && IsAndroidFlyoutFiltersMode));
 
-    public bool IsFilterModeActive => IsFilterPaneOpen && IsFiltersPaneVisible;
+    public bool IsFilterModeActive => IsFilterPaneOpen;
 
-    public bool IsDownloadModeActive => IsFilterPaneOpen && IsDownloadsPaneVisible;
+    public object SelectedMainContentViewModel => SelectedMainTabIndex switch
+    {
+        0 => RhythmVerseViewModel,
+        1 => EncoreViewModel,
+        2 => DownloadViewModel,
+        3 when IsCloneHeroTabVisible => CloneHeroViewModel,
+        4 => SyncViewModel,
+        5 => SettingsViewModel,
+        _ => RhythmVerseViewModel,
+    };
+
+    public string CurrentMainTabTitle => SelectedMainTabIndex switch
+    {
+        0 => PageStrings.RhythmVerse,
+        1 => PageStrings.Encore,
+        2 => PageStrings.Downloads,
+        3 when IsCloneHeroTabVisible => PageStrings.CloneHero,
+        4 => PageStrings.Sync,
+        5 => PageStrings.Settings,
+        _ => PageStrings.RhythmVerse,
+    };
 
     public IRelayCommand ShowFiltersPaneCommand { get; }
-
-    public IRelayCommand ShowDownloadsPaneCommand { get; }
+    public IRelayCommand ToggleAndroidNavPaneCommand { get; }
+    public IRelayCommand ShowAndroidNavListCommand { get; }
+    public IRelayCommand ShowAndroidFiltersInFlyoutCommand { get; }
+    public IRelayCommand GoRhythmVerseCommand { get; }
+    public IRelayCommand GoEncoreCommand { get; }
+    public IRelayCommand GoDownloadsCommand { get; }
+    public IRelayCommand GoCloneHeroCommand { get; }
+    public IRelayCommand GoSyncCommand { get; }
+    public IRelayCommand GoSettingsCommand { get; }
 
     public IRelayCommand<DownloadFile?> CancelSharedDownloadCommand { get; }
 
@@ -247,8 +285,16 @@ public class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel()
     {
-        ShowFiltersPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Filters));
-        ShowDownloadsPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Downloads));
+        ShowFiltersPaneCommand = new RelayCommand(ToggleDesktopFiltersPane);
+        ToggleAndroidNavPaneCommand = new RelayCommand(ToggleAndroidNavPane);
+        ShowAndroidNavListCommand = new RelayCommand(ShowAndroidNavList);
+        ShowAndroidFiltersInFlyoutCommand = new RelayCommand(ShowAndroidFiltersInFlyout);
+        GoRhythmVerseCommand = new RelayCommand(() => NavigateToTab(0));
+        GoEncoreCommand = new RelayCommand(() => NavigateToTab(1));
+        GoDownloadsCommand = new RelayCommand(() => NavigateToTab(2));
+        GoCloneHeroCommand = new RelayCommand(() => NavigateToTab(3));
+        GoSyncCommand = new RelayCommand(() => NavigateToTab(4));
+        GoSettingsCommand = new RelayCommand(() => NavigateToTab(5));
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
     }
@@ -298,8 +344,16 @@ public class MainViewModel : INotifyPropertyChanged
         _cloneHeroViewModel = cloneHeroViewModel;
         _syncViewModel = syncViewModel;
         _settingsViewModel = settingsViewModel;
-        ShowFiltersPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Filters));
-        ShowDownloadsPaneCommand = new RelayCommand(() => TogglePane(SidePaneMode.Downloads));
+        ShowFiltersPaneCommand = new RelayCommand(ToggleDesktopFiltersPane);
+        ToggleAndroidNavPaneCommand = new RelayCommand(ToggleAndroidNavPane);
+        ShowAndroidNavListCommand = new RelayCommand(ShowAndroidNavList);
+        ShowAndroidFiltersInFlyoutCommand = new RelayCommand(ShowAndroidFiltersInFlyout);
+        GoRhythmVerseCommand = new RelayCommand(() => NavigateToTab(0));
+        GoEncoreCommand = new RelayCommand(() => NavigateToTab(1));
+        GoDownloadsCommand = new RelayCommand(() => NavigateToTab(2));
+        GoCloneHeroCommand = new RelayCommand(() => NavigateToTab(3));
+        GoSyncCommand = new RelayCommand(() => NavigateToTab(4));
+        GoSettingsCommand = new RelayCommand(() => NavigateToTab(5));
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
 
@@ -342,20 +396,68 @@ public class MainViewModel : INotifyPropertyChanged
         SharedDownloads.Remove(item);
     }
 
-    private void TogglePane(SidePaneMode mode)
+    private void ToggleDesktopFiltersPane()
     {
-        if (IsFilterPaneOpen && ActiveSidePaneMode == mode)
+        if (!IsDesktopMode)
         {
-            IsFilterPaneOpen = false;
-            OnPropertyChanged(nameof(IsFilterModeActive));
-            OnPropertyChanged(nameof(IsDownloadModeActive));
             return;
         }
 
-        ActiveSidePaneMode = mode;
-        IsFilterPaneOpen = true;
-        OnPropertyChanged(nameof(IsFilterModeActive));
-        OnPropertyChanged(nameof(IsDownloadModeActive));
+        IsFilterPaneOpen = !IsFilterPaneOpen;
+    }
+
+    private void ToggleAndroidNavPane()
+    {
+        if (!IsCompanionMode)
+        {
+            return;
+        }
+
+        IsAndroidNavPaneOpen = !IsAndroidNavPaneOpen;
+    }
+
+    private void ShowAndroidNavList()
+    {
+        if (!IsCompanionMode)
+        {
+            return;
+        }
+
+        IsAndroidFlyoutFiltersMode = false;
+        IsAndroidNavPaneOpen = true;
+    }
+
+    private void ShowAndroidFiltersInFlyout()
+    {
+        if (!IsCompanionMode)
+        {
+            return;
+        }
+
+        IsAndroidFlyoutFiltersMode = true;
+        IsAndroidNavPaneOpen = true;
+    }
+
+    private void NavigateToTab(int tabIndex)
+    {
+        if (tabIndex == 3 && !IsCloneHeroTabVisible)
+        {
+            return;
+        }
+
+        SelectedMainTabIndex = tabIndex;
+        if (tabIndex == 4)
+        {
+            ObserveBackgroundTask(
+                SyncViewModel.EnsureActivatedAsync(),
+                "Sync activation on tab navigation");
+        }
+
+        if (IsCompanionMode)
+        {
+            IsAndroidFlyoutFiltersMode = false;
+            IsAndroidNavPaneOpen = false;
+        }
     }
 
     private void SharedDownloads_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)

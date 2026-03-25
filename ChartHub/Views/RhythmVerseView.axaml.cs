@@ -13,9 +13,13 @@ namespace ChartHub.Views;
 
 public partial class RhythmVerseView : UserControl
 {
+    private const int LoadMoreDebounceMs = 120;
+
     private RhythmVerseViewModel? _subscribedViewModel;
     private ScrollViewer? _desktopScrollViewer;
     private ScrollViewer? _mobileScrollViewer;
+    private CancellationTokenSource? _loadMoreDebounceCts;
+    private int _loadMoreInFlight;
 
     public RhythmVerseView()
     {
@@ -27,6 +31,15 @@ public partial class RhythmVerseView : UserControl
         base.OnAttachedToVisualTree(e);
 
         ScheduleAttachScrollHandlers();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+
+        _loadMoreDebounceCts?.Cancel();
+        _loadMoreDebounceCts?.Dispose();
+        _loadMoreDebounceCts = null;
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -118,7 +131,32 @@ public partial class RhythmVerseView : UserControl
             return;
         }
 
-        await viewModel.LoadMoreAsync();
+        if (Interlocked.CompareExchange(ref _loadMoreInFlight, 1, 0) != 0)
+        {
+            return;
+        }
+
+        _loadMoreDebounceCts?.Cancel();
+        _loadMoreDebounceCts?.Dispose();
+        _loadMoreDebounceCts = new CancellationTokenSource();
+        CancellationToken cancellationToken = _loadMoreDebounceCts.Token;
+
+        try
+        {
+            // Debounce and yield once so pagination does not execute inside the active offset-change callback.
+            await Task.Delay(LoadMoreDebounceMs, cancellationToken);
+            await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+            cancellationToken.ThrowIfCancellationRequested();
+            await viewModel.LoadMoreAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer scroll event superseded this scheduled pagination attempt.
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _loadMoreInFlight, 0);
+        }
     }
 
     private async void SearchTextBox_KeyDown(object? sender, KeyEventArgs e)

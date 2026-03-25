@@ -6,6 +6,7 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 
 using Avalonia.Media.Imaging;
@@ -42,6 +43,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private readonly AppGlobalSettings _appGlobalSettings;
     private readonly TimeSpan _autoRefreshInterval;
     private readonly bool _isCompanionMode;
+    private const int MaxSavedSyncConnections = 10;
 
     private string _desktopApiBaseUrl = "http://127.0.0.1:15123";
     private string _syncToken = string.Empty;
@@ -53,6 +55,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private string _deviceLabel = "Android Companion";
     private string _pairCode = string.Empty;
     private string _generatedBootstrapPayload = string.Empty;
+    private string _lastKnownDesktopLabel = string.Empty;
     private PendingQrPairingRequest? _pendingQrPairing;
     private Bitmap? _bootstrapQrImage;
     private string? _bootstrapQrImageExportPath;
@@ -78,6 +81,10 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged();
             OnPropertyChanged(nameof(ConnectionHint));
             OnPropertyChanged(nameof(HasConnectionHint));
+            OnPropertyChanged(nameof(HasManualReconnectTarget));
+            OnPropertyChanged(nameof(ShowManualReconnectButton));
+            OnPropertyChanged(nameof(ManualReconnectButtonLabel));
+            ManualReconnectCommand?.NotifyCanExecuteChanged();
             RegenerateBootstrapQrPayload();
         }
     }
@@ -96,6 +103,9 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged();
             OnPropertyChanged(nameof(ConnectionHint));
             OnPropertyChanged(nameof(HasConnectionHint));
+            OnPropertyChanged(nameof(HasManualReconnectTarget));
+            OnPropertyChanged(nameof(ShowManualReconnectButton));
+            ManualReconnectCommand?.NotifyCanExecuteChanged();
         }
     }
 
@@ -165,7 +175,14 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
             if (HasError)
             {
-                return "Pairing failed. Scan the desktop QR and try again.";
+                return HasManualReconnectTarget
+                    ? "Auto-connect failed. Use manual connect or scan the desktop QR again."
+                    : "Auto-connect failed. Scan the desktop QR and try again.";
+            }
+
+            if (HasManualReconnectTarget)
+            {
+                return "Saved desktop found. Use manual connect or scan the desktop QR.";
             }
 
             return "Scan the desktop QR to start pairing.";
@@ -191,10 +208,12 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged(nameof(ShowEmptyQueueState));
             OnPropertyChanged(nameof(ShowCompanionScanSection));
             OnPropertyChanged(nameof(ShowCompanionConfirmationSection));
+            OnPropertyChanged(nameof(ShowManualReconnectButton));
             TestConnectionCommand.NotifyCanExecuteChanged();
             ConfirmQrPairingCommand.NotifyCanExecuteChanged();
             CancelPendingQrPairingCommand.NotifyCanExecuteChanged();
             ScanBootstrapQrCommand.NotifyCanExecuteChanged();
+            ManualReconnectCommand?.NotifyCanExecuteChanged();
             RefreshDesktopQrCommand.NotifyCanExecuteChanged();
             RefreshQueueCommand.NotifyCanExecuteChanged();
             RefreshLocalFilesCommand.NotifyCanExecuteChanged();
@@ -227,8 +246,10 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged(nameof(ShowNoLocalFilesHint));
             OnPropertyChanged(nameof(AutoRefreshHint));
             OnPropertyChanged(nameof(IsAutoRefreshActive));
+            OnPropertyChanged(nameof(ShowManualReconnectButton));
             RefreshQueueCommand.NotifyCanExecuteChanged();
             RefreshLocalFilesCommand.NotifyCanExecuteChanged();
+            ManualReconnectCommand?.NotifyCanExecuteChanged();
             PushSelectedLocalFilesCommand.NotifyCanExecuteChanged();
             RetrySelectedCommand.NotifyCanExecuteChanged();
             InstallSelectedCommand.NotifyCanExecuteChanged();
@@ -372,6 +393,19 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     public bool ShowCompanionConfirmationSection => IsCompanionMode && !IsConnected && HasPendingQrPairing;
     public bool ShowCompanionQueueSection => IsCompanionMode && IsConnected;
     public bool ShowCompanionLocalFilesSection => IsCompanionMode && IsConnected;
+    public bool HasManualReconnectTarget => !string.IsNullOrWhiteSpace(SyncToken) && IsEndpointSaneForCompanion(DesktopApiBaseUrl);
+    public bool ShowManualReconnectButton => IsCompanionMode && !IsConnected && HasManualReconnectTarget;
+    public string ManualReconnectButtonLabel
+    {
+        get
+        {
+            string label = ResolveManualReconnectLabel();
+            string host = TryGetHostDisplay(DesktopApiBaseUrl);
+            return string.IsNullOrWhiteSpace(host)
+                ? $"Connect to {label}"
+                : $"Connect to {label} ({host})";
+        }
+    }
     public bool ShowNoLocalFilesHint => IsCompanionMode && IsConnected && !HasLocalFiles;
     public bool IsLocalPushInProgress => _isLocalPushInProgress;
     public bool HasLocalPushCurrentFileName => !string.IsNullOrWhiteSpace(_localPushCurrentFileName);
@@ -428,6 +462,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     public IAsyncRelayCommand TestConnectionCommand { get; }
     public IAsyncRelayCommand ConfirmQrPairingCommand { get; }
     public IAsyncRelayCommand ScanBootstrapQrCommand { get; }
+    public IAsyncRelayCommand ManualReconnectCommand { get; }
     public IRelayCommand CancelPendingQrPairingCommand { get; }
     public IRelayCommand RefreshDesktopQrCommand { get; }
     public IAsyncRelayCommand RefreshQueueCommand { get; }
@@ -460,6 +495,14 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
         _deviceLabel = _appGlobalSettings.SyncApiDeviceLabel;
         _pairCode = _appGlobalSettings.SyncApiPairCode;
+        _lastKnownDesktopLabel = ResolveDesktopLabelFromSettings();
+
+        string restoredApiBaseUrl = TryResolvePreferredApiBaseUrl(_appGlobalSettings.SyncApiSavedConnectionsJson) ?? _desktopApiBaseUrl;
+        if (!string.IsNullOrWhiteSpace(restoredApiBaseUrl))
+        {
+            _desktopApiBaseUrl = restoredApiBaseUrl;
+        }
+
         _statusMessage = GetInitialStatusMessage();
 
         if (!string.IsNullOrWhiteSpace(_appGlobalSettings.SyncApiAuthToken))
@@ -475,6 +518,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, CanTestConnection);
         ConfirmQrPairingCommand = new AsyncRelayCommand(ConfirmQrPairingAsync, CanConfirmQrPairing);
         ScanBootstrapQrCommand = new AsyncRelayCommand(ScanBootstrapQrAsync, CanScanBootstrapQr);
+        ManualReconnectCommand = new AsyncRelayCommand(ManualReconnectAsync, CanManualReconnect);
         CancelPendingQrPairingCommand = new RelayCommand(CancelPendingQrPairing, CanCancelPendingQrPairing);
         RefreshDesktopQrCommand = new RelayCommand(RefreshDesktopQr, CanRefreshDesktopQr);
         RefreshQueueCommand = new AsyncRelayCommand(RefreshQueueAsync, CanRefreshQueue);
@@ -510,6 +554,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private bool CanCancelPendingQrPairing()
     {
         return !IsBusy && HasPendingQrPairing;
+    }
+
+    private bool CanManualReconnect()
+    {
+        return !IsBusy && !IsConnected && HasManualReconnectTarget;
     }
 
     private bool CanRefreshQueue()
@@ -702,9 +751,41 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         DesktopApiBaseUrl = ShouldAdoptPairApiBaseUrl(pairingRequest.ApiBaseUrl, claim.ApiBaseUrl)
             ? claim.ApiBaseUrl
             : pairingRequest.ApiBaseUrl;
+        _lastKnownDesktopLabel = string.IsNullOrWhiteSpace(pairingRequest.DesktopLabel)
+            ? _lastKnownDesktopLabel
+            : pairingRequest.DesktopLabel.Trim();
+        OnPropertyChanged(nameof(ManualReconnectButtonLabel));
 
         await ConnectAndRefreshAsync();
         ClearPendingQrPairing();
+    }
+
+    public async Task EnsureActivatedAsync()
+    {
+        if (!IsCompanionMode || IsConnected || IsBusy)
+        {
+            return;
+        }
+
+        if (!HasManualReconnectTarget)
+        {
+            return;
+        }
+
+        await RunOperationAsync(
+            ConnectAndRefreshAsync,
+            "Companion auto-connect failed",
+            disconnectOnFailure: false,
+            failureStatusMessage: "Auto-connect failed. Use manual connect or scan desktop QR.");
+    }
+
+    private async Task ManualReconnectAsync()
+    {
+        await RunOperationAsync(
+            ConnectAndRefreshAsync,
+            "Manual companion reconnect failed",
+            disconnectOnFailure: false,
+            failureStatusMessage: "Manual connect failed. Confirm LAN access or scan desktop QR.");
     }
 
     private async Task ConnectAndRefreshAsync()
@@ -718,6 +799,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         IsConnected = true;
         _appGlobalSettings.SyncApiAuthToken = SyncToken;
         _appGlobalSettings.SyncApiDeviceLabel = DeviceLabel;
+        PersistSuccessfulConnection();
 
         StatusMessage = $"Connected to {version.Api} v{version.Version}.";
         ErrorMessage = null;
@@ -1431,6 +1513,164 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         {
             DeviceLabel = _appGlobalSettings.SyncApiDeviceLabel;
         }
+        else if (e.PropertyName == nameof(AppGlobalSettings.SyncApiAuthToken))
+        {
+            SyncToken = _appGlobalSettings.SyncApiAuthToken;
+        }
+        else if (e.PropertyName == nameof(AppGlobalSettings.SyncApiSavedConnectionsJson))
+        {
+            string? preferredBaseUrl = TryResolvePreferredApiBaseUrl(_appGlobalSettings.SyncApiSavedConnectionsJson);
+            if (!string.IsNullOrWhiteSpace(preferredBaseUrl))
+            {
+                DesktopApiBaseUrl = preferredBaseUrl;
+            }
+
+            _lastKnownDesktopLabel = ResolveDesktopLabelFromSettings();
+            OnPropertyChanged(nameof(ManualReconnectButtonLabel));
+        }
+        else if (e.PropertyName == nameof(AppGlobalSettings.SyncApiLastPairedDeviceLabel))
+        {
+            _lastKnownDesktopLabel = ResolveDesktopLabelFromSettings();
+            OnPropertyChanged(nameof(ManualReconnectButtonLabel));
+        }
+    }
+
+    private void PersistSuccessfulConnection()
+    {
+        string normalizedBaseUrl = NormalizeApiBaseUrl(DesktopApiBaseUrl);
+        if (string.IsNullOrWhiteSpace(normalizedBaseUrl))
+        {
+            return;
+        }
+
+        string desktopLabel = ResolveManualReconnectLabel();
+        string nowUtc = DateTimeOffset.UtcNow.ToString("O");
+
+        List<SavedSyncConnection> savedConnections = ParseSavedConnections(_appGlobalSettings.SyncApiSavedConnectionsJson);
+        savedConnections.RemoveAll(entry => string.Equals(entry.ApiBaseUrl, normalizedBaseUrl, StringComparison.OrdinalIgnoreCase));
+        savedConnections.Insert(0, new SavedSyncConnection
+        {
+            ApiBaseUrl = normalizedBaseUrl,
+            DesktopLabel = desktopLabel,
+            LastConnectedAtUtc = nowUtc,
+        });
+
+        while (savedConnections.Count > MaxSavedSyncConnections)
+        {
+            savedConnections.RemoveAt(savedConnections.Count - 1);
+        }
+
+        _appGlobalSettings.SyncApiSavedConnectionsJson = JsonSerializer.Serialize(savedConnections);
+        _appGlobalSettings.SyncApiLastPairedDeviceLabel = desktopLabel;
+        _appGlobalSettings.SyncApiLastPairedAtUtc = nowUtc;
+
+        _lastKnownDesktopLabel = desktopLabel;
+        OnPropertyChanged(nameof(ManualReconnectButtonLabel));
+    }
+
+    private string ResolveDesktopLabelFromSettings()
+    {
+        string fromSettings = _appGlobalSettings.SyncApiLastPairedDeviceLabel?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(fromSettings))
+        {
+            return fromSettings;
+        }
+
+        SavedSyncConnection? connection = SelectPreferredConnection(_appGlobalSettings.SyncApiSavedConnectionsJson);
+        if (!string.IsNullOrWhiteSpace(connection?.DesktopLabel))
+        {
+            return connection.DesktopLabel.Trim();
+        }
+
+        return "Desktop";
+    }
+
+    private string ResolveManualReconnectLabel()
+    {
+        string label = _lastKnownDesktopLabel?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(label))
+        {
+            return label;
+        }
+
+        return "Desktop";
+    }
+
+    private static string? TryResolvePreferredApiBaseUrl(string savedConnectionsJson)
+    {
+        SavedSyncConnection? preferred = SelectPreferredConnection(savedConnectionsJson);
+        return preferred is null
+            ? null
+            : NormalizeApiBaseUrl(preferred.ApiBaseUrl);
+    }
+
+    private static SavedSyncConnection? SelectPreferredConnection(string savedConnectionsJson)
+    {
+        List<SavedSyncConnection> entries = ParseSavedConnections(savedConnectionsJson);
+
+        SavedSyncConnection? byMostRecent = entries
+            .Where(entry => !string.IsNullOrWhiteSpace(NormalizeApiBaseUrl(entry.ApiBaseUrl)))
+            .OrderByDescending(entry => ParseConnectedAtUtc(entry.LastConnectedAtUtc))
+            .FirstOrDefault();
+
+        return byMostRecent;
+    }
+
+    private static List<SavedSyncConnection> ParseSavedConnections(string savedConnectionsJson)
+    {
+        if (string.IsNullOrWhiteSpace(savedConnectionsJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<SavedSyncConnection>>(
+                savedConnectionsJson,
+                SyncJsonOptions) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static DateTimeOffset ParseConnectedAtUtc(string? value)
+    {
+        return DateTimeOffset.TryParse(value, out DateTimeOffset parsed)
+            ? parsed
+            : DateTimeOffset.MinValue;
+    }
+
+    private static string NormalizeApiBaseUrl(string? value)
+    {
+        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri))
+        {
+            return string.Empty;
+        }
+
+        return uri.GetLeftPart(UriPartial.Authority);
+    }
+
+    private static bool IsEndpointSaneForCompanion(string? value)
+    {
+        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri))
+        {
+            return false;
+        }
+
+        return !IsLoopbackHost(uri);
+    }
+
+    private static string TryGetHostDisplay(string? apiBaseUrl)
+    {
+        if (!Uri.TryCreate(apiBaseUrl?.Trim(), UriKind.Absolute, out Uri? uri)
+            || string.IsNullOrWhiteSpace(uri.Host))
+        {
+            return string.Empty;
+        }
+
+        return uri.Host;
     }
 
     public void Dispose()
@@ -1497,3 +1737,15 @@ internal sealed record PendingQrPairingRequest(
     string ApiBaseUrl,
     string PairCode,
     string DesktopLabel);
+
+internal sealed class SavedSyncConnection
+{
+    [JsonPropertyName("apiBaseUrl")]
+    public string ApiBaseUrl { get; set; } = string.Empty;
+
+    [JsonPropertyName("desktopLabel")]
+    public string DesktopLabel { get; set; } = string.Empty;
+
+    [JsonPropertyName("lastConnectedAtUtc")]
+    public string LastConnectedAtUtc { get; set; } = string.Empty;
+}
