@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 
 using Avalonia.Platform;
 
+using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Utilities;
 using ChartHub.ViewModels;
@@ -37,8 +38,6 @@ public class ApiClientService : INotifyPropertyChanged
             { "ch", ["Clone Hero", "ch.png"] },
             { "gh3pc", ["Guitar Hero World Tour PC", "gh.png"] }
         };
-
-    private const string BaseUrl = "https://rhythmverse.co";
 
     private readonly List<string> _ratings = new()
     {
@@ -141,7 +140,7 @@ public class ApiClientService : INotifyPropertyChanged
 
         if (_httpClient.BaseAddress is null)
         {
-            _httpClient.BaseAddress = new Uri(BaseUrl);
+            _httpClient.BaseAddress = ResolveBaseUri(_configuration);
         }
 
         if (_httpClient.DefaultRequestHeaders.Authorization is null)
@@ -154,6 +153,9 @@ public class ApiClientService : INotifyPropertyChanged
 
     public async Task<IReadOnlyList<ViewSong>> GetSongFilesAsync(bool search, string searchString, string sort, string order, List<InstrumentItem> instrument, string authorText)
     {
+        Uri baseUri = ResolveBaseUri(_configuration);
+        string baseUrl = baseUri.AbsoluteUri.TrimEnd('/');
+
         if (search)
         {
             CurrentPage = 1;
@@ -221,14 +223,14 @@ public class ApiClientService : INotifyPropertyChanged
                     if (string.IsNullOrEmpty(responseBody))
                     {
                         Logger.LogInfo("Api", "Mock data file was not found; falling back to live API");
-                        HttpResponseMessage response = await _httpClient.PostAsync(endpoint, content);
+                        HttpResponseMessage response = await _httpClient.PostAsync(new Uri(baseUri, endpoint), content);
                         response.EnsureSuccessStatusCode();
                         responseBody = await response.Content.ReadAsStringAsync();
                     }
                 }
                 else
                 {
-                    HttpResponseMessage response = await _httpClient.PostAsync(endpoint, content);
+                    HttpResponseMessage response = await _httpClient.PostAsync(new Uri(baseUri, endpoint), content);
                     response.EnsureSuccessStatusCode();
                     responseBody = await response.Content.ReadAsStringAsync();
                 }
@@ -317,7 +319,7 @@ public class ApiClientService : INotifyPropertyChanged
                                     if (!image.StartsWith("http", StringComparison.OrdinalIgnoreCase)
                                         && !image.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        image = BaseUrl + image;
+                                        image = CombineWithBaseUrl(baseUrl, image);
                                     }
                                     songView.AlbumArt = image;
                                 }
@@ -335,7 +337,7 @@ public class ApiClientService : INotifyPropertyChanged
                                 {
                                     if (!avatarPath.StartsWith("http"))
                                     {
-                                        avatarPath = BaseUrl + avatarPath;
+                                        avatarPath = CombineWithBaseUrl(baseUrl, avatarPath);
                                     }
 
                                     author.AvatarPath = avatarPath;
@@ -349,7 +351,7 @@ public class ApiClientService : INotifyPropertyChanged
 
                                 if (!downloadUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    songView.DownloadLink = BaseUrl + downloadUrl;
+                                    songView.DownloadLink = CombineWithBaseUrl(baseUrl, downloadUrl);
                                 }
                                 else
                                 {
@@ -409,11 +411,29 @@ public class ApiClientService : INotifyPropertyChanged
     {
         var httpClient = new HttpClient
         {
-            BaseAddress = new Uri(BaseUrl)
+            BaseAddress = ResolveBaseUri(configuration)
         };
         httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
         return httpClient;
     }
+
+    private static Uri ResolveBaseUri(IConfiguration configuration)
+    {
+        string? configuredValue = configuration["Runtime:RhythmVerseSource"] ?? configuration["RhythmVerseSource"];
+        if (Enum.TryParse(configuredValue, ignoreCase: true, out RhythmVerseSource source))
+        {
+            return RhythmVerseSourceUrls.GetBaseUri(source);
+        }
+
+        return RhythmVerseSourceUrls.GetBaseUri(RhythmVerseSource.RhythmVerseOfficial);
+    }
+
+    private static string CombineWithBaseUrl(string baseUrl, string relativePath)
+    {
+        string normalizedPath = relativePath.StartsWith('/') ? relativePath : $"/{relativePath}";
+        return $"{baseUrl}{normalizedPath}";
+    }
+
     private static bool IsMockDataEnabled(IConfiguration configuration)
     {
         string?[] candidates = new[]

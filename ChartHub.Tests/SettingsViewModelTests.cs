@@ -24,7 +24,8 @@ public class SettingsViewModelTests
         using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
         await Task.Yield();
 
-        Assert.Equal(20, sut.Fields.Count);
+        Assert.Equal(21, sut.Fields.Count);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.RhythmVerseSource" && field.IsDropdownEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.UseMockData" && field.IsToggleEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.DownloadDirectory" && field.IsDirectoryPicker);
         Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiDesktopBaseUrl");

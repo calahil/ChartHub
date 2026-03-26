@@ -11,4 +11,8 @@ public sealed class SyncOptions
     public int RecordsPerPage { get; set; } = 100;
 
     public int MaxPagesPerRun { get; set; } = 2000;
+
+    public int CursorMaxAgeMinutes { get; set; } = 120;
+
+    public int PageRewindOnResume { get; set; } = 2;
 }

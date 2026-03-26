@@ -88,8 +88,22 @@ public sealed class RhythmVerseUpstreamClient(
 
             using var songDocument = JsonDocument.Parse(songNode.ToJsonString());
             JsonElement songElement = songDocument.RootElement;
-            JsonElement data = songElement.GetProperty("data");
-            JsonElement file = songElement.GetProperty("file");
+            if (songElement.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            if (!songElement.TryGetProperty("data", out JsonElement data)
+                || data.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            if (!songElement.TryGetProperty("file", out JsonElement file)
+                || file.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
 
             songs.Add(new SyncedSong
             {

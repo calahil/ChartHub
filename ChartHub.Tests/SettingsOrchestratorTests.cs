@@ -21,15 +21,18 @@ public class SettingsOrchestratorTests
         {
             config.Runtime.DownloadDirectory = "/tmp/downloads";
             config.Runtime.SyncApiAuthToken = "updated-sync-token";
+            config.Runtime.RhythmVerseSource = RhythmVerseSource.ChartHubMirror;
         });
 
         Assert.True(result.IsValid);
         Assert.Equal(1, store.SaveCallCount);
         Assert.Equal("/tmp/downloads", sut.Current.Runtime.DownloadDirectory);
         Assert.Equal("updated-sync-token", sut.Current.Runtime.SyncApiAuthToken);
+        Assert.Equal(RhythmVerseSource.ChartHubMirror, sut.Current.Runtime.RhythmVerseSource);
         Assert.NotNull(observed);
         Assert.Equal("/tmp/downloads", observed!.Runtime.DownloadDirectory);
         Assert.Equal("updated-sync-token", observed.Runtime.SyncApiAuthToken);
+        Assert.Equal(RhythmVerseSource.ChartHubMirror, observed.Runtime.RhythmVerseSource);
     }
 
     [Fact]
@@ -143,6 +146,7 @@ public class SettingsOrchestratorTests
                 ConfigVersion = source.ConfigVersion,
                 Runtime = new RuntimeAppConfig
                 {
+                    RhythmVerseSource = source.Runtime.RhythmVerseSource,
                     UseMockData = source.Runtime.UseMockData,
                     TempDirectory = source.Runtime.TempDirectory,
                     DownloadDirectory = source.Runtime.DownloadDirectory,

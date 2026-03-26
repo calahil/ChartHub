@@ -165,6 +165,57 @@ public class UpstreamClientConversionTests
         Assert.Null(songs[0].RecordId);
     }
 
+    [Fact]
+    public void ConvertToSyncedSongs_WithBooleanSongNode_SkipsMalformedAndConvertsValidEntry()
+    {
+        RhythmVersePageEnvelope envelope = new()
+        {
+            TotalAvailable = 2,
+            TotalFiltered = 2,
+            Returned = 2,
+            Start = 0,
+            Records = 25,
+            Page = 1,
+            Songs =
+            [
+                JsonNode.Parse("false"),
+                JsonNode.Parse("""{"data":{"song_id":321,"artist":"A"},"file":{"file_id":"f-321"}}"""),
+            ],
+        };
+
+        RhythmVerseUpstreamClient sut = BuildClient("{}");
+        IReadOnlyList<SyncedSong> songs = sut.ConvertToSyncedSongs(envelope);
+
+        Assert.Single(songs);
+        Assert.Equal(321L, songs[0].SongId);
+    }
+
+    [Fact]
+    public void ConvertToSyncedSongs_WithBooleanDataOrFile_SkipsMalformedAndConvertsValidEntry()
+    {
+        RhythmVersePageEnvelope envelope = new()
+        {
+            TotalAvailable = 3,
+            TotalFiltered = 3,
+            Returned = 3,
+            Start = 0,
+            Records = 25,
+            Page = 1,
+            Songs =
+            [
+                JsonNode.Parse("""{"data":false,"file":{"file_id":"f-1"}}"""),
+                JsonNode.Parse("""{"data":{"song_id":2},"file":false}"""),
+                JsonNode.Parse("""{"data":{"song_id":654,"artist":"B"},"file":{"file_id":"f-654"}}"""),
+            ],
+        };
+
+        RhythmVerseUpstreamClient sut = BuildClient("{}");
+        IReadOnlyList<SyncedSong> songs = sut.ConvertToSyncedSongs(envelope);
+
+        Assert.Single(songs);
+        Assert.Equal(654L, songs[0].SongId);
+    }
+
     private static RhythmVerseUpstreamClient BuildClient(string responseJson)
     {
         HttpClient httpClient = new(new StubHttpMessageHandler(

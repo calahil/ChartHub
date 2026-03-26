@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Reflection;
 
+using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.ViewModels;
@@ -63,6 +64,39 @@ public class ApiClientServiceTests
         Assert.Equal(1, sut.TotalPages);
         Assert.Equal(1, sut.StartRecord);
         Assert.Equal(25, sut.EndRecord);
+    }
+
+    [Fact]
+    public async Task GetSongFilesAsync_WithMirrorSource_UsesMirrorBaseUrlForRelativeLinks()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler((_, _) => throw new InvalidOperationException("HTTP fallback should not be used when mock payload is available.")))
+        {
+            BaseAddress = new Uri("https://rhythmverse.co"),
+        };
+
+        ApiClientService sut = CreateService(
+          configurationValues: new Dictionary<string, string?>
+          {
+              ["Runtime:UseMockData"] = "True",
+              ["Runtime:RhythmVerseSource"] = nameof(RhythmVerseSource.ChartHubMirror),
+              ["rhythmverseToken"] = "token-test",
+          },
+          httpClient,
+          loadEmbeddedMockData: () => BuildMappedSongResponseJson(),
+          resolveMockDataPath: () => null);
+
+        IReadOnlyList<ViewSong> results = await sut.GetSongFilesAsync(
+          search: false,
+          searchString: string.Empty,
+          sort: "downloads",
+          order: "desc",
+          instrument: [],
+          authorText: string.Empty);
+
+        ViewSong song = Assert.Single(results);
+        Assert.Equal("http://10.0.0.7:5147/img/data-art.png", song.AlbumArt);
+        Assert.Equal("http://10.0.0.7:5147/downloads/data-song.zip", song.DownloadLink);
+        Assert.Equal("http://10.0.0.7:5147/avatars/author.png", song.Author?.AvatarPath);
     }
 
     [Fact]

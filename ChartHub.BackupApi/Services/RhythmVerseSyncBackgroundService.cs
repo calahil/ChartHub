@@ -43,9 +43,38 @@ public sealed partial class RhythmVerseSyncBackgroundService(
 
         using IServiceScope scope = scopeFactory.CreateScope();
         IRhythmVerseRepository repository = scope.ServiceProvider.GetRequiredService<IRhythmVerseRepository>();
-        string reconciliationRunId = Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture);
 
-        await repository.BeginReconciliationRunAsync(reconciliationRunId, cancellationToken).ConfigureAwait(false);
+        // Attempt to load and validate existing cursor for potential resume
+        SyncCursor? cursor = await LoadOrInitializeCursorAsync(repository, cancellationToken)
+            .ConfigureAwait(false);
+
+        int page = 1;
+        string reconciliationRunId;
+        bool isResuming = false;
+        DateTime cursorStartedUtc = DateTime.UtcNow;
+
+        if (cursor is not null
+            && cursor.IsValid(syncOptions.Value.RecordsPerPage, syncOptions.Value.CursorMaxAgeMinutes, DateTime.UtcNow))
+        {
+            // Cursor valid: resume from rewound page with same run ID
+            reconciliationRunId = cursor.RunId;
+            cursorStartedUtc = cursor.CursorStartedUtc;
+            int rewindPages = Math.Min(cursor.LastCompletedPage - 1, syncOptions.Value.PageRewindOnResume);
+            page = Math.Max(1, cursor.LastCompletedPage - rewindPages);
+            isResuming = true;
+            Log.SyncResuming(logger, page, reconciliationRunId, cursor.LastCompletedPage);
+        }
+        else
+        {
+            // Cursor invalid/absent: start fresh with new run ID
+            reconciliationRunId = Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+            Log.SyncStartingFresh(logger, reconciliationRunId);
+        }
+
+        if (!isResuming)
+        {
+            await repository.BeginReconciliationRunAsync(reconciliationRunId, cancellationToken).ConfigureAwait(false);
+        }
 
         string? rawWatermark = await repository
             .GetSyncStateAsync("sync.last_record_updated", cancellationToken)
@@ -58,7 +87,6 @@ public sealed partial class RhythmVerseSyncBackgroundService(
         }
 
         long? cycleHighWatermark = updatedSince;
-        int page = 1;
         int maxPages = Math.Max(1, syncOptions.Value.MaxPagesPerRun);
         int records = Math.Clamp(syncOptions.Value.RecordsPerPage, 1, 250);
         bool cycleFailed = false;
@@ -101,6 +129,10 @@ public sealed partial class RhythmVerseSyncBackgroundService(
 
             Log.SyncPageComplete(logger, page, songs.Count);
 
+            // Persist page cursor for potential resume on next cycle
+            await SaveCursorAsync(repository, reconciliationRunId, page, records, cursorStartedUtc, cancellationToken)
+                .ConfigureAwait(false);
+
             if (songs.Count < records)
             {
                 reachedTerminalPage = true;
@@ -116,6 +148,10 @@ public sealed partial class RhythmVerseSyncBackgroundService(
         if (!cycleFailed && reachedTerminalPage)
         {
             await repository.FinalizeReconciliationRunAsync(reconciliationRunId, cancellationToken).ConfigureAwait(false);
+
+            // Clear cursor after successful finalization
+            await ClearCursorAsync(repository, cancellationToken)
+                .ConfigureAwait(false);
 
             await repository
                 .SetSyncStateAsync("sync.last_success_utc", DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture), cancellationToken)
@@ -194,6 +230,119 @@ public sealed partial class RhythmVerseSyncBackgroundService(
         return false;
     }
 
+    private sealed record SyncCursor(
+        string RunId,
+        int LastCompletedPage,
+        int RecordsPerPage,
+        DateTime CursorStartedUtc)
+    {
+        public bool IsValid(int currentRecordsPerPage, int maxAgeMinutes, DateTime nowUtc)
+        {
+            if (RecordsPerPage != currentRecordsPerPage)
+            {
+                return false;
+            }
+
+            TimeSpan age = nowUtc - CursorStartedUtc;
+            return age.TotalMinutes < maxAgeMinutes;
+        }
+    }
+
+    private async Task<SyncCursor?> LoadOrInitializeCursorAsync(
+        IRhythmVerseRepository repository,
+        CancellationToken cancellationToken)
+    {
+        string? rawRunId = await repository
+            .GetSyncStateAsync("sync.run_id", cancellationToken)
+            .ConfigureAwait(false);
+
+        string? rawLastPage = await repository
+            .GetSyncStateAsync("sync.last_completed_page", cancellationToken)
+            .ConfigureAwait(false);
+
+        string? rawRecordsPerPage = await repository
+            .GetSyncStateAsync("sync.records_per_page", cancellationToken)
+            .ConfigureAwait(false);
+
+        string? rawStartedUtc = await repository
+            .GetSyncStateAsync("sync.cursor_started_utc", cancellationToken)
+            .ConfigureAwait(false);
+
+        string? rawStatus = await repository
+            .GetSyncStateAsync("sync.status", cancellationToken)
+            .ConfigureAwait(false);
+
+        if (rawRunId is null
+            || rawLastPage is null
+            || rawRecordsPerPage is null
+            || rawStartedUtc is null
+            || rawStatus is null)
+        {
+            return null;
+        }
+
+        if (!int.TryParse(rawLastPage, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int lastPage))
+        {
+            return null;
+        }
+
+        if (!int.TryParse(rawRecordsPerPage, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int recordsPerPage))
+        {
+            return null;
+        }
+
+        if (!DateTime.TryParseExact(rawStartedUtc, "O", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out DateTime startedUtc))
+        {
+            return null;
+        }
+
+        if (rawStatus != "in_progress")
+        {
+            return null;
+        }
+
+        return new SyncCursor(rawRunId, lastPage, recordsPerPage, startedUtc);
+    }
+
+    private async Task SaveCursorAsync(
+        IRhythmVerseRepository repository,
+        string runId,
+        int page,
+        int recordsPerPage,
+        DateTime cursorStartedUtc,
+        CancellationToken cancellationToken)
+    {
+        await repository
+            .SetSyncStateAsync("sync.run_id", runId, cancellationToken)
+            .ConfigureAwait(false);
+
+        await repository
+            .SetSyncStateAsync("sync.last_completed_page", page.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken)
+            .ConfigureAwait(false);
+
+        await repository
+            .SetSyncStateAsync("sync.records_per_page", recordsPerPage.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken)
+            .ConfigureAwait(false);
+
+        await repository
+            .SetSyncStateAsync("sync.cursor_started_utc", cursorStartedUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture), cancellationToken)
+            .ConfigureAwait(false);
+
+        await repository
+            .SetSyncStateAsync("sync.status", "in_progress", cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task ClearCursorAsync(
+        IRhythmVerseRepository repository,
+        CancellationToken cancellationToken)
+    {
+        // Set status to completed so we don't attempt resume later
+        await repository
+            .SetSyncStateAsync("sync.status", "completed", cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     private static partial class Log
     {
         [LoggerMessage(EventId = 1001, Level = LogLevel.Information, Message = "RhythmVerse sync is disabled.")]
@@ -219,5 +368,11 @@ public sealed partial class RhythmVerseSyncBackgroundService(
 
         [LoggerMessage(EventId = 1008, Level = LogLevel.Warning, Message = "RhythmVerse sync cycle stopped before a terminal page was reached; reconciliation run left incomplete after {MaxPages} pages.")]
         public static partial void SyncCycleIncomplete(ILogger logger, int maxPages);
+
+        [LoggerMessage(EventId = 1009, Level = LogLevel.Information, Message = "Resuming RhythmVerse sync from page {Page} (run {RunId}, rewound from {LastCompletedPage}).")]
+        public static partial void SyncResuming(ILogger logger, int page, string runId, int lastCompletedPage);
+
+        [LoggerMessage(EventId = 1010, Level = LogLevel.Information, Message = "Starting fresh RhythmVerse sync cycle (run {RunId}).")]
+        public static partial void SyncStartingFresh(ILogger logger, string runId);
     }
 }

@@ -5,6 +5,12 @@ namespace ChartHub.Configuration.Models;
 public sealed class RuntimeAppConfig
 {
     [SettingGroup("General")]
+    [SettingDisplay("RhythmVerse Source")]
+    [SettingEditor(SettingEditorKind.Dropdown)]
+    [SettingHotReloadable(true)]
+    public RhythmVerseSource RhythmVerseSource { get; set; } = RhythmVerseSource.RhythmVerseOfficial;
+
+    [SettingGroup("General")]
     [SettingDisplay("Use Mock Data")]
     [SettingEditor(SettingEditorKind.Toggle)]
     [SettingHotReloadable(true)]

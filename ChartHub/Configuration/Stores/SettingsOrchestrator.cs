@@ -81,6 +81,7 @@ public sealed class SettingsOrchestrator : ISettingsOrchestrator, IDisposable
             ConfigVersion = source.ConfigVersion,
             Runtime = new RuntimeAppConfig
             {
+                RhythmVerseSource = source.Runtime.RhythmVerseSource,
                 UseMockData = source.Runtime.UseMockData,
                 TempDirectory = source.Runtime.TempDirectory,
                 DownloadDirectory = source.Runtime.DownloadDirectory,

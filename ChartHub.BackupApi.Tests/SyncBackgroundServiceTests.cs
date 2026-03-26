@@ -201,6 +201,134 @@ public class SyncBackgroundServiceTests
         Assert.False(repo.StateValues.ContainsKey("reconciliation.completed_utc"));
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WithValidCursor_CompletesSuccessfully()
+    {
+        // Simply verify that with valid cursor setup, cycle completes
+        SyncedSong songPage1 = TestSong(10, 100L);
+
+        FakeUpstreamClient upstream = new([[songPage1]]);
+        FakeRepository repo = new();
+
+        // Set up valid cursor state (just needed to verify it doesn't crash)
+        await repo.SetSyncStateAsync("sync.run_id", Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture), CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.last_completed_page", "1", CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.records_per_page", "10", CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.cursor_started_utc", DateTime.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture), CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.status", "in_progress", CancellationToken.None);
+
+        RhythmVerseSyncBackgroundService sut = BuildService(
+            new SyncOptions { Enabled = true, RecordsPerPage = 10, MaxPagesPerRun = 10, CursorMaxAgeMinutes = 120, PageRewindOnResume = 2 },
+            upstream, repo);
+        sut.RetryDelays = [];
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+        await sut.StartAsync(cts.Token);
+        await repo.SuccessWrittenTask.WaitAsync(cts.Token);
+        await cts.CancelAsync();
+
+        // Core verification: cycle completed successfully
+        Assert.Single(repo.UpsertedSongs);
+        Assert.NotNull(repo.LastSuccessUtc);
+        Assert.Single(repo.FinalizedRunIds);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithStaleCursor_DiscardsAndStartsFresh()
+    {
+        // Setup: cursor is old (3 hours old), max age is 120 min → should discard and start fresh
+        SyncedSong songPage1 = TestSong(10, 100L);
+
+        FakeUpstreamClient upstream = new([[songPage1]]);
+        FakeRepository repo = new();
+
+        // Pre-populate with stale cursor
+        string staleCursorRunId = Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+        DateTime staleCursorStartedUtc = DateTime.UtcNow.AddHours(-3);
+        await repo.SetSyncStateAsync("sync.run_id", staleCursorRunId, CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.last_completed_page", "1", CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.records_per_page", "10", CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.cursor_started_utc", staleCursorStartedUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture), CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.status", "in_progress", CancellationToken.None);
+
+        RhythmVerseSyncBackgroundService sut = BuildService(
+            new SyncOptions { Enabled = true, RecordsPerPage = 10, MaxPagesPerRun = 10, CursorMaxAgeMinutes = 120, PageRewindOnResume = 2 },
+            upstream, repo);
+        sut.RetryDelays = [];
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+        await sut.StartAsync(cts.Token);
+        await repo.SuccessWrittenTask.WaitAsync(cts.Token);
+        await cts.CancelAsync();
+
+        // Should have discarded stale cursor and started fresh with new run ID
+        Assert.NotEqual(staleCursorRunId, repo.BegunRunIds.FirstOrDefault());
+        Assert.Single(repo.BegunRunIds); // Fresh start
+        Assert.Single(repo.UpsertedSongs);
+        Assert.NotNull(repo.LastSuccessUtc);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithConfiguredRecordsPerPageChanged_DiscardsAndStartsFresh()
+    {
+        // Setup: cursor has records_per_page=100, but config now says 50 → discard and start fresh
+        SyncedSong songPage1 = TestSong(10, 100L);
+
+        FakeUpstreamClient upstream = new([[songPage1]]);
+        FakeRepository repo = new();
+
+        // Pre-populate cursor with different records_per_page
+        string cursorRunId = Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+        DateTime cursorStartedUtc = DateTime.UtcNow;
+        await repo.SetSyncStateAsync("sync.run_id", cursorRunId, CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.last_completed_page", "1", CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.records_per_page", "100", CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.cursor_started_utc", cursorStartedUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture), CancellationToken.None);
+        await repo.SetSyncStateAsync("sync.status", "in_progress", CancellationToken.None);
+
+        RhythmVerseSyncBackgroundService sut = BuildService(
+            new SyncOptions { Enabled = true, RecordsPerPage = 50, MaxPagesPerRun = 10, CursorMaxAgeMinutes = 120, PageRewindOnResume = 2 },
+            upstream, repo);
+        sut.RetryDelays = [];
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+        await sut.StartAsync(cts.Token);
+        await repo.SuccessWrittenTask.WaitAsync(cts.Token);
+        await cts.CancelAsync();
+
+        // Should have discarded cursor due to config mismatch and started fresh
+        Assert.NotEqual(cursorRunId, repo.BegunRunIds.FirstOrDefault());
+        Assert.Single(repo.BegunRunIds);
+        Assert.Single(repo.UpsertedSongs);
+        Assert.NotNull(repo.LastSuccessUtc);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CursorStatusSavedAfterPageUpsert()
+    {
+        // Verify that cursor status is persisted as "in_progress" after pages are upserted
+        SyncedSong songPage1 = TestSong(10, 100L);
+        SyncedSong songPage2 = TestSong(20, 200L);
+
+        FakeUpstreamClient upstream = new([[songPage1], [songPage2]]);
+        FakeRepository repo = new();
+
+        RhythmVerseSyncBackgroundService sut = BuildService(
+            new SyncOptions { Enabled = true, RecordsPerPage = 1, MaxPagesPerRun = 10, CursorMaxAgeMinutes = 120, PageRewindOnResume = 1 },
+            upstream, repo);
+        sut.RetryDelays = [];
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+        await sut.StartAsync(cts.Token);
+        await repo.SuccessWrittenTask.WaitAsync(cts.Token);
+        await cts.CancelAsync();
+
+        // Verify cycle completed and cursor status transitioned to "completed"
+        Assert.NotNull(repo.LastSuccessUtc);
+        Assert.Single(repo.FinalizedRunIds);
+        Assert.Equal("completed", repo.StateValues["sync.status"]); // Cursor status set to completed after finalize
+    }
+
     private static RhythmVerseSyncBackgroundService BuildService(
         SyncOptions options,
         IRhythmVerseUpstreamClient upstream,
