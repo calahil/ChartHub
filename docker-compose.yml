@@ -25,6 +25,44 @@ services:
     networks:
       - internal_env
 
+  backup-api:
+    build:
+      context: .
+      dockerfile: ChartHub.BackupApi/Dockerfile
+    container_name: charthub-backup-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+      - Database__Provider=postgresql
+      - Database__PostgreSqlConnectionString=Host=db;Port=5432;Database=${PSQL_DB};Username=${PSQL_USER};Password=${PSQL_PASSWORD}
+      - RhythmVerseSource__BaseUrl=${RHYTHMVERSE_BASE_URL:-https://rhythmverse.co/}
+      - RhythmVerseSource__Token=${RHYTHMVERSE_TOKEN:-CHANGE_ME}
+      - Sync__Enabled=${BACKUP_SYNC_ENABLED:-true}
+      - Sync__InitialDelayMinutes=${BACKUP_SYNC_INITIAL_DELAY_MINUTES:-0}
+      - Downloads__Mode=${BACKUP_DOWNLOADS_MODE:-redirect}
+      - Downloads__CacheDirectory=/cache/downloads
+      - Downloads__ExternalRedirectCacheHours=${BACKUP_DOWNLOADS_EXTERNAL_REDIRECT_CACHE_HOURS:-48}
+      - ImageCache__CacheDirectory=/cache/images
+    ports:
+      - "5147:5000"
+    volumes:
+      - ${BACKUP_DOWNLOADS_HOST_PATH:-./ChartHub.BackupApi/cache/downloads}:/cache/downloads
+      - ${BACKUP_IMAGES_HOST_PATH:-./ChartHub.BackupApi/cache/images}:/cache/images
+    healthcheck:
+      interval: 30s
+      retries: 5
+      start_period: 20s
+      test:
+      - CMD-SHELL
+      - wget --spider -q http://localhost:5000/api/rhythmverse/health/sync || exit 1
+      timeout: 5s
+    restart: always
+    networks:
+      - internal_env
+
 networks:
   internal_env:
     external: true

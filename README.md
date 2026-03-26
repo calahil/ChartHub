@@ -26,6 +26,31 @@ dotnet build ChartHub/ChartHub.csproj
 dotnet run --project ChartHub/ChartHub.csproj
 ```
 
+## Docker (Backup API + PostgreSQL)
+
+The repository includes Docker Compose support for the Backup API and PostgreSQL.
+
+1. Copy `.env.example` to `.env` and update `RHYTHMVERSE_TOKEN`.
+2. Start the stack:
+
+```bash
+docker compose up -d --build
+```
+
+3. Backup API is exposed at `http://127.0.0.1:5147`.
+
+The Backup API cache directories are mounted as Docker bind mounts:
+
+- `/cache/downloads`
+- `/cache/images`
+
+Host paths are configurable in `.env`:
+
+- `BACKUP_DOWNLOADS_HOST_PATH`
+- `BACKUP_IMAGES_HOST_PATH`
+
+These mounts persist cached assets and downloads across container restarts.
+
 ## Run tests
 
 ```bash

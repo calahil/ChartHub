@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/TestResults/
+**/cache/
+.git/
+.gitignore
+.env
+.env.*
+*.user
+*.suo
+*.nupkg
