@@ -45,6 +45,62 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
     }
 
     [Fact]
+    public async Task PostSearchLiveAsync_WithPartialArtistName_FindsMatchingEntry()
+    {
+        // "Weird" as a search term must match artist "Weird Al Yankovic".
+        await _factory.SeedSongsAsync(
+        [
+            Song(1, "Weird Al Yankovic", "Eat It"),
+            Song(2, "Unrelated Artist", "Other Song"),
+        ]);
+
+        HttpClient client = _factory.CreateClient();
+        HttpResponseMessage response = await client.PostAsync(
+            "/api/all/songfiles/search/live",
+            new FormUrlEncodedContent(
+            [
+                new KeyValuePair<string, string>("text", "Weird"),
+                new KeyValuePair<string, string>("page", "1"),
+                new KeyValuePair<string, string>("records", "25"),
+            ]));
+
+        response.EnsureSuccessStatusCode();
+        JsonElement payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        JsonElement songs = payload.GetProperty("data").GetProperty("songs");
+        Assert.Equal(1, songs.GetArrayLength());
+        Assert.Equal(1L, songs[0].GetProperty("data").GetProperty("song_id").GetInt64());
+    }
+
+    [Fact]
+    public async Task PostSearchLiveAsync_WithQueryLackingPunctuation_FindsArtistWithPunctuation()
+    {
+        // "ACDC" (no slash) must match the stored artist "AC/DC" after punctuation normalisation.
+        await _factory.SeedSongsAsync(
+        [
+            Song(1, "AC/DC", "Highway to Hell"),
+            Song(2, "Unrelated Artist", "Other Song"),
+        ]);
+
+        HttpClient client = _factory.CreateClient();
+        HttpResponseMessage response = await client.PostAsync(
+            "/api/all/songfiles/search/live",
+            new FormUrlEncodedContent(
+            [
+                new KeyValuePair<string, string>("text", "ACDC"),
+                new KeyValuePair<string, string>("page", "1"),
+                new KeyValuePair<string, string>("records", "25"),
+            ]));
+
+        response.EnsureSuccessStatusCode();
+        JsonElement payload = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        JsonElement songs = payload.GetProperty("data").GetProperty("songs");
+        Assert.Equal(1, songs.GetArrayLength());
+        Assert.Equal(1L, songs[0].GetProperty("data").GetProperty("song_id").GetInt64());
+    }
+
+    [Fact]
     public async Task PostListAsync_WithInstrumentFilter_UsesNonNullDiffFields()
     {
         await _factory.SeedSongsAsync(

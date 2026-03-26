@@ -280,6 +280,79 @@ public class RepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task GetSongsPageAsync_WithTextQuery_MatchesPartialArtistName()
+    {
+        // "Weird" is a partial match for "Weird Al Yankovic".
+        await _sut.UpsertSongsAsync(
+            [
+                Song(1, "Weird Al Yankovic", title: "Eat It"),
+                Song(2, "Another Artist", title: "Another Song"),
+            ],
+            CancellationToken.None);
+
+        RhythmVersePageEnvelope envelope = await _sut.GetSongsPageAsync(
+            1, 10, "Weird", null, null, null, null, CancellationToken.None);
+
+        Assert.Equal(1, envelope.Returned);
+        Assert.Equal(1L, (long?)envelope.Songs[0]?["data"]?["song_id"]);
+    }
+
+    [Fact]
+    public async Task GetSongsPageAsync_WithPunctuationInQuery_MatchesArtistContainingPunctuation()
+    {
+        // Query "AC/DC" must match the stored artist "AC/DC".
+        await _sut.UpsertSongsAsync(
+            [
+                Song(1, "AC/DC", title: "Highway to Hell"),
+                Song(2, "Another Band", title: "Other Song"),
+            ],
+            CancellationToken.None);
+
+        RhythmVersePageEnvelope envelope = await _sut.GetSongsPageAsync(
+            1, 10, "AC/DC", null, null, null, null, CancellationToken.None);
+
+        Assert.Equal(1, envelope.Returned);
+        Assert.Equal(1L, (long?)envelope.Songs[0]?["data"]?["song_id"]);
+    }
+
+    [Fact]
+    public async Task GetSongsPageAsync_WithQueryLackingPunctuation_MatchesArtistThatHasPunctuation()
+    {
+        // Query "ACDC" (no slash) must still find the artist stored as "AC/DC"
+        // because the search normalises both sides by stripping connector punctuation.
+        await _sut.UpsertSongsAsync(
+            [
+                Song(1, "AC/DC", title: "Back in Black"),
+                Song(2, "Another Band", title: "Another Song"),
+            ],
+            CancellationToken.None);
+
+        RhythmVersePageEnvelope envelope = await _sut.GetSongsPageAsync(
+            1, 10, "ACDC", null, null, null, null, CancellationToken.None);
+
+        Assert.Equal(1, envelope.Returned);
+        Assert.Equal(1L, (long?)envelope.Songs[0]?["data"]?["song_id"]);
+    }
+
+    [Fact]
+    public async Task GetSongsPageAsync_WithLowercaseQuery_MatchesMixedCaseArtist()
+    {
+        // Case-insensitive: "weird" must match "Weird Al Yankovic".
+        await _sut.UpsertSongsAsync(
+            [
+                Song(1, "Weird Al Yankovic", title: "White and Nerdy"),
+                Song(2, "Normal Artist", title: "Normal Song"),
+            ],
+            CancellationToken.None);
+
+        RhythmVersePageEnvelope envelope = await _sut.GetSongsPageAsync(
+            1, 10, "weird", null, null, null, null, CancellationToken.None);
+
+        Assert.Equal(1, envelope.Returned);
+        Assert.Equal(1L, (long?)envelope.Songs[0]?["data"]?["song_id"]);
+    }
+
+    [Fact]
     public async Task GetSongsPageAsync_Pagination_ReturnsCorrectSlices()
     {
         IEnumerable<SyncedSong> songs = Enumerable.Range(1, 5)

@@ -28,6 +28,13 @@ public sealed partial class RhythmVerseSyncBackgroundService(
             return;
         }
 
+        int initialDelayMinutes = syncOptions.Value.InitialDelayMinutes;
+        if (initialDelayMinutes > 0)
+        {
+            Log.SyncInitialDelayStarted(logger, initialDelayMinutes);
+            await Task.Delay(TimeSpan.FromMinutes(initialDelayMinutes), stoppingToken).ConfigureAwait(false);
+        }
+
         await RunSyncCycleAsync(stoppingToken).ConfigureAwait(false);
 
         using PeriodicTimer timer = new(TimeSpan.FromMinutes(Math.Max(1, syncOptions.Value.IntervalMinutes)));
@@ -374,5 +381,8 @@ public sealed partial class RhythmVerseSyncBackgroundService(
 
         [LoggerMessage(EventId = 1010, Level = LogLevel.Information, Message = "Starting fresh RhythmVerse sync cycle (run {RunId}).")]
         public static partial void SyncStartingFresh(ILogger logger, string runId);
+
+        [LoggerMessage(EventId = 1011, Level = LogLevel.Information, Message = "RhythmVerse sync startup delayed by {DelayMinutes} minutes (Sync__InitialDelayMinutes).")]
+        public static partial void SyncInitialDelayStarted(ILogger logger, int delayMinutes);
     }
 }

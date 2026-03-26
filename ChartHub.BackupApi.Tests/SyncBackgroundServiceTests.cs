@@ -30,6 +30,25 @@ public class SyncBackgroundServiceTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WithInitialDelay_DoesNotFetchBeforeDelayElapses()
+    {
+        // InitialDelayMinutes = 60 means the service waits 60 minutes before the first cycle.
+        // We cancel after a short wall-clock time so the delay never elapses and no fetch occurs.
+        FakeUpstreamClient upstream = new([[]]);
+        FakeRepository repo = new();
+        RhythmVerseSyncBackgroundService sut = BuildService(
+            new SyncOptions { Enabled = true, RecordsPerPage = 10, MaxPagesPerRun = 10, InitialDelayMinutes = 60 },
+            upstream, repo);
+        sut.RetryDelays = [];
+
+        using CancellationTokenSource cts = new(TimeSpan.FromMilliseconds(200));
+        await sut.StartAsync(cts.Token);
+        try { await repo.SuccessWrittenTask.WaitAsync(cts.Token); } catch (OperationCanceledException) { }
+
+        Assert.Equal(0, upstream.FetchCallCount);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WithPartialFinalPage_UpsertsAllSongsAndWritesWatermark()
     {
         // page 1 is full (2 == RecordsPerPage) → continues; page 2 is short (1 < 2) → stops

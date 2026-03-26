@@ -49,7 +49,7 @@ public class ApiClientServiceTests
         Assert.Equal(10, song.Downloads);   // FileData.Downloads=10 is non-zero so it wins over DataData.Downloads=42
         Assert.Equal(7, song.Comments);
         Assert.Equal(210, song.SongLength);
-        Assert.Equal("https://rhythmverse.co/img/data-art.png", song.AlbumArt);
+        Assert.Equal("https://rhythmverse.co/assets/album_art/data-art.png", song.AlbumArt);
         Assert.Equal("https://rhythmverse.co/downloads/data-song.zip", song.DownloadLink);
         Assert.Equal("https://rhythmverse.co/avatars/author.png", song.Author?.AvatarPath);
         Assert.Equal("rb3.png", song.Gameformat);
@@ -94,9 +94,9 @@ public class ApiClientServiceTests
           authorText: string.Empty);
 
         ViewSong song = Assert.Single(results);
-        Assert.Equal("http://10.0.0.7:5147/img/data-art.png", song.AlbumArt);
-        Assert.Equal("http://10.0.0.7:5147/downloads/data-song.zip", song.DownloadLink);
-        Assert.Equal("http://10.0.0.7:5147/avatars/author.png", song.Author?.AvatarPath);
+        Assert.Equal("http://127.0.0.1:5147/assets/album_art/data-art.png", song.AlbumArt);
+        Assert.Equal("http://127.0.0.1:5147/downloads/data-song.zip", song.DownloadLink);
+        Assert.Equal("http://127.0.0.1:5147/avatars/author.png", song.Author?.AvatarPath);
     }
 
     [Fact]
@@ -340,7 +340,7 @@ public class ApiClientServiceTests
                   "diff_bass": "2",
                   "diff_vocals": "1",
                   "diff_keys": "1",
-                  "album_art": "/img/data-art.png"
+                  "album_art": "/assets/album_art/data-art.png"
                 },
                 "file": {
                   "file_id": "rv-file-123",
@@ -356,7 +356,7 @@ public class ApiClientServiceTests
                   "file_album": "File Album",
                   "file_genre": "File Genre",
                   "file_year": 1980,
-                  "album_art": "/img/file-art.png",
+                  "album_art": "/assets/album_art/file-art.png",
                   "download_url": "/downloads/data-song.zip",
                   "gameformat": "rb3",
                   "author": {

@@ -72,7 +72,55 @@ public static class RhythmVerseEndpoints
             .WithDescription("Returns OpenAPI-compatible schema components for the compatibility response contract.")
             .Produces(StatusCodes.Status200OK, contentType: "application/json");
 
+        endpoints.MapGet("/img/{**path}", GetMirroredImageAsync)
+            .WithName("GetMirroredImage")
+            .WithTags("Assets")
+            .WithSummary("Get a mirrored RhythmVerse image asset")
+            .WithDescription("Fetches an upstream RhythmVerse image asset on cache miss and serves the cached bytes on subsequent requests.")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        endpoints.MapGet("/avatars/{**path}", GetMirroredAvatarAsync)
+            .WithName("GetMirroredAvatar")
+            .WithTags("Assets")
+            .WithSummary("Get a mirrored RhythmVerse avatar asset")
+            .WithDescription("Fetches an upstream RhythmVerse avatar asset on cache miss and serves the cached bytes on subsequent requests.")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        endpoints.MapGet("/assets/album_art/{**path}", GetMirroredAlbumArtAsync)
+            .WithName("GetMirroredAlbumArt")
+            .WithTags("Assets")
+            .WithSummary("Get mirrored RhythmVerse album art")
+            .WithDescription("Fetches upstream RhythmVerse album-art assets on cache miss and serves the cached bytes on subsequent requests.")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
         return endpoints;
+    }
+
+    private static Task<IResult> GetMirroredImageAsync(
+        [FromServices] IImageProxyService imageProxyService,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        return GetMirroredAssetAsync(imageProxyService, $"img/{path}", cancellationToken);
+    }
+
+    private static Task<IResult> GetMirroredAvatarAsync(
+        [FromServices] IImageProxyService imageProxyService,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        return GetMirroredAssetAsync(imageProxyService, $"avatars/{path}", cancellationToken);
+    }
+
+    private static Task<IResult> GetMirroredAlbumArtAsync(
+        [FromServices] IImageProxyService imageProxyService,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        return GetMirroredAssetAsync(imageProxyService, $"assets/album_art/{path}", cancellationToken);
     }
 
     private static Task<IResult> GetSongsListCompatAsync(
@@ -248,5 +296,16 @@ public static class RhythmVerseEndpoints
             reconciliation_in_progress = reconciliationInProgress,
             last_run_completed = lastRunCompleted,
         });
+    }
+
+    private static async Task<IResult> GetMirroredAssetAsync(
+        IImageProxyService imageProxyService,
+        string assetPath,
+        CancellationToken cancellationToken)
+    {
+        ImageProxyResult? result = await imageProxyService.GetImageAsync(assetPath, cancellationToken).ConfigureAwait(false);
+        return result is null
+            ? Results.NotFound()
+            : Results.File(result.Data, result.ContentType);
     }
 }

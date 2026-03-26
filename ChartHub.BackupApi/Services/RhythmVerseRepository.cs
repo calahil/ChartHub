@@ -214,10 +214,21 @@ public sealed partial class RhythmVerseRepository(
         if (!string.IsNullOrWhiteSpace(query))
         {
             string filter = query.Trim();
+            string filterLower = filter.ToLowerInvariant();
+            string filterNormalized = NormalizeSearchQuery(filter);
+
+#pragma warning disable CA1862 // EF Core LINQ-to-SQL queries cannot translate StringComparison overloads; ToLower() is translatable to SQL and necessary here.
+            // Always apply both predicates:
+            //   1. case-insensitive raw match  → "Weird" finds "Weird Al Yankovic" on PostgreSQL
+            //   2. punctuation-stripped match  → "ACDC" finds "AC/DC"; "Guns N Roses" finds "Guns N' Roses"
             baseQuery = baseQuery.Where(x =>
-                x.Artist.Contains(filter) ||
-                x.Title.Contains(filter) ||
-                x.Album.Contains(filter));
+                x.Artist.ToLower().Contains(filterLower) ||
+                x.Title.ToLower().Contains(filterLower) ||
+                x.Album.ToLower().Contains(filterLower) ||
+                x.Artist.Replace("/", "").Replace("-", "").Replace("'", "").ToLower().Contains(filterNormalized) ||
+                x.Title.Replace("/", "").Replace("-", "").Replace("'", "").ToLower().Contains(filterNormalized) ||
+                x.Album.Replace("/", "").Replace("-", "").Replace("'", "").ToLower().Contains(filterNormalized));
+#pragma warning restore CA1862
         }
 
         if (!string.IsNullOrWhiteSpace(genre))
@@ -472,6 +483,29 @@ public sealed partial class RhythmVerseRepository(
         }
 
         return families;
+    }
+
+    /// <summary>
+    /// Strips the most common connector-punctuation characters and lowercases the result so
+    /// that a query without punctuation (e.g. "ACDC") can match a stored value that contains
+    /// it (e.g. "AC/DC"), and vice versa.
+    /// The same set of characters must be stripped from both the stored field (via EF
+    /// Replace calls) and from the C#-side query before the Contains comparison is made.
+    /// </summary>
+    private static string NormalizeSearchQuery(string input)
+    {
+        // Strip: forward-slash, hyphen, apostrophe – the most common connector chars in
+        // music artist/title names that users routinely omit when searching.
+        System.Text.StringBuilder sb = new(input.Length);
+        foreach (char c in input.ToLowerInvariant())
+        {
+            if (c is not '/' and not '-' and not '\'')
+            {
+                sb.Append(c);
+            }
+        }
+
+        return sb.ToString().Trim();
     }
 
     private static IOrderedQueryable<SongSnapshotEntity> ApplySort(

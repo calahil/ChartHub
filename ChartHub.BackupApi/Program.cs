@@ -13,6 +13,7 @@ builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(Dat
 builder.Services.Configure<RhythmVerseSourceOptions>(builder.Configuration.GetSection(RhythmVerseSourceOptions.SectionName));
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection(SyncOptions.SectionName));
 builder.Services.Configure<DownloadOptions>(builder.Configuration.GetSection(DownloadOptions.SectionName));
+builder.Services.Configure<ImageCacheOptions>(builder.Configuration.GetSection(ImageCacheOptions.SectionName));
 
 builder.Services.AddDbContext<BackupDbContext>((serviceProvider, options) =>
 {
@@ -35,6 +36,7 @@ builder.Services.AddDbContext<BackupDbContext>((serviceProvider, options) =>
 });
 
 builder.Services.AddHttpClient<IRhythmVerseUpstreamClient, RhythmVerseUpstreamClient>();
+builder.Services.AddHttpClient<IImageProxyService, ImageProxyService>();
 builder.Services.AddScoped<IRhythmVerseRepository, RhythmVerseRepository>();
 builder.Services.AddSingleton<ISchemaDocumentService, SchemaDocumentService>();
 
