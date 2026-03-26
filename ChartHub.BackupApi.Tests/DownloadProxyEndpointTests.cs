@@ -55,6 +55,43 @@ public sealed class DownloadProxyEndpointTests : IClassFixture<BackupApiWebAppli
     }
 
     [Fact]
+    public async Task HeadDownloadFile_WhenProxyReturnsFile_DoesNotReturnMethodNotAllowed()
+    {
+        string payloadPath = Path.Combine(_tempRootPath, "head-download-file.rar");
+        await File.WriteAllBytesAsync(payloadPath, [31, 32, 33]);
+
+        using HttpClient client = _factory
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IDownloadProxyService>(new StubDownloadProxyService(
+                    new DownloadProxyResult(payloadPath, "application/vnd.rar")));
+            }))
+            .CreateClient();
+
+        using HttpRequestMessage request = new(HttpMethod.Head, "/download_file/stackoverflow/532e3cb651aa6/head-download-file.rar");
+        HttpResponseMessage response = await client.SendAsync(request);
+
+        Assert.NotEqual(System.Net.HttpStatusCode.MethodNotAllowed, response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HeadDownloadFile_WhenProxyMisses_Returns404()
+    {
+        using HttpClient client = _factory
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IDownloadProxyService>(new StubDownloadProxyService(null));
+            }))
+            .CreateClient();
+
+        using HttpRequestMessage request = new(HttpMethod.Head, "/download_file/stackoverflow/532e3cb651aa6/head-miss.rar");
+        HttpResponseMessage response = await client.SendAsync(request);
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetExternalDownload_WhenProxyReturnsFile_RespondsWithFilePayload()
     {
         string payloadPath = Path.Combine(_tempRootPath, "external-song.zip");
@@ -89,6 +126,46 @@ public sealed class DownloadProxyEndpointTests : IClassFixture<BackupApiWebAppli
             .CreateClient();
 
         HttpResponseMessage response = await client.GetAsync("/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip");
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HeadExternalDownload_WhenProxyReturnsFile_DoesNotReturnMethodNotAllowed()
+    {
+        string payloadPath = Path.Combine(_tempRootPath, "head-external.zip");
+        await File.WriteAllBytesAsync(payloadPath, [41, 42, 43]);
+
+        using HttpClient client = _factory
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IDownloadProxyService>(new StubDownloadProxyService(
+                    fileResult: null,
+                    externalResult: new DownloadProxyResult(payloadPath, "application/zip")));
+            }))
+            .CreateClient();
+
+        using HttpRequestMessage request = new(HttpMethod.Head, "/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip");
+        HttpResponseMessage response = await client.SendAsync(request);
+
+        Assert.NotEqual(System.Net.HttpStatusCode.MethodNotAllowed, response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HeadExternalDownload_WhenProxyMisses_Returns404()
+    {
+        using HttpClient client = _factory
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IDownloadProxyService>(new StubDownloadProxyService(
+                    fileResult: null,
+                    externalResult: null));
+            }))
+            .CreateClient();
+
+        using HttpRequestMessage request = new(HttpMethod.Head, "/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip");
+        HttpResponseMessage response = await client.SendAsync(request);
 
         Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
     }

@@ -24,7 +24,7 @@ public static class RhythmVerseEndpoints
             .Produces(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status500InternalServerError);
 
-        group.MapGet("/download/{fileId}", RedirectDownloadAsync)
+        group.MapMethods("/download/{fileId}", ["GET", "HEAD"], RedirectDownloadAsync)
             .WithName("RedirectRhythmVerseDownload")
             .WithTags("RhythmVerse")
             .WithSummary("Resolve a mirrored file ID to its download URL")
@@ -96,7 +96,7 @@ public static class RhythmVerseEndpoints
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
-        endpoints.MapGet("/download_file/{**path}", GetMirroredDownloadFileAsync)
+        endpoints.MapMethods("/download_file/{**path}", ["GET", "HEAD"], GetMirroredDownloadFileAsync)
             .WithName("GetMirroredDownloadFile")
             .WithTags("Assets")
             .WithSummary("Get a mirrored RhythmVerse download file")
@@ -104,7 +104,7 @@ public static class RhythmVerseEndpoints
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
-        endpoints.MapGet("/downloads/external", GetMirroredExternalDownloadAsync)
+        endpoints.MapMethods("/downloads/external", ["GET", "HEAD"], GetMirroredExternalDownloadAsync)
             .WithName("GetMirroredExternalDownload")
             .WithTags("Assets")
             .WithSummary("Get a mirrored external download")

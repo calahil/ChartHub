@@ -261,7 +261,7 @@ public class ApiClientService : INotifyPropertyChanged
                                 continue;
                             }
 
-                            string downloadUrl = songFile.DownloadUrl ?? string.Empty;
+                            string downloadUrl = ResolvePreferredDownloadUrl(songFile);
                             if (!downloadUrl.StartsWith("http://marketplace.xbox.com") && !downloadUrl.StartsWith("https://store.xbox.com/"))
                             {
                                 var songView = new ViewSong();
@@ -448,6 +448,7 @@ public class ApiClientService : INotifyPropertyChanged
         }
 
         if (downloadUri.Host.Contains("drive.google.com", StringComparison.OrdinalIgnoreCase)
+            || downloadUri.Host.Contains("mediafire.com", StringComparison.OrdinalIgnoreCase)
             || downloadUri.Host.Contains("marketplace.xbox.com", StringComparison.OrdinalIgnoreCase)
             || downloadUri.Host.Contains("store.xbox.com", StringComparison.OrdinalIgnoreCase)
             || downloadUri.IsLoopback)
@@ -456,6 +457,57 @@ public class ApiClientService : INotifyPropertyChanged
         }
 
         return $"{baseUri.AbsoluteUri.TrimEnd('/')}/downloads/external?sourceUrl={Uri.EscapeDataString(downloadUrl)}";
+    }
+
+    private static string ResolvePreferredDownloadUrl(FileData file)
+    {
+        string downloadUrl = file.DownloadUrl ?? string.Empty;
+        if (!IsMalformedMirrorExternalProxyUrl(downloadUrl))
+        {
+            return downloadUrl;
+        }
+
+        if (file.DownloadPageUrlFull is not null)
+        {
+            string full = file.DownloadPageUrlFull.ToString();
+            if (!string.IsNullOrWhiteSpace(full))
+            {
+                return full;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(file.DownloadPageUrl))
+        {
+            return file.DownloadPageUrl;
+        }
+
+        return downloadUrl;
+    }
+
+    private static bool IsMalformedMirrorExternalProxyUrl(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        string candidate = value.Trim();
+        if (candidate.StartsWith("/downloads/external", StringComparison.OrdinalIgnoreCase))
+        {
+            return candidate.IndexOf("sourceUrl=", StringComparison.OrdinalIgnoreCase) < 0;
+        }
+
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out Uri? uri))
+        {
+            return false;
+        }
+
+        if (!uri.IsLoopback || !string.Equals(uri.AbsolutePath, "/downloads/external", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return uri.Query.IndexOf("sourceUrl=", StringComparison.OrdinalIgnoreCase) < 0;
     }
 
     private static bool IsMockDataEnabled(IConfiguration configuration)
