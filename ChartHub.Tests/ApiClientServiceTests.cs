@@ -193,6 +193,74 @@ public class ApiClientServiceTests
     }
 
     [Fact]
+    public async Task GetSongFilesAsync_WithMirrorSource_RewritesAbsoluteExternalDownloadUrlToMirrorProxy()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(async (_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(BuildLiveFallbackResponseJson()),
+        }))
+        {
+            BaseAddress = new Uri("https://rhythmverse.co"),
+        };
+
+        ApiClientService sut = CreateService(
+            configurationValues: new Dictionary<string, string?>
+            {
+                ["Runtime:UseMockData"] = "False",
+                ["Runtime:RhythmVerseSource"] = nameof(RhythmVerseSource.ChartHubMirror),
+                ["rhythmverseToken"] = "token-test",
+            },
+            httpClient,
+            loadEmbeddedMockData: () => null,
+            resolveMockDataPath: () => null);
+
+        IReadOnlyList<ViewSong> results = await sut.GetSongFilesAsync(
+            search: true,
+            searchString: string.Empty,
+            sort: "downloads",
+            order: "desc",
+            instrument: [],
+            authorText: string.Empty);
+
+        ViewSong song = Assert.Single(results);
+        Assert.Equal("http://127.0.0.1:5147/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip", song.DownloadLink);
+    }
+
+    [Fact]
+    public async Task GetSongFilesAsync_WithMirrorSource_DoesNotRewriteGoogleDriveDownloadUrl()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(async (_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(BuildLiveFallbackResponseJson("https://drive.google.com/file/d/file-123/view")),
+        }))
+        {
+            BaseAddress = new Uri("https://rhythmverse.co"),
+        };
+
+        ApiClientService sut = CreateService(
+            configurationValues: new Dictionary<string, string?>
+            {
+                ["Runtime:UseMockData"] = "False",
+                ["Runtime:RhythmVerseSource"] = nameof(RhythmVerseSource.ChartHubMirror),
+                ["rhythmverseToken"] = "token-test",
+            },
+            httpClient,
+            loadEmbeddedMockData: () => null,
+            resolveMockDataPath: () => null);
+
+        IReadOnlyList<ViewSong> results = await sut.GetSongFilesAsync(
+            search: true,
+            searchString: string.Empty,
+            sort: "downloads",
+            order: "desc",
+            instrument: [],
+            authorText: string.Empty);
+
+        ViewSong song = Assert.Single(results);
+        Assert.Equal("https://drive.google.com/file/d/file-123/view", song.DownloadLink);
+    }
+
+    [Fact]
     public async Task GetSongFilesAsync_OnAndroid_WhenUseMockDataFalse_UsesLiveApi()
     {
         HttpRequestMessage? capturedRequest = null;
@@ -387,7 +455,7 @@ public class ApiClientServiceTests
         """;
     }
 
-    private static string BuildLiveFallbackResponseJson()
+    private static string BuildLiveFallbackResponseJson(string downloadUrl = "https://cdn.example/live-song.zip")
     {
         return """
         {
@@ -420,7 +488,7 @@ public class ApiClientServiceTests
                   "file_genre": "Pop",
                   "file_year": 2024,
                   "album_art": "",
-                  "download_url": "https://cdn.example/live-song.zip",
+                  "download_url": "__DOWNLOAD_URL__",
                   "gameformat": "yarg",
                   "author": {
                     "name": "Live Author",
@@ -432,7 +500,7 @@ public class ApiClientServiceTests
             ]
           }
         }
-        """;
+        """.Replace("__DOWNLOAD_URL__", downloadUrl, StringComparison.Ordinal);
     }
 
     private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> sendAsync) : HttpMessageHandler

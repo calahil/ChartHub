@@ -96,6 +96,22 @@ public static class RhythmVerseEndpoints
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
+        endpoints.MapGet("/download_file/{**path}", GetMirroredDownloadFileAsync)
+            .WithName("GetMirroredDownloadFile")
+            .WithTags("Assets")
+            .WithSummary("Get a mirrored RhythmVerse download file")
+            .WithDescription("Fetches upstream RhythmVerse download files on cache miss and serves cached files on subsequent requests.")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        endpoints.MapGet("/downloads/external", GetMirroredExternalDownloadAsync)
+            .WithName("GetMirroredExternalDownload")
+            .WithTags("Assets")
+            .WithSummary("Get a mirrored external download")
+            .WithDescription("Fetches supported external downloads on cache miss, caches resolved redirects and file bytes on disk, and serves cached files on subsequent requests.")
+            .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
         return endpoints;
     }
 
@@ -121,6 +137,34 @@ public static class RhythmVerseEndpoints
         CancellationToken cancellationToken)
     {
         return GetMirroredAssetAsync(imageProxyService, $"assets/album_art/{path}", cancellationToken);
+    }
+
+    private static async Task<IResult> GetMirroredDownloadFileAsync(
+        [FromServices] IDownloadProxyService downloadProxyService,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        DownloadProxyResult? result = await downloadProxyService
+            .GetDownloadFileAsync($"download_file/{path}", cancellationToken)
+            .ConfigureAwait(false);
+
+        return result is null
+            ? Results.NotFound()
+            : Results.File(result.FilePath, result.ContentType, enableRangeProcessing: true);
+    }
+
+    private static async Task<IResult> GetMirroredExternalDownloadAsync(
+        [FromServices] IDownloadProxyService downloadProxyService,
+        [FromQuery] string sourceUrl,
+        CancellationToken cancellationToken)
+    {
+        DownloadProxyResult? result = await downloadProxyService
+            .GetExternalDownloadAsync(sourceUrl, cancellationToken)
+            .ConfigureAwait(false);
+
+        return result is null
+            ? Results.NotFound()
+            : Results.File(result.FilePath, result.ContentType, enableRangeProcessing: true);
     }
 
     private static Task<IResult> GetSongsListCompatAsync(

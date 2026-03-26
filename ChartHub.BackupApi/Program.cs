@@ -37,6 +37,7 @@ builder.Services.AddDbContext<BackupDbContext>((serviceProvider, options) =>
 
 builder.Services.AddHttpClient<IRhythmVerseUpstreamClient, RhythmVerseUpstreamClient>();
 builder.Services.AddHttpClient<IImageProxyService, ImageProxyService>();
+builder.Services.AddHttpClient<IDownloadProxyService, DownloadProxyService>();
 builder.Services.AddScoped<IRhythmVerseRepository, RhythmVerseRepository>();
 builder.Services.AddSingleton<ISchemaDocumentService, SchemaDocumentService>();
 

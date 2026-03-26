@@ -355,7 +355,7 @@ public class ApiClientService : INotifyPropertyChanged
                                 }
                                 else
                                 {
-                                    songView.DownloadLink = downloadUrl;
+                                    songView.DownloadLink = RewriteExternalDownloadUrl(baseUri, downloadUrl);
                                 }
 
                                 songView.SourceName = LibrarySourceNames.RhythmVerse;
@@ -432,6 +432,30 @@ public class ApiClientService : INotifyPropertyChanged
     {
         string normalizedPath = relativePath.StartsWith('/') ? relativePath : $"/{relativePath}";
         return $"{baseUrl}{normalizedPath}";
+    }
+
+    private static string RewriteExternalDownloadUrl(Uri baseUri, string downloadUrl)
+    {
+        if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out Uri? downloadUri))
+        {
+            return downloadUrl;
+        }
+
+        if (!string.Equals(baseUri.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+            || baseUri.Port != 5147)
+        {
+            return downloadUrl;
+        }
+
+        if (downloadUri.Host.Contains("drive.google.com", StringComparison.OrdinalIgnoreCase)
+            || downloadUri.Host.Contains("marketplace.xbox.com", StringComparison.OrdinalIgnoreCase)
+            || downloadUri.Host.Contains("store.xbox.com", StringComparison.OrdinalIgnoreCase)
+            || downloadUri.IsLoopback)
+        {
+            return downloadUrl;
+        }
+
+        return $"{baseUri.AbsoluteUri.TrimEnd('/')}/downloads/external?sourceUrl={Uri.EscapeDataString(downloadUrl)}";
     }
 
     private static bool IsMockDataEnabled(IConfiguration configuration)

@@ -27,6 +27,8 @@ public sealed class SwaggerDocumentationTests : IClassFixture<BackupApiWebApplic
         AssertOperationHasSummaryAndDescription(paths, "/api/rhythmverse/songs/{songId}", "get");
         AssertOperationHasSummaryAndDescription(paths, "/api/rhythmverse/download/{fileId}", "get");
         AssertOperationHasSummaryAndDescription(paths, "/api/rhythmverse/health/sync", "get");
+        AssertOperationHasSummaryAndDescription(paths, "/download_file/{path}", "get");
+        AssertOperationHasSummaryAndDescription(paths, "/downloads/external", "get");
         AssertOperationHasSummaryAndDescription(paths, "/api/all/songfiles/list", "post");
         AssertOperationHasSummaryAndDescription(paths, "/api/all/songfiles/search/live", "post");
         AssertOperationHasSummaryAndDescription(paths, "/api/schemas/rhythmverse-song-list.json", "get");
