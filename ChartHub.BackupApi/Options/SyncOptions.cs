@@ -6,7 +6,7 @@ public sealed class SyncOptions
 
     public bool Enabled { get; set; } = true;
 
-    public int IntervalMinutes { get; set; } = 60;
+    public int IntervalMinutes { get; set; } = 10080;
 
     public int RecordsPerPage { get; set; } = 100;
 

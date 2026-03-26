@@ -5,12 +5,41 @@ Accept: application/json
 
 ###
 
-GET {{ChartHub.BackupApi_HostAddress}}/api/rhythmverse/songs?page=1&records=25
+GET {{ChartHub.BackupApi_HostAddress}}/api/rhythmverse/songs/240
 Accept: application/json
+
+###
+
+GET {{ChartHub.BackupApi_HostAddress}}/api/rhythmverse/health/sync
+Accept: application/json
+
+###
+
+POST {{ChartHub.BackupApi_HostAddress}}/api/all/songfiles/list
+Content-Type: application/x-www-form-urlencoded
+
+page=1&records=25&instrument=guitar&instrument=drums&author=farottone&sort[0][sort_by]=artist&sort[0][sort_order]=asc&data_type=full
+
+###
+
+POST {{ChartHub.BackupApi_HostAddress}}/api/all/songfiles/search/live
+Content-Type: application/x-www-form-urlencoded
+
+text=metallica&page=1&records=25&instrument=guitar&sort[0][sort_by]=record_updated&sort[0][sort_order]=desc&data_type=full
+
+###
+
+GET {{ChartHub.BackupApi_HostAddress}}/api/rhythmverse/download/file-240
+Accept: */*
 
 ###
 
 GET {{ChartHub.BackupApi_HostAddress}}/api/schemas/rhythmverse-song-list.json
 Accept: application/schema+json
+
+###
+
+GET {{ChartHub.BackupApi_HostAddress}}/api/schemas/rhythmverse-song-list.openapi.json
+Accept: application/json
 
 ###

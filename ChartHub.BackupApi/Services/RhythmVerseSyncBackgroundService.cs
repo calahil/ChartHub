@@ -1,12 +1,13 @@
 using ChartHub.BackupApi.Options;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace ChartHub.BackupApi.Services;
 
 public sealed partial class RhythmVerseSyncBackgroundService(
     IRhythmVerseUpstreamClient upstreamClient,
-    IRhythmVerseRepository repository,
+    IServiceScopeFactory scopeFactory,
     IOptions<SyncOptions> syncOptions,
     ILogger<RhythmVerseSyncBackgroundService> logger) : BackgroundService
 {
@@ -40,6 +41,12 @@ public sealed partial class RhythmVerseSyncBackgroundService(
     {
         Log.SyncCycleStarted(logger);
 
+        using IServiceScope scope = scopeFactory.CreateScope();
+        IRhythmVerseRepository repository = scope.ServiceProvider.GetRequiredService<IRhythmVerseRepository>();
+        string reconciliationRunId = Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+
+        await repository.BeginReconciliationRunAsync(reconciliationRunId, cancellationToken).ConfigureAwait(false);
+
         string? rawWatermark = await repository
             .GetSyncStateAsync("sync.last_record_updated", cancellationToken)
             .ConfigureAwait(false);
@@ -54,7 +61,8 @@ public sealed partial class RhythmVerseSyncBackgroundService(
         int page = 1;
         int maxPages = Math.Max(1, syncOptions.Value.MaxPagesPerRun);
         int records = Math.Clamp(syncOptions.Value.RecordsPerPage, 1, 250);
-        bool cycleCompleted = true;
+        bool cycleFailed = false;
+        bool reachedTerminalPage = false;
 
         for (; page <= maxPages; page++)
         {
@@ -63,18 +71,23 @@ public sealed partial class RhythmVerseSyncBackgroundService(
 
             if (envelope is null)
             {
-                cycleCompleted = false;
+                cycleFailed = true;
                 break;
             }
+
+            await repository
+                .SetSyncStateAsync("records.total_available", envelope.TotalAvailable.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken)
+                .ConfigureAwait(false);
 
             IReadOnlyList<Models.SyncedSong> songs = upstreamClient.ConvertToSyncedSongs(envelope);
 
             if (songs.Count == 0)
             {
+                reachedTerminalPage = true;
                 break;
             }
 
-            await repository.UpsertSongsAsync(songs, cancellationToken).ConfigureAwait(false);
+            await repository.UpsertSongsAsync(songs, cancellationToken, reconciliationRunId).ConfigureAwait(false);
 
             // Advance the high watermark from this page's records.
             foreach (Models.SyncedSong song in songs)
@@ -86,20 +99,24 @@ public sealed partial class RhythmVerseSyncBackgroundService(
                 }
             }
 
-            await repository
-                .SetSyncStateAsync("records.total_available", envelope.TotalAvailable.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken)
-                .ConfigureAwait(false);
-
             Log.SyncPageComplete(logger, page, songs.Count);
 
             if (songs.Count < records)
             {
+                reachedTerminalPage = true;
                 break;
             }
         }
 
-        if (cycleCompleted)
+        if (!cycleFailed && !reachedTerminalPage)
         {
+            Log.SyncCycleIncomplete(logger, maxPages);
+        }
+
+        if (!cycleFailed && reachedTerminalPage)
+        {
+            await repository.FinalizeReconciliationRunAsync(reconciliationRunId, cancellationToken).ConfigureAwait(false);
+
             await repository
                 .SetSyncStateAsync("sync.last_success_utc", DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture), cancellationToken)
                 .ConfigureAwait(false);
@@ -137,6 +154,14 @@ public sealed partial class RhythmVerseSyncBackgroundService(
             }
             catch (Exception ex)
             {
+                // Check if this is a non-transient error (client error 4xx)
+                if (IsNonTransientError(ex))
+                {
+                    Log.SyncPageFailedNonTransient(logger, page, ex);
+                    return null;
+                }
+
+                // Handle transient errors with retry logic
                 if (attempt < RetryDelays.Length)
                 {
                     Log.SyncPageRetrying(logger, page, attempt + 1, (int)RetryDelays[attempt].TotalSeconds, ex);
@@ -151,6 +176,22 @@ public sealed partial class RhythmVerseSyncBackgroundService(
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Determines if an error is non-transient (should not be retried).
+    /// Permanent client errors (4xx) are non-transient.
+    /// Transient errors include network timeouts, server errors (5xx), and temporary failures.
+    /// </summary>
+    private static bool IsNonTransientError(Exception ex)
+    {
+        if (ex is HttpRequestException hre && hre.StatusCode.HasValue)
+        {
+            // 4xx client errors are non-transient
+            return (int)hre.StatusCode >= 400 && (int)hre.StatusCode < 500;
+        }
+
+        return false;
     }
 
     private static partial class Log
@@ -172,5 +213,11 @@ public sealed partial class RhythmVerseSyncBackgroundService(
 
         [LoggerMessage(EventId = 1006, Level = LogLevel.Information, Message = "Sync watermark advanced to {WatermarkUnix}.")]
         public static partial void SyncWatermarkUpdated(ILogger logger, long watermarkUnix);
+
+        [LoggerMessage(EventId = 1007, Level = LogLevel.Error, Message = "Sync page {Page} encountered a non-transient error (client error); not retrying.")]
+        public static partial void SyncPageFailedNonTransient(ILogger logger, int page, Exception exception);
+
+        [LoggerMessage(EventId = 1008, Level = LogLevel.Warning, Message = "RhythmVerse sync cycle stopped before a terminal page was reached; reconciliation run left incomplete after {MaxPages} pages.")]
+        public static partial void SyncCycleIncomplete(ILogger logger, int maxPages);
     }
 }

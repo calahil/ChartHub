@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:17.0-alpine
+    container_name: ${NAME}
+    environment:
+      - POSTGRES_USER=${PSQL_USER}
+      - POSTGRES_PASSWORD=${PSQL_PASSWORD}
+      - POSTGRES_DB=${PSQL_DB}
+      - TZ=Etc/UTC
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - rhythmverse:/var/lib/postgresql/data
+      #- ./backup:/backup
+    healthcheck:
+      interval: 30s
+      retries: 5
+      start_period: 20s
+      test:
+      - CMD-SHELL
+      - pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
+      timeout: 5s
+    restart: always
+    networks:
+      - internal_env
+
+networks:
+  internal_env:
+    external: true
+    name: ${INTERNAL}
+
+volumes:
+  rhythmverse:
+    external: true

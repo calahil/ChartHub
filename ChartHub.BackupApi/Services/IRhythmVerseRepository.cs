@@ -4,7 +4,14 @@ namespace ChartHub.BackupApi.Services;
 
 public interface IRhythmVerseRepository
 {
-    Task UpsertSongsAsync(IEnumerable<SyncedSong> songs, CancellationToken cancellationToken);
+    Task BeginReconciliationRunAsync(string reconciliationRunId, CancellationToken cancellationToken);
+
+    Task UpsertSongsAsync(
+        IEnumerable<SyncedSong> songs,
+        CancellationToken cancellationToken,
+        string? reconciliationRunId = null);
+
+    Task FinalizeReconciliationRunAsync(string reconciliationRunId, CancellationToken cancellationToken);
 
     Task<RhythmVersePageEnvelope> GetSongsPageAsync(
         int page,
@@ -14,6 +21,19 @@ public interface IRhythmVerseRepository
         string? gameformat,
         string? author,
         string? group,
+        CancellationToken cancellationToken);
+
+    Task<RhythmVersePageEnvelope> GetSongsPageAdvancedAsync(
+        int page,
+        int records,
+        string? query,
+        string? genre,
+        string? gameformat,
+        string? author,
+        string? group,
+        string? sortBy,
+        string? sortOrder,
+        IReadOnlyList<string>? instruments,
         CancellationToken cancellationToken);
 
     Task<string?> GetDownloadUrlByFileIdAsync(string fileId, CancellationToken cancellationToken);

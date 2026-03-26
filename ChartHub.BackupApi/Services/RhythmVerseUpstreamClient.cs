@@ -14,8 +14,13 @@ public sealed class RhythmVerseUpstreamClient(
 {
     public async Task<RhythmVersePageEnvelope> FetchSongsPageAsync(int page, int records, long? updatedSince, CancellationToken cancellationToken)
     {
-        Uri requestUri = BuildSongsUri(page, records, updatedSince);
-        using HttpRequestMessage request = new(HttpMethod.Get, requestUri);
+        string baseUrl = sourceOptions.Value.BaseUrl.TrimEnd('/');
+        string path = sourceOptions.Value.SongsPath.TrimStart('/');
+        var requestUri = new Uri($"{baseUrl}/{path}");
+
+        MultipartFormDataContent content = BuildSongsContent(page, records);
+
+        using HttpRequestMessage request = new(HttpMethod.Post, requestUri) { Content = content };
 
         if (!string.IsNullOrWhiteSpace(sourceOptions.Value.Token))
         {
@@ -23,6 +28,25 @@ public sealed class RhythmVerseUpstreamClient(
         }
 
         using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+        // Log status code before throwing to aid diagnostics
+        if (!response.IsSuccessStatusCode)
+        {
+            string responseBody = string.Empty;
+            try
+            {
+                responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                if (responseBody.Length > 200)
+                {
+                    responseBody = string.Concat(responseBody.AsSpan(0, 200), "...");
+                }
+            }
+            catch
+            {
+                // Ignore errors reading response body for logging
+            }
+        }
+
         response.EnsureSuccessStatusCode();
 
         await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -70,7 +94,7 @@ public sealed class RhythmVerseUpstreamClient(
             songs.Add(new SyncedSong
             {
                 SongId = ReadLong(data, "song_id"),
-                RecordId = ReadString(data, "record_id"),
+                RecordId = ReadNullableString(data, "record_id"),
                 Artist = ReadString(data, "artist"),
                 Title = ReadString(data, "title"),
                 Album = ReadString(data, "album"),
@@ -97,22 +121,24 @@ public sealed class RhythmVerseUpstreamClient(
         return songs;
     }
 
-    private Uri BuildSongsUri(int page, int records, long? updatedSince)
+    /// <summary>
+    /// Builds the POST form content for the RhythmVerse API list endpoint.
+    /// The endpoint requires multipart form data with pagination and sort parameters.
+    /// Note: The updatedSince parameter is not currently supported by the endpoint and is ignored.
+    /// </summary>
+    private static MultipartFormDataContent BuildSongsContent(int page, int records)
     {
-        string baseUrl = sourceOptions.Value.BaseUrl.TrimEnd('/');
-        string path = sourceOptions.Value.SongsPath.TrimStart('/');
         int boundedPage = Math.Max(page, 1);
-        int boundedRecords = Math.Max(records, 1);
-        // The sort and updated_after parameters are advisory hints to the upstream API.
-        // Parameter names are inferred from common RhythmVerse API conventions; adjust if needed.
-        string uri = updatedSince.HasValue
-            ? string.Create(
-                CultureInfo.InvariantCulture,
-                $"{baseUrl}/{path}?start={(boundedPage - 1) * boundedRecords}&records={boundedRecords}&page={boundedPage}&sort=record_updated&sort_dir=desc&updated_after={updatedSince.Value}")
-            : string.Create(
-                CultureInfo.InvariantCulture,
-                $"{baseUrl}/{path}?start={(boundedPage - 1) * boundedRecords}&records={boundedRecords}&page={boundedPage}");
-        return new Uri(uri);
+        int boundedRecords = Math.Clamp(records, 1, 250);
+
+        var content = new MultipartFormDataContent();
+        content.Add(new StringContent("release_date"), "sort[0][sort_by]");
+        content.Add(new StringContent("ASC"), "sort[0][sort_order]");
+        content.Add(new StringContent("full"), "data_type");
+        content.Add(new StringContent(boundedPage.ToString(CultureInfo.InvariantCulture)), "page");
+        content.Add(new StringContent(boundedRecords.ToString(CultureInfo.InvariantCulture)), "records");
+
+        return content;
     }
 
     private string ResolveDownloadUrl(JsonElement file)
@@ -205,5 +231,19 @@ public sealed class RhythmVerseUpstreamClient(
         }
 
         return property.ValueKind == JsonValueKind.Null ? string.Empty : property.ToString();
+    }
+
+    private static string? ReadNullableString(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out JsonElement property) || property.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        string? value = property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : property.ToString();
+
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 }

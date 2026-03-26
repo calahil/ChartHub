@@ -8,7 +8,7 @@ public sealed class SongSnapshotEntity
     public long SongId { get; set; }
 
     [MaxLength(256)]
-    public string RecordId { get; set; } = string.Empty;
+    public string? RecordId { get; set; }
 
     [MaxLength(512)]
     public string Artist { get; set; } = string.Empty;
@@ -58,6 +58,11 @@ public sealed class SongSnapshotEntity
     public string DataJson { get; set; } = "{}";
 
     public string FileJson { get; set; } = "{}";
+
+    public bool IsDeleted { get; set; }
+
+    [MaxLength(64)]
+    public string? LastReconciledRunId { get; set; }
 
     public DateTimeOffset LastSyncedUtc { get; set; }
 }

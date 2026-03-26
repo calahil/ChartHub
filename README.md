@@ -5,7 +5,9 @@ ChartHub is a cross-platform Avalonia client for browsing and managing custom rh
 ## Repository layout
 
 - `ChartHub/`: Main app project (`net10.0` desktop and optional `net10.0-android`)
+- `ChartHub.BackupApi/`: Backup API for mirroring RhythmVerse catalog data into a local database
 - `ChartHub.Tests/`: xUnit test suite
+- `ChartHub.BackupApi.Tests/`: xUnit tests for the backup API
 - `ChartHub.sln`: Solution entry point
 
 ## Requirements
@@ -61,6 +63,78 @@ You can also use the workspace tasks in `.vscode/tasks.json` for `build`, `run`,
 - Runtime defaults are in `ChartHub/appsettings.json`.
 - Local developer secrets are loaded using user-secrets (`UserSecretsId` is set in `ChartHub/ChartHub.csproj`).
 - Current API authentication key name is `rhythmverseToken` for backend compatibility.
+
+## RhythmVerse Backup API
+
+The Backup API mirrors RhythmVerse song metadata into a local database for read/query access and download redirection.
+
+### Client compatibility routes
+
+To match the ChartHub client contract, the Backup API exposes these form POST endpoints:
+
+- `POST /api/all/songfiles/list`
+- `POST /api/all/songfiles/search/live`
+
+Supported form fields:
+
+- `instrument` (repeatable)
+- `author`
+- `sort[0][sort_by]`
+- `sort[0][sort_order]`
+- `data_type`
+- `text` (search route)
+- `page`
+- `records`
+
+Current compatibility semantics:
+
+- Author filtering is exact `AuthorId` match.
+- Instrument filtering matches songs where any selected instrument maps to a non-null difficulty field.
+- Sorting supports a broad allow-list and falls back to default ordering when an unknown sort key is provided.
+
+### Sync model
+
+- Sync is designed as a full reconciliation sweep.
+- Each scheduled run starts from page 1 and continues until it reaches a terminal page:
+	- an empty page, or
+	- a short final page where `returned < records`
+- Songs seen during the active run are stamped with the run identifier.
+- After a completed run, songs not seen in that run are soft-deleted.
+- If a previously soft-deleted song reappears in a later run, it is restored automatically.
+- If a run stops early because of retry exhaustion, cancellation, or `MaxPagesPerRun`, reconciliation is left incomplete and no unseen songs are soft-deleted.
+
+### Default cadence
+
+- `Sync.IntervalMinutes` now defaults to `10080`, which is one week.
+- `Sync.RecordsPerPage` and `Sync.MaxPagesPerRun` remain the main safety controls for sizing a full sweep.
+- If `MaxPagesPerRun` is too low to reach the terminal page, the run will remain incomplete by design.
+
+### Sync health endpoint
+
+The Backup API exposes `GET /api/rhythmverse/health/sync`.
+
+Response fields:
+
+- `last_success_utc`: UTC timestamp of the last completed reconciliation run
+- `lag_seconds`: age in seconds of `last_success_utc`
+- `total_available`: last reported upstream total from the sync process
+- `last_record_updated_unix`: highest upstream `record_updated` seen by the current sync implementation
+- `reconciliation_current_run_id`: current or most recent reconciliation run id
+- `reconciliation_started_utc`: when the current or most recent run started
+- `reconciliation_completed_utc`: when the most recent completed run finished
+- `reconciliation_in_progress`: `true` when a run has started and has not yet completed
+- `last_run_completed`: `true` when the most recent run finished completely; `false` when in progress, interrupted, or no run has ever completed
+
+### Current upstream constraint
+
+- The upstream RhythmVerse endpoint currently ignores the `updatedSince` input used by the client code.
+- Because of that, correctness depends on full-run reconciliation, not incremental watermark filtering.
+
+### Operational notes
+
+- Apply Backup API EF migrations before deploying reconciliation changes.
+- Public Backup API song and download lookups exclude soft-deleted rows by default.
+- Soft delete is intentional: this is a backup catalog, so rows removed upstream are hidden from normal reads but retained in persistence.
 
 ## Local Sync API (Desktop <-> Android)
 

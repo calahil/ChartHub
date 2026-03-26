@@ -15,6 +15,8 @@ public sealed class BackupDbContext(DbContextOptions<BackupDbContext> options) :
             entity.HasIndex(x => x.RecordId).IsUnique();
             entity.HasIndex(x => x.FileId);
             entity.HasIndex(x => x.RecordUpdatedUnix);
+            entity.HasIndex(x => x.IsDeleted);
+            entity.HasIndex(x => new { x.IsDeleted, x.LastReconciledRunId });
             entity.HasIndex(x => x.Artist);
             entity.HasIndex(x => x.Title);
             entity.HasIndex(x => x.Genre);

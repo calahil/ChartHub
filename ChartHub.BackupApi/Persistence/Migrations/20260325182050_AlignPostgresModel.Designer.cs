@@ -3,6 +3,7 @@ using System;
 using ChartHub.BackupApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ChartHub.BackupApi.Persistence.Migrations
 {
     [DbContext(typeof(BackupDbContext))]
-    partial class BackupDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260325182050_AlignPostgresModel")]
+    partial class AlignPostgresModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -96,17 +99,11 @@ namespace ChartHub.BackupApi.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("LastReconciledRunId")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
                     b.Property<DateTimeOffset>("LastSyncedUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("RecordId")
+                        .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
@@ -143,8 +140,6 @@ namespace ChartHub.BackupApi.Persistence.Migrations
 
                     b.HasIndex("GroupId");
 
-                    b.HasIndex("IsDeleted");
-
                     b.HasIndex("LastSyncedUtc");
 
                     b.HasIndex("RecordId")
@@ -153,8 +148,6 @@ namespace ChartHub.BackupApi.Persistence.Migrations
                     b.HasIndex("RecordUpdatedUnix");
 
                     b.HasIndex("Title");
-
-                    b.HasIndex("IsDeleted", "LastReconciledRunId");
 
                     b.ToTable("SongSnapshots");
                 });

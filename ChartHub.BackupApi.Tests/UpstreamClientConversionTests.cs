@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json.Nodes;
 
 using ChartHub.BackupApi.Models;
 using ChartHub.BackupApi.Options;
@@ -17,7 +18,7 @@ public class UpstreamClientConversionTests
     [Fact]
     public async Task FetchAndConvert_WithTestFixture_MapsFirstSongFieldsCorrectly()
     {
-        string json = await File.ReadAllTextAsync(Path.Combine("Fixtures", "test.json"));
+        string json = await File.ReadAllTextAsync("test.json");
         RhythmVerseUpstreamClient sut = BuildClient(json);
 
         RhythmVersePageEnvelope envelope = await sut.FetchSongsPageAsync(1, 25, null, CancellationToken.None);
@@ -40,7 +41,7 @@ public class UpstreamClientConversionTests
     [Fact]
     public async Task FetchAndConvert_WithTestFixture_MapsPhase2DiffFields()
     {
-        string json = await File.ReadAllTextAsync(Path.Combine("Fixtures", "test.json"));
+        string json = await File.ReadAllTextAsync("test.json");
         RhythmVerseUpstreamClient sut = BuildClient(json);
 
         RhythmVersePageEnvelope envelope = await sut.FetchSongsPageAsync(1, 25, null, CancellationToken.None);
@@ -59,7 +60,7 @@ public class UpstreamClientConversionTests
     [Fact]
     public async Task FetchAndConvert_WithTestFixture_MapsAuthorGroupAndGameFormat()
     {
-        string json = await File.ReadAllTextAsync(Path.Combine("Fixtures", "test.json"));
+        string json = await File.ReadAllTextAsync("test.json");
         RhythmVerseUpstreamClient sut = BuildClient(json);
 
         RhythmVersePageEnvelope envelope = await sut.FetchSongsPageAsync(1, 25, null, CancellationToken.None);
@@ -77,7 +78,7 @@ public class UpstreamClientConversionTests
     [Fact]
     public async Task FetchAndConvert_WithTestFixture_SongJsonRoundTripsSongId()
     {
-        string json = await File.ReadAllTextAsync(Path.Combine("Fixtures", "test.json"));
+        string json = await File.ReadAllTextAsync("test.json");
         RhythmVerseUpstreamClient sut = BuildClient(json);
 
         RhythmVersePageEnvelope envelope = await sut.FetchSongsPageAsync(1, 25, null, CancellationToken.None);
@@ -93,7 +94,7 @@ public class UpstreamClientConversionTests
     [Fact]
     public async Task FetchSongsPage_PaginationFieldsAreParsedCorrectly()
     {
-        string json = await File.ReadAllTextAsync(Path.Combine("Fixtures", "test.json"));
+        string json = await File.ReadAllTextAsync("test.json");
         RhythmVerseUpstreamClient sut = BuildClient(json);
 
         RhythmVersePageEnvelope envelope = await sut.FetchSongsPageAsync(1, 25, null, CancellationToken.None);
@@ -103,6 +104,65 @@ public class UpstreamClientConversionTests
         Assert.Equal(25, envelope.Records);
         Assert.Equal(0, envelope.Start);
         Assert.True(envelope.TotalAvailable > 0);
+    }
+
+    [Fact]
+    public async Task FetchSongsPage_SendsPostRequestWithCorrectMultipartFields()
+    {
+        string json = await File.ReadAllTextAsync("test.json");
+        HttpRequestMessage? capturedRequest = null;
+
+        HttpClient httpClient = new(new CaptureRequestHandler(
+            req =>
+            {
+                capturedRequest = req;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(json, Encoding.UTF8, "application/json"),
+                });
+            }))
+        {
+            BaseAddress = new Uri("https://rhythmverse.co"),
+        };
+
+        RhythmVerseSourceOptions sourceOptions = new()
+        {
+            BaseUrl = "https://rhythmverse.co",
+            SongsPath = "api/all/songfiles/list",
+        };
+
+        RhythmVerseUpstreamClient sut = new(httpClient, Microsoft.Extensions.Options.Options.Create(sourceOptions));
+        await sut.FetchSongsPageAsync(1, 25, null, CancellationToken.None);
+
+        // Verify request contract
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(HttpMethod.Post, capturedRequest.Method);
+        Assert.EndsWith("api/all/songfiles/list", capturedRequest.RequestUri?.ToString() ?? "");
+
+        // Verify multipart form fields are present
+        Assert.NotNull(capturedRequest.Content);
+        Assert.IsType<MultipartFormDataContent>(capturedRequest.Content);
+    }
+
+    [Fact]
+    public void ConvertToSyncedSongs_WithMissingRecordId_ProducesNullRecordId()
+    {
+        var envelope = new RhythmVersePageEnvelope
+        {
+            TotalAvailable = 1,
+            TotalFiltered = 1,
+            Returned = 1,
+            Start = 0,
+            Records = 25,
+            Page = 1,
+            Songs = [JsonNode.Parse("""{"data":{"song_id":999},"file":{"file_id":"abc"}}""")],
+        };
+
+        RhythmVerseUpstreamClient sut = BuildClient("{}");
+        IReadOnlyList<SyncedSong> songs = sut.ConvertToSyncedSongs(envelope);
+
+        Assert.Single(songs);
+        Assert.Null(songs[0].RecordId);
     }
 
     private static RhythmVerseUpstreamClient BuildClient(string responseJson)
@@ -119,7 +179,7 @@ public class UpstreamClientConversionTests
         RhythmVerseSourceOptions sourceOptions = new()
         {
             BaseUrl = "https://rhythmverse.co",
-            SongsPath = "api/songs",
+            SongsPath = "api/all/songfiles/list",
         };
 
         return new RhythmVerseUpstreamClient(httpClient, Microsoft.Extensions.Options.Options.Create(sourceOptions));
@@ -132,5 +192,14 @@ public class UpstreamClientConversionTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
             => sendAsync(request, cancellationToken);
+    }
+
+    private sealed class CaptureRequestHandler(
+        Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync)
+        : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+            => sendAsync(request);
     }
 }

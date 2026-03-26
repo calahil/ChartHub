@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 
+using ChartHub.BackupApi.Models;
 using ChartHub.BackupApi.Options;
 using ChartHub.BackupApi.Services;
 
@@ -14,30 +15,115 @@ public static class RhythmVerseEndpoints
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/rhythmverse");
 
-        group.MapGet("/songs", GetSongsAsync);
-        group.MapGet("/songs/{songId:long}", GetSongByIdAsync);
-        group.MapGet("/download/{fileId}", RedirectDownloadAsync);
-        group.MapGet("/health/sync", GetSyncHealthAsync);
+        group.MapGet("/songs/{songId:long}", GetSongByIdAsync)
+            .WithName("GetRhythmVerseSongById")
+            .WithTags("RhythmVerse")
+            .WithSummary("Get a mirrored RhythmVerse song by ID")
+            .WithDescription("Returns the stored upstream song payload for the requested song ID. Soft-deleted songs are excluded.")
+            .Produces<JsonNode>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status500InternalServerError);
 
-        endpoints.MapGet("/api/schemas/rhythmverse-song-list.json", GetJsonSchema);
-        endpoints.MapGet("/api/schemas/rhythmverse-song-list.openapi.json", GetOpenApiSchema);
+        group.MapGet("/download/{fileId}", RedirectDownloadAsync)
+            .WithName("RedirectRhythmVerseDownload")
+            .WithTags("RhythmVerse")
+            .WithSummary("Resolve a mirrored file ID to its download URL")
+            .WithDescription("Redirects to the stored upstream download URL for a mirrored file. Only redirect mode is currently supported.")
+            .Produces(StatusCodes.Status302Found)
+            .Produces<BackupApiErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/health/sync", GetSyncHealthAsync)
+            .WithName("GetRhythmVerseSyncHealth")
+            .WithTags("RhythmVerse")
+            .WithSummary("Get RhythmVerse synchronization health")
+            .WithDescription("Returns mirror synchronization metadata, reconciliation state, and lag indicators for operational monitoring.")
+            .Produces<SyncHealthResponse>(StatusCodes.Status200OK);
+
+        endpoints.MapPost("/api/all/songfiles/list", GetSongsListCompatAsync)
+            .WithName("ListRhythmVerseSongsCompat")
+            .WithTags("RhythmVerse Compatibility")
+            .WithSummary("Compatibility list endpoint for RhythmVerse clients")
+            .WithDescription("Mirrors upstream form contract for listing songs. Form-data keys: `page` (default 1), `records` (default 25, clamped 1-250), `author` (author_id or shortname match), repeatable `instrument` (OR semantics), `sort[0][sort_by]`, `sort[0][sort_order]`, optional legacy `data_type` (accepted, currently ignored).")
+            .Accepts<CompatibilitySongsFormRequest>("application/x-www-form-urlencoded")
+            .Produces<CompatibilitySongsResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+        endpoints.MapPost("/api/all/songfiles/search/live", GetSongsSearchCompatAsync)
+            .WithName("SearchRhythmVerseSongsCompat")
+            .WithTags("RhythmVerse Compatibility")
+            .WithSummary("Compatibility search endpoint for RhythmVerse clients")
+            .WithDescription("Mirrors upstream search form contract and applies free-text filtering over mirrored artist/title/album fields. Same keys as list endpoint plus `text` search term (empty/whitespace behaves like list mode).")
+            .Accepts<CompatibilitySongsFormRequest>("application/x-www-form-urlencoded")
+            .Produces<CompatibilitySongsResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+        endpoints.MapGet("/api/schemas/rhythmverse-song-list.json", GetJsonSchema)
+            .WithName("GetRhythmVerseSongListJsonSchema")
+            .WithTags("Schemas")
+            .WithSummary("Get JSON Schema for compatibility song-list envelope")
+            .WithDescription("Returns a JSON Schema document that describes the compatibility song-list response envelope.")
+            .Produces(StatusCodes.Status200OK, contentType: "application/schema+json");
+
+        endpoints.MapGet("/api/schemas/rhythmverse-song-list.openapi.json", GetOpenApiSchema)
+            .WithName("GetRhythmVerseSongListOpenApiSchema")
+            .WithTags("Schemas")
+            .WithSummary("Get OpenAPI components schema for compatibility song-list envelope")
+            .WithDescription("Returns OpenAPI-compatible schema components for the compatibility response contract.")
+            .Produces(StatusCodes.Status200OK, contentType: "application/json");
 
         return endpoints;
     }
 
-    private static async Task<IResult> GetSongsAsync(
+    private static Task<IResult> GetSongsListCompatAsync(
+        HttpRequest request,
         [FromServices] IRhythmVerseRepository repository,
-        [FromQuery] int page = 1,
-        [FromQuery] int records = 25,
-        [FromQuery(Name = "q")] string? query = null,
-        [FromQuery] string? genre = null,
-        [FromQuery] string? gameformat = null,
-        [FromQuery] string? author = null,
-        [FromQuery] string? group = null,
         CancellationToken cancellationToken = default)
     {
+        return GetSongsFromCompatFormAsync(request, repository, includeSearchText: false, cancellationToken);
+    }
+
+    private static Task<IResult> GetSongsSearchCompatAsync(
+        HttpRequest request,
+        [FromServices] IRhythmVerseRepository repository,
+        CancellationToken cancellationToken = default)
+    {
+        return GetSongsFromCompatFormAsync(request, repository, includeSearchText: true, cancellationToken);
+    }
+
+    private static async Task<IResult> GetSongsFromCompatFormAsync(
+        HttpRequest request,
+        [FromServices] IRhythmVerseRepository repository,
+        bool includeSearchText,
+        CancellationToken cancellationToken = default)
+    {
+        IFormCollection form = await request.ReadFormAsync(cancellationToken).ConfigureAwait(false);
+
+        int page = ParseInt(form["page"], 1);
+        int records = ParseInt(form["records"], 25);
+        string? query = includeSearchText ? Normalize(form["text"]) : null;
+        string? author = Normalize(form["author"]);
+        string? sortBy = Normalize(form["sort[0][sort_by]"]);
+        string? sortOrder = Normalize(form["sort[0][sort_order]"]);
+        var instruments = form["instrument"]
+            .Select(x => x?.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .ToList();
+
         Models.RhythmVersePageEnvelope envelope = await repository
-            .GetSongsPageAsync(page, records, query, genre, gameformat, author, group, cancellationToken)
+            .GetSongsPageAdvancedAsync(
+                page,
+                records,
+                query,
+                genre: null,
+                gameformat: null,
+                author,
+                group: null,
+                sortBy,
+                sortOrder,
+                instruments,
+                cancellationToken)
             .ConfigureAwait(false);
 
         JsonObject payload = new()
@@ -62,6 +148,21 @@ public static class RhythmVerseEndpoints
         };
 
         return Results.Json(payload);
+    }
+
+    private static string? Normalize(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static int ParseInt(string? value, int fallback)
+    {
+        if (int.TryParse(value, out int parsed))
+        {
+            return parsed;
+        }
+
+        return fallback;
     }
 
     private static async Task<IResult> RedirectDownloadAsync(
@@ -111,6 +212,9 @@ public static class RhythmVerseEndpoints
         string? lastSuccessUtc = await repository.GetSyncStateAsync("sync.last_success_utc", cancellationToken).ConfigureAwait(false);
         string? totalAvailable = await repository.GetSyncStateAsync("records.total_available", cancellationToken).ConfigureAwait(false);
         string? lastRecordUpdated = await repository.GetSyncStateAsync("sync.last_record_updated", cancellationToken).ConfigureAwait(false);
+        string? reconciliationCurrentRunId = await repository.GetSyncStateAsync("reconciliation.current_run_id", cancellationToken).ConfigureAwait(false);
+        string? reconciliationStartedUtc = await repository.GetSyncStateAsync("reconciliation.started_utc", cancellationToken).ConfigureAwait(false);
+        string? reconciliationCompletedUtc = await repository.GetSyncStateAsync("reconciliation.completed_utc", cancellationToken).ConfigureAwait(false);
 
         long? lagSeconds = null;
         if (lastSuccessUtc is not null
@@ -119,12 +223,30 @@ public static class RhythmVerseEndpoints
             lagSeconds = (long)(DateTimeOffset.UtcNow - parsedSuccess).TotalSeconds;
         }
 
+        bool reconciliationInProgress = reconciliationStartedUtc is not null;
+
+        if (reconciliationInProgress
+            && reconciliationCompletedUtc is not null
+            && DateTimeOffset.TryParse(reconciliationStartedUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out DateTimeOffset parsedReconciliationStart)
+            && DateTimeOffset.TryParse(reconciliationCompletedUtc, null, System.Globalization.DateTimeStyles.RoundtripKind, out DateTimeOffset parsedReconciliationCompletion)
+            && parsedReconciliationCompletion >= parsedReconciliationStart)
+        {
+            reconciliationInProgress = false;
+        }
+
+        bool lastRunCompleted = !reconciliationInProgress && reconciliationCompletedUtc is not null;
+
         return Results.Ok(new
         {
             last_success_utc = lastSuccessUtc,
             lag_seconds = lagSeconds,
             total_available = totalAvailable,
             last_record_updated_unix = lastRecordUpdated,
+            reconciliation_current_run_id = reconciliationCurrentRunId,
+            reconciliation_started_utc = reconciliationStartedUtc,
+            reconciliation_completed_utc = reconciliationCompletedUtc,
+            reconciliation_in_progress = reconciliationInProgress,
+            last_run_completed = lastRunCompleted,
         });
     }
 }

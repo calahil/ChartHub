@@ -3,6 +3,7 @@ using System;
 using ChartHub.BackupApi.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ChartHub.BackupApi.Persistence.Migrations
 {
     [DbContext(typeof(BackupDbContext))]
-    partial class BackupDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260325200751_AddReconciliationTracking")]
+    partial class AddReconciliationTracking
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -107,6 +110,7 @@ namespace ChartHub.BackupApi.Persistence.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("RecordId")
+                        .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 

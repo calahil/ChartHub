@@ -5,6 +5,7 @@ using ChartHub.BackupApi.Options;
 using ChartHub.BackupApi.Services;
 using ChartHub.BackupApi.Tests.TestInfrastructure;
 
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -51,6 +52,13 @@ public class SyncBackgroundServiceTests
         Assert.Equal(3, repo.UpsertedSongs.Count);
         Assert.Equal(200L, repo.WatermarkWritten);
         Assert.NotNull(repo.LastSuccessUtc);
+        Assert.Single(repo.FinalizedRunIds);
+        Assert.Single(repo.BegunRunIds);
+        Assert.Equal(repo.BegunRunIds[0], repo.FinalizedRunIds[0]);
+        Assert.Equal(repo.BegunRunIds[0], repo.StateValues["reconciliation.current_run_id"]);
+        Assert.NotNull(repo.StateValues["reconciliation.started_utc"]);
+        Assert.NotNull(repo.StateValues["reconciliation.completed_utc"]);
+        Assert.Equal(repo.LastSuccessUtc, repo.StateValues["sync.last_success_utc"]);
     }
 
     [Fact]
@@ -71,6 +79,7 @@ public class SyncBackgroundServiceTests
         Assert.Empty(repo.UpsertedSongs);
         Assert.NotNull(repo.LastSuccessUtc);
         Assert.Null(repo.WatermarkWritten); // no songs → no watermark advance
+        Assert.Single(repo.FinalizedRunIds);
     }
 
     [Fact]
@@ -93,6 +102,7 @@ public class SyncBackgroundServiceTests
         Assert.NotNull(repo.LastSuccessUtc);
         // Retry happened: FetchCallCount > 1
         Assert.True(upstream.FetchCallCount >= 2);
+        Assert.Single(repo.FinalizedRunIds);
     }
 
     [Fact]
@@ -114,17 +124,123 @@ public class SyncBackgroundServiceTests
         Assert.Equal(4, upstream.FetchCallCount);
         Assert.Empty(repo.UpsertedSongs);
         Assert.Null(repo.LastSuccessUtc); // cycle was incomplete
+        Assert.Empty(repo.FinalizedRunIds);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenClientErrorFails_DoesNotRetry()
+    {
+        // Simulate a HTTP 405 Method Not Allowed (non-transient client error)
+        FakeUpstreamClient upstream = new([], clientErrorStatusCode: 405, signalAfterCalls: 1);
+        FakeRepository repo = new();
+        RhythmVerseSyncBackgroundService sut = BuildService(
+            new SyncOptions { Enabled = true, RecordsPerPage = 10, MaxPagesPerRun = 10 },
+            upstream, repo);
+        sut.RetryDelays = [TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero];
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+        await sut.StartAsync(cts.Token);
+        await upstream.DoneTask.WaitAsync(cts.Token);
+        await cts.CancelAsync();
+
+        // Should only attempt once (no retries for 4xx)
+        Assert.Equal(1, upstream.FetchCallCount);
+        Assert.Empty(repo.UpsertedSongs);
+        Assert.Empty(repo.FinalizedRunIds);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenFirstAttemptsFailTransient_RetriesThenSucceeds()
+    {
+        // Simulate transient failures (408 Timeout) that recover on retry
+        SyncedSong song = TestSong(1, 50L);
+        FakeUpstreamClient upstream = new([[song]], failFirstNAttempts: 2, transientFailure: true);
+        FakeRepository repo = new();
+        RhythmVerseSyncBackgroundService sut = BuildService(
+            new SyncOptions { Enabled = true, RecordsPerPage = 10, MaxPagesPerRun = 10 },
+            upstream, repo);
+        sut.RetryDelays = [TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero];
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+        await sut.StartAsync(cts.Token);
+        await repo.SuccessWrittenTask.WaitAsync(cts.Token);
+        await cts.CancelAsync();
+
+        // Should have retried after transient failures
+        Assert.True(upstream.FetchCallCount >= 3);
+        Assert.Single(repo.UpsertedSongs);
+        Assert.NotNull(repo.LastSuccessUtc);
+        Assert.Single(repo.FinalizedRunIds);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenMaxPagesReached_DoesNotFinalizeReconciliation()
+    {
+        SyncedSong songA = TestSong(1, 100L);
+        SyncedSong songB = TestSong(2, 200L);
+        SyncedSong songC = TestSong(3, 300L);
+
+        FakeUpstreamClient upstream = new([[songA], [songB], [songC]]);
+        FakeRepository repo = new();
+        RhythmVerseSyncBackgroundService sut = BuildService(
+            new SyncOptions { Enabled = true, RecordsPerPage = 1, MaxPagesPerRun = 2 },
+            upstream, repo);
+        sut.RetryDelays = [];
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+        await sut.StartAsync(cts.Token);
+        await Task.Delay(100, cts.Token);
+        await cts.CancelAsync();
+
+        Assert.Equal(2, repo.UpsertedSongs.Count);
+        Assert.Null(repo.LastSuccessUtc);
+        Assert.Empty(repo.FinalizedRunIds);
+        Assert.Single(repo.BegunRunIds);
+        Assert.Equal(repo.BegunRunIds[0], repo.StateValues["reconciliation.current_run_id"]);
+        Assert.NotNull(repo.StateValues["reconciliation.started_utc"]);
+        Assert.False(repo.StateValues.ContainsKey("reconciliation.completed_utc"));
     }
 
     private static RhythmVerseSyncBackgroundService BuildService(
         SyncOptions options,
         IRhythmVerseUpstreamClient upstream,
-        IRhythmVerseRepository repo) =>
-        new(
+        IRhythmVerseRepository repo)
+    {
+        IServiceScopeFactory scopeFactory = new FakeScopeFactory(repo);
+
+        return new(
             upstream,
-            repo,
+            scopeFactory,
             Microsoft.Extensions.Options.Options.Create(options),
             NullLogger<RhythmVerseSyncBackgroundService>.Instance);
+    }
+
+    private sealed class FakeScopeFactory(IRhythmVerseRepository repository) : IServiceScopeFactory
+    {
+        public IServiceScope CreateScope() => new FakeScope(repository);
+    }
+
+    private sealed class FakeScope(IRhythmVerseRepository repository) : IServiceScope
+    {
+        public IServiceProvider ServiceProvider { get; } = new FakeServiceProvider(repository);
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class FakeServiceProvider(IRhythmVerseRepository repository) : IServiceProvider
+    {
+        public object? GetService(Type serviceType)
+        {
+            if (serviceType == typeof(IRhythmVerseRepository))
+            {
+                return repository;
+            }
+
+            throw new InvalidOperationException($"No service registered for type '{serviceType.FullName}'.");
+        }
+    }
 
     private static SyncedSong TestSong(long id, long? recordUpdatedUnix = null)
     {
@@ -154,7 +270,9 @@ public class SyncBackgroundServiceTests
         IReadOnlyList<IReadOnlyList<SyncedSong>> pages,
         int failFirstNAttempts = 0,
         bool alwaysFail = false,
-        int signalAfterCalls = 0) : IRhythmVerseUpstreamClient
+        int signalAfterCalls = 0,
+        int? clientErrorStatusCode = null,
+        bool transientFailure = false) : IRhythmVerseUpstreamClient
     {
         private readonly TaskCompletionSource _done =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -172,9 +290,29 @@ public class SyncBackgroundServiceTests
                 _done.TrySetResult();
             }
 
+            // Simulate client error (4xx) - non-transient, should not retry
+            if (clientErrorStatusCode.HasValue)
+            {
+                throw new HttpRequestException(
+                    $"Simulated client error",
+                    null,
+                    (System.Net.HttpStatusCode)clientErrorStatusCode.Value);
+            }
+
             if (alwaysFail || call < failFirstNAttempts)
             {
-                throw new HttpRequestException($"Simulated upstream failure (call {call})");
+                if (transientFailure)
+                {
+                    // Simulate transient error (5xx or timeout)
+                    throw new HttpRequestException(
+                        $"Simulated transient failure (call {call})",
+                        null,
+                        System.Net.HttpStatusCode.InternalServerError);
+                }
+                else
+                {
+                    throw new HttpRequestException($"Simulated upstream failure (call {call})");
+                }
             }
 
             int pageIndex = page - 1;
@@ -233,6 +371,7 @@ public class SyncBackgroundServiceTests
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         private readonly List<SyncedSong> _upsertedSongs = [];
+        private readonly Dictionary<string, string> _stateValues = new(StringComparer.Ordinal);
         private readonly object _lock = new();
 
         public List<SyncedSong> UpsertedSongs
@@ -248,15 +387,37 @@ public class SyncBackgroundServiceTests
 
         public long? WatermarkWritten { get; private set; }
         public string? LastSuccessUtc { get; private set; }
+        public List<string> BegunRunIds { get; } = [];
+        public List<string> FinalizedRunIds { get; } = [];
+        public IReadOnlyDictionary<string, string> StateValues => _stateValues;
         public Task SuccessWrittenTask => _successWritten.Task;
 
-        public Task UpsertSongsAsync(IEnumerable<SyncedSong> songs, CancellationToken cancellationToken)
+        public Task BeginReconciliationRunAsync(string reconciliationRunId, CancellationToken cancellationToken)
+        {
+            BegunRunIds.Add(reconciliationRunId);
+            _stateValues["reconciliation.current_run_id"] = reconciliationRunId;
+            _stateValues["reconciliation.started_utc"] = DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+            return Task.CompletedTask;
+        }
+
+        public Task UpsertSongsAsync(
+            IEnumerable<SyncedSong> songs,
+            CancellationToken cancellationToken,
+            string? reconciliationRunId = null)
         {
             lock (_lock)
             {
                 _upsertedSongs.AddRange(songs);
             }
 
+            return Task.CompletedTask;
+        }
+
+        public Task FinalizeReconciliationRunAsync(string reconciliationRunId, CancellationToken cancellationToken)
+        {
+            FinalizedRunIds.Add(reconciliationRunId);
+            _stateValues["reconciliation.current_run_id"] = reconciliationRunId;
+            _stateValues["reconciliation.completed_utc"] = DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
             return Task.CompletedTask;
         }
 
@@ -274,6 +435,20 @@ public class SyncBackgroundServiceTests
                 Songs = [],
             });
 
+        public Task<RhythmVersePageEnvelope> GetSongsPageAdvancedAsync(
+            int page,
+            int records,
+            string? query,
+            string? genre,
+            string? gameformat,
+            string? author,
+            string? group,
+            string? sortBy,
+            string? sortOrder,
+            IReadOnlyList<string>? instruments,
+            CancellationToken cancellationToken)
+            => GetSongsPageAsync(page, records, query, genre, gameformat, author, group, cancellationToken);
+
         public Task<string?> GetDownloadUrlByFileIdAsync(string fileId, CancellationToken cancellationToken)
             => Task.FromResult<string?>(null);
 
@@ -282,6 +457,8 @@ public class SyncBackgroundServiceTests
 
         public Task SetSyncStateAsync(string key, string value, CancellationToken cancellationToken)
         {
+            _stateValues[key] = value;
+
             if (key == "sync.last_success_utc")
             {
                 LastSuccessUtc = value;
@@ -301,6 +478,6 @@ public class SyncBackgroundServiceTests
         }
 
         public Task<string?> GetSyncStateAsync(string key, CancellationToken cancellationToken)
-            => Task.FromResult<string?>(null);
+            => Task.FromResult(_stateValues.TryGetValue(key, out string? value) ? value : null);
     }
 }

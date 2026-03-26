@@ -15,6 +15,7 @@
         "${HOME}/Android/Sdk/platform-tools/adb": true,
         "dotnet new": true,
         "dotnet sln": true,
-        "dotnet ef": true
+        "dotnet ef": true,
+        "cp": true
     }
 }
