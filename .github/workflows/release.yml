@@ -1,0 +1,261 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  validate-tag:
+    name: Parse and validate tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      android_version_code: ${{ steps.parse.outputs.android_version_code }}
+    steps:
+      - name: Parse version from tag
+        id: parse
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Tag '${TAG}' does not match required format vX.Y.Z"
+            exit 1
+          fi
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          PATCH="${BASH_REMATCH[3]}"
+          echo "version=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+          echo "android_version_code=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))" >> "$GITHUB_OUTPUT"
+
+  validate:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    needs: validate-tag
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore ChartHub.sln
+
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Fail on warning suppressions
+        run: |
+          if rg -n '#pragma warning disable|SuppressMessage' \
+            --glob '!ChartHub/obj/**' \
+            --glob '!ChartHub/bin/**' \
+            --glob '!ChartHub/Models/APIRootResponse.cs' \
+            ChartHub ChartHub.Tests; then
+            echo "Warning suppressions found. These require explicit review."
+            exit 1
+          fi
+
+      - name: Verify formatting
+        run: dotnet format ChartHub.sln --verify-no-changes --severity error --no-restore
+
+      - name: Build
+        run: dotnet build ChartHub.sln --configuration Release --no-restore
+
+      - name: Test ChartHub with coverage threshold
+        run: >-
+          dotnet test ChartHub.Tests/ChartHub.Tests.csproj
+          --configuration Release
+          --no-build
+          /p:CollectCoverage=true
+          /p:CoverletOutput=./TestResults/Coverage/
+          /p:CoverletOutputFormat=cobertura
+          /p:Threshold=70
+          /p:ThresholdType=line
+          /p:ThresholdStat=total
+
+      - name: Test BackupApi
+        run: >-
+          dotnet test ChartHub.BackupApi.Tests/ChartHub.BackupApi.Tests.csproj
+          --configuration Release
+          --no-build
+
+  build-desktop:
+    name: Publish desktop (${{ matrix.rid }})
+    runs-on: ubuntu-latest
+    needs: [validate-tag, validate]
+    strategy:
+      fail-fast: true
+      matrix:
+        rid: [linux-x64, win-x64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore ChartHub.sln
+
+      - name: Publish
+        run: >-
+          dotnet publish ChartHub/ChartHub.csproj
+          --configuration Release
+          --no-restore
+          -r ${{ matrix.rid }}
+          --self-contained true
+          -p:Version=${{ needs.validate-tag.outputs.version }}
+          -o ./publish/${{ matrix.rid }}
+
+      - name: Archive
+        run: |
+          cd publish
+          zip -r \
+            "../charthub-${{ needs.validate-tag.outputs.version }}-${{ matrix.rid }}.zip" \
+            "${{ matrix.rid }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.rid }}
+          path: charthub-${{ needs.validate-tag.outputs.version }}-${{ matrix.rid }}.zip
+          retention-days: 1
+
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    needs: [validate-tag, validate]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install Android workload
+        run: dotnet workload install android
+
+      - name: Build APK
+        run: >-
+          dotnet build ChartHub/ChartHub.csproj
+          --configuration Release
+          -p:EnableAndroid=true
+          -f net10.0-android
+          -p:ApplicationDisplayVersion=${{ needs.validate-tag.outputs.version }}
+          -p:ApplicationVersion=${{ needs.validate-tag.outputs.android_version_code }}
+
+      - name: Locate and stage APK
+        run: |
+          APK=$(find ChartHub/bin/Release/net10.0-android -name "*.apk" | head -1)
+          if [[ -z "$APK" ]]; then
+            echo "No APK found under ChartHub/bin/Release/net10.0-android"
+            exit 1
+          fi
+          cp "$APK" "charthub-${{ needs.validate-tag.outputs.version }}-unsigned.apk"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: charthub-${{ needs.validate-tag.outputs.version }}-unsigned.apk
+          retention-days: 1
+
+  build-api-image:
+    name: Build and push Backup API image
+    runs-on: ubuntu-latest
+    needs: [validate-tag, validate]
+    outputs:
+      image_digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/charthub-backup-api
+          tags: |
+            type=semver,pattern={{version}},value=v${{ needs.validate-tag.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.validate-tag.outputs.version }}
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.title=ChartHub Backup API
+            org.opencontainers.image.vendor=Calahil Studios
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ChartHub.BackupApi/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-tag, build-desktop, build-android, build-api-image]
+    steps:
+      - name: Download desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: ./release-assets
+          merge-multiple: true
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: ./release-assets
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.validate-tag.outputs.version }}
+        run: |
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "ChartHub ${VERSION}" \
+            --generate-notes \
+            ./release-assets/*
+
+      - name: Write release summary
+        env:
+          VERSION: ${{ needs.validate-tag.outputs.version }}
+          DIGEST: ${{ needs.build-api-image.outputs.image_digest }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          {
+            echo "## ChartHub ${VERSION}"
+            echo ""
+            echo "### Backup API"
+            echo "- Image: \`ghcr.io/${REPO_OWNER}/charthub-backup-api:${VERSION}\`"
+            echo "- Digest: \`${DIGEST}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy
+    needs: [validate-tag, publish-release, build-api-image]
+    uses: ./.github/workflows/deploy.yml
+    with:
+      image_tag: ${{ needs.validate-tag.outputs.version }}
+      image_registry: ghcr.io/${{ github.repository_owner }}
+    secrets: inherit

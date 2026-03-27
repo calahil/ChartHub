@@ -26,10 +26,11 @@ services:
       - internal_env
 
   backup-api:
+    image: ${BACKUP_API_IMAGE:-charthub-backup-api:local}
     build:
       context: .
       dockerfile: ChartHub.BackupApi/Dockerfile
-    container_name: charthub-backup-api
+    container_name: ${BACKUP_API_CONTAINER_NAME:-charthub-backup-api}
     depends_on:
       db:
         condition: service_healthy
@@ -47,7 +48,7 @@ services:
       - Downloads__ExternalRedirectCacheHours=${BACKUP_DOWNLOADS_EXTERNAL_REDIRECT_CACHE_HOURS:-48}
       - ImageCache__CacheDirectory=/cache/images
     ports:
-      - "5147:5000"
+      - "${API_PORT:-5147}:5000"
     volumes:
       - ${BACKUP_DOWNLOADS_HOST_PATH:-./ChartHub.BackupApi/cache/downloads}:/cache/downloads
       - ${BACKUP_IMAGES_HOST_PATH:-./ChartHub.BackupApi/cache/images}:/cache/images

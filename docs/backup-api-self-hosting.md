@@ -178,3 +178,45 @@ Supported form fields include:
 4. Confirm `/health` and `/api/rhythmverse/health/sync` respond
 5. Verify cache directories are writable and persisting data
 6. Watch logs during the first sync to confirm reconciliation completes cleanly
+
+## Rollback Procedure
+
+To roll back the Backup API to a previous release, identify the last known-good version tag
+(e.g. `1.2.3`) from the GitHub Releases page or from GHCR version history.
+
+On the deployment host, for each environment stack you need to roll back:
+
+```bash
+# Set the previous image tag
+PREVIOUS_TAG=1.2.3
+ENV_NAME=dev   # or staging, prod
+PROJECT_NAME=charthub-${ENV_NAME}
+
+# Edit your .env file to point to the previous image
+# BACKUP_API_IMAGE=ghcr.io/<owner>/charthub-backup-api:${PREVIOUS_TAG}
+
+# Pull the previous image
+docker compose --project-name "${PROJECT_NAME}" --env-file .env.deploy pull backup-api
+
+# Redeploy
+docker compose --project-name "${PROJECT_NAME}" --env-file .env.deploy up -d
+```
+
+After redeploying, verify the stack is healthy:
+
+```bash
+# Replace 5147 with your environment's API_PORT value
+curl -s http://localhost:5147/health | jq
+curl -s http://localhost:5147/api/rhythmverse/health/sync | jq
+```
+
+Confirm that the running container uses the expected image:
+
+```bash
+docker inspect charthub-dev-backup-api --format '{{ index .Config.Image }}'
+```
+
+The database volume is not affected by image rollbacks. EF Core migrations that ran against
+the database during the broken release remain applied. If the previous image is incompatible
+with the current database schema, a database restore from backup is required before rolling
+back the image.
