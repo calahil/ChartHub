@@ -568,7 +568,7 @@ public class SyncViewModelTests
     public async Task RefreshDesktopQrCommand_RegeneratesPairCode_AndExportsImagePath()
     {
         using var temp = new TemporaryDirectoryFixture("sync-vm-refresh-qr");
-        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        AppGlobalSettings settings = CreateSettings(temp.RootPath, syncApiPairCode: "PAIR123");
         StubDesktopQrImageExportService qrExportService = new();
 
         using var sut = new SyncViewModel(
@@ -580,13 +580,14 @@ public class SyncViewModelTests
 
         string originalPairCode = sut.PairCode;
         string originalPayload = sut.GeneratedBootstrapPayload;
+        int exportCallsBeforeRefresh = qrExportService.ExportCalls;
 
         sut.RefreshDesktopQrCommand.Execute(null);
 
         Assert.NotEqual(originalPairCode, sut.PairCode);
         Assert.NotEqual(originalPayload, sut.GeneratedBootstrapPayload);
         Assert.Equal(qrExportService.ExportPath, sut.BootstrapQrImageExportPath);
-        Assert.True(qrExportService.ExportCalls >= 2);
+        Assert.True(qrExportService.ExportCalls > exportCallsBeforeRefresh);
     }
 
     [Fact]
@@ -1110,7 +1111,8 @@ public class SyncViewModelTests
         string rootPath,
         string? syncApiAuthToken = null,
         string? syncApiSavedConnectionsJson = null,
-        string? syncApiLastPairedDeviceLabel = null)
+        string? syncApiLastPairedDeviceLabel = null,
+        string? syncApiPairCode = null)
     {
         var config = new AppConfigRoot
         {
@@ -1125,6 +1127,7 @@ public class SyncViewModelTests
                 SyncApiAuthToken = syncApiAuthToken ?? string.Empty,
                 SyncApiSavedConnectionsJson = syncApiSavedConnectionsJson ?? "[]",
                 SyncApiLastPairedDeviceLabel = syncApiLastPairedDeviceLabel ?? string.Empty,
+                SyncApiPairCode = syncApiPairCode ?? string.Empty,
             },
         };
 
