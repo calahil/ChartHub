@@ -106,6 +106,41 @@ public class AppGlobalSettingsTests
         Assert.Equal(32 * 1024 * 1024, settings.SyncApiMaxRequestBodyBytes);
     }
 
+    [Fact]
+    public async Task UpdateSyncApiPairingState_WhenPersistenceIsDelayed_UpdatesVisibleStateImmediately()
+    {
+        using var temp = new TemporaryDirectoryFixture("app-global-settings-sync-api-pairing-immediate");
+
+        AppConfigRoot config = CreateConfig(temp.RootPath);
+        var orchestrator = new BlockingSettingsOrchestrator(config);
+        using var settings = new AppGlobalSettings(orchestrator);
+
+        DateTimeOffset pairedAtUtc = DateTimeOffset.UtcNow;
+        string pairingHistoryJson = "[{\"deviceLabel\":\"Companion 1\",\"pairedAtUtc\":\"2026-03-27T00:00:00.0000000+00:00\"}]";
+
+        settings.UpdateSyncApiPairingState(
+            "PAIR-5678",
+            pairedAtUtc,
+            "Companion 1",
+            pairedAtUtc,
+            pairingHistoryJson);
+
+        Assert.Equal("PAIR-5678", settings.SyncApiPairCode);
+        Assert.Equal(pairedAtUtc.ToString("O"), settings.SyncApiPairCodeIssuedAtUtc);
+        Assert.Equal("Companion 1", settings.SyncApiLastPairedDeviceLabel);
+        Assert.Equal(pairedAtUtc.ToString("O"), settings.SyncApiLastPairedAtUtc);
+        Assert.Equal(pairingHistoryJson, settings.SyncApiPairingHistoryJson);
+
+        orchestrator.ReleasePendingUpdate();
+
+        bool persisted = await WaitForConditionAsync(
+            () => orchestrator.UpdateCount > 0
+                && orchestrator.Current.Runtime.SyncApiPairCode == "PAIR-5678"
+                && orchestrator.Current.Runtime.SyncApiLastPairedDeviceLabel == "Companion 1",
+            TimeSpan.FromSeconds(2));
+        Assert.True(persisted);
+    }
+
     private static AppConfigRoot CreateConfig(string rootPath)
     {
         string tempDirectory = Path.Combine(rootPath, "Temp");
@@ -169,6 +204,40 @@ public class AppGlobalSettingsTests
         {
             SettingsChanged?.Invoke(Current);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class BlockingSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator
+    {
+        private readonly TaskCompletionSource _releaseUpdate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public AppConfigRoot Current { get; private set; } = current;
+
+        public int UpdateCount { get; private set; }
+
+        public event Action<AppConfigRoot>? SettingsChanged;
+
+        public async Task<ConfigValidationResult> UpdateAsync(Action<AppConfigRoot> update, CancellationToken cancellationToken = default)
+        {
+            await _releaseUpdate.Task.WaitAsync(cancellationToken);
+            update(Current);
+            UpdateCount++;
+            SettingsChanged?.Invoke(Current);
+            return ConfigValidationResult.Success;
+        }
+
+        public Task ReloadAsync(CancellationToken cancellationToken = default)
+        {
+            SettingsChanged?.Invoke(Current);
+            return Task.CompletedTask;
+        }
+
+        public void ReleasePendingUpdate()
+        {
+            if (!_releaseUpdate.Task.IsCompleted)
+            {
+                _releaseUpdate.SetResult();
+            }
         }
     }
 }

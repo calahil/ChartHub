@@ -470,6 +470,35 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         });
     }
 
+    internal void UpdateSyncApiPairingState(
+        string pairCode,
+        DateTimeOffset pairCodeIssuedAtUtc,
+        string deviceLabel,
+        DateTimeOffset pairedAtUtc,
+        string pairingHistoryJson)
+    {
+        string normalizedPairCode = pairCode ?? string.Empty;
+        string normalizedDeviceLabel = deviceLabel ?? string.Empty;
+        string normalizedHistoryJson = NormalizeSyncConnectionsJson(pairingHistoryJson);
+        string issuedAtUtc = pairCodeIssuedAtUtc.ToString("O");
+        string pairedAtUtcValue = pairedAtUtc.ToString("O");
+
+        Runtime.SyncApiPairCode = normalizedPairCode;
+        Runtime.SyncApiPairCodeIssuedAtUtc = issuedAtUtc;
+        Runtime.SyncApiLastPairedDeviceLabel = normalizedDeviceLabel;
+        Runtime.SyncApiLastPairedAtUtc = pairedAtUtcValue;
+        Runtime.SyncApiPairingHistoryJson = normalizedHistoryJson;
+
+        QueueConfigUpdate(config =>
+        {
+            config.Runtime.SyncApiPairCode = normalizedPairCode;
+            config.Runtime.SyncApiPairCodeIssuedAtUtc = issuedAtUtc;
+            config.Runtime.SyncApiLastPairedDeviceLabel = normalizedDeviceLabel;
+            config.Runtime.SyncApiLastPairedAtUtc = pairedAtUtcValue;
+            config.Runtime.SyncApiPairingHistoryJson = normalizedHistoryJson;
+        });
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private void RaiseAllSettingsChanged()

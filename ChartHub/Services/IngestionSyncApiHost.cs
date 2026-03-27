@@ -187,14 +187,10 @@ public sealed class IngestionSyncApiHost(
                     return;
                 }
 
-                RotatePairCode();
-
                 string deviceLabel = payload.DeviceLabel?.Trim() ?? string.Empty;
                 DateTimeOffset pairedAtUtc = DateTimeOffset.UtcNow;
 
-                _globalSettings.SyncApiLastPairedDeviceLabel = deviceLabel;
-                _globalSettings.SyncApiLastPairedAtUtc = pairedAtUtc.ToString("O");
-                AppendPairingHistory(deviceLabel, pairedAtUtc);
+                ApplySuccessfulPairClaim(deviceLabel, pairedAtUtc);
 
                 Logger.LogInfo("SyncApi", "Companion device paired", new Dictionary<string, object?>
                 {
@@ -1387,35 +1383,49 @@ public sealed class IngestionSyncApiHost(
         }
     }
 
-    private void AppendPairingHistory(string deviceLabel, DateTimeOffset pairedAtUtc)
+    private void ApplySuccessfulPairClaim(string deviceLabel, DateTimeOffset pairedAtUtc)
     {
         lock (_pairCodeSync)
         {
-            List<PairingHistoryEntry> items;
-            try
-            {
-                items = JsonSerializer.Deserialize<List<PairingHistoryEntry>>(
-                    _globalSettings.SyncApiPairingHistoryJson,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
-            }
-            catch
-            {
-                items = [];
-            }
+            _currentPairCode = AppGlobalSettings.GenerateSyncPairCode();
+            _currentPairCodeIssuedAtUtc = DateTimeOffset.UtcNow;
 
-            items.Insert(0, new PairingHistoryEntry
-            {
-                DeviceLabel = string.IsNullOrWhiteSpace(deviceLabel) ? "Unknown device" : deviceLabel,
-                PairedAtUtc = pairedAtUtc.ToString("O"),
-            });
-
-            while (items.Count > MaxPairingHistoryEntries)
-            {
-                items.RemoveAt(items.Count - 1);
-            }
-
-            _globalSettings.SyncApiPairingHistoryJson = JsonSerializer.Serialize(items);
+            string pairingHistoryJson = BuildUpdatedPairingHistoryJson(deviceLabel, pairedAtUtc);
+            _globalSettings.UpdateSyncApiPairingState(
+                _currentPairCode,
+                _currentPairCodeIssuedAtUtc,
+                deviceLabel,
+                pairedAtUtc,
+                pairingHistoryJson);
         }
+    }
+
+    private string BuildUpdatedPairingHistoryJson(string deviceLabel, DateTimeOffset pairedAtUtc)
+    {
+        List<PairingHistoryEntry> items;
+        try
+        {
+            items = JsonSerializer.Deserialize<List<PairingHistoryEntry>>(
+                _globalSettings.SyncApiPairingHistoryJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+        }
+        catch
+        {
+            items = [];
+        }
+
+        items.Insert(0, new PairingHistoryEntry
+        {
+            DeviceLabel = string.IsNullOrWhiteSpace(deviceLabel) ? "Unknown device" : deviceLabel,
+            PairedAtUtc = pairedAtUtc.ToString("O"),
+        });
+
+        while (items.Count > MaxPairingHistoryEntries)
+        {
+            items.RemoveAt(items.Count - 1);
+        }
+
+        return JsonSerializer.Serialize(items);
     }
 
     private static DateTimeOffset TryParseIssuedAt(string? value)
