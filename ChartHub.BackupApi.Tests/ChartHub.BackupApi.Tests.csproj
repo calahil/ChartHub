@@ -26,7 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\ChartHub\Tests\test.json" Link="Fixtures\test.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\ChartHub\Tests\test.json" Link="test.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
