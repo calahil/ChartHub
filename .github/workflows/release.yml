@@ -1,40 +1,90 @@
-name: Release
+name: Release and Deploy
 
 on:
   push:
+    branches:
+      - main
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v*'
 
 permissions:
   contents: write
   packages: write
 
 jobs:
-  validate-tag:
-    name: Parse and validate tag
+  classify:
+    name: Classify release channel
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.parse.outputs.version }}
-      android_version_code: ${{ steps.parse.outputs.android_version_code }}
+      version: ${{ steps.classify.outputs.version }}
+      android_version_code: ${{ steps.classify.outputs.android_version_code }}
+      release_channel: ${{ steps.classify.outputs.release_channel }}
+      is_tag_release: ${{ steps.classify.outputs.is_tag_release }}
+      is_prerelease: ${{ steps.classify.outputs.is_prerelease }}
+      image_tag: ${{ steps.classify.outputs.image_tag }}
+      image_tag_minor: ${{ steps.classify.outputs.image_tag_minor }}
     steps:
-      - name: Parse version from tag
-        id: parse
+      - name: Classify branch or tag
+        id: classify
         run: |
-          TAG="${GITHUB_REF_NAME}"
-          if [[ ! "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            echo "Tag '${TAG}' does not match required format vX.Y.Z"
+          REF_TYPE="${GITHUB_REF_TYPE}"
+          REF_NAME="${GITHUB_REF_NAME}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          if [[ "$REF_TYPE" == "branch" && "$REF_NAME" == "main" ]]; then
+            echo "release_channel=dev" >> "$GITHUB_OUTPUT"
+            echo "is_tag_release=false" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "version=main-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+            echo "android_version_code=1" >> "$GITHUB_OUTPUT"
+            echo "image_tag=main-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+            echo "image_tag_minor=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$REF_TYPE" != "tag" ]]; then
+            echo "Unsupported ref type: ${REF_TYPE}"
             exit 1
           fi
-          MAJOR="${BASH_REMATCH[1]}"
-          MINOR="${BASH_REMATCH[2]}"
-          PATCH="${BASH_REMATCH[3]}"
-          echo "version=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
-          echo "android_version_code=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))" >> "$GITHUB_OUTPUT"
+
+          TAG="${REF_NAME}"
+
+          if [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-rc\.([0-9]+)$ ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+            RC_NUM="${BASH_REMATCH[4]}"
+            echo "release_channel=rc" >> "$GITHUB_OUTPUT"
+            echo "is_tag_release=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "version=${MAJOR}.${MINOR}.${PATCH}-rc.${RC_NUM}" >> "$GITHUB_OUTPUT"
+            echo "image_tag=${MAJOR}.${MINOR}.${PATCH}-rc.${RC_NUM}" >> "$GITHUB_OUTPUT"
+            echo "image_tag_minor=" >> "$GITHUB_OUTPUT"
+            echo "android_version_code=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+            echo "release_channel=stable" >> "$GITHUB_OUTPUT"
+            echo "is_tag_release=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "version=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+            echo "image_tag=${MAJOR}.${MINOR}.${PATCH}" >> "$GITHUB_OUTPUT"
+            echo "image_tag_minor=${MAJOR}.${MINOR}" >> "$GITHUB_OUTPUT"
+            echo "android_version_code=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Unsupported tag format '${TAG}'. Use vX.Y.Z or vX.Y.Z-rc.N"
+          exit 1
 
   validate:
     name: Quality gates
     runs-on: ubuntu-latest
-    needs: validate-tag
+    needs: classify
     steps:
       - uses: actions/checkout@v4
 
@@ -85,8 +135,9 @@ jobs:
 
   build-desktop:
     name: Publish desktop (${{ matrix.rid }})
+    if: needs.classify.outputs.is_tag_release == 'true'
     runs-on: ubuntu-latest
-    needs: [validate-tag, validate]
+    needs: [classify, validate]
     strategy:
       fail-fast: true
       matrix:
@@ -108,27 +159,28 @@ jobs:
           --no-restore
           -r ${{ matrix.rid }}
           --self-contained true
-          -p:Version=${{ needs.validate-tag.outputs.version }}
+          -p:Version=${{ needs.classify.outputs.version }}
           -o ./publish/${{ matrix.rid }}
 
       - name: Archive
         run: |
           cd publish
           zip -r \
-            "../charthub-${{ needs.validate-tag.outputs.version }}-${{ matrix.rid }}.zip" \
+            "../charthub-${{ needs.classify.outputs.version }}-${{ matrix.rid }}.zip" \
             "${{ matrix.rid }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.rid }}
-          path: charthub-${{ needs.validate-tag.outputs.version }}-${{ matrix.rid }}.zip
+          path: charthub-${{ needs.classify.outputs.version }}-${{ matrix.rid }}.zip
           retention-days: 1
 
   build-android:
     name: Build Android APK
+    if: needs.classify.outputs.is_tag_release == 'true'
     runs-on: ubuntu-latest
-    needs: [validate-tag, validate]
+    needs: [classify, validate]
     steps:
       - uses: actions/checkout@v4
 
@@ -145,8 +197,8 @@ jobs:
           --configuration Release
           -p:EnableAndroid=true
           -f net10.0-android
-          -p:ApplicationDisplayVersion=${{ needs.validate-tag.outputs.version }}
-          -p:ApplicationVersion=${{ needs.validate-tag.outputs.android_version_code }}
+          -p:ApplicationDisplayVersion=${{ needs.classify.outputs.version }}
+          -p:ApplicationVersion=${{ needs.classify.outputs.android_version_code }}
 
       - name: Locate and stage APK
         run: |
@@ -155,19 +207,19 @@ jobs:
             echo "No APK found under ChartHub/bin/Release/net10.0-android"
             exit 1
           fi
-          cp "$APK" "charthub-${{ needs.validate-tag.outputs.version }}-unsigned.apk"
+          cp "$APK" "charthub-${{ needs.classify.outputs.version }}-unsigned.apk"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: charthub-${{ needs.validate-tag.outputs.version }}-unsigned.apk
+          path: charthub-${{ needs.classify.outputs.version }}-unsigned.apk
           retention-days: 1
 
   build-api-image:
     name: Build and push Backup API image
     runs-on: ubuntu-latest
-    needs: [validate-tag, validate]
+    needs: [classify, validate]
     outputs:
       image_digest: ${{ steps.push.outputs.digest }}
     steps:
@@ -182,18 +234,42 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract image metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/charthub-backup-api
-          tags: |
-            type=semver,pattern={{version}},value=v${{ needs.validate-tag.outputs.version }}
-            type=semver,pattern={{major}}.{{minor}},value=v${{ needs.validate-tag.outputs.version }}
-            type=raw,value=latest
-          labels: |
-            org.opencontainers.image.title=ChartHub Backup API
-            org.opencontainers.image.vendor=Calahil Studios
+      - name: Compute image tags
+        id: tags
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+          CHANNEL: ${{ needs.classify.outputs.release_channel }}
+          IMAGE_TAG: ${{ needs.classify.outputs.image_tag }}
+          IMAGE_TAG_MINOR: ${{ needs.classify.outputs.image_tag_minor }}
+        run: |
+          BASE="ghcr.io/${REPO_OWNER}/charthub-backup-api"
+          if [[ "$CHANNEL" == "dev" ]]; then
+            {
+              echo "tags<<EOF"
+              echo "${BASE}:${IMAGE_TAG}"
+              echo "${BASE}:dev-latest"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$CHANNEL" == "rc" ]]; then
+            {
+              echo "tags<<EOF"
+              echo "${BASE}:${IMAGE_TAG}"
+              echo "${BASE}:rc-latest"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          {
+            echo "tags<<EOF"
+            echo "${BASE}:${IMAGE_TAG}"
+            echo "${BASE}:${IMAGE_TAG_MINOR}"
+            echo "${BASE}:latest"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         id: push
@@ -202,15 +278,21 @@ jobs:
           context: .
           file: ChartHub.BackupApi/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.title=ChartHub Backup API
+            org.opencontainers.image.vendor=Calahil Studios
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.classify.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   publish-release:
     name: Publish GitHub Release
+    if: needs.classify.outputs.is_tag_release == 'true'
     runs-on: ubuntu-latest
-    needs: [validate-tag, build-desktop, build-android, build-api-image]
+    needs: [classify, build-desktop, build-android, build-api-image]
     steps:
       - name: Download desktop artifacts
         uses: actions/download-artifact@v4
@@ -229,17 +311,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
-          VERSION: ${{ needs.validate-tag.outputs.version }}
+          VERSION: ${{ needs.classify.outputs.version }}
+          IS_PRERELEASE: ${{ needs.classify.outputs.is_prerelease }}
         run: |
-          gh release create "$TAG" \
-            --repo "${{ github.repository }}" \
-            --title "ChartHub ${VERSION}" \
-            --generate-notes \
-            ./release-assets/*
+          ARGS=(
+            "create" "$TAG"
+            "--repo" "${{ github.repository }}"
+            "--title" "ChartHub ${VERSION}"
+            "--generate-notes"
+          )
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            ARGS+=("--prerelease")
+          fi
+          gh release "${ARGS[@]}" ./release-assets/*
 
       - name: Write release summary
         env:
-          VERSION: ${{ needs.validate-tag.outputs.version }}
+          VERSION: ${{ needs.classify.outputs.version }}
           DIGEST: ${{ needs.build-api-image.outputs.image_digest }}
           REPO_OWNER: ${{ github.repository_owner }}
         run: |
@@ -247,15 +335,278 @@ jobs:
             echo "## ChartHub ${VERSION}"
             echo ""
             echo "### Backup API"
-            echo "- Image: \`ghcr.io/${REPO_OWNER}/charthub-backup-api:${VERSION}\`"
-            echo "- Digest: \`${DIGEST}\`"
+            echo "- Image: ghcr.io/${REPO_OWNER}/charthub-backup-api:${VERSION}"
+            echo "- Digest: ${DIGEST}"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  deploy:
-    name: Deploy
-    needs: [validate-tag, publish-release, build-api-image]
-    uses: ./.github/workflows/deploy.yml
-    with:
-      image_tag: ${{ needs.validate-tag.outputs.version }}
-      image_registry: ghcr.io/${{ github.repository_owner }}
-    secrets: inherit
+  deploy-dev:
+    name: Deploy Backup API to dev
+    if: needs.classify.outputs.release_channel == 'dev'
+    runs-on: [self-hosted, linux, charthub-host]
+    needs: [classify, build-api-image]
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Write env file
+        env:
+          BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api:${{ needs.classify.outputs.image_tag }}
+          NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
+          PSQL_USER: ${{ secrets.PSQL_USER }}
+          PSQL_PASSWORD: ${{ secrets.PSQL_PASSWORD }}
+          PSQL_DB: ${{ secrets.PSQL_DB }}
+          INTERNAL: ${{ secrets.INTERNAL }}
+          API_PORT: ${{ secrets.API_PORT }}
+          BACKUP_API_CONTAINER_NAME: charthub-dev-backup-api
+          BACKUP_DOWNLOADS_HOST_PATH: ${{ secrets.BACKUP_DOWNLOADS_HOST_PATH }}
+          BACKUP_IMAGES_HOST_PATH: ${{ secrets.BACKUP_IMAGES_HOST_PATH }}
+          RHYTHMVERSE_TOKEN: ${{ secrets.RHYTHMVERSE_TOKEN }}
+          BACKUP_SYNC_ENABLED: ${{ secrets.BACKUP_SYNC_ENABLED }}
+        run: |
+          printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
+          printenv NAME                 | xargs -I{} printf 'NAME=%s\n' "{}" >> .env.deploy
+          printenv PSQL_USER            | xargs -I{} printf 'PSQL_USER=%s\n' "{}" >> .env.deploy
+          printenv PSQL_PASSWORD        | xargs -I{} printf 'PSQL_PASSWORD=%s\n' "{}" >> .env.deploy
+          printenv PSQL_DB              | xargs -I{} printf 'PSQL_DB=%s\n' "{}" >> .env.deploy
+          printenv INTERNAL             | xargs -I{} printf 'INTERNAL=%s\n' "{}" >> .env.deploy
+          printenv API_PORT             | xargs -I{} printf 'API_PORT=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_API_CONTAINER_NAME | xargs -I{} printf 'BACKUP_API_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_DOWNLOADS_HOST_PATH | xargs -I{} printf 'BACKUP_DOWNLOADS_HOST_PATH=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_IMAGES_HOST_PATH    | xargs -I{} printf 'BACKUP_IMAGES_HOST_PATH=%s\n' "{}" >> .env.deploy
+          printenv RHYTHMVERSE_TOKEN    | xargs -I{} printf 'RHYTHMVERSE_TOKEN=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
+
+      - name: Pull and deploy
+        run: |
+          docker compose --project-name charthub-dev --env-file .env.deploy pull backup-api
+          docker compose --project-name charthub-dev --env-file .env.deploy up -d
+
+      - name: Verify health
+        env:
+          API_PORT: ${{ secrets.API_PORT }}
+        run: |
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${API_PORT}/health" 2>/dev/null || echo "000")
+            if [[ "$STATUS" == "200" ]]; then
+              break
+            fi
+            if [[ "$i" == "12" ]]; then
+              echo "Dev /health check failed"
+              exit 1
+            fi
+            sleep 5
+          done
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${API_PORT}/api/rhythmverse/health/sync" 2>/dev/null || echo "000")
+          if [[ "$HTTP" != "200" ]]; then
+            echo "Dev sync health check failed"
+            exit 1
+          fi
+
+      - name: Clean up env file
+        if: always()
+        run: rm -f .env.deploy
+
+  deploy-staging:
+    name: Deploy Backup API to staging
+    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
+    runs-on: [self-hosted, linux, charthub-host]
+    needs: [classify, build-api-image]
+    outputs:
+      staged_image_ref: ${{ steps.capture-staged-image.outputs.staged_image_ref }}
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Write env file
+        env:
+          BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
+          NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
+          PSQL_USER: ${{ secrets.PSQL_USER }}
+          PSQL_PASSWORD: ${{ secrets.PSQL_PASSWORD }}
+          PSQL_DB: ${{ secrets.PSQL_DB }}
+          INTERNAL: ${{ secrets.INTERNAL }}
+          API_PORT: ${{ secrets.API_PORT }}
+          BACKUP_API_CONTAINER_NAME: charthub-staging-backup-api
+          BACKUP_DOWNLOADS_HOST_PATH: ${{ secrets.BACKUP_DOWNLOADS_HOST_PATH }}
+          BACKUP_IMAGES_HOST_PATH: ${{ secrets.BACKUP_IMAGES_HOST_PATH }}
+          RHYTHMVERSE_TOKEN: ${{ secrets.RHYTHMVERSE_TOKEN }}
+          BACKUP_SYNC_ENABLED: ${{ secrets.BACKUP_SYNC_ENABLED }}
+        run: |
+          printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
+          printenv NAME                 | xargs -I{} printf 'NAME=%s\n' "{}" >> .env.deploy
+          printenv PSQL_USER            | xargs -I{} printf 'PSQL_USER=%s\n' "{}" >> .env.deploy
+          printenv PSQL_PASSWORD        | xargs -I{} printf 'PSQL_PASSWORD=%s\n' "{}" >> .env.deploy
+          printenv PSQL_DB              | xargs -I{} printf 'PSQL_DB=%s\n' "{}" >> .env.deploy
+          printenv INTERNAL             | xargs -I{} printf 'INTERNAL=%s\n' "{}" >> .env.deploy
+          printenv API_PORT             | xargs -I{} printf 'API_PORT=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_API_CONTAINER_NAME | xargs -I{} printf 'BACKUP_API_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_DOWNLOADS_HOST_PATH | xargs -I{} printf 'BACKUP_DOWNLOADS_HOST_PATH=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_IMAGES_HOST_PATH    | xargs -I{} printf 'BACKUP_IMAGES_HOST_PATH=%s\n' "{}" >> .env.deploy
+          printenv RHYTHMVERSE_TOKEN    | xargs -I{} printf 'RHYTHMVERSE_TOKEN=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
+
+      - name: Pull and deploy
+        run: |
+          docker compose --project-name charthub-staging --env-file .env.deploy pull backup-api
+          docker compose --project-name charthub-staging --env-file .env.deploy up -d
+
+      - name: Verify health
+        env:
+          API_PORT: ${{ secrets.API_PORT }}
+        run: |
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${API_PORT}/health" 2>/dev/null || echo "000")
+            if [[ "$STATUS" == "200" ]]; then
+              break
+            fi
+            if [[ "$i" == "12" ]]; then
+              echo "Staging /health check failed"
+              exit 1
+            fi
+            sleep 5
+          done
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${API_PORT}/api/rhythmverse/health/sync" 2>/dev/null || echo "000")
+          if [[ "$HTTP" != "200" ]]; then
+            echo "Staging sync health check failed"
+            exit 1
+          fi
+
+      - name: Verify staged image digest
+        id: capture-staged-image
+        env:
+          EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
+        run: |
+          ACTUAL_IMAGE_REF=$(docker inspect charthub-staging-backup-api --format '{{ index .RepoDigests 0 }}')
+          if [[ "$ACTUAL_IMAGE_REF" != "$EXPECTED_IMAGE_REF" ]]; then
+            echo "Staging deployed unexpected image"
+            echo "Expected: $EXPECTED_IMAGE_REF"
+            echo "Actual:   $ACTUAL_IMAGE_REF"
+            exit 1
+          fi
+          echo "staged_image_ref=$ACTUAL_IMAGE_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Clean up env file
+        if: always()
+        run: rm -f .env.deploy
+
+  deploy-production:
+    name: Deploy Backup API to production
+    if: needs.classify.outputs.release_channel == 'stable'
+    runs-on: [self-hosted, linux, charthub-host]
+    needs: [classify, build-api-image, deploy-staging]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Verify promotion digest from staging
+        env:
+          EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
+          STAGED_IMAGE_REF: ${{ needs.deploy-staging.outputs.staged_image_ref }}
+        run: |
+          if [[ -z "$STAGED_IMAGE_REF" ]]; then
+            echo "Staging image reference is missing"
+            exit 1
+          fi
+          if [[ "$STAGED_IMAGE_REF" != "$EXPECTED_IMAGE_REF" ]]; then
+            echo "Production blocked: staging image does not match expected digest"
+            echo "Expected: $EXPECTED_IMAGE_REF"
+            echo "Staged:   $STAGED_IMAGE_REF"
+            exit 1
+          fi
+
+      - name: Write env file
+        env:
+          BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
+          NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
+          PSQL_USER: ${{ secrets.PSQL_USER }}
+          PSQL_PASSWORD: ${{ secrets.PSQL_PASSWORD }}
+          PSQL_DB: ${{ secrets.PSQL_DB }}
+          INTERNAL: ${{ secrets.INTERNAL }}
+          API_PORT: ${{ secrets.API_PORT }}
+          BACKUP_API_CONTAINER_NAME: charthub-prod-backup-api
+          BACKUP_DOWNLOADS_HOST_PATH: ${{ secrets.BACKUP_DOWNLOADS_HOST_PATH }}
+          BACKUP_IMAGES_HOST_PATH: ${{ secrets.BACKUP_IMAGES_HOST_PATH }}
+          RHYTHMVERSE_TOKEN: ${{ secrets.RHYTHMVERSE_TOKEN }}
+          BACKUP_SYNC_ENABLED: ${{ secrets.BACKUP_SYNC_ENABLED }}
+        run: |
+          printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
+          printenv NAME                 | xargs -I{} printf 'NAME=%s\n' "{}" >> .env.deploy
+          printenv PSQL_USER            | xargs -I{} printf 'PSQL_USER=%s\n' "{}" >> .env.deploy
+          printenv PSQL_PASSWORD        | xargs -I{} printf 'PSQL_PASSWORD=%s\n' "{}" >> .env.deploy
+          printenv PSQL_DB              | xargs -I{} printf 'PSQL_DB=%s\n' "{}" >> .env.deploy
+          printenv INTERNAL             | xargs -I{} printf 'INTERNAL=%s\n' "{}" >> .env.deploy
+          printenv API_PORT             | xargs -I{} printf 'API_PORT=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_API_CONTAINER_NAME | xargs -I{} printf 'BACKUP_API_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_DOWNLOADS_HOST_PATH | xargs -I{} printf 'BACKUP_DOWNLOADS_HOST_PATH=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_IMAGES_HOST_PATH    | xargs -I{} printf 'BACKUP_IMAGES_HOST_PATH=%s\n' "{}" >> .env.deploy
+          printenv RHYTHMVERSE_TOKEN    | xargs -I{} printf 'RHYTHMVERSE_TOKEN=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
+
+      - name: Pull and deploy
+        run: |
+          docker compose --project-name charthub-prod --env-file .env.deploy pull backup-api
+          docker compose --project-name charthub-prod --env-file .env.deploy up -d
+
+      - name: Verify health
+        env:
+          API_PORT: ${{ secrets.API_PORT }}
+        run: |
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${API_PORT}/health" 2>/dev/null || echo "000")
+            if [[ "$STATUS" == "200" ]]; then
+              break
+            fi
+            if [[ "$i" == "12" ]]; then
+              echo "Production /health check failed"
+              exit 1
+            fi
+            sleep 5
+          done
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${API_PORT}/api/rhythmverse/health/sync" 2>/dev/null || echo "000")
+          if [[ "$HTTP" != "200" ]]; then
+            echo "Production sync health check failed"
+            exit 1
+          fi
+
+      - name: Verify production image digest
+        env:
+          EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
+        run: |
+          ACTUAL_IMAGE_REF=$(docker inspect charthub-prod-backup-api --format '{{ index .RepoDigests 0 }}')
+          if [[ "$ACTUAL_IMAGE_REF" != "$EXPECTED_IMAGE_REF" ]]; then
+            echo "Production deployed unexpected image"
+            echo "Expected: $EXPECTED_IMAGE_REF"
+            echo "Actual:   $ACTUAL_IMAGE_REF"
+            exit 1
+          fi
+
+      - name: Write deployment summary
+        env:
+          VERSION: ${{ needs.classify.outputs.version }}
+          DIGEST: ${{ needs.build-api-image.outputs.image_digest }}
+        run: |
+          {
+            echo "## Production deployment complete"
+            echo "- Version: ${VERSION}"
+            echo "- Image digest: ${DIGEST}"
+            echo "- Time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clean up env file
+        if: always()
+        run: rm -f .env.deploy
