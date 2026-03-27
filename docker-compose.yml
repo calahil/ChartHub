@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:17.0-alpine
-    container_name: ${NAME}
+    container_name: ${PSQL_CONTAINER_NAME:-charthub-postgres}
     environment:
       - POSTGRES_USER=${PSQL_USER}
       - POSTGRES_PASSWORD=${PSQL_PASSWORD}
@@ -11,7 +11,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - rhythmverse:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
       #- ./backup:/backup
     healthcheck:
       interval: 30s
@@ -70,5 +70,6 @@ networks:
     name: ${INTERNAL}
 
 volumes:
-  rhythmverse:
+  db_data:
     external: true
+    name: ${DB_VOLUME:-charthub-data}

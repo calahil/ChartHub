@@ -356,7 +356,7 @@ jobs:
       - name: Write env file
         env:
           BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api:${{ needs.classify.outputs.image_tag }}
-          NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
+          PSQL_CONTAINER_NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
           PSQL_USER: ${{ secrets.PSQL_USER }}
           PSQL_PASSWORD: ${{ secrets.PSQL_PASSWORD }}
           PSQL_DB: ${{ secrets.PSQL_DB }}
@@ -367,9 +367,10 @@ jobs:
           BACKUP_IMAGES_HOST_PATH: ${{ secrets.BACKUP_IMAGES_HOST_PATH }}
           RHYTHMVERSE_TOKEN: ${{ secrets.RHYTHMVERSE_TOKEN }}
           BACKUP_SYNC_ENABLED: ${{ secrets.BACKUP_SYNC_ENABLED }}
+          DB_VOLUME: ${{ secrets.DB_VOLUME }}
         run: |
           printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
-          printenv NAME                 | xargs -I{} printf 'NAME=%s\n' "{}" >> .env.deploy
+          printenv PSQL_CONTAINER_NAME  | xargs -I{} printf 'PSQL_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
           printenv PSQL_USER            | xargs -I{} printf 'PSQL_USER=%s\n' "{}" >> .env.deploy
           printenv PSQL_PASSWORD        | xargs -I{} printf 'PSQL_PASSWORD=%s\n' "{}" >> .env.deploy
           printenv PSQL_DB              | xargs -I{} printf 'PSQL_DB=%s\n' "{}" >> .env.deploy
@@ -380,6 +381,7 @@ jobs:
           printenv BACKUP_IMAGES_HOST_PATH    | xargs -I{} printf 'BACKUP_IMAGES_HOST_PATH=%s\n' "{}" >> .env.deploy
           printenv RHYTHMVERSE_TOKEN    | xargs -I{} printf 'RHYTHMVERSE_TOKEN=%s\n' "{}" >> .env.deploy
           printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
+          printenv DB_VOLUME            | xargs -I{} printf 'DB_VOLUME=%s\n' "{}" >> .env.deploy
 
       - name: Pull and deploy
         run: |
@@ -430,7 +432,7 @@ jobs:
       - name: Write env file
         env:
           BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
-          NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
+          PSQL_CONTAINER_NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
           PSQL_USER: ${{ secrets.PSQL_USER }}
           PSQL_PASSWORD: ${{ secrets.PSQL_PASSWORD }}
           PSQL_DB: ${{ secrets.PSQL_DB }}
@@ -441,9 +443,10 @@ jobs:
           BACKUP_IMAGES_HOST_PATH: ${{ secrets.BACKUP_IMAGES_HOST_PATH }}
           RHYTHMVERSE_TOKEN: ${{ secrets.RHYTHMVERSE_TOKEN }}
           BACKUP_SYNC_ENABLED: ${{ secrets.BACKUP_SYNC_ENABLED }}
+          DB_VOLUME: ${{ secrets.DB_VOLUME }}
         run: |
           printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
-          printenv NAME                 | xargs -I{} printf 'NAME=%s\n' "{}" >> .env.deploy
+          printenv PSQL_CONTAINER_NAME  | xargs -I{} printf 'PSQL_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
           printenv PSQL_USER            | xargs -I{} printf 'PSQL_USER=%s\n' "{}" >> .env.deploy
           printenv PSQL_PASSWORD        | xargs -I{} printf 'PSQL_PASSWORD=%s\n' "{}" >> .env.deploy
           printenv PSQL_DB              | xargs -I{} printf 'PSQL_DB=%s\n' "{}" >> .env.deploy
@@ -454,6 +457,7 @@ jobs:
           printenv BACKUP_IMAGES_HOST_PATH    | xargs -I{} printf 'BACKUP_IMAGES_HOST_PATH=%s\n' "{}" >> .env.deploy
           printenv RHYTHMVERSE_TOKEN    | xargs -I{} printf 'RHYTHMVERSE_TOKEN=%s\n' "{}" >> .env.deploy
           printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
+          printenv DB_VOLUME            | xargs -I{} printf 'DB_VOLUME=%s\n' "{}" >> .env.deploy
 
       - name: Pull and deploy
         run: |
@@ -532,7 +536,7 @@ jobs:
       - name: Write env file
         env:
           BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
-          NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
+          PSQL_CONTAINER_NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
           PSQL_USER: ${{ secrets.PSQL_USER }}
           PSQL_PASSWORD: ${{ secrets.PSQL_PASSWORD }}
           PSQL_DB: ${{ secrets.PSQL_DB }}
@@ -543,9 +547,10 @@ jobs:
           BACKUP_IMAGES_HOST_PATH: ${{ secrets.BACKUP_IMAGES_HOST_PATH }}
           RHYTHMVERSE_TOKEN: ${{ secrets.RHYTHMVERSE_TOKEN }}
           BACKUP_SYNC_ENABLED: ${{ secrets.BACKUP_SYNC_ENABLED }}
+          DB_VOLUME: ${{ secrets.DB_VOLUME }}
         run: |
           printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
-          printenv NAME                 | xargs -I{} printf 'NAME=%s\n' "{}" >> .env.deploy
+          printenv PSQL_CONTAINER_NAME  | xargs -I{} printf 'PSQL_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
           printenv PSQL_USER            | xargs -I{} printf 'PSQL_USER=%s\n' "{}" >> .env.deploy
           printenv PSQL_PASSWORD        | xargs -I{} printf 'PSQL_PASSWORD=%s\n' "{}" >> .env.deploy
           printenv PSQL_DB              | xargs -I{} printf 'PSQL_DB=%s\n' "{}" >> .env.deploy
@@ -556,6 +561,7 @@ jobs:
           printenv BACKUP_IMAGES_HOST_PATH    | xargs -I{} printf 'BACKUP_IMAGES_HOST_PATH=%s\n' "{}" >> .env.deploy
           printenv RHYTHMVERSE_TOKEN    | xargs -I{} printf 'RHYTHMVERSE_TOKEN=%s\n' "{}" >> .env.deploy
           printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
+          printenv DB_VOLUME            | xargs -I{} printf 'DB_VOLUME=%s\n' "{}" >> .env.deploy
 
       - name: Pull and deploy
         run: |
