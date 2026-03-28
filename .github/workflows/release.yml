@@ -150,7 +150,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore ChartHub.sln
+        run: dotnet restore ChartHub.sln -r ${{ matrix.rid }}
 
       - name: Publish
         run: >-
@@ -357,6 +357,7 @@ jobs:
         env:
           BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api:${{ needs.classify.outputs.image_tag }}
           PSQL_CONTAINER_NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
+          PSQL_PORT: ${{ secrets.PSQL_PORT }}
           PSQL_USER: ${{ secrets.PSQL_USER }}
           PSQL_PASSWORD: ${{ secrets.PSQL_PASSWORD }}
           PSQL_DB: ${{ secrets.PSQL_DB }}
@@ -371,6 +372,7 @@ jobs:
         run: |
           printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
           printenv PSQL_CONTAINER_NAME  | xargs -I{} printf 'PSQL_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
+          printenv PSQL_PORT            | xargs -I{} printf 'PSQL_PORT=%s\n' "{}" >> .env.deploy
           printenv PSQL_USER            | xargs -I{} printf 'PSQL_USER=%s\n' "{}" >> .env.deploy
           printenv PSQL_PASSWORD        | xargs -I{} printf 'PSQL_PASSWORD=%s\n' "{}" >> .env.deploy
           printenv PSQL_DB              | xargs -I{} printf 'PSQL_DB=%s\n' "{}" >> .env.deploy
@@ -433,6 +435,7 @@ jobs:
         env:
           BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
           PSQL_CONTAINER_NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
+          PSQL_PORT: ${{ secrets.PSQL_PORT }}
           PSQL_USER: ${{ secrets.PSQL_USER }}
           PSQL_PASSWORD: ${{ secrets.PSQL_PASSWORD }}
           PSQL_DB: ${{ secrets.PSQL_DB }}
@@ -447,6 +450,7 @@ jobs:
         run: |
           printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
           printenv PSQL_CONTAINER_NAME  | xargs -I{} printf 'PSQL_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
+          printenv PSQL_PORT            | xargs -I{} printf 'PSQL_PORT=%s\n' "{}" >> .env.deploy
           printenv PSQL_USER            | xargs -I{} printf 'PSQL_USER=%s\n' "{}" >> .env.deploy
           printenv PSQL_PASSWORD        | xargs -I{} printf 'PSQL_PASSWORD=%s\n' "{}" >> .env.deploy
           printenv PSQL_DB              | xargs -I{} printf 'PSQL_DB=%s\n' "{}" >> .env.deploy
@@ -537,6 +541,7 @@ jobs:
         env:
           BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
           PSQL_CONTAINER_NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
+          PSQL_PORT: ${{ secrets.PSQL_PORT }}
           PSQL_USER: ${{ secrets.PSQL_USER }}
           PSQL_PASSWORD: ${{ secrets.PSQL_PASSWORD }}
           PSQL_DB: ${{ secrets.PSQL_DB }}
@@ -551,6 +556,7 @@ jobs:
         run: |
           printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
           printenv PSQL_CONTAINER_NAME  | xargs -I{} printf 'PSQL_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
+          printenv PSQL_PORT            | xargs -I{} printf 'PSQL_PORT=%s\n' "{}" >> .env.deploy
           printenv PSQL_USER            | xargs -I{} printf 'PSQL_USER=%s\n' "{}" >> .env.deploy
           printenv PSQL_PASSWORD        | xargs -I{} printf 'PSQL_PASSWORD=%s\n' "{}" >> .env.deploy
           printenv PSQL_DB              | xargs -I{} printf 'PSQL_DB=%s\n' "{}" >> .env.deploy
