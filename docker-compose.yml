@@ -38,7 +38,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:5000
       - Database__Provider=postgresql
-      - Database__PostgreSqlConnectionString=Host=db;Port=5432;Database=${PSQL_DB};Username=${PSQL_USER};Password=${PSQL_PASSWORD}
+      - Database__PostgreSqlConnectionString=Host=${PSQL_CONTAINER_NAME:-charthub-postgres};Port=5432;Database=${PSQL_DB};Username=${PSQL_USER};Password=${PSQL_PASSWORD}
       - RhythmVerseSource__BaseUrl=${RHYTHMVERSE_BASE_URL:-https://rhythmverse.co/}
       - RhythmVerseSource__Token=${RHYTHMVERSE_TOKEN:-CHANGE_ME}
       - Sync__Enabled=${BACKUP_SYNC_ENABLED:-true}
