@@ -1,0 +1,76 @@
+name: Dotnet Quality
+
+on:
+  workflow_call:
+    inputs:
+      dotnet_version:
+        description: Dotnet SDK version
+        required: false
+        type: string
+        default: 10.0.x
+      coverage_threshold:
+        description: Line coverage threshold for ChartHub.Tests
+        required: false
+        type: number
+        default: 70
+      run_backupapi_tests:
+        description: Run ChartHub.BackupApi.Tests suite
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet_version }}
+
+      - name: Restore
+        run: dotnet restore ChartHub.sln
+
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Fail on warning suppressions
+        run: |
+          if rg -n '#pragma warning disable|SuppressMessage' \
+            --glob '!ChartHub/obj/**' \
+            --glob '!ChartHub/bin/**' \
+            --glob '!ChartHub/Models/APIRootResponse.cs' \
+            ChartHub ChartHub.Tests; then
+            echo "Warning suppressions found. These require explicit review."
+            exit 1
+          fi
+
+      - name: Verify formatting
+        run: dotnet format ChartHub.sln --verify-no-changes --severity error --no-restore
+
+      - name: Build
+        run: dotnet build ChartHub.sln --configuration Release --no-restore
+
+      - name: Test ChartHub with coverage threshold
+        run: >-
+          dotnet test ChartHub.Tests/ChartHub.Tests.csproj
+          --configuration Release
+          --no-build
+          /p:CollectCoverage=true
+          /p:CoverletOutput=./TestResults/Coverage/
+          /p:CoverletOutputFormat=cobertura
+          /p:Threshold=${{ inputs.coverage_threshold }}
+          /p:ThresholdType=line
+          /p:ThresholdStat=total
+
+      - name: Test BackupApi
+        if: ${{ inputs.run_backupapi_tests }}
+        run: >-
+          dotnet test ChartHub.BackupApi.Tests/ChartHub.BackupApi.Tests.csproj
+          --configuration Release
+          --no-build
