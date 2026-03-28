@@ -44,6 +44,8 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private readonly TimeSpan _autoRefreshInterval;
     private readonly bool _isCompanionMode;
     private const int MaxSavedSyncConnections = 10;
+    private const int MaxDesktopSyncLogEntries = 200;
+    private static readonly TimeSpan DesktopPairCodeRefreshSafetyWindow = TimeSpan.FromMinutes(2);
 
     private string _desktopApiBaseUrl = "http://127.0.0.1:15123";
     private string _syncToken = string.Empty;
@@ -57,6 +59,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private string _generatedBootstrapPayload = string.Empty;
     private string _lastKnownDesktopLabel = string.Empty;
     private PendingQrPairingRequest? _pendingQrPairing;
+    private string _selectedPendingQrApiBaseUrl = string.Empty;
     private Bitmap? _bootstrapQrImage;
     private string? _bootstrapQrImageExportPath;
     private CancellationTokenSource? _autoRefreshCancellationTokenSource;
@@ -334,10 +337,35 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     public string PendingQrPairingSummary => _pendingQrPairing is null
         ? string.Empty
         : string.IsNullOrWhiteSpace(_pendingQrPairing.DesktopLabel)
-            ? _pendingQrPairing.ApiBaseUrl
-            : $"{_pendingQrPairing.DesktopLabel} ({_pendingQrPairing.ApiBaseUrl})";
+            ? SelectedPendingQrApiBaseUrl
+            : $"{_pendingQrPairing.DesktopLabel} ({SelectedPendingQrApiBaseUrl})";
 
     public bool HasPendingQrPairing => _pendingQrPairing is not null;
+    public IReadOnlyList<string> PendingQrPairingApiBaseUrls => _pendingQrPairing?.ApiBaseUrls ?? [];
+    public bool HasPendingQrPairingApiChoices => PendingQrPairingApiBaseUrls.Count > 0;
+
+    public string SelectedPendingQrApiBaseUrl
+    {
+        get => _selectedPendingQrApiBaseUrl;
+        set
+        {
+            if (string.Equals(_selectedPendingQrApiBaseUrl, value, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            string normalized = NormalizeApiBaseUrl(value);
+            if (string.IsNullOrWhiteSpace(normalized)
+                || !PendingQrPairingApiBaseUrls.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _selectedPendingQrApiBaseUrl = normalized;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(PendingQrPairingSummary));
+        }
+    }
 
     public Bitmap? BootstrapQrImage
     {
@@ -377,6 +405,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
     public ObservableCollection<IngestionQueueItem> QueueItems { get; } = [];
     public ObservableCollection<WatcherFile> LocalFiles { get; } = [];
+    public ObservableCollection<string> DesktopSyncLogEntries { get; } = [];
 
     public bool IsCompanionMode => _isCompanionMode;
     public bool IsDesktopMode => !_isCompanionMode;
@@ -389,6 +418,8 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     public bool ShowEmptyQueueState => IsConnected && !IsBusy && QueueItems.Count == 0;
     public bool IsAutoRefreshActive => IsConnected && _autoRefreshCancellationTokenSource is not null;
     public bool ShowDesktopBootstrapSection => IsDesktopMode;
+    public bool HasDesktopSyncLogEntries => DesktopSyncLogEntries.Count > 0;
+    public bool HasNoDesktopSyncLogEntries => !HasDesktopSyncLogEntries;
     public bool ShowCompanionScanSection => IsCompanionMode && !IsConnected;
     public bool ShowCompanionConfirmationSection => IsCompanionMode && !IsConnected && HasPendingQrPairing;
     public bool ShowCompanionQueueSection => IsCompanionMode && IsConnected;
@@ -498,6 +529,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         _lastKnownDesktopLabel = ResolveDesktopLabelFromSettings();
 
         string restoredApiBaseUrl = TryResolvePreferredApiBaseUrl(_appGlobalSettings.SyncApiSavedConnectionsJson) ?? _desktopApiBaseUrl;
+        if (!string.IsNullOrWhiteSpace(_appGlobalSettings.SyncApiPreferredBaseUrl))
+        {
+            restoredApiBaseUrl = NormalizeApiBaseUrl(_appGlobalSettings.SyncApiPreferredBaseUrl);
+        }
+
         if (!string.IsNullOrWhiteSpace(restoredApiBaseUrl))
         {
             _desktopApiBaseUrl = restoredApiBaseUrl;
@@ -512,7 +548,15 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
         QueueItems.CollectionChanged += OnQueueItemsCollectionChanged;
         LocalFiles.CollectionChanged += OnLocalFilesCollectionChanged;
+        DesktopSyncLogEntries.CollectionChanged += OnDesktopSyncLogCollectionChanged;
         _appGlobalSettings.PropertyChanged += OnAppGlobalSettingsPropertyChanged;
+        if (_ingestionSyncApiHost is not null)
+        {
+            _ingestionSyncApiHost.ActivityLogged += OnSyncApiActivityLogged;
+        }
+
+        EnsureDesktopPairCodeFreshForBootstrap();
+
         RegenerateBootstrapQrPayload();
 
         TestConnectionCommand = new AsyncRelayCommand(TestConnectionAsync, CanTestConnection);
@@ -527,6 +571,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         RetrySelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(RetrySelectedAsync, CanActOnSelectedItem);
         InstallSelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(InstallSelectedAsync, CanInstallSelectedItem);
         OpenFolderSelectedCommand = new AsyncRelayCommand<IngestionQueueItem?>(OpenFolderSelectedAsync, CanActOnSelectedItem);
+
+        if (IsDesktopMode)
+        {
+            AppendDesktopSyncLog("Desktop sync view ready.");
+        }
     }
 
     private bool CanTestConnection()
@@ -728,6 +777,50 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             : $"Desktop QR refreshed and exported to {BootstrapQrImageExportPath}.";
     }
 
+    private void EnsureDesktopPairCodeFreshForBootstrap()
+    {
+        if (!IsDesktopMode)
+        {
+            return;
+        }
+
+        DateTimeOffset nowUtc = DateTimeOffset.UtcNow;
+        if (!ShouldRefreshDesktopPairCode(nowUtc))
+        {
+            return;
+        }
+
+        string nextCode = _ingestionSyncApiHost?.RefreshPairCode() ?? AppGlobalSettings.GenerateSyncPairCode();
+        PairCode = nextCode;
+
+        if (_ingestionSyncApiHost is null)
+        {
+            _appGlobalSettings.SyncApiPairCode = nextCode;
+            _appGlobalSettings.SyncApiPairCodeIssuedAtUtc = nowUtc.ToString("O");
+        }
+
+        AppendDesktopSyncLog("Pair code refreshed for a full pairing window.");
+        StatusMessage = "Pair code auto-refreshed for a full pairing window.";
+    }
+
+    private bool ShouldRefreshDesktopPairCode(DateTimeOffset nowUtc)
+    {
+        string pairCode = _appGlobalSettings.SyncApiPairCode?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(pairCode))
+        {
+            return true;
+        }
+
+        if (!DateTimeOffset.TryParse(_appGlobalSettings.SyncApiPairCodeIssuedAtUtc, out DateTimeOffset issuedAtUtc))
+        {
+            return true;
+        }
+
+        int ttlMinutes = Math.Clamp(_appGlobalSettings.SyncApiPairCodeTtlMinutes, 1, 1440);
+        DateTimeOffset expiresAtUtc = issuedAtUtc.AddMinutes(ttlMinutes);
+        return nowUtc.Add(DesktopPairCodeRefreshSafetyWindow) >= expiresAtUtc;
+    }
+
     private async Task TestConnectionAsync()
     {
         await RunOperationAsync(async () =>
@@ -738,8 +831,16 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task PairWithQrAsync(PendingQrPairingRequest pairingRequest)
     {
+        string selectedBaseUrl = string.IsNullOrWhiteSpace(SelectedPendingQrApiBaseUrl)
+            ? pairingRequest.ApiBaseUrls.FirstOrDefault() ?? string.Empty
+            : SelectedPendingQrApiBaseUrl;
+        if (string.IsNullOrWhiteSpace(selectedBaseUrl))
+        {
+            throw new InvalidOperationException("Pairing payload did not include a usable desktop URL.");
+        }
+
         DesktopSyncPairClaimResponse claim = await _desktopSyncApiClient.ClaimPairTokenAsync(
-            pairingRequest.ApiBaseUrl,
+            selectedBaseUrl,
             pairingRequest.PairCode,
             DeviceLabel);
         if (!claim.Paired || string.IsNullOrWhiteSpace(claim.Token))
@@ -748,15 +849,13 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
 
         SyncToken = claim.Token;
-        DesktopApiBaseUrl = ShouldAdoptPairApiBaseUrl(pairingRequest.ApiBaseUrl, claim.ApiBaseUrl)
-            ? claim.ApiBaseUrl
-            : pairingRequest.ApiBaseUrl;
+        DesktopApiBaseUrl = ResolveBestClaimedApiBaseUrl(selectedBaseUrl, claim.ApiBaseUrls);
         _lastKnownDesktopLabel = string.IsNullOrWhiteSpace(pairingRequest.DesktopLabel)
             ? _lastKnownDesktopLabel
             : pairingRequest.DesktopLabel.Trim();
         OnPropertyChanged(nameof(ManualReconnectButtonLabel));
 
-        await ConnectAndRefreshAsync();
+        await ConnectAndRefreshAsync(claim.ApiBaseUrls);
         ClearPendingQrPairing();
     }
 
@@ -773,7 +872,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
 
         await RunOperationAsync(
-            ConnectAndRefreshAsync,
+            () => ConnectAndRefreshAsync(),
             "Companion auto-connect failed",
             disconnectOnFailure: false,
             failureStatusMessage: "Auto-connect failed. Use manual connect or scan desktop QR.");
@@ -782,13 +881,13 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private async Task ManualReconnectAsync()
     {
         await RunOperationAsync(
-            ConnectAndRefreshAsync,
+            () => ConnectAndRefreshAsync(),
             "Manual companion reconnect failed",
             disconnectOnFailure: false,
             failureStatusMessage: "Manual connect failed. Confirm LAN access or scan desktop QR.");
     }
 
-    private async Task ConnectAndRefreshAsync()
+    private async Task ConnectAndRefreshAsync(IReadOnlyList<string>? pairingApiBaseUrls = null)
     {
         DesktopSyncVersionResponse version = await _desktopSyncApiClient.GetVersionAsync(DesktopApiBaseUrl, SyncToken);
         if (!version.SupportsIngestions)
@@ -799,7 +898,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         IsConnected = true;
         _appGlobalSettings.SyncApiAuthToken = SyncToken;
         _appGlobalSettings.SyncApiDeviceLabel = DeviceLabel;
-        PersistSuccessfulConnection();
+        PersistSuccessfulConnection(pairingApiBaseUrls);
 
         StatusMessage = $"Connected to {version.Api} v{version.Version}.";
         ErrorMessage = null;
@@ -840,22 +939,25 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     {
         IReadOnlyList<IngestionQueueItem> items = await _desktopSyncApiClient.GetIngestionsAsync(DesktopApiBaseUrl, SyncToken, limit: 200);
 
-        QueueItems.Clear();
-        foreach (IngestionQueueItem item in items)
+        await RunOnUiThreadAsync(() =>
         {
-            QueueItems.Add(item);
-        }
+            QueueItems.Clear();
+            foreach (IngestionQueueItem item in items)
+            {
+                QueueItems.Add(item);
+            }
 
-        StatusMessage = QueueItems.Count == 0
-            ? "Connected. No ingestion items currently queued."
-            : $"Loaded {QueueItems.Count} ingestion item(s).";
-        ErrorMessage = null;
+            StatusMessage = QueueItems.Count == 0
+                ? "Connected. No ingestion items currently queued."
+                : $"Loaded {QueueItems.Count} ingestion item(s).";
+            ErrorMessage = null;
 
-        if (IsConnected)
-        {
-            _lastAutoRefreshUtc = DateTimeOffset.UtcNow;
-            OnPropertyChanged(nameof(AutoRefreshHint));
-        }
+            if (IsConnected)
+            {
+                _lastAutoRefreshUtc = DateTimeOffset.UtcNow;
+                OnPropertyChanged(nameof(AutoRefreshHint));
+            }
+        });
     }
 
     private async Task RefreshLocalFilesCoreAsync()
@@ -1151,27 +1253,32 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }, "Failed to request folder open", disconnectOnFailure: false, failureStatusMessage: "Open folder request failed.");
     }
 
-    private static bool ShouldAdoptPairApiBaseUrl(string currentBaseUrl, string? claimedBaseUrl)
+    private static string ResolveBestClaimedApiBaseUrl(string currentBaseUrl, IReadOnlyList<string>? claimedBaseUrls)
     {
-        if (string.IsNullOrWhiteSpace(claimedBaseUrl)
-            || !Uri.TryCreate(claimedBaseUrl.Trim(), UriKind.Absolute, out Uri? claimedUri))
+        if (claimedBaseUrls is null || claimedBaseUrls.Count == 0)
         {
-            return false;
+            return currentBaseUrl;
+        }
+
+        foreach (string claimedBaseUrl in claimedBaseUrls)
+        {
+            if (!Uri.TryCreate(claimedBaseUrl?.Trim(), UriKind.Absolute, out Uri? claimedUri))
+            {
+                continue;
+            }
+
+            if (!IsLoopbackHost(claimedUri))
+            {
+                return claimedUri.GetLeftPart(UriPartial.Authority);
+            }
         }
 
         if (!Uri.TryCreate(currentBaseUrl?.Trim(), UriKind.Absolute, out Uri? currentUri))
         {
-            return true;
+            return currentBaseUrl ?? string.Empty;
         }
 
-        bool claimedLoopback = IsLoopbackHost(claimedUri);
-        bool currentLoopback = IsLoopbackHost(currentUri);
-        if (claimedLoopback && !currentLoopback)
-        {
-            return false;
-        }
-
-        return true;
+        return currentUri.GetLeftPart(UriPartial.Authority);
     }
 
     private static bool IsLoopbackHost(Uri uri)
@@ -1218,15 +1325,15 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     private string BuildBootstrapPayload()
     {
         string pairCode = PairCode?.Trim() ?? string.Empty;
-        string resolvedApiBaseUrl = ResolveBootstrapApiBaseUrl();
+        IReadOnlyList<string> resolvedApiBaseUrls = ResolveBootstrapApiBaseUrls();
         if (string.IsNullOrWhiteSpace(pairCode)
-            || string.IsNullOrWhiteSpace(resolvedApiBaseUrl))
+            || resolvedApiBaseUrls.Count == 0)
         {
             return string.Empty;
         }
 
         var payload = new SyncBootstrapPayload(
-            ApiBaseUrl: resolvedApiBaseUrl,
+            ApiBaseUrls: resolvedApiBaseUrls,
             PairCode: pairCode,
             DeviceLabel: DefaultDesktopBootstrapLabel,
             Version: 1);
@@ -1240,24 +1347,31 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         return $"charthub-sync://bootstrap?d={encoded}";
     }
 
-    private string ResolveBootstrapApiBaseUrl()
+    private IReadOnlyList<string> ResolveBootstrapApiBaseUrls()
     {
+        List<string> candidates = [];
+
         if (Uri.TryCreate(DesktopApiBaseUrl?.Trim(), UriKind.Absolute, out Uri? baseUri)
             && IsLanReachableBootstrapUri(baseUri))
         {
-            return baseUri.GetLeftPart(UriPartial.Authority);
+            candidates.Add(baseUri.GetLeftPart(UriPartial.Authority));
         }
 
-        string resolvedFromHostSettings = SyncApiAddressResolver.ResolveAdvertisedApiBaseUrl(
+        IReadOnlyList<string> resolvedFromHostSettings = SyncApiAddressResolver.ResolveAdvertisedApiBaseUrls(
             DefaultHostListenPrefix,
             string.Empty);
-        if (Uri.TryCreate(resolvedFromHostSettings, UriKind.Absolute, out Uri? resolvedUri)
-            && IsLanReachableBootstrapUri(resolvedUri))
+        foreach (string resolvedCandidate in resolvedFromHostSettings)
         {
-            return resolvedUri.GetLeftPart(UriPartial.Authority);
+            if (Uri.TryCreate(resolvedCandidate, UriKind.Absolute, out Uri? resolvedUri)
+                && IsLanReachableBootstrapUri(resolvedUri))
+            {
+                candidates.Add(resolvedUri.GetLeftPart(UriPartial.Authority));
+            }
         }
 
-        return string.Empty;
+        return candidates
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static bool TryParseBootstrapPayload(string payloadText, out SyncBootstrapPayload? payload)
@@ -1318,22 +1432,36 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     {
         try
         {
-            SyncBootstrapPayload? payload = JsonSerializer.Deserialize<SyncBootstrapPayload>(json, SyncJsonOptions);
-            if (payload is null
-                || string.IsNullOrWhiteSpace(payload.ApiBaseUrl)
-                || string.IsNullOrWhiteSpace(payload.PairCode)
-                || !Uri.TryCreate(payload.ApiBaseUrl.Trim(), UriKind.Absolute, out Uri? parsed)
-                || !IsLanReachableBootstrapUri(parsed))
+            SyncBootstrapPayloadEnvelope? payload = JsonSerializer.Deserialize<SyncBootstrapPayloadEnvelope>(json, SyncJsonOptions);
+            if (payload is null || string.IsNullOrWhiteSpace(payload.PairCode))
             {
                 return null;
             }
 
-            return payload with
+            List<string> normalizedApiBaseUrls = [];
+            foreach (string apiBaseUrl in payload.ApiBaseUrls ?? [])
             {
-                ApiBaseUrl = parsed.GetLeftPart(UriPartial.Authority),
-                PairCode = payload.PairCode.Trim(),
-                DeviceLabel = payload.DeviceLabel?.Trim() ?? string.Empty,
-            };
+                if (!Uri.TryCreate(apiBaseUrl?.Trim(), UriKind.Absolute, out Uri? parsed)
+                    || !IsLanReachableBootstrapUri(parsed))
+                {
+                    continue;
+                }
+
+                normalizedApiBaseUrls.Add(parsed.GetLeftPart(UriPartial.Authority));
+            }
+
+            if (normalizedApiBaseUrls.Count == 0)
+            {
+                return null;
+            }
+
+            return new SyncBootstrapPayload(
+                ApiBaseUrls: normalizedApiBaseUrls
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                PairCode: payload.PairCode.Trim(),
+                DeviceLabel: payload.DeviceLabel?.Trim() ?? string.Empty,
+                Version: payload.Version);
         }
         catch
         {
@@ -1371,8 +1499,17 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 
     private void SetPendingQrPairing(SyncBootstrapPayload payload)
     {
-        _pendingQrPairing = new PendingQrPairingRequest(payload.ApiBaseUrl, payload.PairCode, payload.DeviceLabel);
+        _pendingQrPairing = new PendingQrPairingRequest(
+            payload.ApiBaseUrls
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            payload.PairCode,
+            payload.DeviceLabel);
+        _selectedPendingQrApiBaseUrl = _pendingQrPairing.ApiBaseUrls.FirstOrDefault() ?? string.Empty;
         OnPropertyChanged(nameof(HasPendingQrPairing));
+        OnPropertyChanged(nameof(PendingQrPairingApiBaseUrls));
+        OnPropertyChanged(nameof(HasPendingQrPairingApiChoices));
+        OnPropertyChanged(nameof(SelectedPendingQrApiBaseUrl));
         OnPropertyChanged(nameof(PendingQrPairingSummary));
         OnPropertyChanged(nameof(ShowCompanionConfirmationSection));
         OnPropertyChanged(nameof(ShowCompanionScanSection));
@@ -1388,7 +1525,11 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
 
         _pendingQrPairing = null;
+        _selectedPendingQrApiBaseUrl = string.Empty;
         OnPropertyChanged(nameof(HasPendingQrPairing));
+        OnPropertyChanged(nameof(PendingQrPairingApiBaseUrls));
+        OnPropertyChanged(nameof(HasPendingQrPairingApiChoices));
+        OnPropertyChanged(nameof(SelectedPendingQrApiBaseUrl));
         OnPropertyChanged(nameof(PendingQrPairingSummary));
         OnPropertyChanged(nameof(ShowCompanionConfirmationSection));
         OnPropertyChanged(nameof(ShowCompanionScanSection));
@@ -1407,7 +1548,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        IsBusy = true;
+        await RunOnUiThreadAsync(() => IsBusy = true);
         try
         {
             await operation();
@@ -1416,10 +1557,13 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         {
             if (disconnectOnFailure)
             {
-                IsConnected = false;
-                QueueItems.Clear();
-                _lastAutoRefreshUtc = null;
-                OnPropertyChanged(nameof(AutoRefreshHint));
+                await RunOnUiThreadAsync(() =>
+                {
+                    IsConnected = false;
+                    QueueItems.Clear();
+                    _lastAutoRefreshUtc = null;
+                    OnPropertyChanged(nameof(AutoRefreshHint));
+                });
             }
 
             ErrorMessage = ex.Message;
@@ -1447,7 +1591,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
         finally
         {
-            IsBusy = false;
+            await RunOnUiThreadAsync(() => IsBusy = false);
         }
     }
 
@@ -1455,6 +1599,26 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
     {
         string message = ex.Message.ToLowerInvariant();
 
+        // Typed exception classification (primary path — no text parsing required)
+        if (ex is DesktopSyncApiException apiException)
+        {
+            return apiException.ErrorCode switch
+            {
+                DesktopSyncErrorCode.PairingExpired =>
+                    (ErrorCategory.PairingExpired, "Pair code expired. Scan a fresh desktop QR and confirm pairing again."),
+                DesktopSyncErrorCode.InvalidPairingCode =>
+                    (ErrorCategory.AuthenticationFailed, "Pairing code invalid or expired. Regenerate or re-pair with desktop."),
+                DesktopSyncErrorCode.PairingNotConfigured =>
+                    (ErrorCategory.AuthenticationFailed, "Pairing not yet configured on desktop. Scan desktop QR to initiate pairing."),
+                DesktopSyncErrorCode.BadRequest =>
+                    (ErrorCategory.UnsupportedVersion, "Invalid request or unsupported operation. Verify desktop is compatible."),
+                DesktopSyncErrorCode.InternalServerError =>
+                    (ErrorCategory.UnknownError, "Desktop server error. Restart desktop host and retry."),
+                _ => (ErrorCategory.UnknownError, "Check error message above and retry."),
+            };
+        }
+
+        // Fallback classification for non-API exceptions (network, timeout, etc.)
         if (ex is OperationCanceledException || message.Contains("canceled") || message.Contains("cancelled"))
         {
             return (ErrorCategory.NetworkUnreachable, "The desktop request timed out or was canceled. Retry and keep the companion paired.");
@@ -1465,16 +1629,6 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
             || message.Contains("connection failure") || message.Contains("failed to connect"))
         {
             return (ErrorCategory.NetworkUnreachable, "Verify desktop URL (e.g., http://192.168.1.10:15123) is correct and reachable.");
-        }
-
-        if (message.Contains("unauthorized") || message.Contains("invalid token") || message.Contains("authentication"))
-        {
-            return (ErrorCategory.AuthenticationFailed, "Regenerate token in Settings or re-pair with desktop.");
-        }
-
-        if (message.Contains("does not support") || message.Contains("ingestion") || ex is InvalidOperationException)
-        {
-            return (ErrorCategory.UnsupportedVersion, "Upgrade desktop host or check compatibility.");
         }
 
         return (ErrorCategory.UnknownError, "Check error message above and retry.");
@@ -1509,6 +1663,14 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         {
             PairCode = _appGlobalSettings.SyncApiPairCode;
         }
+        else if (e.PropertyName == nameof(AppGlobalSettings.SyncApiPreferredBaseUrl))
+        {
+            string preferredBaseUrl = NormalizeApiBaseUrl(_appGlobalSettings.SyncApiPreferredBaseUrl);
+            if (!string.IsNullOrWhiteSpace(preferredBaseUrl))
+            {
+                DesktopApiBaseUrl = preferredBaseUrl;
+            }
+        }
         else if (e.PropertyName == nameof(AppGlobalSettings.SyncApiDeviceLabel))
         {
             DeviceLabel = _appGlobalSettings.SyncApiDeviceLabel;
@@ -1535,7 +1697,7 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    private void PersistSuccessfulConnection()
+    private void PersistSuccessfulConnection(IReadOnlyList<string>? pairingApiBaseUrls = null)
     {
         string normalizedBaseUrl = NormalizeApiBaseUrl(DesktopApiBaseUrl);
         if (string.IsNullOrWhiteSpace(normalizedBaseUrl))
@@ -1547,13 +1709,33 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         string nowUtc = DateTimeOffset.UtcNow.ToString("O");
 
         List<SavedSyncConnection> savedConnections = ParseSavedConnections(_appGlobalSettings.SyncApiSavedConnectionsJson);
-        savedConnections.RemoveAll(entry => string.Equals(entry.ApiBaseUrl, normalizedBaseUrl, StringComparison.OrdinalIgnoreCase));
-        savedConnections.Insert(0, new SavedSyncConnection
+
+        List<string> candidateBaseUrls = [normalizedBaseUrl];
+        foreach (string? candidate in pairingApiBaseUrls ?? [])
         {
-            ApiBaseUrl = normalizedBaseUrl,
-            DesktopLabel = desktopLabel,
-            LastConnectedAtUtc = nowUtc,
-        });
+            string normalizedCandidate = NormalizeApiBaseUrl(candidate);
+            if (string.IsNullOrWhiteSpace(normalizedCandidate)
+                || !IsEndpointSaneForCompanion(normalizedCandidate)
+                || candidateBaseUrls.Contains(normalizedCandidate, StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            candidateBaseUrls.Add(normalizedCandidate);
+        }
+
+        savedConnections.RemoveAll(entry =>
+            candidateBaseUrls.Contains(entry.ApiBaseUrl, StringComparer.OrdinalIgnoreCase));
+
+        for (int index = candidateBaseUrls.Count - 1; index >= 0; index--)
+        {
+            savedConnections.Insert(0, new SavedSyncConnection
+            {
+                ApiBaseUrl = candidateBaseUrls[index],
+                DesktopLabel = desktopLabel,
+                LastConnectedAtUtc = nowUtc,
+            });
+        }
 
         while (savedConnections.Count > MaxSavedSyncConnections)
         {
@@ -1561,11 +1743,23 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         }
 
         _appGlobalSettings.SyncApiSavedConnectionsJson = JsonSerializer.Serialize(savedConnections);
+        _appGlobalSettings.SyncApiPreferredBaseUrl = normalizedBaseUrl;
         _appGlobalSettings.SyncApiLastPairedDeviceLabel = desktopLabel;
         _appGlobalSettings.SyncApiLastPairedAtUtc = nowUtc;
 
         _lastKnownDesktopLabel = desktopLabel;
         OnPropertyChanged(nameof(ManualReconnectButtonLabel));
+    }
+
+    private static async Task RunOnUiThreadAsync(Action action)
+    {
+        if (AvaloniaApp.Current is null || Dispatcher.UIThread.CheckAccess())
+        {
+            action();
+            return;
+        }
+
+        await Dispatcher.UIThread.InvokeAsync(action, DispatcherPriority.Background);
     }
 
     private string ResolveDesktopLabelFromSettings()
@@ -1673,11 +1867,65 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
         return uri.Host;
     }
 
+    private void OnDesktopSyncLogCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(HasDesktopSyncLogEntries));
+        OnPropertyChanged(nameof(HasNoDesktopSyncLogEntries));
+    }
+
+    private void OnSyncApiActivityLogged(string message)
+    {
+        if (!IsDesktopMode)
+        {
+            return;
+        }
+
+        AppendDesktopSyncLog(message);
+    }
+
+    private void AppendDesktopSyncLog(string message)
+    {
+        string entry = $"[{DateTimeOffset.UtcNow.ToLocalTime():HH:mm:ss}] {message}";
+
+        if (AvaloniaApp.Current is null)
+        {
+            DesktopSyncLogEntries.Add(entry);
+            TrimDesktopSyncLogs();
+            return;
+        }
+
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            DesktopSyncLogEntries.Add(entry);
+            TrimDesktopSyncLogs();
+            return;
+        }
+
+        _ = Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            DesktopSyncLogEntries.Add(entry);
+            TrimDesktopSyncLogs();
+        }, DispatcherPriority.Background);
+    }
+
+    private void TrimDesktopSyncLogs()
+    {
+        while (DesktopSyncLogEntries.Count > MaxDesktopSyncLogEntries)
+        {
+            DesktopSyncLogEntries.RemoveAt(0);
+        }
+    }
+
     public void Dispose()
     {
         QueueItems.CollectionChanged -= OnQueueItemsCollectionChanged;
         LocalFiles.CollectionChanged -= OnLocalFilesCollectionChanged;
+        DesktopSyncLogEntries.CollectionChanged -= OnDesktopSyncLogCollectionChanged;
         _appGlobalSettings.PropertyChanged -= OnAppGlobalSettingsPropertyChanged;
+        if (_ingestionSyncApiHost is not null)
+        {
+            _ingestionSyncApiHost.ActivityLogged -= OnSyncApiActivityLogged;
+        }
 
         foreach (WatcherFile file in LocalFiles)
         {
@@ -1728,15 +1976,30 @@ public sealed class SyncViewModel : INotifyPropertyChanged, IDisposable
 }
 
 public sealed record SyncBootstrapPayload(
-    string ApiBaseUrl,
+    IReadOnlyList<string> ApiBaseUrls,
     string PairCode,
     string DeviceLabel,
     int Version);
 
 internal sealed record PendingQrPairingRequest(
-    string ApiBaseUrl,
+    IReadOnlyList<string> ApiBaseUrls,
     string PairCode,
     string DesktopLabel);
+
+internal sealed class SyncBootstrapPayloadEnvelope
+{
+    [JsonPropertyName("apiBaseUrls")]
+    public List<string> ApiBaseUrls { get; set; } = [];
+
+    [JsonPropertyName("pairCode")]
+    public string PairCode { get; set; } = string.Empty;
+
+    [JsonPropertyName("deviceLabel")]
+    public string DeviceLabel { get; set; } = string.Empty;
+
+    [JsonPropertyName("version")]
+    public int Version { get; set; } = 1;
+}
 
 internal sealed class SavedSyncConnection
 {

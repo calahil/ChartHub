@@ -66,6 +66,36 @@ public class AppGlobalSettingsTests
     }
 
     [Fact]
+    public async Task Constructor_WhenPairCodeExpired_UpdatesVisibleStateImmediately_WhenPersistenceDelayed()
+    {
+        using var temp = new TemporaryDirectoryFixture("app-global-settings-expired-pair-code-delayed");
+
+        string expiredCode = "111111";
+        DateTimeOffset expiredIssuedAt = DateTimeOffset.UtcNow.AddHours(-2);
+        AppConfigRoot config = CreateConfig(temp.RootPath);
+        config.Runtime.SyncApiPairCode = expiredCode;
+        config.Runtime.SyncApiPairCodeIssuedAtUtc = expiredIssuedAt.ToString("O");
+        config.Runtime.SyncApiPairCodeTtlMinutes = 10;
+
+        var orchestrator = new BlockingSettingsOrchestrator(config);
+        using var settings = new AppGlobalSettings(orchestrator);
+
+        Assert.NotEqual(expiredCode, settings.SyncApiPairCode);
+        Assert.Equal(6, settings.SyncApiPairCode.Length);
+        Assert.True(DateTimeOffset.TryParse(settings.SyncApiPairCodeIssuedAtUtc, out DateTimeOffset refreshedIssuedAt));
+        Assert.True(refreshedIssuedAt >= DateTimeOffset.UtcNow.AddMinutes(-1));
+
+        orchestrator.ReleasePendingUpdate();
+
+        bool persisted = await WaitForConditionAsync(
+            () => orchestrator.UpdateCount > 0
+                && orchestrator.Current.Runtime.SyncApiPairCode == settings.SyncApiPairCode
+                && orchestrator.Current.Runtime.SyncApiPairCodeIssuedAtUtc == settings.SyncApiPairCodeIssuedAtUtc,
+            TimeSpan.FromSeconds(2));
+        Assert.True(persisted);
+    }
+
+    [Fact]
     public async Task Constructor_WhenPairCodeStillValid_PreservesCodeAndIssuedAt()
     {
         using var temp = new TemporaryDirectoryFixture("app-global-settings-valid-pair-code");

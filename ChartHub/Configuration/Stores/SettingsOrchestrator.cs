@@ -98,6 +98,7 @@ public sealed class SettingsOrchestrator : ISettingsOrchestrator, IDisposable
                 SyncApiLastPairedAtUtc = source.Runtime.SyncApiLastPairedAtUtc,
                 SyncApiPairingHistoryJson = source.Runtime.SyncApiPairingHistoryJson,
                 SyncApiSavedConnectionsJson = source.Runtime.SyncApiSavedConnectionsJson,
+                SyncApiPreferredBaseUrl = source.Runtime.SyncApiPreferredBaseUrl,
                 AllowSyncApiStateOverride = source.Runtime.AllowSyncApiStateOverride,
                 SyncApiMaxRequestBodyBytes = source.Runtime.SyncApiMaxRequestBodyBytes,
                 SyncApiBodyReadTimeoutMs = source.Runtime.SyncApiBodyReadTimeoutMs,

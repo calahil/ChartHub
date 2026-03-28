@@ -13,6 +13,7 @@ namespace ChartHub.Services;
 
 public interface IIngestionSyncApiHost
 {
+    event Action<string>? ActivityLogged;
     Task StartAsync(CancellationToken cancellationToken = default);
     string RefreshPairCode();
 }
@@ -45,6 +46,8 @@ public sealed class IngestionSyncApiHost(
     private bool _started;
     private string _activeListenerPrefix = DefaultListenPrefix;
     private string _activeApiBaseUrl = DefaultListenPrefix.TrimEnd('/');
+
+    public event Action<string>? ActivityLogged;
 
     private const string DefaultListenPrefix = "http://0.0.0.0:15123/";
     private const string SyncTokenHeader = "X-ChartHub-Sync-Token";
@@ -82,6 +85,7 @@ public sealed class IngestionSyncApiHost(
             ["apiBaseUrl"] = _activeApiBaseUrl,
             ["authTokenConfigured"] = !string.IsNullOrWhiteSpace(_globalSettings.SyncApiAuthToken),
         });
+        EmitActivity($"Sync API started on {_activeListenerPrefix}");
 
         _listenLoopTask = Task.Run(() => ListenLoopAsync(_cts.Token), CancellationToken.None);
         return Task.CompletedTask;
@@ -202,7 +206,7 @@ public sealed class IngestionSyncApiHost(
                 {
                     paired = true,
                     token = _globalSettings.SyncApiAuthToken,
-                    apiBaseUrl = ResolveRequestApiBaseUrl(request),
+                    apiBaseUrls = ResolveRequestApiBaseUrls(request),
                     pairedAtUtc,
                 });
                 return;
@@ -1335,6 +1339,26 @@ public sealed class IngestionSyncApiHost(
         return DefaultListenPrefix.TrimEnd('/');
     }
 
+    private IReadOnlyList<string> ResolveRequestApiBaseUrls(HttpListenerRequest request)
+    {
+        var candidates = SyncApiAddressResolver
+            .ResolveAdvertisedApiBaseUrls(_activeListenerPrefix, string.Empty)
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            string fallback = ResolveRequestApiBaseUrl(request);
+            if (!string.IsNullOrWhiteSpace(fallback))
+            {
+                candidates.Add(fallback);
+            }
+        }
+
+        return candidates
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private void SyncPairCodeStateFromSettings()
     {
         string configuredPairCode = _globalSettings.SyncApiPairCode.Trim();
@@ -1367,7 +1391,7 @@ public sealed class IngestionSyncApiHost(
 
             int ttlMinutes = Math.Clamp(_globalSettings.SyncApiPairCodeTtlMinutes, 1, 1440);
             DateTimeOffset expiresAt = _currentPairCodeIssuedAtUtc.AddMinutes(ttlMinutes);
-            return DateTimeOffset.UtcNow > expiresAt;
+            return DateTimeOffset.UtcNow >= expiresAt;
         }
     }
 
@@ -1527,10 +1551,17 @@ public sealed class IngestionSyncApiHost(
         {
             Interlocked.Increment(ref _slowRequestsTotal);
             Logger.LogWarning("SyncApi", "Sync API request completed slowly", context);
+            EmitActivity($"{request.HttpMethod} {request.Url?.AbsolutePath} -> {response.StatusCode} ({(long)elapsed.TotalMilliseconds} ms, slow)");
             return;
         }
 
         Logger.LogInfo("SyncApi", "Sync API request completed", context);
+        EmitActivity($"{request.HttpMethod} {request.Url?.AbsolutePath} -> {response.StatusCode} ({(long)elapsed.TotalMilliseconds} ms)");
+    }
+
+    private void EmitActivity(string message)
+    {
+        ActivityLogged?.Invoke(message);
     }
 
     public async ValueTask DisposeAsync()
@@ -1555,6 +1586,7 @@ public sealed class IngestionSyncApiHost(
             {
                 ["prefix"] = _activeListenerPrefix,
             });
+            EmitActivity("Sync API stopped.");
         }
 
         _mutationGate.Dispose();

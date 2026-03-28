@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using Avalonia.Threading;
 
@@ -247,10 +248,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private string _pairCodeExpiryDisplay = "Unknown";
     private string _lastPairedDeviceDisplay = "Never paired";
     private string _lastPairedAtDisplay = "-";
+    private string _selectedSyncEndpoint = string.Empty;
 
     public ObservableCollection<SettingsFieldViewModel> Fields { get; } = [];
     public ObservableCollection<SecretFieldViewModel> Secrets { get; } = [];
     public ObservableCollection<SyncPairingHistoryEntryViewModel> PairingHistoryEntries { get; } = [];
+    public ObservableCollection<string> SyncEndpointOptions { get; } = [];
 
     public AsyncRelayCommand SaveCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> SaveSecretCommand { get; }
@@ -259,6 +262,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public IAsyncRelayCommand UnlinkCloudAccountCommand { get; }
     public IRelayCommand DismissCloudAuthGateCommand { get; }
     public IAsyncRelayCommand RegeneratePairCodeCommand { get; }
+    public IAsyncRelayCommand ApplySyncEndpointCommand { get; }
     public string SecretStorageBackend { get; }
     public string CloudProviderId => _cloudAccountService.ProviderId;
     public string CloudProviderDisplayName => _cloudAccountService.ProviderDisplayName;
@@ -439,6 +443,24 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     public bool HasNoPairingHistory => PairingHistoryEntries.Count == 0;
 
+    public bool HasSyncEndpointOptions => SyncEndpointOptions.Count > 0;
+
+    public string SelectedSyncEndpoint
+    {
+        get => _selectedSyncEndpoint;
+        set
+        {
+            if (_selectedSyncEndpoint == value)
+            {
+                return;
+            }
+
+            _selectedSyncEndpoint = value;
+            OnPropertyChanged();
+            ApplySyncEndpointCommand.NotifyCanExecuteChanged();
+        }
+    }
+
     public string StatusMessage
     {
         get => _statusMessage;
@@ -507,6 +529,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         UnlinkCloudAccountCommand = new AsyncRelayCommand(UnlinkCloudAccountAsync, CanUnlinkCloudAccount);
         DismissCloudAuthGateCommand = new RelayCommand(DismissCloudAuthGate, CanDismissCloudAuthGate);
         RegeneratePairCodeCommand = new AsyncRelayCommand(RegeneratePairCodeAsync, CanRegeneratePairCode);
+        ApplySyncEndpointCommand = new AsyncRelayCommand(ApplySyncEndpointAsync, CanApplySyncEndpoint);
         SecretStorageBackend = ResolveSecretStorageBackend(secretStore);
         CloudAccountStatusMessage = $"{CloudProviderDisplayName} is not linked.";
 
@@ -531,6 +554,18 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private bool CanDismissCloudAuthGate() => IsCloudAuthGateVisible;
 
     private bool CanRegeneratePairCode() => !_isSaving;
+
+    private bool CanApplySyncEndpoint()
+    {
+        string selected = NormalizeApiBaseUrl(SelectedSyncEndpoint);
+        if (string.IsNullOrWhiteSpace(selected))
+        {
+            return false;
+        }
+
+        string current = NormalizeApiBaseUrl(_settings.Current.Runtime.SyncApiPreferredBaseUrl);
+        return !string.Equals(selected, current, StringComparison.OrdinalIgnoreCase);
+    }
 
     private async Task RefreshCloudAccountStateAsync(CancellationToken cancellationToken = default)
     {
@@ -717,6 +752,32 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
 
         RefreshPairingHistory(config.Runtime.SyncApiPairingHistoryJson);
+        RefreshSyncEndpointOptions(config.Runtime.SyncApiSavedConnectionsJson, config.Runtime.SyncApiPreferredBaseUrl);
+    }
+
+    private void RefreshSyncEndpointOptions(string savedConnectionsJson, string preferredBaseUrl)
+    {
+        List<string> endpoints = ParseSavedSyncEndpoints(savedConnectionsJson);
+        string normalizedPreferred = NormalizeApiBaseUrl(preferredBaseUrl);
+        if (!string.IsNullOrWhiteSpace(normalizedPreferred)
+            && !endpoints.Contains(normalizedPreferred, StringComparer.OrdinalIgnoreCase))
+        {
+            endpoints.Insert(0, normalizedPreferred);
+        }
+
+        SyncEndpointOptions.Clear();
+        foreach (string endpoint in endpoints)
+        {
+            SyncEndpointOptions.Add(endpoint);
+        }
+
+        string nextSelected = !string.IsNullOrWhiteSpace(normalizedPreferred)
+            ? normalizedPreferred
+            : SyncEndpointOptions.FirstOrDefault() ?? string.Empty;
+        SelectedSyncEndpoint = nextSelected;
+
+        OnPropertyChanged(nameof(HasSyncEndpointOptions));
+        ApplySyncEndpointCommand.NotifyCanExecuteChanged();
     }
 
     private void RefreshPairingHistory(string pairingHistoryJson)
@@ -1111,6 +1172,30 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         StatusMessage = "Pair code regenerated.";
     }
 
+    private async Task ApplySyncEndpointAsync()
+    {
+        if (!CanApplySyncEndpoint())
+        {
+            return;
+        }
+
+        string selected = NormalizeApiBaseUrl(SelectedSyncEndpoint);
+        if (string.IsNullOrWhiteSpace(selected))
+        {
+            return;
+        }
+
+        ConfigValidationResult result = await _settings.UpdateAsync(config =>
+        {
+            config.Runtime.SyncApiPreferredBaseUrl = selected;
+        });
+
+        StatusMessage = result.IsValid
+            ? "Preferred sync endpoint updated."
+            : "Failed to update preferred sync endpoint.";
+        ApplySyncEndpointCommand.NotifyCanExecuteChanged();
+    }
+
     private bool CanSave()
     {
         return !_isSaving && !HasValidationErrors;
@@ -1198,6 +1283,50 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
 
         return null;
+    }
+
+    private static List<string> ParseSavedSyncEndpoints(string savedConnectionsJson)
+    {
+        if (string.IsNullOrWhiteSpace(savedConnectionsJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            List<SavedSyncEndpointPayload> entries = JsonSerializer.Deserialize<List<SavedSyncEndpointPayload>>(savedConnectionsJson, PairingHistoryJsonOptions) ?? [];
+            return entries
+                .Select(entry => NormalizeApiBaseUrl(entry.ApiBaseUrl))
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+        catch (JsonException ex)
+        {
+            Logger.LogWarning("Config", "Failed to parse saved sync endpoints JSON", new Dictionary<string, object?>
+            {
+                ["error"] = ex.Message,
+                ["jsonPreview"] = savedConnectionsJson.Length <= 256
+                    ? savedConnectionsJson
+                    : savedConnectionsJson[..256],
+            });
+            return [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static string NormalizeApiBaseUrl(string? value)
+    {
+        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri)
+            || string.IsNullOrWhiteSpace(uri.Host))
+        {
+            return string.Empty;
+        }
+
+        return uri.GetLeftPart(UriPartial.Authority);
     }
 
     private static string? ValidateDirectoryPath(string path)
@@ -1373,4 +1502,10 @@ internal sealed class PairingHistoryEntryPayload
 {
     public string DeviceLabel { get; set; } = string.Empty;
     public string PairedAtUtc { get; set; } = string.Empty;
+}
+
+internal sealed class SavedSyncEndpointPayload
+{
+    [JsonPropertyName("apiBaseUrl")]
+    public string ApiBaseUrl { get; set; } = string.Empty;
 }

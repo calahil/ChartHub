@@ -57,6 +57,7 @@ public sealed class ConnectionDiagnostics
         {
             ErrorCategory.NetworkUnreachable => $"✗ Desktop host unreachable. {RemediationHint}",
             ErrorCategory.AuthenticationFailed => $"✗ Invalid token or authentication failed. {RemediationHint}",
+            ErrorCategory.PairingExpired => $"✗ Pairing code expired. {RemediationHint}",
             ErrorCategory.UnsupportedVersion => $"✗ Server does not support ingestion sync. {RemediationHint}",
             ErrorCategory.UnknownError => $"✗ Connection failed: {LastErrorMessage}",
             _ => "⚠ No connection attempted yet."
@@ -81,6 +82,11 @@ public enum ErrorCategory
     /// Token/credentials invalid or expired.
     /// </summary>
     AuthenticationFailed,
+
+    /// <summary>
+    /// Pair code expired before companion claim completed.
+    /// </summary>
+    PairingExpired,
 
     /// <summary>
     /// Server is reachable but doesn't support required features.

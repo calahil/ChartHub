@@ -316,6 +316,34 @@ public class SettingsViewModelTests
         Assert.Empty(sut.PairingHistoryEntries);
     }
 
+    [Fact]
+    public async Task ApplySyncEndpointCommand_PersistsPreferredEndpoint()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-preferred-sync-endpoint");
+        AppConfigRoot config = CreateConfig(temp.RootPath);
+        config.Runtime.SyncApiSavedConnectionsJson =
+            "[{\"apiBaseUrl\":\"http://192.168.1.44:15123\"},{\"apiBaseUrl\":\"http://192.168.1.55:15123\"}]";
+
+        var orchestrator = new FakeSettingsOrchestrator(config);
+        var secrets = new InMemorySecretStore();
+        var cloudAccount = new FakeCloudStorageAccountService();
+
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        await Task.Yield();
+
+        Assert.True(sut.HasSyncEndpointOptions);
+        Assert.Equal(2, sut.SyncEndpointOptions.Count);
+        Assert.Contains("http://192.168.1.44:15123", sut.SyncEndpointOptions);
+        Assert.Contains("http://192.168.1.55:15123", sut.SyncEndpointOptions);
+        Assert.Equal("http://192.168.1.44:15123", sut.SelectedSyncEndpoint);
+
+        sut.SelectedSyncEndpoint = "http://192.168.1.55:15123";
+        await sut.ApplySyncEndpointCommand.ExecuteAsync(null);
+
+        Assert.Equal("http://192.168.1.55:15123", orchestrator.Current.Runtime.SyncApiPreferredBaseUrl);
+        Assert.Equal("Preferred sync endpoint updated.", sut.StatusMessage);
+    }
+
     private static AppConfigRoot CreateConfig(string rootPath)
     {
         string tempDirectory = Path.Combine(rootPath, "Temp");

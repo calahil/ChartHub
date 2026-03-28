@@ -8,32 +8,46 @@ public static class SyncApiAddressResolver
 {
     private const string DefaultListenPrefix = "http://127.0.0.1:15123/";
 
-    public static string ResolveAdvertisedApiBaseUrl(string? listenPrefix, string? advertisedBaseUrl)
+    public static IReadOnlyList<string> ResolveAdvertisedApiBaseUrls(string? listenPrefix, string? advertisedBaseUrl)
     {
         string normalizedAdvertisedBaseUrl = NormalizeAdvertisedBaseUrl(advertisedBaseUrl);
         if (Uri.TryCreate(normalizedAdvertisedBaseUrl, UriKind.Absolute, out Uri? advertisedUri)
             && !string.IsNullOrWhiteSpace(advertisedUri.Host))
         {
-            return advertisedUri.GetLeftPart(UriPartial.Authority);
+            return [advertisedUri.GetLeftPart(UriPartial.Authority)];
         }
 
         if (!Uri.TryCreate(listenPrefix, UriKind.Absolute, out Uri? parsedListener)
             || string.IsNullOrWhiteSpace(parsedListener.Host))
         {
-            return DefaultListenPrefix.TrimEnd('/');
+            return [DefaultListenPrefix.TrimEnd('/')];
         }
 
         if (!IsWildcardHost(parsedListener.Host))
         {
-            return parsedListener.GetLeftPart(UriPartial.Authority);
+            return [parsedListener.GetLeftPart(UriPartial.Authority)];
         }
 
-        if (TryResolveLanApiBaseUrl(parsedListener, out string? lanApiBaseUrl))
+        var candidates = GetLanCandidateAddresses()
+            .OrderBy(address => GetLanAddressPreference(address))
+            .ThenBy(address => address.ToString(), StringComparer.Ordinal)
+            .Select(address => new UriBuilder(parsedListener.Scheme, address.ToString(), parsedListener.Port)
+                .Uri
+                .GetLeftPart(UriPartial.Authority))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (candidates.Count == 0)
         {
-            return lanApiBaseUrl;
+            return [DefaultListenPrefix.TrimEnd('/')];
         }
 
-        return DefaultListenPrefix.TrimEnd('/');
+        return candidates;
+    }
+
+    public static string ResolveAdvertisedApiBaseUrl(string? listenPrefix, string? advertisedBaseUrl)
+    {
+        return ResolveAdvertisedApiBaseUrls(listenPrefix, advertisedBaseUrl).First();
     }
 
     private static string NormalizeAdvertisedBaseUrl(string? value)
@@ -53,23 +67,6 @@ public static class SyncApiAddressResolver
         return candidate.EndsWith("/", StringComparison.Ordinal)
             ? candidate[..^1]
             : candidate;
-    }
-
-    private static bool TryResolveLanApiBaseUrl(Uri listenerUri, out string lanApiBaseUrl)
-    {
-        IPAddress? selectedAddress = GetLanCandidateAddresses()
-            .OrderBy(address => GetLanAddressPreference(address))
-            .ThenBy(address => address.ToString(), StringComparer.Ordinal)
-            .FirstOrDefault();
-        if (selectedAddress is null)
-        {
-            lanApiBaseUrl = string.Empty;
-            return false;
-        }
-
-        UriBuilder builder = new(listenerUri.Scheme, selectedAddress.ToString(), listenerUri.Port);
-        lanApiBaseUrl = builder.Uri.GetLeftPart(UriPartial.Authority);
-        return true;
     }
 
     private static IEnumerable<IPAddress> GetLanCandidateAddresses()

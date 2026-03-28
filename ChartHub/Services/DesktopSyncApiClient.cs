@@ -6,6 +6,31 @@ using ChartHub.Models;
 
 namespace ChartHub.Services;
 
+/// <summary>
+/// Semantic error codes for Desktop Sync API failures.
+/// Maps HTTP status codes and error conditions to explicit, type-safe error types.
+/// </summary>
+public enum DesktopSyncErrorCode
+{
+    /// <summary>Pair code expired (410 Gone). User must scan fresh QR to re-pair.</summary>
+    PairingExpired,
+
+    /// <summary>Invalid or stale pair code (401 Unauthorized). User must verify code or re-scan.</summary>
+    InvalidPairingCode,
+
+    /// <summary>Pairing not yet configured (409 Conflict). User must initiate pairing flow.</summary>
+    PairingNotConfigured,
+
+    /// <summary>Bad request, invalid parameters, or unsupported operation (400 Bad Request).</summary>
+    BadRequest,
+
+    /// <summary>Server error or internal failure (5xx). Contact support or retry.</summary>
+    InternalServerError,
+
+    /// <summary>Unknown or unclassified error. Default fallback.</summary>
+    Unknown,
+}
+
 public interface IDesktopSyncApiClient
 {
     Task<DesktopSyncPairClaimResponse> ClaimPairTokenAsync(string baseUrl, string pairCode, string? deviceLabel = null, CancellationToken cancellationToken = default);
@@ -23,8 +48,55 @@ public interface IDesktopSyncApiClient
     Task TriggerOpenFolderAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Typed exception for Desktop Sync API failures.
+/// Carries both HTTP status code and semantic error code for robust error classification.
+/// </summary>
+public sealed class DesktopSyncApiException : InvalidOperationException
+{
+    public DesktopSyncApiException(HttpStatusCode statusCode, DesktopSyncErrorCode errorCode, string reasonPhrase, string errorBody)
+        : base($"Desktop sync API request failed ({(int)statusCode} {reasonPhrase}): {errorBody}")
+    {
+        StatusCode = statusCode;
+        ErrorCode = errorCode;
+        ErrorBody = errorBody;
+    }
+
+    /// <summary>HTTP status code from the response.</summary>
+    public HttpStatusCode StatusCode { get; }
+
+    /// <summary>Semantic error code for type-safe error classification.</summary>
+    public DesktopSyncErrorCode ErrorCode { get; }
+
+    /// <summary>Error message from the API response body.</summary>
+    public string ErrorBody { get; }
+
+    /// <summary>Maps an HTTP status code to a semantic error code.</summary>
+    private static DesktopSyncErrorCode MapStatusToErrorCode(HttpStatusCode statusCode)
+    {
+        return statusCode switch
+        {
+            HttpStatusCode.BadRequest => DesktopSyncErrorCode.BadRequest,
+            HttpStatusCode.Unauthorized => DesktopSyncErrorCode.InvalidPairingCode,
+            HttpStatusCode.Conflict => DesktopSyncErrorCode.PairingNotConfigured,
+            HttpStatusCode.Gone => DesktopSyncErrorCode.PairingExpired,
+            HttpStatusCode.InternalServerError or
+            HttpStatusCode.ServiceUnavailable or
+            HttpStatusCode.GatewayTimeout => DesktopSyncErrorCode.InternalServerError,
+            _ => DesktopSyncErrorCode.Unknown,
+        };
+    }
+
+    /// <summary>Creates a DesktopSyncApiException with automatic error code mapping.</summary>
+    public static DesktopSyncApiException FromResponse(HttpStatusCode statusCode, string reasonPhrase, string errorBody)
+    {
+        DesktopSyncErrorCode errorCode = MapStatusToErrorCode(statusCode);
+        return new DesktopSyncApiException(statusCode, errorCode, reasonPhrase, errorBody);
+    }
+}
+
 public sealed record DesktopSyncVersionResponse(string Api, string Version, bool SupportsIngestions, bool SupportsDesktopState);
-public sealed record DesktopSyncPairClaimResponse(bool Paired, string Token, string ApiBaseUrl);
+public sealed record DesktopSyncPairClaimResponse(bool Paired, string Token, IReadOnlyList<string> ApiBaseUrls);
 public sealed record LocalIngestionUploadMetadata(
     string Source,
     string? SourceId,
@@ -66,7 +138,7 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
         return new DesktopSyncPairClaimResponse(
             Paired: claim.Paired,
             Token: claim.Token ?? string.Empty,
-            ApiBaseUrl: claim.ApiBaseUrl ?? string.Empty);
+            ApiBaseUrls: NormalizeApiBaseUrls(claim.ApiBaseUrls));
     }
 
     public async Task<DesktopSyncVersionResponse> GetVersionAsync(string baseUrl, string token, CancellationToken cancellationToken = default)
@@ -219,7 +291,7 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
         }
 
         string errorBody = await TryReadErrorAsync(response, cancellationToken).ConfigureAwait(false);
-        throw new InvalidOperationException($"Desktop sync API request failed ({(int)response.StatusCode} {response.ReasonPhrase}): {errorBody}");
+        throw DesktopSyncApiException.FromResponse(response.StatusCode, response.ReasonPhrase ?? "Unknown", errorBody);
     }
 
     private static async Task<string> TryReadErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken)
@@ -282,6 +354,30 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
         return uri;
     }
 
+    private static IReadOnlyList<string> NormalizeApiBaseUrls(IReadOnlyList<string>? values)
+    {
+        if (values is null || values.Count == 0)
+        {
+            return [];
+        }
+
+        List<string> normalized = [];
+        foreach (string value in values)
+        {
+            if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri)
+                || string.IsNullOrWhiteSpace(uri.Host))
+            {
+                continue;
+            }
+
+            normalized.Add(uri.GetLeftPart(UriPartial.Authority));
+        }
+
+        return normalized
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private static IngestionQueueItem MapQueueItem(IngestionQueueItemEnvelope item)
     {
         IngestionState state = Enum.TryParse<IngestionState>(item.CurrentState, ignoreCase: true, out IngestionState parsedState)
@@ -340,7 +436,7 @@ public sealed class DesktopSyncApiClient : IDesktopSyncApiClient
     {
         public bool Paired { get; set; }
         public string? Token { get; set; }
-        public string? ApiBaseUrl { get; set; }
+        public List<string>? ApiBaseUrls { get; set; }
     }
 
     private sealed class UploadEnvelope

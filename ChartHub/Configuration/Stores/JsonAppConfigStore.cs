@@ -242,6 +242,11 @@ public sealed class JsonAppConfigStore : IAppConfigStore
             config.Runtime.SyncApiSavedConnectionsJson = rootNode["SyncApiSavedConnectionsJson"]?.GetValue<string>() ?? config.Runtime.SyncApiSavedConnectionsJson;
         }
 
+        if (rootNode["SyncApiPreferredBaseUrl"] is not null)
+        {
+            config.Runtime.SyncApiPreferredBaseUrl = rootNode["SyncApiPreferredBaseUrl"]?.GetValue<string>() ?? config.Runtime.SyncApiPreferredBaseUrl;
+        }
+
         if (rootNode["AllowSyncApiStateOverride"] is not null)
         {
             config.Runtime.AllowSyncApiStateOverride = rootNode["AllowSyncApiStateOverride"]?.GetValue<bool>() ?? config.Runtime.AllowSyncApiStateOverride;

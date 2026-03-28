@@ -68,41 +68,64 @@
                     BorderThickness="1"
                     BorderBrush="{DynamicResource ThemeBorderMidBrush}"
                     Background="{DynamicResource ThemeControlLowBrush}">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="Desktop QR Pairing"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource ThemeForegroundBrush}" />
-                    <TextBlock Text="{Binding BootstrapInstructions}"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource ThemeForegroundLowBrush}" />
-                    <Button HorizontalAlignment="Left"
-                        MinWidth="180"
-                        Content="Refresh QR"
-                        Command="{Binding RefreshDesktopQrCommand}" />
-                    <Border IsVisible="{Binding ShowDesktopBootstrapPlaceholder}"
-                            Padding="10"
+                <Grid ColumnDefinitions="2*,3*" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="8">
+                        <TextBlock Text="Desktop QR Pairing"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource ThemeForegroundBrush}" />
+                        <TextBlock Text="{Binding BootstrapInstructions}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                        <Button HorizontalAlignment="Left"
+                                MinWidth="180"
+                                Content="Refresh QR"
+                                Command="{Binding RefreshDesktopQrCommand}" />
+                        <Border IsVisible="{Binding ShowDesktopBootstrapPlaceholder}"
+                                Padding="10"
+                                BorderThickness="1"
+                                BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                                Background="{DynamicResource ThemeControlMidBrush}">
+                            <TextBlock Text="{Binding BootstrapPlaceholderText}"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                        </Border>
+                        <Image IsVisible="{Binding HasBootstrapQrImage}"
+                               Width="220"
+                               Height="220"
+                               HorizontalAlignment="Left"
+                               Source="{Binding BootstrapQrImage}" />
+                        <TextBox Text="{Binding BootstrapQrImageExportPath}"
+                                 IsReadOnly="True"
+                                 IsVisible="{Binding HasBootstrapQrImageExportPath}"
+                                 Watermark="Generated QR image path"
+                                 TextWrapping="Wrap" />
+                        <TextBox Text="{Binding GeneratedBootstrapPayload}"
+                                 IsReadOnly="True"
+                                 Watermark="Generated bootstrap payload"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Border Grid.Column="1"
+                            Padding="8"
                             BorderThickness="1"
                             BorderBrush="{DynamicResource ThemeBorderLowBrush}"
                             Background="{DynamicResource ThemeControlMidBrush}">
-                        <TextBlock Text="{Binding BootstrapPlaceholderText}"
-                                   TextWrapping="Wrap"
-                                   Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Sync API Activity"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource ThemeForegroundBrush}" />
+                            <TextBlock Text="Incoming API actions and queue operations are listed here."
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                            <TextBlock Text="No activity yet."
+                                       IsVisible="{Binding HasNoDesktopSyncLogEntries}"
+                                       Foreground="{DynamicResource ThemeForegroundLowBrush}" />
+                            <ListBox ItemsSource="{Binding DesktopSyncLogEntries}"
+                                     IsVisible="{Binding HasDesktopSyncLogEntries}"
+                                     Height="280" />
+                        </StackPanel>
                     </Border>
-                    <Image IsVisible="{Binding HasBootstrapQrImage}"
-                           Width="220"
-                           Height="220"
-                           HorizontalAlignment="Left"
-                           Source="{Binding BootstrapQrImage}" />
-                          <TextBox Text="{Binding BootstrapQrImageExportPath}"
-                             IsReadOnly="True"
-                             IsVisible="{Binding HasBootstrapQrImageExportPath}"
-                             Watermark="Generated QR image path"
-                             TextWrapping="Wrap" />
-                    <TextBox Text="{Binding GeneratedBootstrapPayload}"
-                             IsReadOnly="True"
-                             Watermark="Generated bootstrap payload"
-                             TextWrapping="Wrap" />
-                </StackPanel>
+                </Grid>
             </Border>
 
             <Border IsVisible="{Binding ShowCompanionScanSection}"
@@ -137,6 +160,10 @@
                             <TextBlock Text="Ready To Pair"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource ThemeForegroundBrush}" />
+                            <ComboBox ItemsSource="{Binding PendingQrPairingApiBaseUrls}"
+                                      SelectedItem="{Binding SelectedPendingQrApiBaseUrl}"
+                                      IsVisible="{Binding HasPendingQrPairingApiChoices}"
+                                      HorizontalAlignment="Stretch" />
                             <TextBlock Text="{Binding PendingQrPairingSummary}"
                                        TextWrapping="Wrap"
                                        Foreground="{DynamicResource ThemeForegroundLowBrush}" />

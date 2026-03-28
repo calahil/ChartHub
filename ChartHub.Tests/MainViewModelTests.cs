@@ -454,7 +454,7 @@ public class MainViewModelTests
 
         public Task<DesktopSyncPairClaimResponse> ClaimPairTokenAsync(string baseUrl, string pairCode, string? deviceLabel = null, CancellationToken cancellationToken = default)
             => ClaimPairTokenHandler?.Invoke(baseUrl, pairCode, deviceLabel, cancellationToken)
-                ?? Task.FromResult(new DesktopSyncPairClaimResponse(true, "token", baseUrl));
+                ?? Task.FromResult(new DesktopSyncPairClaimResponse(true, "token", [baseUrl]));
 
         public Task<DesktopSyncVersionResponse> GetVersionAsync(string baseUrl, string token, CancellationToken cancellationToken = default)
             => GetVersionHandler?.Invoke(baseUrl, token, cancellationToken)

@@ -104,6 +104,13 @@ public sealed class RuntimeAppConfig
     public string SyncApiSavedConnectionsJson { get; set; } = "[]";
 
     [SettingGroup("Sync API")]
+    [SettingDisplay("Preferred Companion Endpoint")]
+    [SettingEditor(SettingEditorKind.Text)]
+    [SettingHotReloadable(true)]
+    [SettingHidden]
+    public string SyncApiPreferredBaseUrl { get; set; } = string.Empty;
+
+    [SettingGroup("Sync API")]
     [SettingDisplay("Allow Event State Override")]
     [SettingEditor(SettingEditorKind.Toggle)]
     [SettingHotReloadable(true)]

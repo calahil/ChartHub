@@ -87,6 +87,79 @@ public class IngestionSyncApiHostTests
     }
 
     [Fact]
+    public async Task PairClaimEndpoint_ImmediatelyAfterStart_WithDelayedDefaultsPersistence_ReturnsOk()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-delayed-defaults");
+
+        var config = new AppConfigRoot
+        {
+            Runtime = new RuntimeAppConfig
+            {
+                TempDirectory = Path.Combine(temp.RootPath, "Temp"),
+                DownloadDirectory = Path.Combine(temp.RootPath, "Downloads"),
+                StagingDirectory = Path.Combine(temp.RootPath, "Staging"),
+                OutputDirectory = Path.Combine(temp.RootPath, "Output"),
+                CloneHeroDataDirectory = Path.Combine(temp.RootPath, "CloneHero"),
+                CloneHeroSongDirectory = Path.Combine(temp.RootPath, "CloneHero", "Songs"),
+                SyncApiAuthToken = "token-pair-delayed",
+                SyncApiPairCode = "111111",
+                SyncApiPairCodeIssuedAtUtc = DateTimeOffset.UtcNow.AddHours(-2).ToString("O"),
+                SyncApiPairCodeTtlMinutes = 10,
+            },
+        };
+
+        foreach (string? dir in new[]
+        {
+            config.Runtime.TempDirectory,
+            config.Runtime.DownloadDirectory,
+            config.Runtime.StagingDirectory,
+            config.Runtime.OutputDirectory,
+            config.Runtime.CloneHeroDataDirectory,
+            config.Runtime.CloneHeroSongDirectory,
+        })
+        {
+            Directory.CreateDirectory(dir);
+        }
+
+        var orchestrator = new BlockingSettingsOrchestrator(config);
+        using var settings = new AppGlobalSettings(orchestrator);
+        var catalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var stateMachine = new SongIngestionStateMachine();
+        var installer = new SongInstallService(
+            settings,
+            catalog,
+            stateMachine,
+            new OnyxService(settings),
+            new SongIniMetadataParser(),
+            new CloneHeroDirectorySchemaService(),
+            libraryCatalog: null);
+
+        await using var host = new IngestionSyncApiHost(
+            catalog,
+            stateMachine,
+            settings,
+            installer,
+            new FakeDesktopPathOpener());
+
+        await host.StartAsync();
+
+        using HttpClient client = CreateHttpClient();
+        string payload = JsonSerializer.Serialize(new
+        {
+            pairCode = settings.SyncApiPairCode,
+            deviceLabel = "Pixel Companion",
+        });
+
+        using HttpResponseMessage response = await client.PostAsync(
+            "api/pair/claim",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        orchestrator.ReleasePendingUpdate();
+    }
+
+    [Fact]
     public async Task PairClaimEndpoint_ReturnsResolvedApiBaseUrlOnDefaultPort()
     {
         using var temp = new TemporaryDirectoryFixture("sync-api-pair-claim-api-base-url");
@@ -110,7 +183,10 @@ public class IngestionSyncApiHostTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         string body = await response.Content.ReadAsStringAsync();
         using var json = JsonDocument.Parse(body);
-        string? apiBaseUrl = json.RootElement.GetProperty("apiBaseUrl").GetString();
+        JsonElement apiBaseUrls = json.RootElement.GetProperty("apiBaseUrls");
+        Assert.True(apiBaseUrls.ValueKind == JsonValueKind.Array);
+        Assert.True(apiBaseUrls.GetArrayLength() > 0);
+        string? apiBaseUrl = apiBaseUrls[0].GetString();
         Assert.True(Uri.TryCreate(apiBaseUrl, UriKind.Absolute, out Uri? parsedApiBaseUrl));
         Assert.Equal(15123, parsedApiBaseUrl!.Port);
     }
@@ -1394,6 +1470,37 @@ public class IngestionSyncApiHostTests
         {
             SettingsChanged?.Invoke(Current);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class BlockingSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator
+    {
+        private readonly TaskCompletionSource _releaseUpdate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public AppConfigRoot Current { get; private set; } = current;
+
+        public event Action<AppConfigRoot>? SettingsChanged;
+
+        public async Task<ConfigValidationResult> UpdateAsync(Action<AppConfigRoot> update, CancellationToken cancellationToken = default)
+        {
+            await _releaseUpdate.Task.WaitAsync(cancellationToken);
+            update(Current);
+            SettingsChanged?.Invoke(Current);
+            return ConfigValidationResult.Success;
+        }
+
+        public Task ReloadAsync(CancellationToken cancellationToken = default)
+        {
+            SettingsChanged?.Invoke(Current);
+            return Task.CompletedTask;
+        }
+
+        public void ReleasePendingUpdate()
+        {
+            if (!_releaseUpdate.Task.IsCompleted)
+            {
+                _releaseUpdate.SetResult();
+            }
         }
     }
 

@@ -147,6 +147,12 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         set => QueueConfigUpdate(config => config.Runtime.SyncApiSavedConnectionsJson = NormalizeSyncConnectionsJson(value));
     }
 
+    public string SyncApiPreferredBaseUrl
+    {
+        get => Runtime.SyncApiPreferredBaseUrl ?? string.Empty;
+        set => QueueConfigUpdate(config => config.Runtime.SyncApiPreferredBaseUrl = value?.Trim() ?? string.Empty);
+    }
+
     public bool AllowSyncApiStateOverride
     {
         get => Runtime.AllowSyncApiStateOverride;
@@ -252,7 +258,7 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
             ? parsedIssuedAt
             : nowUtc;
         bool shouldRotateSyncPairCode = string.IsNullOrWhiteSpace(Runtime.SyncApiPairCode)
-            || nowUtc > syncApiPairCodeIssuedAt.AddMinutes(syncApiPairCodeTtlMinutes);
+            || nowUtc >= syncApiPairCodeIssuedAt.AddMinutes(syncApiPairCodeTtlMinutes);
         string syncApiPairCode = shouldRotateSyncPairCode
             ? GenerateSyncPairCode()
             : Runtime.SyncApiPairCode;
@@ -263,6 +269,7 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         string syncApiLastPairedAtUtc = Runtime.SyncApiLastPairedAtUtc ?? string.Empty;
         string syncApiPairingHistoryJson = NormalizeSyncConnectionsJson(Runtime.SyncApiPairingHistoryJson);
         string syncApiSavedConnectionsJson = NormalizeSyncConnectionsJson(Runtime.SyncApiSavedConnectionsJson);
+        string syncApiPreferredBaseUrl = Runtime.SyncApiPreferredBaseUrl?.Trim() ?? string.Empty;
         int syncApiMaxRequestBodyBytes = Runtime.SyncApiMaxRequestBodyBytes == LegacySyncApiMaxRequestBodyBytes
             ? DefaultSyncApiMaxRequestBodyBytes
             : ClampSyncApiMaxRequestBodyBytes(Runtime.SyncApiMaxRequestBodyBytes);
@@ -279,6 +286,28 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         FileTools.CreateDirectoryIfNotExists(outputDir);
         FileTools.CreateDirectoryIfNotExists(cloneHeroDataDir);
         FileTools.CreateDirectoryIfNotExists(cloneHeroSongsDir);
+
+        Runtime.TempDirectory = tempDir;
+        Runtime.DownloadDirectory = downloadDir;
+        Runtime.StagingDirectory = stagingDir;
+        Runtime.OutputDirectory = outputDir;
+        Runtime.CloneHeroDataDirectory = cloneHeroDataDir;
+        Runtime.CloneHeroSongDirectory = cloneHeroSongsDir;
+        Runtime.SyncApiAuthToken = syncApiAuthToken;
+        Runtime.SyncApiDeviceLabel = syncApiDeviceLabel;
+        Runtime.SyncApiPairCode = syncApiPairCode;
+        Runtime.SyncApiPairCodeIssuedAtUtc = syncApiPairCodeIssuedAtUtc;
+        Runtime.SyncApiPairCodeTtlMinutes = syncApiPairCodeTtlMinutes;
+        Runtime.SyncApiLastPairedDeviceLabel = syncApiLastPairedDeviceLabel;
+        Runtime.SyncApiLastPairedAtUtc = syncApiLastPairedAtUtc;
+        Runtime.SyncApiPairingHistoryJson = syncApiPairingHistoryJson;
+        Runtime.SyncApiSavedConnectionsJson = syncApiSavedConnectionsJson;
+        Runtime.SyncApiPreferredBaseUrl = syncApiPreferredBaseUrl;
+        Runtime.SyncApiMaxRequestBodyBytes = syncApiMaxRequestBodyBytes;
+        Runtime.SyncApiBodyReadTimeoutMs = syncApiBodyReadTimeoutMs;
+        Runtime.SyncApiMutationWaitTimeoutMs = syncApiMutationWaitTimeoutMs;
+        Runtime.SyncApiSlowRequestThresholdMs = syncApiSlowRequestThresholdMs;
+        Runtime.TransferOrchestratorConcurrencyCap = transferConcurrencyCap;
 
         QueueConfigUpdate(config =>
         {
@@ -297,6 +326,7 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
             config.Runtime.SyncApiLastPairedAtUtc = syncApiLastPairedAtUtc;
             config.Runtime.SyncApiPairingHistoryJson = syncApiPairingHistoryJson;
             config.Runtime.SyncApiSavedConnectionsJson = syncApiSavedConnectionsJson;
+            config.Runtime.SyncApiPreferredBaseUrl = syncApiPreferredBaseUrl;
             config.Runtime.SyncApiMaxRequestBodyBytes = syncApiMaxRequestBodyBytes;
             config.Runtime.SyncApiBodyReadTimeoutMs = syncApiBodyReadTimeoutMs;
             config.Runtime.SyncApiMutationWaitTimeoutMs = syncApiMutationWaitTimeoutMs;
@@ -519,6 +549,7 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(SyncApiLastPairedAtUtc));
         OnPropertyChanged(nameof(SyncApiPairingHistoryJson));
         OnPropertyChanged(nameof(SyncApiSavedConnectionsJson));
+        OnPropertyChanged(nameof(SyncApiPreferredBaseUrl));
         OnPropertyChanged(nameof(AllowSyncApiStateOverride));
         OnPropertyChanged(nameof(SyncApiMaxRequestBodyBytes));
         OnPropertyChanged(nameof(SyncApiBodyReadTimeoutMs));

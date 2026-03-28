@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 
 using ChartHub.Configuration.Interfaces;
@@ -167,7 +168,7 @@ public class SyncViewModelTests
         AppGlobalSettings settings = CreateSettings(temp.RootPath);
         StubDesktopSyncApiClient client = new()
         {
-            ClaimPairTokenHandler = (_, _, _, _) => Task.FromResult(new DesktopSyncPairClaimResponse(true, "token-claimed", "http://192.168.1.55:15123")),
+            ClaimPairTokenHandler = (_, _, _, _) => Task.FromResult(new DesktopSyncPairClaimResponse(true, "token-claimed", ["http://192.168.1.55:15123"])),
             GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
             GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]),
         };
@@ -190,7 +191,7 @@ public class SyncViewModelTests
         AppGlobalSettings settings = CreateSettings(temp.RootPath);
         StubDesktopSyncApiClient client = new()
         {
-            ClaimPairTokenHandler = (_, _, _, _) => Task.FromResult(new DesktopSyncPairClaimResponse(true, "token-claimed", "http://127.0.0.1:15123")),
+            ClaimPairTokenHandler = (_, _, _, _) => Task.FromResult(new DesktopSyncPairClaimResponse(true, "token-claimed", ["http://127.0.0.1:15123"])),
             GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
             GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([]),
         };
@@ -213,7 +214,7 @@ public class SyncViewModelTests
         IngestionQueueItem queueItem = CreateQueueItem();
         StubDesktopSyncApiClient client = new()
         {
-            ClaimPairTokenHandler = (_, _, _, _) => Task.FromResult(new DesktopSyncPairClaimResponse(true, "token-claimed", "http://192.168.1.55:15123")),
+            ClaimPairTokenHandler = (_, _, _, _) => Task.FromResult(new DesktopSyncPairClaimResponse(true, "token-claimed", ["http://192.168.1.55:15123"])),
             GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("ingestion-sync", "1.0.0", true, true)),
             GetIngestionsHandler = (_, _, _, _) => Task.FromResult<IReadOnlyList<IngestionQueueItem>>([queueItem]),
         };
@@ -276,7 +277,7 @@ public class SyncViewModelTests
 
         SyncBootstrapPayload payload = DecodeBootstrapPayload(sut.GeneratedBootstrapPayload);
 
-        Assert.Equal("http://192.168.1.55:15123", payload.ApiBaseUrl);
+        Assert.Contains("http://192.168.1.55:15123", payload.ApiBaseUrls);
         Assert.Equal("PAIR-5555", payload.PairCode);
         Assert.Equal("ChartHub Desktop", payload.DeviceLabel);
     }
@@ -301,7 +302,7 @@ public class SyncViewModelTests
         }
 
         SyncBootstrapPayload payload = DecodeBootstrapPayload(generatedPayload);
-        Assert.NotEqual("http://127.0.0.1:15123", payload.ApiBaseUrl);
+        Assert.DoesNotContain(payload.ApiBaseUrls, static apiBaseUrl => string.Equals(apiBaseUrl, "http://127.0.0.1:15123", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -336,6 +337,59 @@ public class SyncViewModelTests
         Assert.True(sut.ShowCompanionScanSection);
         Assert.False(sut.ShowCompanionConfirmationSection);
         Assert.False(sut.ShowCompanionQueueSection);
+    }
+
+    [Fact]
+    public void Constructor_InDesktopMode_WithNearExpiryPairCode_RefreshesCodeUsingHost()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-desktop-refresh-near-expiry");
+        string nearExpiryIssuedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-9).ToString("O");
+        AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            syncApiPairCode: "OLD999",
+            syncApiPairCodeIssuedAtUtc: nearExpiryIssuedAtUtc,
+            syncApiPairCodeTtlMinutes: 10);
+        StubIngestionSyncApiHost host = new()
+        {
+            RefreshPairCodeResult = "654321",
+        };
+
+        using var sut = new SyncViewModel(
+            new StubDesktopSyncApiClient(),
+            settings,
+            isCompanionMode: false,
+            ingestionSyncApiHost: host);
+
+        Assert.Equal("654321", sut.PairCode);
+        Assert.Equal(1, host.RefreshPairCodeCalls);
+        Assert.Contains("auto-refreshed", sut.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("full pairing window", sut.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Constructor_InDesktopMode_WithFreshPairCode_DoesNotRefreshCode()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-desktop-no-refresh-fresh");
+        string freshIssuedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-2).ToString("O");
+        AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            syncApiPairCode: "FRESH1",
+            syncApiPairCodeIssuedAtUtc: freshIssuedAtUtc,
+            syncApiPairCodeTtlMinutes: 10);
+        StubIngestionSyncApiHost host = new()
+        {
+            RefreshPairCodeResult = "654321",
+        };
+
+        using var sut = new SyncViewModel(
+            new StubDesktopSyncApiClient(),
+            settings,
+            isCompanionMode: false,
+            ingestionSyncApiHost: host);
+
+        Assert.Equal("FRESH1", sut.PairCode);
+        Assert.Equal(0, host.RefreshPairCodeCalls);
+        Assert.Equal("Present this QR on the desktop so the companion can pair over LAN.", sut.StatusMessage);
     }
 
     [Fact]
@@ -939,7 +993,7 @@ public class SyncViewModelTests
         AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient
         {
-            GetVersionHandler = (_, _, _) => throw new UnauthorizedAccessException("Invalid token or authentication failed."),
+            GetVersionHandler = (_, _, _) => throw DesktopSyncApiException.FromResponse(HttpStatusCode.Unauthorized, "Unauthorized", "Invalid token"),
         };
 
         using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
@@ -950,7 +1004,7 @@ public class SyncViewModelTests
 
         Assert.False(sut.IsConnected);
         Assert.Equal(ErrorCategory.AuthenticationFailed, sut.Diagnostics.LastErrorCategory);
-        Assert.Contains("token", sut.Diagnostics.RemediationHint, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("regenerate", sut.Diagnostics.RemediationHint, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -960,7 +1014,7 @@ public class SyncViewModelTests
         AppGlobalSettings settings = CreateSettings(temp.RootPath);
         var client = new StubDesktopSyncApiClient
         {
-            GetVersionHandler = (_, _, _) => Task.FromResult(new DesktopSyncVersionResponse("old-api", "0.9.0", false, false)),
+            GetVersionHandler = (_, _, _) => throw DesktopSyncApiException.FromResponse(HttpStatusCode.BadRequest, "Bad Request", "Unsupported operation"),
         };
 
         using var sut = new SyncViewModel(client, settings, isCompanionMode: true);
@@ -971,7 +1025,29 @@ public class SyncViewModelTests
 
         Assert.False(sut.IsConnected);
         Assert.Equal(ErrorCategory.UnsupportedVersion, sut.Diagnostics.LastErrorCategory);
-        Assert.Contains("ingestion", sut.Diagnostics.LastErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("compatible", sut.Diagnostics.RemediationHint, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ConfirmQrPairing_OnExpiredPairCode_ClassifiesAsPairingExpired()
+    {
+        using var temp = new TemporaryDirectoryFixture("sync-vm-qr-pair-code-expired");
+        AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        var client = new StubDesktopSyncApiClient
+        {
+            ClaimPairTokenHandler = (_, _, _, _) => throw DesktopSyncApiException.FromResponse(HttpStatusCode.Gone, "Gone", "Pair code expired"),
+        };
+        StubQrCodeScannerService scanner = CreateScanner("http://192.168.1.55:15123", "PAIR-1234", "Studio Desktop");
+
+        using var sut = new SyncViewModel(client, settings, scanner, isCompanionMode: true);
+
+        await sut.ScanBootstrapQrCommand.ExecuteAsync(null);
+        await sut.ConfirmQrPairingCommand.ExecuteAsync(null);
+
+        Assert.False(sut.IsConnected);
+        Assert.Equal(ErrorCategory.PairingExpired, sut.Diagnostics.LastErrorCategory);
+        Assert.Contains("scan", sut.Diagnostics.RemediationHint, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("expired", sut.Diagnostics.RemediationHint, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1112,7 +1188,9 @@ public class SyncViewModelTests
         string? syncApiAuthToken = null,
         string? syncApiSavedConnectionsJson = null,
         string? syncApiLastPairedDeviceLabel = null,
-        string? syncApiPairCode = null)
+        string? syncApiPairCode = null,
+        string? syncApiPairCodeIssuedAtUtc = null,
+        int syncApiPairCodeTtlMinutes = 10)
     {
         var config = new AppConfigRoot
         {
@@ -1128,6 +1206,8 @@ public class SyncViewModelTests
                 SyncApiSavedConnectionsJson = syncApiSavedConnectionsJson ?? "[]",
                 SyncApiLastPairedDeviceLabel = syncApiLastPairedDeviceLabel ?? string.Empty,
                 SyncApiPairCode = syncApiPairCode ?? string.Empty,
+                SyncApiPairCodeIssuedAtUtc = syncApiPairCodeIssuedAtUtc ?? DateTimeOffset.UtcNow.ToString("O"),
+                SyncApiPairCodeTtlMinutes = syncApiPairCodeTtlMinutes,
             },
         };
 
@@ -1159,7 +1239,7 @@ public class SyncViewModelTests
 
     private static string BuildBootstrapPayloadString(string baseUrl, string pairCode, string desktopLabel)
     {
-        var payload = new SyncBootstrapPayload(baseUrl, pairCode, desktopLabel, 1);
+        var payload = new SyncBootstrapPayload([baseUrl], pairCode, desktopLabel, 1);
         string json = JsonSerializer.Serialize(payload);
         string encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json))
             .TrimEnd('=')
@@ -1235,6 +1315,27 @@ public class SyncViewModelTests
         }
     }
 
+    private sealed class StubIngestionSyncApiHost : IIngestionSyncApiHost
+    {
+        public int RefreshPairCodeCalls { get; private set; }
+
+        public string RefreshPairCodeResult { get; init; } = "123456";
+
+        public event Action<string>? ActivityLogged;
+
+        public Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            ActivityLogged?.Invoke("Sync API started.");
+            return Task.CompletedTask;
+        }
+
+        public string RefreshPairCode()
+        {
+            RefreshPairCodeCalls++;
+            return RefreshPairCodeResult;
+        }
+    }
+
     private sealed class StubDesktopSyncApiClient : IDesktopSyncApiClient
     {
         public Func<string, string, string?, CancellationToken, Task<DesktopSyncPairClaimResponse>>? ClaimPairTokenHandler { get; init; }
@@ -1244,10 +1345,6 @@ public class SyncViewModelTests
         public Func<string, string, long, CancellationToken, Task>? TriggerRetryHandler { get; init; }
         public Func<string, string, long, CancellationToken, Task>? TriggerInstallHandler { get; init; }
         public Func<string, string, long, CancellationToken, Task>? TriggerOpenFolderHandler { get; init; }
-
-        public Task<DesktopSyncPairClaimResponse> ClaimPairTokenAsync(string baseUrl, string pairCode, string? deviceLabel = null, CancellationToken cancellationToken = default)
-            => ClaimPairTokenHandler?.Invoke(baseUrl, pairCode, deviceLabel, cancellationToken)
-                ?? Task.FromResult(new DesktopSyncPairClaimResponse(true, "token", baseUrl));
 
         public Task<DesktopSyncVersionResponse> GetVersionAsync(string baseUrl, string token, CancellationToken cancellationToken = default)
             => GetVersionHandler?.Invoke(baseUrl, token, cancellationToken)
@@ -1278,6 +1375,10 @@ public class SyncViewModelTests
         public Task TriggerOpenFolderAsync(string baseUrl, string token, long ingestionId, CancellationToken cancellationToken = default)
             => TriggerOpenFolderHandler?.Invoke(baseUrl, token, ingestionId, cancellationToken)
                 ?? Task.CompletedTask;
+
+        public Task<DesktopSyncPairClaimResponse> ClaimPairTokenAsync(string baseUrl, string pairCode, string? deviceLabel = null, CancellationToken cancellationToken = default)
+            => ClaimPairTokenHandler?.Invoke(baseUrl, pairCode, deviceLabel, cancellationToken)
+                ?? Task.FromResult(new DesktopSyncPairClaimResponse(true, "token", [baseUrl]));
     }
 
     private sealed class StubLocalIngestionPushService : ILocalIngestionPushService
