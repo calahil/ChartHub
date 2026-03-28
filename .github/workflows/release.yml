@@ -388,7 +388,7 @@ jobs:
       - name: Pull and deploy
         run: |
           docker compose --project-name charthub-dev --env-file .env.deploy pull backup-api
-          docker compose --project-name charthub-dev --env-file .env.deploy up -d
+          docker compose --project-name charthub-dev --env-file .env.deploy up -d --no-build
 
       - name: Verify health
         env:
@@ -466,7 +466,7 @@ jobs:
       - name: Pull and deploy
         run: |
           docker compose --project-name charthub-staging --env-file .env.deploy pull backup-api
-          docker compose --project-name charthub-staging --env-file .env.deploy up -d
+          docker compose --project-name charthub-staging --env-file .env.deploy up -d --no-build
 
       - name: Verify health
         env:
@@ -494,14 +494,18 @@ jobs:
         env:
           EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
         run: |
-          ACTUAL_IMAGE_REF=$(docker inspect charthub-staging-backup-api --format '{{ index .RepoDigests 0 }}')
-          if [[ "$ACTUAL_IMAGE_REF" != "$EXPECTED_IMAGE_REF" ]]; then
+          EXPECTED_IMAGE_ID=$(docker image inspect "$EXPECTED_IMAGE_REF" --format '{{ .Id }}')
+          ACTUAL_IMAGE_ID=$(docker inspect charthub-staging-backup-api --format '{{ .Image }}')
+          ACTUAL_IMAGE_REF=$(docker inspect charthub-staging-backup-api --format '{{ .Config.Image }}')
+          if [[ "$ACTUAL_IMAGE_ID" != "$EXPECTED_IMAGE_ID" ]]; then
             echo "Staging deployed unexpected image"
             echo "Expected: $EXPECTED_IMAGE_REF"
-            echo "Actual:   $ACTUAL_IMAGE_REF"
+            echo "Expected image ID: $EXPECTED_IMAGE_ID"
+            echo "Actual image ID:   $ACTUAL_IMAGE_ID"
+            echo "Container image:   $ACTUAL_IMAGE_REF"
             exit 1
           fi
-          echo "staged_image_ref=$ACTUAL_IMAGE_REF" >> "$GITHUB_OUTPUT"
+          echo "staged_image_ref=$EXPECTED_IMAGE_REF" >> "$GITHUB_OUTPUT"
 
       - name: Clean up env file
         if: always()
@@ -572,7 +576,7 @@ jobs:
       - name: Pull and deploy
         run: |
           docker compose --project-name charthub-prod --env-file .env.deploy pull backup-api
-          docker compose --project-name charthub-prod --env-file .env.deploy up -d
+          docker compose --project-name charthub-prod --env-file .env.deploy up -d --no-build
 
       - name: Verify health
         env:
@@ -599,11 +603,15 @@ jobs:
         env:
           EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
         run: |
-          ACTUAL_IMAGE_REF=$(docker inspect charthub-prod-backup-api --format '{{ index .RepoDigests 0 }}')
-          if [[ "$ACTUAL_IMAGE_REF" != "$EXPECTED_IMAGE_REF" ]]; then
+          EXPECTED_IMAGE_ID=$(docker image inspect "$EXPECTED_IMAGE_REF" --format '{{ .Id }}')
+          ACTUAL_IMAGE_ID=$(docker inspect charthub-prod-backup-api --format '{{ .Image }}')
+          ACTUAL_IMAGE_REF=$(docker inspect charthub-prod-backup-api --format '{{ .Config.Image }}')
+          if [[ "$ACTUAL_IMAGE_ID" != "$EXPECTED_IMAGE_ID" ]]; then
             echo "Production deployed unexpected image"
             echo "Expected: $EXPECTED_IMAGE_REF"
-            echo "Actual:   $ACTUAL_IMAGE_REF"
+            echo "Expected image ID: $EXPECTED_IMAGE_ID"
+            echo "Actual image ID:   $ACTUAL_IMAGE_ID"
+            echo "Container image:   $ACTUAL_IMAGE_REF"
             exit 1
           fi
 
