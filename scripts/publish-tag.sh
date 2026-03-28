@@ -22,13 +22,10 @@ echo "Repository: $repo_root"
 echo "Branch:     $current_branch"
 echo "Commit:     $current_commit"
 echo
-echo "Release tags must match one of:"
-echo "  vX.Y.Z"
-echo "  vX.Y.Z-rc.N"
-echo
 
 skip_confirmation=false
 dry_run=false
+delete_mode=false
 tag_name=""
 
 for arg in "$@"; do
@@ -38,6 +35,9 @@ for arg in "$@"; do
       ;;
     --dry-run)
       dry_run=true
+      ;;
+    --delete)
+      delete_mode=true
       ;;
     -*)
       echo "Unknown option: $arg"
@@ -53,8 +53,23 @@ for arg in "$@"; do
   esac
 done
 
+if [[ "$delete_mode" == true ]]; then
+  echo "Mode: Delete tag"
+else
+  echo "Mode: Publish tag"
+fi
+echo
+echo "Tags must match one of:"
+echo "  vX.Y.Z"
+echo "  vX.Y.Z-rc.N"
+echo
+
 if [[ -z "$tag_name" ]]; then
-  read -r -p "Enter git tag to publish: " tag_name
+  if [[ "$delete_mode" == true ]]; then
+    read -r -p "Enter git tag to delete: " tag_name
+  else
+    read -r -p "Enter git tag to publish: " tag_name
+  fi
 else
   echo "Requested tag: $tag_name"
 fi
@@ -71,14 +86,32 @@ fi
 
 git fetch --tags origin
 
+tag_exists_locally=false
+tag_exists_remote=false
+
 if git rev-parse -q --verify "refs/tags/$tag_name" >/dev/null 2>&1; then
-  echo "Tag '$tag_name' already exists locally."
-  exit 1
+  tag_exists_locally=true
 fi
 
 if git ls-remote --tags origin "refs/tags/$tag_name" | grep -q .; then
-  echo "Tag '$tag_name' already exists on origin."
-  exit 1
+  tag_exists_remote=true
+fi
+
+if [[ "$delete_mode" == true ]]; then
+  if [[ "$tag_exists_locally" == false && "$tag_exists_remote" == false ]]; then
+    echo "Tag '$tag_name' does not exist locally or on origin."
+    exit 1
+  fi
+else
+  if [[ "$tag_exists_locally" == true ]]; then
+    echo "Tag '$tag_name' already exists locally."
+    exit 1
+  fi
+
+  if [[ "$tag_exists_remote" == true ]]; then
+    echo "Tag '$tag_name' already exists on origin."
+    exit 1
+  fi
 fi
 
 status_output=$(git status --short)
@@ -86,33 +119,76 @@ if [[ -n "$status_output" ]]; then
   echo "Working tree has uncommitted changes:"
   echo "$status_output"
   echo
-  if [[ "$skip_confirmation" == true ]]; then
-    echo "Continuing because --yes was provided."
+  if [[ "$delete_mode" == false ]]; then
+    if [[ "$skip_confirmation" == true ]]; then
+      echo "Continuing because --yes was provided."
+    else
+      read -r -p "Continue tagging the current commit anyway? [y/N]: " continue_dirty
+      if [[ ! "$continue_dirty" =~ ^[Yy]$ ]]; then
+        echo "Aborted."
+        exit 1
+      fi
+    fi
   else
-    read -r -p "Continue tagging the current commit anyway? [y/N]: " continue_dirty
-    if [[ ! "$continue_dirty" =~ ^[Yy]$ ]]; then
+    echo "(Dirty working tree warning does not apply to delete operations.)"
+  fi
+fi
+
+if [[ "$delete_mode" == true ]]; then
+  delete_action="Delete tag '$tag_name'"
+  if [[ "$tag_exists_locally" == true ]]; then
+    delete_action="$delete_action (locally"
+  fi
+  if [[ "$tag_exists_remote" == true ]]; then
+    if [[ "$tag_exists_locally" == true ]]; then
+      delete_action="$delete_action and on origin)"
+    else
+      delete_action="$delete_action (on origin)"
+    fi
+  else
+    if [[ "$tag_exists_locally" == true ]]; then
+      delete_action="$delete_action)"
+    fi
+  fi
+
+  if [[ "$skip_confirmation" == true ]]; then
+    echo "$delete_action because --yes was provided."
+  else
+    read -r -p "$delete_action? [y/N]: " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+      echo "Aborted."
+      exit 1
+    fi
+  fi
+else
+  if [[ "$skip_confirmation" == true ]]; then
+    echo "Creating and pushing tag '$tag_name' for commit $current_commit because --yes was provided."
+  else
+    read -r -p "Create and push tag '$tag_name' for commit $current_commit? [y/N]: " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
       echo "Aborted."
       exit 1
     fi
   fi
 fi
 
-if [[ "$skip_confirmation" == true ]]; then
-  echo "Creating and pushing tag '$tag_name' for commit $current_commit because --yes was provided."
-else
-  read -r -p "Create and push tag '$tag_name' for commit $current_commit? [y/N]: " confirm
-  if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-    echo "Aborted."
-    exit 1
-  fi
-fi
-
 if [[ "$dry_run" == true ]]; then
-  echo "Dry run: would create annotated tag '$tag_name' on commit $current_commit and push it to origin."
+  if [[ "$delete_mode" == true ]]; then
+    echo "Dry run: would delete tag '$tag_name'"
+    [[ "$tag_exists_locally" == true ]] && echo "  - locally"
+    [[ "$tag_exists_remote" == true ]] && echo "  - on origin"
+  else
+    echo "Dry run: would create annotated tag '$tag_name' on commit $current_commit and push it to origin."
+  fi
   exit 0
 fi
 
-git tag -a "$tag_name" -m "Release $tag_name"
-git push origin "$tag_name"
-
-echo "Published tag '$tag_name' to origin."
+if [[ "$delete_mode" == true ]]; then
+  [[ "$tag_exists_locally" == true ]] && git tag -d "$tag_name"
+  [[ "$tag_exists_remote" == true ]] && git push origin --delete "$tag_name"
+  echo "Deleted tag '$tag_name'."
+else
+  git tag -a "$tag_name" -m "Release $tag_name"
+  git push origin "$tag_name"
+  echo "Published tag '$tag_name' to origin."
+fi
