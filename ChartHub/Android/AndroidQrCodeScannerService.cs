@@ -1,3 +1,5 @@
+// ANDROID-only implementation
+#if ANDROID
 using Android.App;
 using Android.Gms.Common.Apis;
 using Android.Gms.Extensions;
@@ -38,6 +40,7 @@ public sealed class AndroidQrCodeScannerService : IQrCodeScannerService
         }
         catch (OperationCanceledException)
         {
+#endif
             return null;
         }
         catch (ApiException ex) when (ex.StatusCode == 16)

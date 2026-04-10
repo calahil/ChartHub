@@ -56,6 +56,11 @@ This project uses strict MVVM.
 
 ---
 
+
+## Platform-Specific Code Rules
+
+- All Android-specific code and usings must be guarded with `#if ANDROID`.
+
 ## Hard Rules
 
 Agents MUST NOT:

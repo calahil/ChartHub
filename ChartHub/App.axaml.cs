@@ -14,6 +14,10 @@ using ChartHub.Views;
 
 using Microsoft.Extensions.DependencyInjection;
 
+#if ANDROID
+using Avalonia.Android;
+#endif
+
 namespace ChartHub;
 
 public partial class App : Avalonia.Application
@@ -58,12 +62,20 @@ public partial class App : Avalonia.Application
                 DataContext = shellViewModel
             };
         }
+        else if (ApplicationLifetime is IActivityApplicationLifetime activityLifetime)
+        {
+            activityLifetime.MainViewFactory = () => new AppShellView
+            {
+                DataContext = shellViewModel
+            };
+        }
 
         base.OnFrameworkInitializationCompleted();
     }
 
     private static void OnApplicationExit(object? sender, ControlledApplicationLifetimeExitEventArgs e)
     {
+        Logger.LogInfo("App", $"OnApplicationExit called. Exit code: {e.ApplicationExitCode}");
         DisposeApplicationResourcesOnce();
     }
 
@@ -118,6 +130,7 @@ public partial class App : Avalonia.Application
     {
         if (Interlocked.Exchange(ref _shutdownHandled, 1) != 0)
         {
+            Logger.LogInfo("App", "DisposeApplicationResourcesOnce: already handled");
             return;
         }
 
@@ -132,10 +145,12 @@ public partial class App : Avalonia.Application
 
             if (ServiceProvider is IAsyncDisposable asyncDisposable)
             {
+                Logger.LogInfo("App", "Disposing ServiceProvider (async)");
                 asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
             }
             else if (ServiceProvider is IDisposable disposable)
             {
+                Logger.LogInfo("App", "Disposing ServiceProvider (sync)");
                 disposable.Dispose();
             }
 

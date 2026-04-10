@@ -34,7 +34,7 @@
                                                          x:Name="EncoreSearchTextBox"
                              Height="20"
                              CornerRadius="10"
-                             Watermark="{Binding PageStrings.SearchText}"
+                             PlaceholderText="{Binding PageStrings.SearchText}"
                              VerticalAlignment="Top"
                                                          KeyDown="SearchTextBox_KeyDown"
                              Text="{Binding SearchText}" />
@@ -225,7 +225,7 @@
                 <Grid Grid.Row="0"
                       ColumnDefinitions="*,Auto">
                     <TextBox Grid.Column="0"
-                             Watermark="{Binding PageStrings.SearchText}"
+                             PlaceholderText="{Binding PageStrings.SearchText}"
                              Text="{Binding SearchText}"
                              Margin="0,0,8,0" />
                     <Button Grid.Column="1"

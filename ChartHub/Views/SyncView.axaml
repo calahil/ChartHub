@@ -97,11 +97,11 @@
                         <TextBox Text="{Binding BootstrapQrImageExportPath}"
                                  IsReadOnly="True"
                                  IsVisible="{Binding HasBootstrapQrImageExportPath}"
-                                 Watermark="Generated QR image path"
+                                 PlaceholderText="Generated QR image path"
                                  TextWrapping="Wrap" />
                         <TextBox Text="{Binding GeneratedBootstrapPayload}"
                                  IsReadOnly="True"
-                                 Watermark="Generated bootstrap payload"
+                                 PlaceholderText="Generated bootstrap payload"
                                  TextWrapping="Wrap" />
                     </StackPanel>
 

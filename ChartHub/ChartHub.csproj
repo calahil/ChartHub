@@ -1,8 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework Condition="'$(EnableAndroid)'!='true'">net10.0</TargetFramework>
-		<TargetFrameworks Condition="'$(EnableAndroid)'=='true'">net10.0;net10.0-android</TargetFrameworks>
+		<TargetFrameworks>net10.0;net10.0-android</TargetFrameworks>
 		<OutputType Condition="'$(TargetFramework)'!='net10.0-android'">WinExe</OutputType>
 		<OutputType Condition="'$(TargetFramework)'=='net10.0-android'">Exe</OutputType>
 		<RootNamespace>ChartHub</RootNamespace>
@@ -34,13 +33,13 @@
 
 	<ItemGroup>
 		<PackageReference Include="AsyncImageLoader.Avalonia" Version="3.7.0" />
-		<PackageReference Include="Avalonia" Version="11.3.12" />
-		<PackageReference Include="Avalonia.Desktop" Version="11.3.12" Condition="'$(TargetFramework)'!='net10.0-android'" />
-		<PackageReference Include="Avalonia.X11" Version="11.3.12" Condition="'$(TargetFramework)'!='net10.0-android'" />
-		<PackageReference Include="Avalonia.Android" Version="11.3.12" Condition="'$(TargetFramework)'=='net10.0-android'" />
-		<PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.12" />
-		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.12" />
-		<PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.12" />
+		<PackageReference Include="Avalonia" Version="12.0.0" />
+		<PackageReference Include="Avalonia.Desktop" Version="12.0.0" Condition="'$(TargetFramework)'!='net10.0-android'" />
+		<PackageReference Include="Avalonia.X11" Version="12.0.0" Condition="'$(TargetFramework)'!='net10.0-android'" />
+		<PackageReference Include="Avalonia.Android" Version="12.0.0" Condition="'$(TargetFramework)'=='net10.0-android'" />
+		<PackageReference Include="Avalonia.Controls.DataGrid" Version="12.0.0" />
+		<PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.0" />
+		<PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.1" />
 		<PackageReference Include="Google.Apis.Drive.v3" Version="1.68.0.3490" />
 		<PackageReference Include="HtmlAgilityPack" Version="1.11.65" />
@@ -52,9 +51,10 @@
 		<PackageReference Include="SharpCompress" Version="0.38.0" />
 		<PackageReference Include="QRCoder" Version="1.7.0" />
 		<PackageReference Include="Svg.Skia" Version="3.7.0" />
-		<PackageReference Include="SkiaSharp" Version="3.119.2" />
-		<PackageReference Include="SkiaSharp.HarfBuzz" Version="3.119.2" />
-		<PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.2" />
+		<PackageReference Include="SkiaSharp" Version="3.119.3-preview.1.1" />
+		<PackageReference Include="SkiaSharp.HarfBuzz" Version="3.119.3-preview.1.1" />
+		<PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="3.119.3-preview.1.1" />
+		<PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" />
 		<PackageReference Include="YamlDotNet" Version="16.3.0" />
 	</ItemGroup>
 

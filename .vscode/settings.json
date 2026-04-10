@@ -16,6 +16,8 @@
         "dotnet new": true,
         "dotnet sln": true,
         "dotnet ef": true,
-        "cp": true
+        "cp": true,
+        "dotnet list": true,
+        "strings": true
     }
 }

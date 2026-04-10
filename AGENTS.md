@@ -24,6 +24,11 @@ A change is not complete unless all of the following are true:
 6. No banned APIs are introduced.
 7. Public behavior changes are described clearly in the final summary.
 
+
+## Platform-Specific Code Rules
+
+- All Android-specific code and usings must be guarded with `#if ANDROID`.
+
 ## Required Agent Behavior
 
 When making code changes, agents must:

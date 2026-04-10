@@ -343,7 +343,7 @@
                                              Margin="0,8,8,0"
                                              Text="{Binding Value}"
                                              PasswordChar="*"
-                                             Watermark="Enter new value" />
+                                             PlaceholderText="Enter new value" />
 
                                     <Button Grid.Row="2"
                                             Grid.Column="1"

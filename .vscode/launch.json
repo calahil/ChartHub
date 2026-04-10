@@ -24,28 +24,28 @@
             "stopAtEntry": false,
             "console": "internalConsole",
             "internalConsoleOptions": "openOnSessionStart",
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
+            {
+                "name": "ChartHub Desktop (net10.0)",
+                "type": "coreclr",
+                "request": "launch",
+                "preLaunchTask": "build-desktop",
+                "program": "${workspaceFolder}/ChartHub/bin/Debug/net10.0/ChartHub.dll",
+                "args": [],
+                "cwd": "${workspaceFolder}/ChartHub",
+                "stopAtEntry": false,
+                "console": "internalConsole"
+            },
+            {
+                "name": "ChartHub Android (net10.0-android)",
+                "type": "coreclr",
+                "request": "launch",
+                "preLaunchTask": "build-android",
+                "program": "${workspaceFolder}/ChartHub/bin/Debug/net10.0-android/ChartHub.dll",
+                "args": [],
+                "cwd": "${workspaceFolder}/ChartHub",
+                "stopAtEntry": false,
+                "console": "internalConsole"
             }
-        },
-        {
-            "name": "Android: Start Emulator",
-            "type": "node-terminal",
-            "request": "launch",
-            "command": "${env:HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/charthub-emulator.log 2>&1 &"
-        },
-        {
-            "name": "Android: Start Tablet Emulator (emulator-5556)",
-            "type": "node-terminal",
-            "request": "launch",
-            "command": "TABLET_AVD=${TABLET_AVD:-Medium_Tablet_API_36.1}; if ! ${HOME}/Android/Sdk/emulator/emulator -list-avds | grep -qx \"$TABLET_AVD\"; then echo \"Tablet AVD '$TABLET_AVD' not found. Set TABLET_AVD to an installed AVD name.\"; exit 1; fi; ${HOME}/Android/Sdk/emulator/emulator -avd \"$TABLET_AVD\" -port 5556 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/charthub-tablet-emulator.log 2>&1 &"
-        },
-        {
-            "name": "Android: Install To Emulator (emulator-5554)",
-            "type": "node-terminal",
-            "request": "launch",
-            "command": "if ! ${HOME}/Android/Sdk/platform-tools/adb devices | grep -q '^emulator-5554\\s'; then ${HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/charthub-emulator.log 2>&1 & fi; ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 wait-for-device; until [ \"$(${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')\" = \"1\" ]; do sleep 2; done; until ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd package list packages >/dev/null 2>&1; do sleep 2; done; dotnet build ${workspaceFolder}/ChartHub/ChartHub.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:Device=emulator-5554 -p:RuntimeIdentifier=android-x64 -p:EmbedAssembliesIntoApk=true -p:AndroidSdkDirectory=${HOME}/Android/Sdk"
-        },
         {
             "name": "Android: Install To Tablet Emulator (emulator-5556)",
             "type": "node-terminal",

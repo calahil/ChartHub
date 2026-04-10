@@ -1,7 +1,7 @@
+#if ANDROID
 using Android.App;
 using Android.OS;
 using Android.Content.PM;
-
 using Avalonia;
 using Avalonia.Android;
 
@@ -12,7 +12,7 @@ namespace ChartHub;
     Theme = "@style/MyTheme.NoActionBar",
     MainLauncher = true,
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
-public class MainActivity : AvaloniaMainActivity<App>
+public class MainActivity : AvaloniaMainActivity
 {
     protected override void OnCreate(Bundle? savedInstanceState)
     {
@@ -24,10 +24,5 @@ public class MainActivity : AvaloniaMainActivity<App>
             Window?.SetDecorFitsSystemWindows(true);
         }
     }
-
-    protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
-    {
-        return base.CustomizeAppBuilder(builder)
-            .WithInterFont();
-    }
 }
+#endif
