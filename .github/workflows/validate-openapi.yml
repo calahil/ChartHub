@@ -1,19 +1,9 @@
 name: Validate OpenAPI
 
 on:
-  pull_request:
-    paths:
-      - openapi.yaml
-      - docs/swagger-ui.html
-      - README.md
-      - ChartHub/Services/IngestionSyncApiHost.cs
   push:
-    branches: [ main ]
-    paths:
-      - openapi.yaml
-      - docs/swagger-ui.html
-      - README.md
-      - ChartHub/Services/IngestionSyncApiHost.cs
+    tags:
+      - 'v*'
 
 jobs:
   lint-openapi:

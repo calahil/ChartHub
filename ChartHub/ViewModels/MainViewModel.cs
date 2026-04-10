@@ -25,7 +25,6 @@ public class MainViewModel : INotifyPropertyChanged
     private DownloadViewModel _downloadViewModel = null!;
     private readonly SharedDownloadQueue _sharedDownloadQueue = new();
     private CloneHeroViewModel _cloneHeroViewModel = null!;
-    private SyncViewModel _syncViewModel = null!;
     private SettingsViewModel _settingsViewModel = null!;
     private MainViewPageStrings _pageStrings = new MainViewPageStrings();
     private bool _isAndroidNavPaneOpen;
@@ -87,16 +86,6 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public SyncViewModel SyncViewModel
-    {
-        get => _syncViewModel;
-        set
-        {
-            _syncViewModel = value;
-            OnPropertyChanged();
-        }
-    }
-
     private bool _isDownloadTabVisible;
     public bool IsDownloadTabVisible
     {
@@ -130,7 +119,6 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     private bool _isSettingsTabVisible;
-    private bool _isSyncTabVisible;
     private int _selectedMainTabIndex;
     private bool _isFilterPaneOpen;
 
@@ -232,8 +220,7 @@ public class MainViewModel : INotifyPropertyChanged
         1 => EncoreViewModel,
         2 => DownloadViewModel,
         3 when IsCloneHeroTabVisible => CloneHeroViewModel,
-        4 => SyncViewModel,
-        5 => SettingsViewModel,
+        4 => SettingsViewModel,
         _ => RhythmVerseViewModel,
     };
 
@@ -243,8 +230,7 @@ public class MainViewModel : INotifyPropertyChanged
         1 => PageStrings.Encore,
         2 => PageStrings.Downloads,
         3 when IsCloneHeroTabVisible => PageStrings.CloneHero,
-        4 => PageStrings.Sync,
-        5 => PageStrings.Settings,
+        4 => PageStrings.Settings,
         _ => PageStrings.RhythmVerse,
     };
 
@@ -256,7 +242,6 @@ public class MainViewModel : INotifyPropertyChanged
     public IRelayCommand GoEncoreCommand { get; }
     public IRelayCommand GoDownloadsCommand { get; }
     public IRelayCommand GoCloneHeroCommand { get; }
-    public IRelayCommand GoSyncCommand { get; }
     public IRelayCommand GoSettingsCommand { get; }
 
     public IRelayCommand<DownloadFile?> CancelSharedDownloadCommand { get; }
@@ -273,16 +258,6 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool IsSyncTabVisible
-    {
-        get => _isSyncTabVisible;
-        set
-        {
-            _isSyncTabVisible = value;
-            OnPropertyChanged();
-        }
-    }
-
     public MainViewModel()
     {
         ShowFiltersPaneCommand = new RelayCommand(ToggleDesktopFiltersPane);
@@ -293,8 +268,7 @@ public class MainViewModel : INotifyPropertyChanged
         GoEncoreCommand = new RelayCommand(() => NavigateToTab(1));
         GoDownloadsCommand = new RelayCommand(() => NavigateToTab(2));
         GoCloneHeroCommand = new RelayCommand(() => NavigateToTab(3));
-        GoSyncCommand = new RelayCommand(() => NavigateToTab(4));
-        GoSettingsCommand = new RelayCommand(() => NavigateToTab(5));
+        GoSettingsCommand = new RelayCommand(() => NavigateToTab(4));
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
     }
@@ -305,7 +279,6 @@ public class MainViewModel : INotifyPropertyChanged
         SharedDownloadQueue sharedDownloadQueue,
         DownloadViewModel downloadViewModel,
         CloneHeroViewModel cloneHeroViewModel,
-        SyncViewModel syncViewModel,
         SettingsViewModel settingsViewModel)
         : this(
             rhythmVerseViewModel,
@@ -313,7 +286,6 @@ public class MainViewModel : INotifyPropertyChanged
             sharedDownloadQueue,
             downloadViewModel,
             cloneHeroViewModel,
-            syncViewModel,
             settingsViewModel,
             action => Dispatcher.UIThread.Post(action),
             OperatingSystem.IsAndroid())
@@ -326,7 +298,6 @@ public class MainViewModel : INotifyPropertyChanged
         SharedDownloadQueue sharedDownloadQueue,
         DownloadViewModel downloadViewModel,
         CloneHeroViewModel cloneHeroViewModel,
-        SyncViewModel syncViewModel,
         SettingsViewModel settingsViewModel,
         Action<Action> postToUi,
         bool isAndroid)
@@ -342,7 +313,6 @@ public class MainViewModel : INotifyPropertyChanged
         }
         _downloadViewModel = downloadViewModel;
         _cloneHeroViewModel = cloneHeroViewModel;
-        _syncViewModel = syncViewModel;
         _settingsViewModel = settingsViewModel;
         ShowFiltersPaneCommand = new RelayCommand(ToggleDesktopFiltersPane);
         ToggleAndroidNavPaneCommand = new RelayCommand(ToggleAndroidNavPane);
@@ -352,8 +322,7 @@ public class MainViewModel : INotifyPropertyChanged
         GoEncoreCommand = new RelayCommand(() => NavigateToTab(1));
         GoDownloadsCommand = new RelayCommand(() => NavigateToTab(2));
         GoCloneHeroCommand = new RelayCommand(() => NavigateToTab(3));
-        GoSyncCommand = new RelayCommand(() => NavigateToTab(4));
-        GoSettingsCommand = new RelayCommand(() => NavigateToTab(5));
+        GoSettingsCommand = new RelayCommand(() => NavigateToTab(4));
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
 
@@ -362,17 +331,12 @@ public class MainViewModel : INotifyPropertyChanged
         _isCloneHeroTabVisible = supportsCloneHero;
         _isDownloadTabVisible = false;
         _isSettingsTabVisible = true;
-        _isSyncTabVisible = true;
 
         if (supportsCloneHero)
         {
             ObserveBackgroundTask(InitializeCloneHeroAsync(postToUi), "Clone Hero startup reconciliation");
         }
 
-        if (!isAndroid)
-        {
-            _downloadViewModel.DownloadWatcher.LoadItems();
-        }
         postToUi(() => IsDownloadTabVisible = true);
     }
 
@@ -446,12 +410,6 @@ public class MainViewModel : INotifyPropertyChanged
         }
 
         SelectedMainTabIndex = tabIndex;
-        if (tabIndex == 4)
-        {
-            ObserveBackgroundTask(
-                SyncViewModel.EnsureActivatedAsync(),
-                "Sync activation on tab navigation");
-        }
 
         if (IsCompanionMode)
         {
@@ -492,16 +450,6 @@ public class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        _downloadViewModel.DownloadWatcher.LoadItems();
-
-        if (_syncViewModel.IsCompanionMode
-            && _syncViewModel.IsConnected
-            && !_syncViewModel.IsBusy)
-        {
-            ObserveBackgroundTask(
-                _syncViewModel.RefreshLocalFilesSnapshotAsync(),
-                "Sync local file refresh after completed download");
-        }
     }
 
     private static void ObserveBackgroundTask(Task task, string context)

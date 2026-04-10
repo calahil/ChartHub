@@ -19,6 +19,8 @@ using ChartHub.Utilities;
 
 using CommunityToolkit.Mvvm.Input;
 
+using Google.Apis.Auth.OAuth2;
+
 namespace ChartHub.ViewModels;
 
 public sealed class SettingsFieldViewModel : INotifyPropertyChanged
@@ -224,136 +226,80 @@ public sealed class SecretFieldViewModel : INotifyPropertyChanged
 
 public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 {
-    private static readonly JsonSerializerOptions PairingHistoryJsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
 
     private readonly ISettingsOrchestrator _settings;
     private readonly ISecretStore _secretStore;
-    private readonly ICloudStorageAccountService _cloudAccountService;
+    private readonly IGoogleAuthProvider _googleAuthProvider;
+    private readonly IChartHubServerApiClient _serverApiClient;
     private readonly Action<Action> _postToUi;
     private readonly bool _isAndroidPlatform;
+    private static readonly string[] ServerAuthenticationScopes = ["openid", "email", "profile"];
 
     private string _statusMessage = "";
     private bool _hasPendingRestartSettings;
     private bool _isSaving;
     private bool _showDeveloperSettings;
-    private bool _isCloudAccountLinked;
-    private bool _isCloudAccountBusy;
-    private string _cloudAccountStatusMessage = string.Empty;
-    private string? _cloudAccountErrorMessage;
-    private AuthGateViewModel? _cloudAuthGateViewModel;
-    private string _currentPairCodeDisplay = "Not set";
-    private string _pairCodeExpiryDisplay = "Unknown";
-    private string _lastPairedDeviceDisplay = "Never paired";
-    private string _lastPairedAtDisplay = "-";
-    private string _selectedSyncEndpoint = string.Empty;
+    private bool _isServerAuthenticationBusy;
+    private string _serverAuthenticationStatusMessage = "Not authenticated with ChartHub Server.";
+    private string? _serverAuthenticationErrorMessage;
 
     public ObservableCollection<SettingsFieldViewModel> Fields { get; } = [];
     public ObservableCollection<SecretFieldViewModel> Secrets { get; } = [];
-    public ObservableCollection<SyncPairingHistoryEntryViewModel> PairingHistoryEntries { get; } = [];
-    public ObservableCollection<string> SyncEndpointOptions { get; } = [];
 
     public AsyncRelayCommand SaveCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> SaveSecretCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> ClearSecretCommand { get; }
-    public IAsyncRelayCommand LinkCloudAccountCommand { get; }
-    public IAsyncRelayCommand UnlinkCloudAccountCommand { get; }
-    public IRelayCommand DismissCloudAuthGateCommand { get; }
-    public IAsyncRelayCommand RegeneratePairCodeCommand { get; }
-    public IAsyncRelayCommand ApplySyncEndpointCommand { get; }
+    public IAsyncRelayCommand AuthenticateServerCommand { get; }
     public string SecretStorageBackend { get; }
-    public string CloudProviderId => _cloudAccountService.ProviderId;
-    public string CloudProviderDisplayName => _cloudAccountService.ProviderDisplayName;
 
-    public bool IsCloudAccountLinked
+    public bool IsServerAuthenticationBusy
     {
-        get => _isCloudAccountLinked;
+        get => _isServerAuthenticationBusy;
         private set
         {
-            if (_isCloudAccountLinked == value)
+            if (_isServerAuthenticationBusy == value)
             {
                 return;
             }
 
-            _isCloudAccountLinked = value;
+            _isServerAuthenticationBusy = value;
             OnPropertyChanged();
-            LinkCloudAccountCommand.NotifyCanExecuteChanged();
-            UnlinkCloudAccountCommand.NotifyCanExecuteChanged();
+            AuthenticateServerCommand.NotifyCanExecuteChanged();
         }
     }
 
-    public bool IsCloudAccountBusy
+    public string ServerAuthenticationStatusMessage
     {
-        get => _isCloudAccountBusy;
+        get => _serverAuthenticationStatusMessage;
         private set
         {
-            if (_isCloudAccountBusy == value)
+            if (_serverAuthenticationStatusMessage == value)
             {
                 return;
             }
 
-            _isCloudAccountBusy = value;
+            _serverAuthenticationStatusMessage = value;
             OnPropertyChanged();
-            LinkCloudAccountCommand.NotifyCanExecuteChanged();
-            UnlinkCloudAccountCommand.NotifyCanExecuteChanged();
         }
     }
 
-    public string CloudAccountStatusMessage
+    public string? ServerAuthenticationErrorMessage
     {
-        get => _cloudAccountStatusMessage;
+        get => _serverAuthenticationErrorMessage;
         private set
         {
-            if (_cloudAccountStatusMessage == value)
+            if (_serverAuthenticationErrorMessage == value)
             {
                 return;
             }
 
-            _cloudAccountStatusMessage = value;
+            _serverAuthenticationErrorMessage = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(HasServerAuthenticationError));
         }
     }
 
-    public string? CloudAccountErrorMessage
-    {
-        get => _cloudAccountErrorMessage;
-        private set
-        {
-            if (_cloudAccountErrorMessage == value)
-            {
-                return;
-            }
-
-            _cloudAccountErrorMessage = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(HasCloudAccountError));
-        }
-    }
-
-    public bool HasCloudAccountError => !string.IsNullOrWhiteSpace(CloudAccountErrorMessage);
-
-    public AuthGateViewModel? CloudAuthGateViewModel
-    {
-        get => _cloudAuthGateViewModel;
-        private set
-        {
-            if (ReferenceEquals(_cloudAuthGateViewModel, value))
-            {
-                return;
-            }
-
-            _cloudAuthGateViewModel = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(IsCloudAuthGateVisible));
-            LinkCloudAccountCommand.NotifyCanExecuteChanged();
-            UnlinkCloudAccountCommand.NotifyCanExecuteChanged();
-            DismissCloudAuthGateCommand.NotifyCanExecuteChanged();
-        }
-    }
-
-    public bool IsCloudAuthGateVisible => CloudAuthGateViewModel is not null;
+    public bool HasServerAuthenticationError => !string.IsNullOrWhiteSpace(ServerAuthenticationErrorMessage);
 
 #if DEBUG
     public bool IsDeveloperBuild => true;
@@ -378,88 +324,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     }
 
     public bool IsSecretsPanelVisible => IsDeveloperBuild && ShowDeveloperSettings;
-
-    public string CurrentPairCodeDisplay
-    {
-        get => _currentPairCodeDisplay;
-        private set
-        {
-            if (_currentPairCodeDisplay == value)
-            {
-                return;
-            }
-
-            _currentPairCodeDisplay = value;
-            OnPropertyChanged();
-        }
-    }
-
-    public string PairCodeExpiryDisplay
-    {
-        get => _pairCodeExpiryDisplay;
-        private set
-        {
-            if (_pairCodeExpiryDisplay == value)
-            {
-                return;
-            }
-
-            _pairCodeExpiryDisplay = value;
-            OnPropertyChanged();
-        }
-    }
-
-    public string LastPairedDeviceDisplay
-    {
-        get => _lastPairedDeviceDisplay;
-        private set
-        {
-            if (_lastPairedDeviceDisplay == value)
-            {
-                return;
-            }
-
-            _lastPairedDeviceDisplay = value;
-            OnPropertyChanged();
-        }
-    }
-
-    public string LastPairedAtDisplay
-    {
-        get => _lastPairedAtDisplay;
-        private set
-        {
-            if (_lastPairedAtDisplay == value)
-            {
-                return;
-            }
-
-            _lastPairedAtDisplay = value;
-            OnPropertyChanged();
-        }
-    }
-
-    public bool HasPairingHistory => PairingHistoryEntries.Count > 0;
-
-    public bool HasNoPairingHistory => PairingHistoryEntries.Count == 0;
-
-    public bool HasSyncEndpointOptions => SyncEndpointOptions.Count > 0;
-
-    public string SelectedSyncEndpoint
-    {
-        get => _selectedSyncEndpoint;
-        set
-        {
-            if (_selectedSyncEndpoint == value)
-            {
-                return;
-            }
-
-            _selectedSyncEndpoint = value;
-            OnPropertyChanged();
-            ApplySyncEndpointCommand.NotifyCanExecuteChanged();
-        }
-    }
 
     public string StatusMessage
     {
@@ -503,21 +367,24 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public SettingsViewModel(
         ISettingsOrchestrator settings,
         ISecretStore secretStore,
-        ICloudStorageAccountService cloudAccountService)
-        : this(settings, secretStore, cloudAccountService, action => Dispatcher.UIThread.Post(action), null)
+        IGoogleAuthProvider googleAuthProvider,
+        IChartHubServerApiClient serverApiClient)
+        : this(settings, secretStore, googleAuthProvider, serverApiClient, action => Dispatcher.UIThread.Post(action), null)
     {
     }
 
     internal SettingsViewModel(
         ISettingsOrchestrator settings,
         ISecretStore secretStore,
-        ICloudStorageAccountService cloudAccountService,
+        IGoogleAuthProvider googleAuthProvider,
+        IChartHubServerApiClient serverApiClient,
         Action<Action> postToUi,
         bool? isAndroidPlatform)
     {
         _settings = settings;
         _secretStore = secretStore;
-        _cloudAccountService = cloudAccountService;
+        _googleAuthProvider = googleAuthProvider;
+        _serverApiClient = serverApiClient;
         _postToUi = postToUi;
         _isAndroidPlatform = isAndroidPlatform ?? OperatingSystem.IsAndroid();
         _showDeveloperSettings = false;
@@ -525,13 +392,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
         SaveSecretCommand = new AsyncRelayCommand<SecretFieldViewModel?>(SaveSecretAsync);
         ClearSecretCommand = new AsyncRelayCommand<SecretFieldViewModel?>(ClearSecretAsync);
-        LinkCloudAccountCommand = new AsyncRelayCommand(LinkCloudAccountAsync, CanLinkCloudAccount);
-        UnlinkCloudAccountCommand = new AsyncRelayCommand(UnlinkCloudAccountAsync, CanUnlinkCloudAccount);
-        DismissCloudAuthGateCommand = new RelayCommand(DismissCloudAuthGate, CanDismissCloudAuthGate);
-        RegeneratePairCodeCommand = new AsyncRelayCommand(RegeneratePairCodeAsync, CanRegeneratePairCode);
-        ApplySyncEndpointCommand = new AsyncRelayCommand(ApplySyncEndpointAsync, CanApplySyncEndpoint);
+        AuthenticateServerCommand = new AsyncRelayCommand(AuthenticateServerAsync, CanAuthenticateServer);
         SecretStorageBackend = ResolveSecretStorageBackend(secretStore);
-        CloudAccountStatusMessage = $"{CloudProviderDisplayName} is not linked.";
+        UpdateServerAuthenticationStatusFromCurrentSettings();
 
         RebuildFieldsFrom(_settings.Current);
         if (IsDeveloperBuild)
@@ -540,133 +403,95 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
 
         _settings.SettingsChanged += OnSettingsChanged;
-        _ = RefreshCloudAccountStateAsync();
         if (IsDeveloperBuild)
         {
             _ = RefreshSecretStateAsync();
         }
     }
 
-    private bool CanLinkCloudAccount() => !IsCloudAccountBusy && !IsCloudAccountLinked && !IsCloudAuthGateVisible;
+    private bool CanAuthenticateServer() => !IsServerAuthenticationBusy;
 
-    private bool CanUnlinkCloudAccount() => !IsCloudAccountBusy && IsCloudAccountLinked && !IsCloudAuthGateVisible;
-
-    private bool CanDismissCloudAuthGate() => IsCloudAuthGateVisible;
-
-    private bool CanRegeneratePairCode() => !_isSaving;
-
-    private bool CanApplySyncEndpoint()
+    private async Task AuthenticateServerAsync()
     {
-        string selected = NormalizeApiBaseUrl(SelectedSyncEndpoint);
-        if (string.IsNullOrWhiteSpace(selected))
+        if (!CanAuthenticateServer())
         {
-            return false;
+            return;
         }
 
-        string current = NormalizeApiBaseUrl(_settings.Current.Runtime.SyncApiPreferredBaseUrl);
-        return !string.Equals(selected, current, StringComparison.OrdinalIgnoreCase);
-    }
+        string baseUrl = ResolveServerApiBaseUrl();
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            ServerAuthenticationErrorMessage = "Set Runtime.ServerApiBaseUrl before authenticating.";
+            ServerAuthenticationStatusMessage = "ChartHub Server authentication is not configured.";
+            return;
+        }
 
-    private async Task RefreshCloudAccountStateAsync(CancellationToken cancellationToken = default)
-    {
-        IsCloudAccountBusy = true;
-        CloudAccountErrorMessage = null;
+        IsServerAuthenticationBusy = true;
+        ServerAuthenticationErrorMessage = null;
+        ServerAuthenticationStatusMessage = "Opening Google sign-in...";
 
         try
         {
-            bool linked = await _cloudAccountService.TryRestoreSessionAsync(cancellationToken);
-            IsCloudAccountLinked = linked;
-            if (linked)
+            UserCredential credential = await _googleAuthProvider.AuthorizeInteractiveAsync(ServerAuthenticationScopes);
+            string? googleIdToken = credential.Token.IdToken;
+            if (string.IsNullOrWhiteSpace(googleIdToken))
             {
-                CloudAuthGateViewModel = null;
+                throw new InvalidOperationException("Google sign-in succeeded but did not return an ID token.");
             }
 
-            CloudAccountStatusMessage = linked
-                ? $"{CloudProviderDisplayName} linked."
-                : $"{CloudProviderDisplayName} is not linked.";
+            ServerAuthenticationStatusMessage = "Exchanging Google token with ChartHub Server...";
+            ChartHubServerAuthExchangeResponse exchange = await _serverApiClient.ExchangeGoogleTokenAsync(baseUrl, googleIdToken);
+            if (string.IsNullOrWhiteSpace(exchange.AccessToken))
+            {
+                throw new InvalidOperationException("ChartHub Server returned an empty access token.");
+            }
+
+            ConfigValidationResult result = await _settings.UpdateAsync(config =>
+            {
+                config.Runtime.ServerApiAuthToken = exchange.AccessToken;
+            });
+
+            if (!result.IsValid)
+            {
+                throw new InvalidOperationException("Failed to store ChartHub Server access token in settings.");
+            }
+
+            ServerAuthenticationStatusMessage = "ChartHub Server authentication succeeded.";
         }
         catch (Exception ex)
         {
-            IsCloudAccountLinked = false;
-            CloudAccountErrorMessage = ex.Message;
-            CloudAccountStatusMessage = $"Unable to check {CloudProviderDisplayName} account status.";
-            Logger.LogError("Auth", "Failed to refresh cloud account state", ex, new Dictionary<string, object?>
-            {
-                ["providerId"] = CloudProviderId,
-            });
+            ServerAuthenticationErrorMessage = ex.Message;
+            ServerAuthenticationStatusMessage = "ChartHub Server authentication failed.";
+            Logger.LogError("Auth", "ChartHub Server authentication failed", ex);
         }
         finally
         {
-            IsCloudAccountBusy = false;
+            IsServerAuthenticationBusy = false;
         }
     }
 
-    private async Task LinkCloudAccountAsync()
+    private string ResolveServerApiBaseUrl()
     {
-        if (!CanLinkCloudAccount())
+        SettingsFieldViewModel? baseUrlField = Fields.FirstOrDefault(field =>
+            string.Equals(field.Key, "Runtime.ServerApiBaseUrl", StringComparison.Ordinal));
+        if (!string.IsNullOrWhiteSpace(baseUrlField?.StringValue))
         {
-            return;
+            return baseUrlField.StringValue.Trim();
         }
 
-        CloudAccountErrorMessage = null;
-        CloudAccountStatusMessage = $"Awaiting {CloudProviderDisplayName} sign-in...";
-        CloudAuthGateViewModel = new AuthGateViewModel(_cloudAccountService, OnCloudAccountAuthenticatedAsync);
-        await Task.CompletedTask;
+        return _settings.Current.Runtime.ServerApiBaseUrl?.Trim() ?? string.Empty;
     }
 
-    private async Task UnlinkCloudAccountAsync()
+    private void UpdateServerAuthenticationStatusFromCurrentSettings()
     {
-        if (!CanUnlinkCloudAccount())
-        {
-            return;
-        }
+        bool hasToken = !string.IsNullOrWhiteSpace(_settings.Current.Runtime.ServerApiAuthToken);
+        ServerAuthenticationStatusMessage = hasToken
+            ? "ChartHub Server token is configured."
+            : "Not authenticated with ChartHub Server.";
 
-        IsCloudAccountBusy = true;
-        CloudAccountErrorMessage = null;
-        CloudAccountStatusMessage = $"Unlinking {CloudProviderDisplayName}...";
-
-        try
+        if (!hasToken)
         {
-            await _cloudAccountService.UnlinkAsync();
-            IsCloudAccountLinked = false;
-            CloudAuthGateViewModel = null;
-            CloudAccountStatusMessage = $"{CloudProviderDisplayName} is not linked.";
-        }
-        catch (Exception ex)
-        {
-            CloudAccountErrorMessage = ex.Message;
-            CloudAccountStatusMessage = $"Failed to unlink {CloudProviderDisplayName}.";
-            Logger.LogError("Auth", "Failed to unlink cloud account", ex, new Dictionary<string, object?>
-            {
-                ["providerId"] = CloudProviderId,
-            });
-        }
-        finally
-        {
-            IsCloudAccountBusy = false;
-        }
-    }
-
-    private Task OnCloudAccountAuthenticatedAsync()
-    {
-        IsCloudAccountLinked = true;
-        CloudAccountErrorMessage = null;
-        CloudAccountStatusMessage = $"{CloudProviderDisplayName} linked.";
-        CloudAuthGateViewModel = null;
-        return Task.CompletedTask;
-    }
-
-    private void DismissCloudAuthGate()
-    {
-        if (!IsCloudAuthGateVisible)
-        {
-            return;
-        }
-
-        CloudAuthGateViewModel = null;
-        if (!IsCloudAccountLinked)
-        {
-            CloudAccountStatusMessage = $"{CloudProviderDisplayName} is not linked.";
+            ServerAuthenticationErrorMessage = null;
         }
     }
 
@@ -687,7 +512,11 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     private void OnSettingsChanged(AppConfigRoot config)
     {
-        _postToUi(() => RebuildFieldsFrom(config));
+        _postToUi(() =>
+        {
+            RebuildFieldsFrom(config);
+            UpdateServerAuthenticationStatusFromCurrentSettings();
+        });
     }
 
     private void RebuildFieldsFrom(AppConfigRoot config)
@@ -721,102 +550,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
 
         HasPendingRestartSettings = Fields.Any(FieldRequiresReloadAfterSave);
-        RefreshPairingDisplay(config);
         RefreshSaveState();
-    }
-
-    private void RefreshPairingDisplay(AppConfigRoot config)
-    {
-        string pairCode = config.Runtime.SyncApiPairCode;
-        CurrentPairCodeDisplay = string.IsNullOrWhiteSpace(pairCode) ? "Not set" : pairCode;
-
-        DateTimeOffset issuedAt = DateTimeOffset.TryParse(config.Runtime.SyncApiPairCodeIssuedAtUtc, out DateTimeOffset parsedIssued)
-            ? parsedIssued
-            : DateTimeOffset.UtcNow;
-        int ttlMinutes = Math.Clamp(config.Runtime.SyncApiPairCodeTtlMinutes, 1, 1440);
-        DateTimeOffset expiresAt = issuedAt.AddMinutes(ttlMinutes).ToLocalTime();
-        PairCodeExpiryDisplay = expiresAt.ToString("yyyy-MM-dd HH:mm:ss");
-
-        string lastPairedDevice = config.Runtime.SyncApiLastPairedDeviceLabel;
-        LastPairedDeviceDisplay = string.IsNullOrWhiteSpace(lastPairedDevice)
-            ? "Never paired"
-            : lastPairedDevice;
-
-        if (DateTimeOffset.TryParse(config.Runtime.SyncApiLastPairedAtUtc, out DateTimeOffset lastPairedAt))
-        {
-            LastPairedAtDisplay = lastPairedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-        }
-        else
-        {
-            LastPairedAtDisplay = "-";
-        }
-
-        RefreshPairingHistory(config.Runtime.SyncApiPairingHistoryJson);
-        RefreshSyncEndpointOptions(config.Runtime.SyncApiSavedConnectionsJson, config.Runtime.SyncApiPreferredBaseUrl);
-    }
-
-    private void RefreshSyncEndpointOptions(string savedConnectionsJson, string preferredBaseUrl)
-    {
-        List<string> endpoints = ParseSavedSyncEndpoints(savedConnectionsJson);
-        string normalizedPreferred = NormalizeApiBaseUrl(preferredBaseUrl);
-        if (!string.IsNullOrWhiteSpace(normalizedPreferred)
-            && !endpoints.Contains(normalizedPreferred, StringComparer.OrdinalIgnoreCase))
-        {
-            endpoints.Insert(0, normalizedPreferred);
-        }
-
-        SyncEndpointOptions.Clear();
-        foreach (string endpoint in endpoints)
-        {
-            SyncEndpointOptions.Add(endpoint);
-        }
-
-        string nextSelected = !string.IsNullOrWhiteSpace(normalizedPreferred)
-            ? normalizedPreferred
-            : SyncEndpointOptions.FirstOrDefault() ?? string.Empty;
-        SelectedSyncEndpoint = nextSelected;
-
-        OnPropertyChanged(nameof(HasSyncEndpointOptions));
-        ApplySyncEndpointCommand.NotifyCanExecuteChanged();
-    }
-
-    private void RefreshPairingHistory(string pairingHistoryJson)
-    {
-        PairingHistoryEntries.Clear();
-
-        if (string.IsNullOrWhiteSpace(pairingHistoryJson))
-        {
-            OnPropertyChanged(nameof(HasPairingHistory));
-            OnPropertyChanged(nameof(HasNoPairingHistory));
-            return;
-        }
-
-        try
-        {
-            List<PairingHistoryEntryPayload> entries = JsonSerializer.Deserialize<List<PairingHistoryEntryPayload>>(pairingHistoryJson, PairingHistoryJsonOptions) ?? [];
-            foreach (PairingHistoryEntryPayload entry in entries)
-            {
-                if (string.IsNullOrWhiteSpace(entry.PairedAtUtc))
-                {
-                    continue;
-                }
-
-                string deviceLabel = string.IsNullOrWhiteSpace(entry.DeviceLabel) ? "Unknown device" : entry.DeviceLabel;
-                if (!DateTimeOffset.TryParse(entry.PairedAtUtc, out DateTimeOffset pairedAtUtc))
-                {
-                    continue;
-                }
-
-                PairingHistoryEntries.Add(new SyncPairingHistoryEntryViewModel(deviceLabel, pairedAtUtc));
-            }
-        }
-        catch
-        {
-            // Keep empty history on malformed JSON.
-        }
-
-        OnPropertyChanged(nameof(HasPairingHistory));
-        OnPropertyChanged(nameof(HasNoPairingHistory));
     }
 
     private void OnFieldPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -1051,7 +785,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         });
 
         _isSaving = true;
-        RegeneratePairCodeCommand.NotifyCanExecuteChanged();
         RefreshSaveState();
         try
         {
@@ -1142,58 +875,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         finally
         {
             _isSaving = false;
-            RegeneratePairCodeCommand.NotifyCanExecuteChanged();
             RefreshSaveState();
         }
-    }
-
-    private async Task RegeneratePairCodeAsync()
-    {
-        if (!CanRegeneratePairCode())
-        {
-            return;
-        }
-
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        string nextCode = AppGlobalSettings.GenerateSyncPairCode();
-
-        ConfigValidationResult result = await _settings.UpdateAsync(config =>
-        {
-            config.Runtime.SyncApiPairCode = nextCode;
-            config.Runtime.SyncApiPairCodeIssuedAtUtc = now.ToString("O");
-        });
-
-        if (!result.IsValid)
-        {
-            StatusMessage = "Failed to regenerate pair code.";
-            return;
-        }
-
-        StatusMessage = "Pair code regenerated.";
-    }
-
-    private async Task ApplySyncEndpointAsync()
-    {
-        if (!CanApplySyncEndpoint())
-        {
-            return;
-        }
-
-        string selected = NormalizeApiBaseUrl(SelectedSyncEndpoint);
-        if (string.IsNullOrWhiteSpace(selected))
-        {
-            return;
-        }
-
-        ConfigValidationResult result = await _settings.UpdateAsync(config =>
-        {
-            config.Runtime.SyncApiPreferredBaseUrl = selected;
-        });
-
-        StatusMessage = result.IsValid
-            ? "Preferred sync endpoint updated."
-            : "Failed to update preferred sync endpoint.";
-        ApplySyncEndpointCommand.NotifyCanExecuteChanged();
     }
 
     private bool CanSave()
@@ -1285,49 +968,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         return null;
     }
 
-    private static List<string> ParseSavedSyncEndpoints(string savedConnectionsJson)
-    {
-        if (string.IsNullOrWhiteSpace(savedConnectionsJson))
-        {
-            return [];
-        }
-
-        try
-        {
-            List<SavedSyncEndpointPayload> entries = JsonSerializer.Deserialize<List<SavedSyncEndpointPayload>>(savedConnectionsJson, PairingHistoryJsonOptions) ?? [];
-            return entries
-                .Select(entry => NormalizeApiBaseUrl(entry.ApiBaseUrl))
-                .Where(value => !string.IsNullOrWhiteSpace(value))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-        catch (JsonException ex)
-        {
-            Logger.LogWarning("Config", "Failed to parse saved sync endpoints JSON", new Dictionary<string, object?>
-            {
-                ["error"] = ex.Message,
-                ["jsonPreview"] = savedConnectionsJson.Length <= 256
-                    ? savedConnectionsJson
-                    : savedConnectionsJson[..256],
-            });
-            return [];
-        }
-        catch
-        {
-            return [];
-        }
-    }
-
-    private static string NormalizeApiBaseUrl(string? value)
-    {
-        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri)
-            || string.IsNullOrWhiteSpace(uri.Host))
-        {
-            return string.Empty;
-        }
-
-        return uri.GetLeftPart(UriPartial.Authority);
-    }
 
     private static string? ValidateDirectoryPath(string path)
     {
@@ -1491,21 +1131,4 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             field.PropertyChanged -= OnFieldPropertyChanged;
         }
     }
-}
-
-public sealed record SyncPairingHistoryEntryViewModel(string DeviceLabel, DateTimeOffset PairedAtUtc)
-{
-    public string PairedAtDisplay => PairedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
-}
-
-internal sealed class PairingHistoryEntryPayload
-{
-    public string DeviceLabel { get; set; } = string.Empty;
-    public string PairedAtUtc { get; set; } = string.Empty;
-}
-
-internal sealed class SavedSyncEndpointPayload
-{
-    [JsonPropertyName("apiBaseUrl")]
-    public string ApiBaseUrl { get; set; } = string.Empty;
 }

@@ -14,8 +14,10 @@ Use this document if you are:
 
 - [ChartHub](../ChartHub): main app project for desktop and optional Android targets
 - [ChartHub.BackupApi](../ChartHub.BackupApi): backup and mirroring service for RhythmVerse catalog data
+- [ChartHub.Server](../ChartHub.Server): server-hosted download and Clone Hero library API
 - [ChartHub.Tests](../ChartHub.Tests): test suite for the main app
 - [ChartHub.BackupApi.Tests](../ChartHub.BackupApi.Tests): test suite for the backup API
+- [ChartHub.Server.Tests](../ChartHub.Server.Tests): test suite for server endpoints and services
 - [ChartHub.sln](../ChartHub.sln): solution entry point
 
 ## Requirements
@@ -90,13 +92,20 @@ Primary references:
 
 The repository includes Docker Compose support for the Backup API and PostgreSQL.
 
-1. Copy `.env.example` to `.env`
-2. Set `RHYTHMVERSE_TOKEN`
+1. Generate local env values:
+
+```bash
+./scripts/setup-local-secrets.sh
+```
+
+2. Set `RHYTHMVERSE_TOKEN` in `.env.local` (or export it before running the script).
 3. Start the stack:
 
 ```bash
 docker compose up -d --build
 ```
+
+The script writes `.env.local` and never overwrites `.env`.
 
 The Backup API is exposed on `http://127.0.0.1:5147`.
 
@@ -174,6 +183,67 @@ The upstream RhythmVerse endpoint currently ignores the `updatedSince` input use
 - Apply Backup API EF migrations before deploying reconciliation changes
 - Public Backup API song and download lookups exclude soft-deleted rows by default
 - Soft delete is intentional so removed upstream rows are hidden from normal reads while still retained in persistence
+
+## ChartHub.Server And Self-Hosting
+
+ChartHub.Server provides authenticated endpoints for:
+
+- download job orchestration
+- source URL resolution and staged installs
+- Clone Hero library operations (list/get/delete/restore/install-from-staged)
+
+Primary references:
+
+- [ChartHub.Server/Program.cs](../ChartHub.Server/Program.cs)
+- [ChartHub.Server/.env.example](../ChartHub.Server/.env.example)
+- [ChartHub.Server/README.docker.md](../ChartHub.Server/README.docker.md)
+
+### Docker Setup
+
+From repository root:
+
+1. Generate local env values:
+
+```bash
+./scripts/setup-local-secrets.sh
+```
+
+2. Set `RHYTHMVERSE_TOKEN` in `.env.local`.
+3. If needed, apply local dotnet user-secrets values too:
+
+```bash
+./scripts/setup-local-secrets.sh --apply-user-secrets
+```
+
+4. Set `CHARTHUB_SERVER_JWT_SIGNING_KEY` manually only when you want to override the generated value.
+5. Set `CHARTHUB_SERVER_ALLOWED_EMAIL_0` to the Google account email you use in the client auth flow.
+6. Initialize bind mount folders:
+
+```bash
+./scripts/init-charthub-server-dev-paths.sh
+```
+
+7. Start the stack:
+
+```bash
+docker compose up -d --build
+```
+
+ChartHub.Server is exposed on `http://127.0.0.1:5180` by default.
+
+### Health Check
+
+```bash
+curl -s http://127.0.0.1:5180/health
+```
+
+Expected response:
+
+```json
+{
+	"status": "ok"
+}
+```
 
 ## Desktop And Android Sync API
 

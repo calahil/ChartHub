@@ -2,6 +2,7 @@ using System.ComponentModel;
 
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Threading;
 
 using ChartHub.Models;
 using ChartHub.Strings;
@@ -138,7 +139,13 @@ public partial class SongInfoControl : UserControl
 
     private void SongNotifier_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        RefreshSongInfo();
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            RefreshSongInfo();
+            return;
+        }
+
+        Dispatcher.UIThread.Post(RefreshSongInfo);
     }
 
     private void RefreshSongInfo()

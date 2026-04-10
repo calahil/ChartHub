@@ -7,6 +7,10 @@ using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
 using ChartHub.ViewModels;
 
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.Auth.OAuth2.Flows;
+using Google.Apis.Auth.OAuth2.Responses;
+
 namespace ChartHub.Tests;
 
 [Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.Unit)]
@@ -18,31 +22,22 @@ public class SettingsViewModelTests
         using var temp = new TemporaryDirectoryFixture("settings-vm-fields");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService();
+        var googleAuthProvider = new FakeGoogleAuthProvider();
+        var serverApiClient = new FakeChartHubServerApiClient();
         await secrets.SetAsync(SecretKeys.GoogleRefreshToken, "stored-refresh-token");
 
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
         await Task.Yield();
 
-        Assert.Equal(21, sut.Fields.Count);
+        Assert.Equal(14, sut.Fields.Count);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.RhythmVerseSource" && field.IsDropdownEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.UseMockData" && field.IsToggleEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.DownloadDirectory" && field.IsDirectoryPicker);
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiDesktopBaseUrl");
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiListenPrefix");
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiAdvertisedBaseUrl");
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiDeviceLabel" && field.IsTextEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiPairCode" && field.IsTextEditor);
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiPairCodeIssuedAtUtc");
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiPairCodeTtlMinutes" && field.IsNumberEditor);
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiSavedConnectionsJson");
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiMaxRequestBodyBytes" && field.IsNumberEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiBodyReadTimeoutMs" && field.IsNumberEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiMutationWaitTimeoutMs" && field.IsNumberEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.SyncApiSlowRequestThresholdMs" && field.IsNumberEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiAuthToken" && field.IsTextEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiBaseUrl" && field.IsTextEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.TransferOrchestratorConcurrencyCap" && field.IsNumberEditor);
         Assert.Contains(sut.Fields, field => field.Key == "GoogleAuth.AndroidClientId" && field.IsTextEditor);
-        Assert.Contains(sut.Fields, field => field.IsGroupHeaderVisible);
+
         int expectedSecretCount = sut.IsDeveloperBuild ? 3 : 0;
         Assert.Equal(expectedSecretCount, sut.Secrets.Count);
         if (sut.IsDeveloperBuild)
@@ -52,21 +47,21 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task Constructor_OnAndroid_ShowsAndroidSyncSettingsAndHidesDesktopHostSyncSettings()
+    public async Task Constructor_OnAndroid_OmitsDesktopOnlySettings()
     {
         using var temp = new TemporaryDirectoryFixture("settings-vm-platform-android");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService();
+        var googleAuthProvider = new FakeGoogleAuthProvider();
+        var serverApiClient = new FakeChartHubServerApiClient();
 
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount, isAndroidPlatform: true);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient, isAndroidPlatform: true);
         await Task.Yield();
 
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiDesktopBaseUrl");
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiListenPrefix");
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiAdvertisedBaseUrl");
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.AllowSyncApiStateOverride");
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiMaxRequestBodyBytes");
+        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiAuthToken");
+        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiPreferredBaseUrl");
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiAuthToken");
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiBaseUrl");
     }
 
     [Fact]
@@ -75,9 +70,10 @@ public class SettingsViewModelTests
         using var temp = new TemporaryDirectoryFixture("settings-vm-validation");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService();
+        var googleAuthProvider = new FakeGoogleAuthProvider();
+        var serverApiClient = new FakeChartHubServerApiClient();
 
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
         await Task.Yield();
 
         SettingsFieldViewModel field = Assert.Single(sut.Fields, item => item.Key == "Runtime.DownloadDirectory");
@@ -95,9 +91,10 @@ public class SettingsViewModelTests
         using var temp = new TemporaryDirectoryFixture("settings-vm-save");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService();
+        var googleAuthProvider = new FakeGoogleAuthProvider();
+        var serverApiClient = new FakeChartHubServerApiClient();
 
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
         await Task.Yield();
 
         SettingsFieldViewModel androidClientField = Assert.Single(sut.Fields, item => item.Key == "GoogleAuth.AndroidClientId");
@@ -117,9 +114,10 @@ public class SettingsViewModelTests
         using var temp = new TemporaryDirectoryFixture("settings-vm-save-reload");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService();
+        var googleAuthProvider = new FakeGoogleAuthProvider();
+        var serverApiClient = new FakeChartHubServerApiClient();
 
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
         await Task.Yield();
 
         SettingsFieldViewModel tempDirectoryField = Assert.Single(sut.Fields, item => item.Key == "Runtime.TempDirectory");
@@ -135,36 +133,15 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task HasPendingRestartSettings_OnlyTrueWhenNonHotReloadableFieldIsDirty()
-    {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-reload-indicator");
-        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
-        var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService();
-
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
-        await Task.Yield();
-
-        Assert.False(sut.HasPendingRestartSettings);
-
-        SettingsFieldViewModel hotReloadableField = Assert.Single(sut.Fields, item => item.Key == "GoogleAuth.AndroidClientId");
-        hotReloadableField.StringValue = "android-client-changed";
-        Assert.False(sut.HasPendingRestartSettings);
-
-        SettingsFieldViewModel nonHotField = Assert.Single(sut.Fields, item => item.Key == "Runtime.StagingDirectory");
-        nonHotField.StringValue = Path.Combine(temp.RootPath, "Staging-New");
-        Assert.True(sut.HasPendingRestartSettings);
-    }
-
-    [Fact]
     public async Task SecretCommands_SaveAndClear_UpdateStateAndStore()
     {
         using var temp = new TemporaryDirectoryFixture("settings-vm-secrets");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService();
+        var googleAuthProvider = new FakeGoogleAuthProvider();
+        var serverApiClient = new FakeChartHubServerApiClient();
 
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
         await Task.Yield();
 
         if (!sut.IsDeveloperBuild)
@@ -191,157 +168,55 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task CloudAccountCommands_LinkAndUnlink_UpdateStateAndCallService()
+    public async Task AuthenticateServerCommand_ExchangesGoogleTokenAndPersistsServerToken()
     {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-cloud-account");
+        using var temp = new TemporaryDirectoryFixture("settings-vm-server-auth");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService
+        var googleAuthProvider = new FakeGoogleAuthProvider
         {
-            TryRestoreSessionResult = false,
+            InteractiveCredential = CreateGoogleCredential(idToken: "google-id-token"),
+        };
+        var serverApiClient = new FakeChartHubServerApiClient
+        {
+            ExchangeResponse = new ChartHubServerAuthExchangeResponse("server-access-token", DateTimeOffset.UtcNow.AddHours(1)),
         };
 
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
         await Task.Yield();
 
-        Assert.False(sut.IsCloudAccountLinked);
-        Assert.Equal("Google Drive", sut.CloudProviderDisplayName);
-        Assert.Equal("google-drive", sut.CloudProviderId);
-        Assert.Equal("Google Drive is not linked.", sut.CloudAccountStatusMessage);
+        await sut.AuthenticateServerCommand.ExecuteAsync(null);
 
-        await sut.LinkCloudAccountCommand.ExecuteAsync(null);
-
-        Assert.True(sut.IsCloudAuthGateVisible);
-        Assert.NotNull(sut.CloudAuthGateViewModel);
-        Assert.Equal(0, cloudAccount.LinkCallCount);
-
-        await sut.CloudAuthGateViewModel!.SignInCommand.ExecuteAsync(null);
-
-        Assert.Equal(1, cloudAccount.LinkCallCount);
-        Assert.True(sut.IsCloudAccountLinked);
-        Assert.Equal("Google Drive linked.", sut.CloudAccountStatusMessage);
-        Assert.False(sut.IsCloudAuthGateVisible);
-
-        await sut.UnlinkCloudAccountCommand.ExecuteAsync(null);
-
-        Assert.Equal(1, cloudAccount.UnlinkCallCount);
-        Assert.False(sut.IsCloudAccountLinked);
-        Assert.Equal("Google Drive is not linked.", sut.CloudAccountStatusMessage);
+        Assert.Equal(1, googleAuthProvider.AuthorizeInteractiveCallCount);
+        Assert.Equal(1, serverApiClient.ExchangeCallCount);
+        Assert.Equal("https://localhost:5001", serverApiClient.LastBaseUrl);
+        Assert.Equal("google-id-token", serverApiClient.LastGoogleIdToken);
+        Assert.Equal("server-access-token", orchestrator.Current.Runtime.ServerApiAuthToken);
+        Assert.Equal("ChartHub Server authentication succeeded.", sut.ServerAuthenticationStatusMessage);
+        Assert.False(sut.HasServerAuthenticationError);
     }
 
     [Fact]
-    public async Task CloudAccountCommands_WhenAuthGateDismissed_RemainsUnlinkedWithoutCallingLink()
+    public async Task AuthenticateServerCommand_WithoutBaseUrl_SetsErrorAndSkipsAuth()
     {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-cloud-dismiss");
-        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
-        var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService
-        {
-            TryRestoreSessionResult = false,
-        };
-
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
-        await Task.Yield();
-
-        await sut.LinkCloudAccountCommand.ExecuteAsync(null);
-
-        Assert.True(sut.IsCloudAuthGateVisible);
-        Assert.Equal(0, cloudAccount.LinkCallCount);
-
-        sut.DismissCloudAuthGateCommand.Execute(null);
-
-        Assert.False(sut.IsCloudAuthGateVisible);
-        Assert.False(sut.IsCloudAccountLinked);
-        Assert.Equal(0, cloudAccount.LinkCallCount);
-        Assert.Equal("Google Drive is not linked.", sut.CloudAccountStatusMessage);
-    }
-
-    [Fact]
-    public async Task Constructor_WhenCloudAlreadyLinked_SetsLinkedStatusAndNoHintError()
-    {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-cloud-linked");
-        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
-        var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService
-        {
-            TryRestoreSessionResult = true,
-        };
-
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
-        await Task.Yield();
-
-        Assert.True(sut.IsCloudAccountLinked);
-        Assert.Equal("Google Drive linked.", sut.CloudAccountStatusMessage);
-        Assert.False(sut.HasCloudAccountError);
-    }
-
-    [Fact]
-    public async Task Constructor_WithPairingHistory_PopulatesRecentPairings()
-    {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-pairing-history");
+        using var temp = new TemporaryDirectoryFixture("settings-vm-server-auth-missing-base-url");
         AppConfigRoot config = CreateConfig(temp.RootPath);
-        config.Runtime.SyncApiPairingHistoryJson =
-            "[{\"deviceLabel\":\"Pixel 9\",\"pairedAtUtc\":\"2026-01-02T03:04:05Z\"},{\"deviceLabel\":\"Galaxy S24\",\"pairedAtUtc\":\"2026-01-01T01:02:03Z\"}]";
+        config.Runtime.ServerApiBaseUrl = string.Empty;
 
         var orchestrator = new FakeSettingsOrchestrator(config);
         var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService();
+        var googleAuthProvider = new FakeGoogleAuthProvider();
+        var serverApiClient = new FakeChartHubServerApiClient();
 
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
         await Task.Yield();
 
-        Assert.True(sut.HasPairingHistory);
-        Assert.False(sut.HasNoPairingHistory);
-        Assert.Equal(2, sut.PairingHistoryEntries.Count);
-        Assert.Equal("Pixel 9", sut.PairingHistoryEntries[0].DeviceLabel);
-        Assert.Equal("Galaxy S24", sut.PairingHistoryEntries[1].DeviceLabel);
-    }
+        await sut.AuthenticateServerCommand.ExecuteAsync(null);
 
-    [Fact]
-    public async Task Constructor_WithMalformedPairingHistory_UsesEmptyHistory()
-    {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-pairing-history-malformed");
-        AppConfigRoot config = CreateConfig(temp.RootPath);
-        config.Runtime.SyncApiPairingHistoryJson = "{not-json";
-
-        var orchestrator = new FakeSettingsOrchestrator(config);
-        var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService();
-
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
-        await Task.Yield();
-
-        Assert.False(sut.HasPairingHistory);
-        Assert.True(sut.HasNoPairingHistory);
-        Assert.Empty(sut.PairingHistoryEntries);
-    }
-
-    [Fact]
-    public async Task ApplySyncEndpointCommand_PersistsPreferredEndpoint()
-    {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-preferred-sync-endpoint");
-        AppConfigRoot config = CreateConfig(temp.RootPath);
-        config.Runtime.SyncApiSavedConnectionsJson =
-            "[{\"apiBaseUrl\":\"http://192.168.1.44:15123\"},{\"apiBaseUrl\":\"http://192.168.1.55:15123\"}]";
-
-        var orchestrator = new FakeSettingsOrchestrator(config);
-        var secrets = new InMemorySecretStore();
-        var cloudAccount = new FakeCloudStorageAccountService();
-
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, cloudAccount);
-        await Task.Yield();
-
-        Assert.True(sut.HasSyncEndpointOptions);
-        Assert.Equal(2, sut.SyncEndpointOptions.Count);
-        Assert.Contains("http://192.168.1.44:15123", sut.SyncEndpointOptions);
-        Assert.Contains("http://192.168.1.55:15123", sut.SyncEndpointOptions);
-        Assert.Equal("http://192.168.1.44:15123", sut.SelectedSyncEndpoint);
-
-        sut.SelectedSyncEndpoint = "http://192.168.1.55:15123";
-        await sut.ApplySyncEndpointCommand.ExecuteAsync(null);
-
-        Assert.Equal("http://192.168.1.55:15123", orchestrator.Current.Runtime.SyncApiPreferredBaseUrl);
-        Assert.Equal("Preferred sync endpoint updated.", sut.StatusMessage);
+        Assert.Equal(0, googleAuthProvider.AuthorizeInteractiveCallCount);
+        Assert.Equal(0, serverApiClient.ExchangeCallCount);
+        Assert.True(sut.HasServerAuthenticationError);
+        Assert.Equal("Set Runtime.ServerApiBaseUrl before authenticating.", sut.ServerAuthenticationErrorMessage);
     }
 
     private static AppConfigRoot CreateConfig(string rootPath)
@@ -370,6 +245,7 @@ public class SettingsViewModelTests
                 OutputDirectory = outputDirectory,
                 CloneHeroDataDirectory = cloneHeroDataDirectory,
                 CloneHeroSongDirectory = cloneHeroSongDirectory,
+                ServerApiBaseUrl = "https://localhost:5001",
                 UseMockData = false,
             },
             GoogleAuth = new GoogleAuthConfig
@@ -383,7 +259,8 @@ public class SettingsViewModelTests
     private static SettingsViewModel CreateSettingsViewModel(
         ISettingsOrchestrator orchestrator,
         ISecretStore secrets,
-        ICloudStorageAccountService cloudAccount,
+        IGoogleAuthProvider googleAuthProvider,
+        IChartHubServerApiClient serverApiClient,
         bool? isAndroidPlatform = null)
     {
         ConstructorInfo? constructor = typeof(SettingsViewModel).GetConstructor(
@@ -392,7 +269,8 @@ public class SettingsViewModelTests
             [
                 typeof(ISettingsOrchestrator),
                 typeof(ISecretStore),
-                typeof(ICloudStorageAccountService),
+                typeof(IGoogleAuthProvider),
+                typeof(IChartHubServerApiClient),
                 typeof(Action<Action>),
                 typeof(bool?),
             ],
@@ -403,10 +281,37 @@ public class SettingsViewModelTests
         return (SettingsViewModel)constructor.Invoke([
             orchestrator,
             secrets,
-            cloudAccount,
+            googleAuthProvider,
+            serverApiClient,
             (Action<Action>)(action => action()),
             isAndroidPlatform,
         ]);
+    }
+
+    private static UserCredential CreateGoogleCredential(string idToken)
+    {
+        var initializer = new GoogleAuthorizationCodeFlow.Initializer
+        {
+            ClientSecrets = new ClientSecrets
+            {
+                ClientId = "test-client-id",
+                ClientSecret = "test-client-secret",
+            },
+            Scopes = ["openid", "email", "profile"],
+        };
+
+        var flow = new GoogleAuthorizationCodeFlow(initializer);
+        var token = new TokenResponse
+        {
+            IdToken = idToken,
+            AccessToken = "test-access-token",
+            RefreshToken = "test-refresh-token",
+            IssuedUtc = DateTime.UtcNow,
+            ExpiresInSeconds = 3600,
+            TokenType = "Bearer",
+        };
+
+        return new UserCredential(flow, "user", token);
     }
 
     private sealed class FakeSettingsOrchestrator : ISettingsOrchestrator
@@ -467,39 +372,78 @@ public class SettingsViewModelTests
         }
     }
 
-    private sealed class FakeCloudStorageAccountService : ICloudStorageAccountService
+    private sealed class FakeGoogleAuthProvider : IGoogleAuthProvider
     {
-        public bool TryRestoreSessionResult { get; set; }
-        public Exception? TryRestoreSessionException { get; set; }
+        public UserCredential? InteractiveCredential { get; set; }
+        public Exception? InteractiveException { get; set; }
+        public int AuthorizeInteractiveCallCount { get; private set; }
 
-        public int TryRestoreSessionCallCount { get; private set; }
-        public int LinkCallCount { get; private set; }
-        public int UnlinkCallCount { get; private set; }
+        public Task<UserCredential?> TryAuthorizeSilentAsync(IEnumerable<string> scopes, CancellationToken cancellationToken = default)
+            => Task.FromResult<UserCredential?>(null);
 
-        public string ProviderId => "google-drive";
-        public string ProviderDisplayName => "Google Drive";
+        public Task SignOutAsync(UserCredential? credential, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
 
-        public Task<bool> TryRestoreSessionAsync(CancellationToken cancellationToken = default)
+        public Task<UserCredential> AuthorizeInteractiveAsync(IEnumerable<string> scopes, CancellationToken cancellationToken = default)
         {
-            TryRestoreSessionCallCount++;
-            if (TryRestoreSessionException is not null)
+            AuthorizeInteractiveCallCount++;
+            if (InteractiveException is not null)
             {
-                throw TryRestoreSessionException;
+                throw InteractiveException;
             }
 
-            return Task.FromResult(TryRestoreSessionResult);
+            if (InteractiveCredential is null)
+            {
+                throw new InvalidOperationException("Interactive credential not configured for test.");
+            }
+
+            return Task.FromResult(InteractiveCredential);
+        }
+    }
+
+    private sealed class FakeChartHubServerApiClient : IChartHubServerApiClient
+    {
+        public int ExchangeCallCount { get; private set; }
+        public string LastBaseUrl { get; private set; } = string.Empty;
+        public string LastGoogleIdToken { get; private set; } = string.Empty;
+        public ChartHubServerAuthExchangeResponse ExchangeResponse { get; set; } =
+            new("test-token", DateTimeOffset.UtcNow.AddMinutes(30));
+
+        public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(
+            string baseUrl,
+            string googleIdToken,
+            CancellationToken cancellationToken = default)
+        {
+            ExchangeCallCount++;
+            LastBaseUrl = baseUrl;
+            LastGoogleIdToken = googleIdToken;
+            return Task.FromResult(ExchangeResponse);
         }
 
-        public Task LinkAsync(CancellationToken cancellationToken = default)
+        public Task<ChartHubServerDownloadJobResponse> CreateDownloadJobAsync(
+            string baseUrl,
+            string bearerToken,
+            ChartHubServerCreateDownloadJobRequest request,
+            CancellationToken cancellationToken = default)
         {
-            LinkCallCount++;
-            return Task.CompletedTask;
+            throw new NotSupportedException();
         }
 
-        public Task UnlinkAsync(CancellationToken cancellationToken = default)
+        public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(
+            string baseUrl,
+            string bearerToken,
+            CancellationToken cancellationToken = default)
         {
-            UnlinkCallCount++;
-            return Task.CompletedTask;
+            throw new NotSupportedException();
+        }
+
+        public Task RequestCancelDownloadJobAsync(
+            string baseUrl,
+            string bearerToken,
+            Guid jobId,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
         }
     }
 }

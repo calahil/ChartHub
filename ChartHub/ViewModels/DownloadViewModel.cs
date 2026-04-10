@@ -3,6 +3,8 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows.Input;
 
+using Avalonia.Threading;
+
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Services.Transfers;
@@ -16,10 +18,10 @@ namespace ChartHub.ViewModels;
 public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
 {
     private readonly AppGlobalSettings _globalSettings;
+    private readonly IChartHubServerApiClient _serverApiClient;
+    private readonly Func<Action, Task> _uiInvoke;
     public bool IsCompanionMode => OperatingSystem.IsAndroid();
     public bool IsDesktopMode => !OperatingSystem.IsAndroid();
-
-    public IResourceWatcher DownloadWatcher { get; set; }
 
     public ICommand CheckAllCommand { get; }
     public IAsyncRelayCommand InstallSongs { get; }
@@ -203,22 +205,8 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         }
     }
 
-    private WatcherFile? _selectedFile;
-    public WatcherFile? SelectedFile
-    {
-        get => _selectedFile;
-        set
-        {
-            _selectedFile = value;
-            OnPropertyChanged(nameof(SelectedFile));
-        }
-    }
-
-    public ObservableCollection<WatcherFile> DownloadFiles { get; set; }
     public ObservableCollection<IngestionQueueItem> IngestionQueue { get; }
-    public bool HasLocalDownloadFiles => DownloadFiles.Count > 0;
     public bool HasIngestionQueueItems => IngestionQueue.Count > 0;
-    public bool ShowLocalEmptyState => !HasLocalDownloadFiles;
     public bool ShowQueueEmptyState => !HasIngestionQueueItems;
 
     public IReadOnlyList<string> QueueStateFilters { get; } =
@@ -305,12 +293,11 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     }
 
     private readonly ISongInstallService _songInstallService;
-    private readonly SongIngestionCatalogService _ingestionCatalog;
-    private readonly LibraryCatalogService _libraryCatalog;
-    private readonly ILocalFileDeletionService _localFileDeletionService;
     private readonly CloneHeroViewModel? _cloneHeroViewModel;
     private readonly CancellationTokenSource _queueRefreshCts = new();
     private readonly Task? _queueRefreshTask;
+    private readonly Dictionary<long, Guid> _serverQueueJobIds = [];
+    private bool _isServerQueueActive;
     private CancellationTokenSource? _installCts;
     private const int MaxInstallLogItems = 500;
     private readonly RelayCommand _cancelInstallCommand;
@@ -322,20 +309,15 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     public DownloadViewModel(
         AppGlobalSettings settings,
         ISongInstallService songInstallService,
-        SongIngestionCatalogService ingestionCatalog,
-        LibraryCatalogService libraryCatalog,
-        ILocalFileDeletionService localFileDeletionService,
-        CloneHeroViewModel? cloneHeroViewModel = null)
+        IChartHubServerApiClient serverApiClient,
+        CloneHeroViewModel? cloneHeroViewModel = null,
+        Func<Action, Task>? uiInvoke = null)
     {
         _globalSettings = settings;
+        _serverApiClient = serverApiClient;
         _songInstallService = songInstallService;
-        _ingestionCatalog = ingestionCatalog;
-        _libraryCatalog = libraryCatalog;
-        _localFileDeletionService = localFileDeletionService;
         _cloneHeroViewModel = cloneHeroViewModel;
-        DownloadWatcher = OperatingSystem.IsAndroid()
-            ? new SnapshotResourceWatcher(_globalSettings.DownloadDir, WatcherType.File)
-            : new ResourceWatcher(_globalSettings.DownloadDir, WatcherType.File);
+        _uiInvoke = uiInvoke ?? (async action => await Dispatcher.UIThread.InvokeAsync(action));
         CheckAllCommand = new RelayCommand(CheckAllItemsCommand);
         InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
         _deleteSelectedDownloadsCommand = new AsyncRelayCommand(DeleteSelectedDownloadsAsync, CanDeleteSelectedDownloads);
@@ -348,53 +330,17 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         ToggleInstallLogCommand = _toggleInstallLogCommand;
         _dismissInstallPanelCommand = new RelayCommand(DismissInstallPanel, CanDismissInstallPanel);
         DismissInstallPanelCommand = _dismissInstallPanelCommand;
-        DownloadFiles = DownloadWatcher.Data;
         IngestionQueue = [];
         _pageStrings = new DownloadPageStrings();
         _isInstallLogExpanded = _globalSettings.InstallLogExpanded;
 
-        DownloadFiles.CollectionChanged += DownloadFiles_CollectionChanged;
         IngestionQueue.CollectionChanged += IngestionQueue_CollectionChanged;
-        WireExistingWatcherItems();
-        DownloadWatcher.LoadItems();
         ObserveBackgroundTask(RefreshIngestionQueueAsync(), "Initial ingestion queue load");
-        ObserveBackgroundTask(ReconcileWatcherDataAsync(_queueRefreshCts.Token), "Initial watcher reconciliation");
         _queueRefreshTask = RunQueueRefreshLoopAsync(_queueRefreshCts.Token);
-    }
-
-    private void DownloadFiles_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        if (e.NewItems is not null)
-        {
-            foreach (WatcherFile file in e.NewItems)
-            {
-                file.PropertyChanged += ItemPropertyChanged;
-                ObserveBackgroundTask(ReconcileLocalFileAsync(file, _queueRefreshCts.Token), "Local watcher reconciliation");
-            }
-        }
-
-        if (e.OldItems is not null)
-        {
-            foreach (WatcherFile file in e.OldItems)
-            {
-                file.PropertyChanged -= ItemPropertyChanged;
-            }
-        }
-
-        _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(HasLocalDownloadFiles));
-        OnPropertyChanged(nameof(ShowLocalEmptyState));
-        ObserveBackgroundTask(RefreshIngestionQueueAsync(_queueRefreshCts.Token), "Queue refresh after local watcher change");
     }
 
     private void ItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is WatcherFile && e.PropertyName == nameof(WatcherFile.Checked))
-        {
-            IsAnyChecked = AnyItemChecked();
-            _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
-        }
-
         if (sender is IngestionQueueItem && e.PropertyName == nameof(IngestionQueueItem.Checked))
         {
             IsAnyChecked = AnyItemChecked();
@@ -476,16 +422,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var selectedWatcherPaths = DownloadFiles
-            .Where(file => file.Checked)
-            .Select(file => file.FilePath)
-            .Where(File.Exists)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        List<string> selectedPaths = selectedQueuePaths.Count > 0
-            ? selectedQueuePaths
-            : selectedWatcherPaths;
+        List<string> selectedPaths = selectedQueuePaths;
 
         if (selectedPaths.Count == 0)
         {
@@ -509,11 +446,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             InstallSummaryText = installedCount == 1
                 ? "Installed 1 item successfully."
                 : $"Installed {installedCount} items successfully.";
-
-            foreach (WatcherFile? item in DownloadFiles.Where(file => file.Checked))
-            {
-                item.Checked = false;
-            }
 
             foreach (IngestionQueueItem? queueItem in IngestionQueue.Where(item => item.Checked))
             {
@@ -555,7 +487,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             _installCts.Dispose();
             _installCts = null;
 
-            DownloadWatcher.LoadItems();
             await RefreshIngestionQueueAsync();
         }
     }
@@ -633,23 +564,21 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
 
     public void CheckAllItems(bool isChecked)
     {
-        foreach (WatcherFile item in DownloadFiles)
+        foreach (IngestionQueueItem item in IngestionQueue)
         {
             item.Checked = isChecked;
         }
-        OnPropertyChanged(nameof(DownloadFiles)); // Notify the UI to update
+        OnPropertyChanged(nameof(IngestionQueue));
     }
 
     public bool AnyItemChecked()
     {
-        return DownloadFiles.Any(item => item.Checked)
-            || IngestionQueue.Any(item => item.Checked);
+        return IngestionQueue.Any(item => item.Checked);
     }
 
     private bool CanDeleteSelectedDownloads()
     {
-        return DownloadFiles.Any(file => file.Checked)
-            || IngestionQueue.Any(item => item.Checked);
+        return IngestionQueue.Any(item => item.Checked);
     }
 
     private async Task DeleteSelectedDownloadsAsync()
@@ -658,11 +587,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             .Where(item => item.Checked)
             .ToList();
 
-        var selectedWatcherFiles = DownloadFiles
-            .Where(file => file.Checked)
-            .ToList();
-
-        if (selectedQueueItems.Count == 0 && selectedWatcherFiles.Count == 0)
+        if (selectedQueueItems.Count == 0)
         {
             return;
         }
@@ -672,12 +597,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             await DeleteQueueItemAsync(item).ConfigureAwait(false);
         }
 
-        foreach (WatcherFile file in selectedWatcherFiles)
-        {
-            await DeleteWatcherFileAsync(file).ConfigureAwait(false);
-        }
-
-        DownloadWatcher.LoadItems();
         await RefreshIngestionQueueAsync().ConfigureAwait(false);
         IsAnyChecked = AnyItemChecked();
         _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
@@ -685,59 +604,36 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
 
     private async Task DeleteQueueItemAsync(IngestionQueueItem item)
     {
-        try
+        if (_isServerQueueActive && _serverQueueJobIds.TryGetValue(item.IngestionId, out Guid jobId))
         {
-            if (!string.IsNullOrWhiteSpace(item.DownloadedLocation))
-            {
-                await _localFileDeletionService.DeletePathIfExistsAsync(item.DownloadedLocation).ConfigureAwait(false);
-            }
-
-            if (!string.IsNullOrWhiteSpace(item.Source) && !string.IsNullOrWhiteSpace(item.SourceId))
-            {
-                await _libraryCatalog.RemoveAsync(item.Source, item.SourceId).ConfigureAwait(false);
-            }
-
-            await _ingestionCatalog.RemoveIngestionAsync(item.IngestionId).ConfigureAwait(false);
+            await RequestCancelServerJobAsync(jobId).ConfigureAwait(false);
+            return;
         }
-        catch (Exception ex)
+
+        Logger.LogWarning("Download", "Cannot cancel queue item because no active ChartHub.Server connection is configured.", new Dictionary<string, object?>
         {
-            Logger.LogError("Download", "Failed to delete selected queue item", ex, new Dictionary<string, object?>
-            {
-                ["ingestionId"] = item.IngestionId,
-                ["source"] = item.Source,
-                ["sourceId"] = item.SourceId,
-            });
-        }
+            ["ingestionId"] = item.IngestionId,
+            ["source"] = item.Source,
+            ["sourceId"] = item.SourceId,
+        });
     }
 
-    private async Task DeleteWatcherFileAsync(WatcherFile file)
+    private async Task RequestCancelServerJobAsync(Guid jobId)
     {
+        if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
+        {
+            return;
+        }
+
         try
         {
-            await _localFileDeletionService.DeletePathIfExistsAsync(file.FilePath).ConfigureAwait(false);
-
-            SongIngestionRecord? linkedIngestion = await _ingestionCatalog
-                .GetLatestIngestionByAssetLocationAsync(file.FilePath)
-                .ConfigureAwait(false);
-
-            if (linkedIngestion is null)
-            {
-                return;
-            }
-
-            if (!string.IsNullOrWhiteSpace(linkedIngestion.Source)
-                && !string.IsNullOrWhiteSpace(linkedIngestion.SourceId))
-            {
-                await _libraryCatalog.RemoveAsync(linkedIngestion.Source, linkedIngestion.SourceId).ConfigureAwait(false);
-            }
-
-            await _ingestionCatalog.RemoveIngestionAsync(linkedIngestion.Id).ConfigureAwait(false);
+            await _serverApiClient.RequestCancelDownloadJobAsync(baseUrl, bearerToken, jobId).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            Logger.LogError("Download", "Failed to delete selected local download", ex, new Dictionary<string, object?>
+            Logger.LogError("Download", "Failed to cancel server download job", ex, new Dictionary<string, object?>
             {
-                ["path"] = file.FilePath,
+                ["jobId"] = jobId,
             });
         }
     }
@@ -753,13 +649,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     {
         _installCts?.Cancel();
         _installCts?.Dispose();
-        DownloadFiles.CollectionChanged -= DownloadFiles_CollectionChanged;
         IngestionQueue.CollectionChanged -= IngestionQueue_CollectionChanged;
-
-        foreach (WatcherFile file in DownloadFiles)
-        {
-            file.PropertyChanged -= ItemPropertyChanged;
-        }
 
         foreach (IngestionQueueItem item in IngestionQueue)
         {
@@ -778,36 +668,165 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             }
         }
         _queueRefreshCts.Dispose();
-
-        if (DownloadWatcher is IDisposable disposableWatcher)
-        {
-            disposableWatcher.Dispose();
-        }
     }
 
     private async Task RefreshIngestionQueueAsync(CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<IngestionQueueItem> items = await _ingestionCatalog.QueryQueueAsync(
-            stateFilter: SelectedQueueStateFilter,
-            sourceFilter: null,
-            sortBy: SelectedQueueSort,
-            descending: IsQueueSortDescending,
-            cancellationToken: cancellationToken);
-
-        var selectedIds = IngestionQueue
-            .Where(item => item.Checked)
-            .Select(item => item.IngestionId)
-            .ToHashSet();
-
-        IngestionQueue.Clear();
-        foreach (IngestionQueueItem item in items)
+        IReadOnlyList<IngestionQueueItem> items;
+        if (TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
-            item.Checked = selectedIds.Contains(item.IngestionId);
-            item.PropertyChanged += ItemPropertyChanged;
-            IngestionQueue.Add(item);
+            try
+            {
+                items = await QueryServerQueueAsync(baseUrl, bearerToken, cancellationToken).ConfigureAwait(false);
+                _isServerQueueActive = true;
+            }
+            catch (Exception ex) when (IsUnauthorizedServerError(ex))
+            {
+                _isServerQueueActive = false;
+                _serverQueueJobIds.Clear();
+                _globalSettings.ServerApiAuthToken = string.Empty;
+                Logger.LogWarning("Download", "ChartHub.Server token rejected during queue refresh; clearing local token.", new Dictionary<string, object?>
+                {
+                    ["baseUrl"] = baseUrl,
+                });
+                items = [];
+            }
+        }
+        else
+        {
+            items = [];
+            _isServerQueueActive = false;
+            _serverQueueJobIds.Clear();
         }
 
-        IsAnyChecked = AnyItemChecked();
+        HashSet<long> selectedIds = [];
+        await _uiInvoke(() =>
+        {
+            selectedIds = IngestionQueue
+                .Where(item => item.Checked)
+                .Select(item => item.IngestionId)
+                .ToHashSet();
+        }).ConfigureAwait(false);
+
+        await _uiInvoke(() =>
+        {
+            IngestionQueue.Clear();
+            foreach (IngestionQueueItem item in items)
+            {
+                item.Checked = selectedIds.Contains(item.IngestionId);
+                IngestionQueue.Add(item);
+            }
+
+            IsAnyChecked = AnyItemChecked();
+        }).ConfigureAwait(false);
+    }
+
+    private async Task<IReadOnlyList<IngestionQueueItem>> QueryServerQueueAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ChartHubServerDownloadJobResponse> jobs = await _serverApiClient
+            .ListDownloadJobsAsync(baseUrl, bearerToken, cancellationToken)
+            .ConfigureAwait(false);
+
+        IEnumerable<ChartHubServerDownloadJobResponse> filtered = jobs;
+        if (!string.Equals(SelectedQueueStateFilter, "All", StringComparison.OrdinalIgnoreCase))
+        {
+            filtered = filtered.Where(job => string.Equals(job.Stage, SelectedQueueStateFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        filtered = SelectedQueueSort switch
+        {
+            "Source" => IsQueueSortDescending
+                ? filtered.OrderByDescending(item => item.Source, StringComparer.OrdinalIgnoreCase)
+                : filtered.OrderBy(item => item.Source, StringComparer.OrdinalIgnoreCase),
+            "State" => IsQueueSortDescending
+                ? filtered.OrderByDescending(item => item.Stage, StringComparer.OrdinalIgnoreCase)
+                : filtered.OrderBy(item => item.Stage, StringComparer.OrdinalIgnoreCase),
+            "Name" => IsQueueSortDescending
+                ? filtered.OrderByDescending(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
+                : filtered.OrderBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase),
+            _ => IsQueueSortDescending
+                ? filtered.OrderByDescending(item => item.UpdatedAtUtc)
+                : filtered.OrderBy(item => item.UpdatedAtUtc),
+        };
+
+        _serverQueueJobIds.Clear();
+        List<IngestionQueueItem> queue = [];
+        foreach (ChartHubServerDownloadJobResponse job in filtered)
+        {
+            long ingestionId = BitConverter.ToInt64(job.JobId.ToByteArray(), 0);
+            _serverQueueJobIds[ingestionId] = job.JobId;
+            queue.Add(new IngestionQueueItem
+            {
+                IngestionId = ingestionId,
+                Source = job.Source,
+                SourceId = job.SourceId,
+                SourceLink = job.SourceUrl,
+                DisplayName = job.DisplayName,
+                CurrentState = MapServerStage(job.Stage),
+                DownloadedLocation = job.DownloadedPath,
+                InstalledLocation = job.InstalledPath,
+                DesktopState = ResolveDesktopState(job),
+                UpdatedAtUtc = job.UpdatedAtUtc,
+                LibrarySource = job.Source,
+            });
+        }
+
+        return queue;
+    }
+
+    private static DesktopState ResolveDesktopState(ChartHubServerDownloadJobResponse job)
+    {
+        if (!string.IsNullOrWhiteSpace(job.InstalledPath)
+            || string.Equals(job.Stage, "Completed", StringComparison.OrdinalIgnoreCase))
+        {
+            return DesktopState.Installed;
+        }
+
+        if (!string.IsNullOrWhiteSpace(job.DownloadedPath)
+            || string.Equals(job.Stage, "Downloaded", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(job.Stage, "Staged", StringComparison.OrdinalIgnoreCase))
+        {
+            return DesktopState.Downloaded;
+        }
+
+        return DesktopState.Cloud;
+    }
+
+    private static IngestionState MapServerStage(string stage)
+    {
+        if (Enum.TryParse(stage, ignoreCase: true, out IngestionState parsed))
+        {
+            return parsed;
+        }
+
+        return stage.ToLowerInvariant() switch
+        {
+            "completed" => IngestionState.Installed,
+            "cancelling" => IngestionState.Downloading,
+            _ => IngestionState.Queued,
+        };
+    }
+
+    private bool TryGetServerConnection(out string baseUrl, out string bearerToken)
+    {
+        baseUrl = NormalizeApiBaseUrl(_globalSettings.ServerApiBaseUrl);
+        bearerToken = _globalSettings.ServerApiAuthToken?.Trim() ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(baseUrl) && !string.IsNullOrWhiteSpace(bearerToken);
+    }
+
+    private static string NormalizeApiBaseUrl(string? value)
+    {
+        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri))
+        {
+            return string.Empty;
+        }
+
+        return uri.GetLeftPart(UriPartial.Authority);
+    }
+
+    private static bool IsUnauthorizedServerError(Exception ex)
+    {
+        return ex.Message.Contains("401 Unauthorized", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void ObserveBackgroundTask(Task task, string context)
@@ -820,36 +839,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
                 Logger.LogError("Download", $"{context} failed", ex);
             }
         }, TaskContinuationOptions.OnlyOnFaulted);
-    }
-
-    private void WireExistingWatcherItems()
-    {
-        foreach (WatcherFile file in DownloadFiles)
-        {
-            file.PropertyChanged += ItemPropertyChanged;
-        }
-    }
-
-    private async Task ReconcileWatcherDataAsync(CancellationToken cancellationToken)
-    {
-        foreach (WatcherFile file in DownloadFiles)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await ReconcileLocalFileAsync(file, cancellationToken);
-        }
-
-        await RefreshIngestionQueueAsync(cancellationToken);
-    }
-
-    private async Task ReconcileLocalFileAsync(WatcherFile file, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(file.FilePath) || !File.Exists(file.FilePath))
-        {
-            return;
-        }
-
-        // Local watcher files are unmanaged unless they were already ingested through trusted sources.
-        await Task.CompletedTask;
     }
 
     private async Task RunQueueRefreshLoopAsync(CancellationToken cancellationToken)

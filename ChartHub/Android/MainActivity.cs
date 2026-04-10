@@ -1,7 +1,8 @@
 #if ANDROID
 using Android.App;
-using Android.OS;
 using Android.Content.PM;
+using Android.OS;
+
 using Avalonia;
 using Avalonia.Android;
 

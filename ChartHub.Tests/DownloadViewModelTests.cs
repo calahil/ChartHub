@@ -1,5 +1,3 @@
-using System.Collections.ObjectModel;
-
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
@@ -13,34 +11,33 @@ namespace ChartHub.Tests;
 public class DownloadViewModelTests
 {
     [Fact]
-    public async Task CheckAllCommand_AndItemSelection_UpdateCheckedStateFlags()
+    public async Task CheckAllCommand_UpdatesQueueSelectionFlags()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-checks");
         using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
         var sut = new ViewModels.DownloadViewModel(
             settings,
             new SongInstallServiceStub(),
-            ingestionCatalog,
-            new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")),
-            new LocalFileDeletionService());
+            new FakeChartHubServerApiClient(),
+            uiInvoke: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
 
         try
         {
-            sut.DownloadFiles.Add(CreateWatcherFile("alpha.zip", temp.GetPath("alpha.zip")));
-            sut.DownloadFiles.Add(CreateWatcherFile("beta.zip", temp.GetPath("beta.zip")));
+            sut.IngestionQueue.Add(CreateQueueItem(1));
+            sut.IngestionQueue.Add(CreateQueueItem(2));
 
             sut.CheckAllCommand.Execute(null);
 
             Assert.True(sut.IsAllChecked);
-            Assert.All(sut.DownloadFiles, file => Assert.True(file.Checked));
+            Assert.All(sut.IngestionQueue, item => Assert.True(item.Checked));
             Assert.True(sut.IsAnyChecked);
 
-            sut.DownloadFiles[0].Checked = false;
-
-            Assert.True(sut.IsAnyChecked);
-
-            sut.DownloadFiles[1].Checked = false;
+            sut.IngestionQueue[0].Checked = false;
+            sut.IngestionQueue[1].Checked = false;
 
             Assert.False(sut.IsAnyChecked);
         }
@@ -51,61 +48,38 @@ public class DownloadViewModelTests
     }
 
     [Fact]
-    public async Task ToggleInstallLogCommand_TogglesExpandedStateAndLabel()
+    public async Task InstallSongsCommand_InstallsSelectedQueueDownloads()
     {
-        using var temp = new TemporaryDirectoryFixture("download-vm-log-toggle");
-        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
-        var sut = new ViewModels.DownloadViewModel(
-            settings,
-            new SongInstallServiceStub(),
-            ingestionCatalog,
-            new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")),
-            new LocalFileDeletionService());
-
-        try
-        {
-            Assert.True(sut.IsInstallLogExpanded);
-            Assert.Equal("Collapse Log", sut.InstallLogToggleText);
-
-            sut.ToggleInstallLogCommand.Execute(null);
-
-            Assert.False(sut.IsInstallLogExpanded);
-            Assert.Equal("Expand Log", sut.InstallLogToggleText);
-
-            sut.ToggleInstallLogCommand.Execute(null);
-
-            Assert.True(sut.IsInstallLogExpanded);
-            Assert.Equal("Collapse Log", sut.InstallLogToggleText);
-        }
-        finally
-        {
-            await sut.DisposeAsync();
-        }
-    }
-
-    [Fact]
-    public async Task InstallSongsCommand_SetsSummary_AndDismissHidesPanel()
-    {
-        using var temp = new TemporaryDirectoryFixture("download-vm-install-summary");
+        using var temp = new TemporaryDirectoryFixture("download-vm-install");
         using AppGlobalSettings settings = CreateSettings(temp.RootPath);
         string selectedFilePath = temp.GetPath("song-a.zip");
         await File.WriteAllTextAsync(selectedFilePath, "zip");
+
         var installStub = new SongInstallServiceStub
         {
             ResultPaths = [Path.Combine(temp.RootPath, "CloneHero", "Songs", "Song A")],
         };
-        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
         var sut = new ViewModels.DownloadViewModel(
             settings,
             installStub,
-            ingestionCatalog,
-            new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")),
-            new LocalFileDeletionService());
+            new FakeChartHubServerApiClient(),
+            uiInvoke: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
 
         try
         {
-            sut.DownloadFiles.Add(CreateWatcherFile("song-a.zip", selectedFilePath, checkedState: true));
+            sut.IngestionQueue.Add(new IngestionQueueItem
+            {
+                IngestionId = 1,
+                DisplayName = "song-a.zip",
+                CurrentState = IngestionState.Downloaded,
+                DownloadedLocation = selectedFilePath,
+                Checked = true,
+            });
 
             await sut.InstallSongsCommand();
 
@@ -118,7 +92,6 @@ public class DownloadViewModelTests
 
             Assert.False(sut.IsInstallPanelVisible);
             Assert.False(sut.HasInstallSummary);
-            Assert.Empty(sut.InstallLogItems);
         }
         finally
         {
@@ -127,98 +100,55 @@ public class DownloadViewModelTests
     }
 
     [Fact]
-    public async Task InstallSongsCommand_OnCancellation_SetsCancelledSummary()
+    public async Task DeleteSelectedDownloadsCommand_WhenServerConnected_CancelsSelectedJobs()
     {
-        using var temp = new TemporaryDirectoryFixture("download-vm-install-cancel");
-        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        string selectedFilePath = temp.GetPath("song-cancel.zip");
-        await File.WriteAllTextAsync(selectedFilePath, "zip");
-        var installStub = new SongInstallServiceStub
+        using var temp = new TemporaryDirectoryFixture("download-vm-delete");
+        using AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            serverApiBaseUrl: "http://127.0.0.1:5001",
+            serverApiAuthToken: "token");
+
+        var fakeClient = new FakeChartHubServerApiClient
         {
-            ThrowOnInstall = new OperationCanceledException(),
+            Jobs =
+            [
+                new ChartHubServerDownloadJobResponse(
+                    new Guid("11111111-1111-1111-1111-111111111111"),
+                    LibrarySourceNames.RhythmVerse,
+                    "id-1",
+                    "Song A",
+                    "https://example.test/song-a",
+                    "Downloaded",
+                    100,
+                    "/tmp/song-a.zip",
+                    null,
+                    null,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+            ],
         };
-        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
-        var sut = new ViewModels.DownloadViewModel(
-            settings,
-            installStub,
-            ingestionCatalog,
-            new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db")),
-            new LocalFileDeletionService());
 
-        try
-        {
-            sut.DownloadFiles.Add(CreateWatcherFile("song-cancel.zip", selectedFilePath, checkedState: true));
-
-            await sut.InstallSongsCommand();
-
-            Assert.Equal("Install cancelled.", sut.InstallSummaryText);
-            Assert.True(sut.IsInstallPanelVisible);
-            Assert.False(sut.IsInstallActive);
-        }
-        finally
-        {
-            await sut.DisposeAsync();
-        }
-    }
-
-    [Fact]
-    public async Task DeleteSelectedDownloadsCommand_DeletesFileAndRemovesCatalogEntries()
-    {
-        using var temp = new TemporaryDirectoryFixture("download-vm-delete-selected");
-        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
-        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
-        var libraryCatalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
         var sut = new ViewModels.DownloadViewModel(
             settings,
             new SongInstallServiceStub(),
-            ingestionCatalog,
-            libraryCatalog,
-            new LocalFileDeletionService());
-
-        string downloadFilePath = temp.GetPath("to-delete.zip");
-        await File.WriteAllTextAsync(downloadFilePath, "zip-data");
-
-        SongIngestionRecord ingestion = await ingestionCatalog.GetOrCreateIngestionAsync(
-            source: LibrarySourceNames.RhythmVerse,
-            sourceId: "delete-me-id",
-            sourceLink: "https://example.com/delete-me");
-        await ingestionCatalog.UpsertAssetAsync(new SongIngestionAssetEntry(
-            IngestionId: ingestion.Id,
-            AttemptId: null,
-            AssetRole: IngestionAssetRole.Downloaded,
-            Location: downloadFilePath,
-            SizeBytes: null,
-            ContentHash: null,
-            RecordedAtUtc: DateTimeOffset.UtcNow));
-        await libraryCatalog.UpsertAsync(new LibraryCatalogEntry(
-            Source: LibrarySourceNames.RhythmVerse,
-            SourceId: "delete-me-id",
-            Title: "Delete Me",
-            Artist: "Artist",
-            Charter: "Charter",
-            LocalPath: Path.Combine(temp.RootPath, "CloneHero", "Songs", "Delete Me"),
-            AddedAtUtc: DateTimeOffset.UtcNow));
+            fakeClient,
+            uiInvoke: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
 
         try
         {
-            sut.IngestionQueue.Add(new IngestionQueueItem
-            {
-                IngestionId = ingestion.Id,
-                Source = LibrarySourceNames.RhythmVerse,
-                SourceId = "delete-me-id",
-                SourceLink = "https://example.com/delete-me",
-                CurrentState = IngestionState.Downloaded,
-                DownloadedLocation = downloadFilePath,
-                DisplayName = "to-delete.zip",
-                UpdatedAtUtc = DateTimeOffset.UtcNow,
-                Checked = true,
-            });
+            bool queueLoaded = await WaitForConditionAsync(() => sut.IngestionQueue.Count == 1, TimeSpan.FromSeconds(2));
+            Assert.True(queueLoaded);
 
+            sut.IngestionQueue[0].Checked = true;
             await sut.DeleteSelectedDownloadsCommand.ExecuteAsync(null);
 
-            Assert.False(File.Exists(downloadFilePath));
-            Assert.False(await libraryCatalog.IsInLibraryAsync(LibrarySourceNames.RhythmVerse, "delete-me-id"));
-            Assert.Null(await ingestionCatalog.GetIngestionByIdAsync(ingestion.Id));
+            Assert.Single(fakeClient.CancelledJobIds);
+            Assert.Equal(new Guid("11111111-1111-1111-1111-111111111111"), fakeClient.CancelledJobIds[0]);
         }
         finally
         {
@@ -226,15 +156,21 @@ public class DownloadViewModelTests
         }
     }
 
-    private static WatcherFile CreateWatcherFile(string displayName, string filePath, bool checkedState = false)
+    private static IngestionQueueItem CreateQueueItem(long id)
     {
-        return new WatcherFile(displayName, filePath, WatcherFileType.Zip, "icon.png", 100)
+        return new IngestionQueueItem
         {
-            Checked = checkedState,
+            IngestionId = id,
+            DisplayName = $"song-{id}.zip",
+            CurrentState = IngestionState.Downloaded,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
         };
     }
 
-    private static AppGlobalSettings CreateSettings(string rootPath)
+    private static AppGlobalSettings CreateSettings(
+        string rootPath,
+        string serverApiBaseUrl = "",
+        string serverApiAuthToken = "")
     {
         var orchestrator = new FakeSettingsOrchestrator(new AppConfigRoot
         {
@@ -246,49 +182,37 @@ public class DownloadViewModelTests
                 OutputDirectory = Path.Combine(rootPath, "Output"),
                 CloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero"),
                 CloneHeroSongDirectory = Path.Combine(rootPath, "CloneHero", "Songs"),
+                ServerApiBaseUrl = serverApiBaseUrl,
+                ServerApiAuthToken = serverApiAuthToken,
             },
         });
 
         return new AppGlobalSettings(orchestrator);
     }
 
+    private static async Task<bool> WaitForConditionAsync(Func<bool> predicate, TimeSpan timeout)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.Add(timeout);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (predicate())
+            {
+                return true;
+            }
+
+            await Task.Delay(20);
+        }
+
+        return predicate();
+    }
+
     private sealed class SongInstallServiceStub : ISongInstallService
     {
         public IReadOnlyList<string> ResultPaths { get; set; } = [];
-        public Exception? ThrowOnInstall { get; set; }
 
         public Task<IReadOnlyList<string>> InstallSelectedDownloadsAsync(IEnumerable<string> selectedFilePaths, IProgress<InstallProgressUpdate>? progress = null, CancellationToken cancellationToken = default)
         {
-            if (ThrowOnInstall is not null)
-            {
-                throw ThrowOnInstall;
-            }
-
             return Task.FromResult(ResultPaths);
-        }
-    }
-
-    private sealed class ResourceWatcherStub : IResourceWatcher
-    {
-        public ResourceWatcherStub(string directoryPath, ObservableCollection<WatcherFile> data)
-        {
-            DirectoryPath = directoryPath;
-            Data = data;
-        }
-
-        public int LoadItemsCallCount { get; private set; }
-
-        public string DirectoryPath { get; }
-        public ObservableCollection<WatcherFile> Data { get; set; }
-        public event EventHandler<string>? DirectoryNotFound
-        {
-            add { }
-            remove { }
-        }
-
-        public void LoadItems()
-        {
-            LoadItemsCallCount++;
         }
     }
 
@@ -312,6 +236,40 @@ public class DownloadViewModelTests
         public Task ReloadAsync(CancellationToken cancellationToken = default)
         {
             SettingsChanged?.Invoke(Current);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeChartHubServerApiClient : IChartHubServerApiClient
+    {
+        public IReadOnlyList<ChartHubServerDownloadJobResponse> Jobs { get; set; } = [];
+        public List<Guid> CancelledJobIds { get; } = [];
+
+        public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(string baseUrl, string googleIdToken, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerAuthExchangeResponse("token", DateTimeOffset.UtcNow.AddHours(1)));
+
+        public Task<ChartHubServerDownloadJobResponse> CreateDownloadJobAsync(string baseUrl, string bearerToken, ChartHubServerCreateDownloadJobRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerDownloadJobResponse(
+                Guid.NewGuid(),
+                request.Source,
+                request.SourceId,
+                request.DisplayName,
+                request.SourceUrl,
+                "Queued",
+                0,
+                null,
+                null,
+                null,
+                null,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow));
+
+        public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => Task.FromResult(Jobs);
+
+        public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+        {
+            CancelledJobIds.Add(jobId);
             return Task.CompletedTask;
         }
     }

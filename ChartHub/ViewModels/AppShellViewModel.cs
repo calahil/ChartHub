@@ -3,8 +3,6 @@ using System.Runtime.CompilerServices;
 
 using Avalonia;
 
-using ChartHub.Services;
-
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChartHub.ViewModels;
@@ -12,7 +10,6 @@ namespace ChartHub.ViewModels;
 public class AppShellViewModel : INotifyPropertyChanged
 {
     private readonly IServiceProvider _serviceProvider;
-    private readonly ICloudStorageAccountService _cloudAccountService;
     private MainViewModel? _mainViewModel;
 
     private object? _currentViewModel;
@@ -26,31 +23,18 @@ public class AppShellViewModel : INotifyPropertyChanged
         }
     }
 
-    private bool _isSignedIn;
-    public bool IsSignedIn
-    {
-        get => _isSignedIn;
-        private set
-        {
-            _isSignedIn = value;
-            OnPropertyChanged();
-        }
-    }
-
     public Thickness RootMargin => OperatingSystem.IsAndroid() ? new Thickness(0, 32, 0, 0) : new Thickness(0);
 
-    public AppShellViewModel(IServiceProvider serviceProvider, ICloudStorageAccountService cloudAccountService)
+    public AppShellViewModel(IServiceProvider serviceProvider)
     {
         _serviceProvider = serviceProvider;
-        _cloudAccountService = cloudAccountService;
         CurrentViewModel = new SplashViewModel(HandlePostSplashAsync);
     }
 
-    private async Task HandlePostSplashAsync()
+    private Task HandlePostSplashAsync()
     {
-        bool silentlyInitialized = await _cloudAccountService.TryRestoreSessionAsync();
-        IsSignedIn = silentlyInitialized;
         SwitchToMain();
+        return Task.CompletedTask;
     }
 
     private void SwitchToMain()

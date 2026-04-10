@@ -20,18 +20,18 @@ public class SettingsOrchestratorTests
         ConfigValidationResult result = await sut.UpdateAsync(config =>
         {
             config.Runtime.DownloadDirectory = "/tmp/downloads";
-            config.Runtime.SyncApiAuthToken = "updated-sync-token";
+            config.Runtime.ServerApiAuthToken = "updated-sync-token";
             config.Runtime.RhythmVerseSource = RhythmVerseSource.ChartHubMirror;
         });
 
         Assert.True(result.IsValid);
         Assert.Equal(1, store.SaveCallCount);
         Assert.Equal("/tmp/downloads", sut.Current.Runtime.DownloadDirectory);
-        Assert.Equal("updated-sync-token", sut.Current.Runtime.SyncApiAuthToken);
+        Assert.Equal("updated-sync-token", sut.Current.Runtime.ServerApiAuthToken);
         Assert.Equal(RhythmVerseSource.ChartHubMirror, sut.Current.Runtime.RhythmVerseSource);
         Assert.NotNull(observed);
         Assert.Equal("/tmp/downloads", observed!.Runtime.DownloadDirectory);
-        Assert.Equal("updated-sync-token", observed.Runtime.SyncApiAuthToken);
+        Assert.Equal("updated-sync-token", observed.Runtime.ServerApiAuthToken);
         Assert.Equal(RhythmVerseSource.ChartHubMirror, observed.Runtime.RhythmVerseSource);
     }
 
@@ -154,8 +154,7 @@ public class SettingsOrchestratorTests
                     OutputDirectory = source.Runtime.OutputDirectory,
                     CloneHeroDataDirectory = source.Runtime.CloneHeroDataDirectory,
                     CloneHeroSongDirectory = source.Runtime.CloneHeroSongDirectory,
-                    SyncApiAuthToken = source.Runtime.SyncApiAuthToken,
-                    AllowSyncApiStateOverride = source.Runtime.AllowSyncApiStateOverride,
+                    ServerApiAuthToken = source.Runtime.ServerApiAuthToken,
                     InstallLogExpanded = source.Runtime.InstallLogExpanded,
                 },
                 GoogleAuth = new GoogleAuthConfig

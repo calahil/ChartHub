@@ -216,6 +216,7 @@ For technical or self-hosting material, use:
 - [docs/backup-api-self-hosting.md](docs/backup-api-self-hosting.md)
 - [docs/sync-api.md](docs/sync-api.md)
 - [ChartHub.BackupApi/README.docker.md](ChartHub.BackupApi/README.docker.md)
+- [ChartHub.Server/README.docker.md](ChartHub.Server/README.docker.md)
 - [openapi.yaml](openapi.yaml)
 - [docs/swagger-ui.html](docs/swagger-ui.html)
 - [architecture.md](architecture.md)

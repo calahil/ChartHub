@@ -3,9 +3,10 @@ using System.Net;
 using System.Net.Http;
 using System.Reflection;
 
+using ChartHub.Configuration.Interfaces;
+using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Services;
-using ChartHub.Services.Transfers;
 using ChartHub.Tests.TestInfrastructure;
 using ChartHub.ViewModels;
 
@@ -103,9 +104,10 @@ public class RhythmVerseViewModelTests
             binder: null,
             [
                 typeof(ApiClientService),
-                typeof(ITransferOrchestrator),
                 typeof(LibraryCatalogService),
                 typeof(SharedDownloadQueue),
+                typeof(ISettingsOrchestrator),
+                typeof(IChartHubServerApiClient),
                 typeof(bool),
                 typeof(Func<Action, Task>),
             ],
@@ -115,12 +117,64 @@ public class RhythmVerseViewModelTests
 
         return (RhythmVerseViewModel)constructor.Invoke([
             apiClient,
-            new NoOpTransferOrchestrator(),
             catalog,
             sharedQueue,
+            new FakeSettingsOrchestrator(),
+            new FakeChartHubServerApiClient(),
             false,
             (Func<Action, Task>)(action => { action(); return Task.CompletedTask; }),
         ]);
+    }
+
+    private sealed class FakeSettingsOrchestrator : ISettingsOrchestrator
+    {
+        public AppConfigRoot Current { get; } = new()
+        {
+            Runtime = new RuntimeAppConfig(),
+        };
+
+        public event Action<AppConfigRoot>? SettingsChanged;
+
+        public Task<ConfigValidationResult> UpdateAsync(Action<AppConfigRoot> update, CancellationToken cancellationToken = default)
+        {
+            update(Current);
+            SettingsChanged?.Invoke(Current);
+            return Task.FromResult(ConfigValidationResult.Success);
+        }
+
+        public Task ReloadAsync(CancellationToken cancellationToken = default)
+        {
+            SettingsChanged?.Invoke(Current);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeChartHubServerApiClient : IChartHubServerApiClient
+    {
+        public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(string baseUrl, string googleIdToken, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerAuthExchangeResponse("token", DateTimeOffset.UtcNow.AddHours(1)));
+
+        public Task<ChartHubServerDownloadJobResponse> CreateDownloadJobAsync(string baseUrl, string bearerToken, ChartHubServerCreateDownloadJobRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerDownloadJobResponse(
+                Guid.NewGuid(),
+                request.Source,
+                request.SourceId,
+                request.DisplayName,
+                request.SourceUrl,
+                "Queued",
+                0,
+                null,
+                null,
+                null,
+                null,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow));
+
+        public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
+
+        public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private static ApiClientService CreateApiClientWithPagedHandler(int delayMs = 0)
@@ -274,23 +328,4 @@ public class RhythmVerseViewModelTests
         }
     }
 
-    private sealed class NoOpTransferOrchestrator : ITransferOrchestrator
-    {
-        public Task<TransferResult> QueueSongDownloadAsync(ViewSong song, DownloadFile? downloadItem, ObservableCollection<DownloadFile> downloads, CancellationToken cancellationToken = default)
-        {
-            DownloadFile item = downloadItem ?? new DownloadFile(song.FileName ?? "song.sng", Path.GetTempPath(), song.DownloadLink ?? string.Empty, song.FileSize)
-            {
-                Finished = true,
-                Status = TransferStage.Completed.ToString(),
-                DownloadProgress = 100,
-            };
-            return Task.FromResult(new TransferResult(true, TransferStage.Completed, song.FileName, null, item));
-        }
-
-        public Task<IReadOnlyList<string>> DownloadSelectedCloudFilesToLocalAsync(IEnumerable<WatcherFile> selectedCloudFiles, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<string>>([]);
-
-        public Task<IReadOnlyList<string>> SyncCloudToLocalAdditiveAsync(IEnumerable<WatcherFile> currentCloudFiles, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<string>>([]);
-    }
 }

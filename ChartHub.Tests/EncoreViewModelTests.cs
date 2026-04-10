@@ -5,7 +5,6 @@ using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Services;
-using ChartHub.Services.Transfers;
 using ChartHub.Tests.TestInfrastructure;
 using ChartHub.ViewModels;
 
@@ -26,7 +25,7 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue())
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue())
         {
             AdvancedName = "Song",
             AdvancedAlbum = "Album",
@@ -53,7 +52,7 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -83,7 +82,7 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -106,7 +105,7 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
         EncoreSong song = Assert.Single(sut.DataItems);
@@ -129,7 +128,7 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -139,7 +138,7 @@ public class EncoreViewModelTests
     }
 
     [Fact]
-    public async Task DownloadSongAsync_UsesUnifiedViewSongFallbacksForEncore()
+    public async Task DownloadSongAsync_UsesServerJobRequestFallbacksForEncore()
     {
         using var temp = new TemporaryDirectoryFixture("encore-vm-viewsong-fallbacks");
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
@@ -165,33 +164,19 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var transfer = new CapturingTransferOrchestrator();
-        var sut = new EncoreViewModel(api, transfer, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var serverApi = new CapturingChartHubServerApiClient();
+        var sut = new EncoreViewModel(api, serverApi, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
         EncoreSong song = Assert.Single(sut.DataItems);
 
         await sut.DownloadSongAsync(song);
 
-        Assert.NotNull(transfer.LastSong);
-        Assert.Equal("Unknown Song", transfer.LastSong!.Title);
-        Assert.Equal("Unknown Artist", transfer.LastSong.Artist);
-        Assert.Equal("Unknown Album", transfer.LastSong.Album);
-        Assert.Equal("Unknown Genre", transfer.LastSong.Genre);
-        Assert.Equal(string.Empty, transfer.LastSong.Year);
-        Assert.Equal(0, transfer.LastSong.Downloads);
-        Assert.Equal(0, transfer.LastSong.Comments);
-        Assert.Equal(210, transfer.LastSong.SongLength);
-        Assert.Equal("3:30", transfer.LastSong.FormattedTime);
-        Assert.Equal("avares://ChartHub/Resources/Images/noalbumart.png", transfer.LastSong.AlbumArt);
-        Assert.Equal("avares://ChartHub/Resources/Images/blankprofile.png", transfer.LastSong.Author?.AvatarPath);
-        Assert.Equal("encore-user", transfer.LastSong.Author?.Name);
-        Assert.Equal(0, transfer.LastSong.DrumString);
-        Assert.Equal(0, transfer.LastSong.GuitarString);
-        Assert.Equal(0, transfer.LastSong.BassString);
-        Assert.Equal(0, transfer.LastSong.VocalString);
-        Assert.Equal(0, transfer.LastSong.KeysString);
-        Assert.Equal(LibraryIdentityService.BuildEncoreSourceKey(321, md5), transfer.LastSong.SourceId);
+        Assert.NotNull(serverApi.LastRequest);
+        Assert.Equal(LibrarySourceNames.Encore, serverApi.LastRequest!.Source);
+        Assert.Equal(LibraryIdentityService.BuildEncoreSourceKey(321, md5), serverApi.LastRequest.SourceId);
+        Assert.Equal("Unknown Artist - Unknown Song.sng", serverApi.LastRequest.DisplayName);
+        Assert.Equal(song.DownloadUrl, serverApi.LastRequest.SourceUrl);
     }
 
     [Fact]
@@ -222,7 +207,7 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -244,7 +229,7 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -265,7 +250,7 @@ public class EncoreViewModelTests
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
         var sharedQueue = new SharedDownloadQueue();
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), sharedQueue);
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), sharedQueue);
 
         Assert.False(sut.HasActiveDownloads);
         Assert.True(sut.NoActiveDownloads);
@@ -289,7 +274,7 @@ public class EncoreViewModelTests
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
         var sharedQueue = new SharedDownloadQueue();
-        var sut = new EncoreViewModel(api, new NoOpTransferOrchestrator(), new NoOpSettingsOrchestrator(), sharedQueue);
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), sharedQueue);
         var item = new DownloadFile("Song", temp.RootPath, "https://example.test/song", 10);
         sharedQueue.Downloads.Add(item);
 
@@ -399,53 +384,77 @@ public class EncoreViewModelTests
         return (EncoreApiService)constructor!.Invoke([catalog, httpClient]);
     }
 
-    private sealed class NoOpTransferOrchestrator : ITransferOrchestrator
+    private sealed class NoOpChartHubServerApiClient : IChartHubServerApiClient
     {
-        public Task<TransferResult> QueueSongDownloadAsync(ViewSong song, DownloadFile? downloadItem, ObservableCollection<DownloadFile> downloads, CancellationToken cancellationToken = default)
-        {
-            DownloadFile item = downloadItem ?? new DownloadFile(song.FileName ?? "song.sng", Path.GetTempPath(), song.DownloadLink ?? string.Empty, song.FileSize)
-            {
-                Finished = true,
-                Status = TransferStage.Completed.ToString(),
-                DownloadProgress = 100,
-            };
-            return Task.FromResult(new TransferResult(true, TransferStage.Completed, song.FileName, null, item));
-        }
+        public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(string baseUrl, string googleIdToken, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerAuthExchangeResponse("token", DateTimeOffset.UtcNow.AddHours(1)));
 
-        public Task<IReadOnlyList<string>> DownloadSelectedCloudFilesToLocalAsync(IEnumerable<WatcherFile> selectedCloudFiles, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<string>>([]);
+        public Task<ChartHubServerDownloadJobResponse> CreateDownloadJobAsync(string baseUrl, string bearerToken, ChartHubServerCreateDownloadJobRequest request, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerDownloadJobResponse(
+                Guid.NewGuid(),
+                request.Source,
+                request.SourceId,
+                request.DisplayName,
+                request.SourceUrl,
+                "Queued",
+                0,
+                null,
+                null,
+                null,
+                null,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow));
 
-        public Task<IReadOnlyList<string>> SyncCloudToLocalAdditiveAsync(IEnumerable<WatcherFile> currentCloudFiles, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<string>>([]);
+        public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
+
+        public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
-    private sealed class CapturingTransferOrchestrator : ITransferOrchestrator
+    private sealed class CapturingChartHubServerApiClient : IChartHubServerApiClient
     {
-        public ViewSong? LastSong { get; private set; }
+        public ChartHubServerCreateDownloadJobRequest? LastRequest { get; private set; }
 
-        public Task<TransferResult> QueueSongDownloadAsync(ViewSong song, DownloadFile? downloadItem, ObservableCollection<DownloadFile> downloads, CancellationToken cancellationToken = default)
+        public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(string baseUrl, string googleIdToken, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerAuthExchangeResponse("token", DateTimeOffset.UtcNow.AddHours(1)));
+
+        public Task<ChartHubServerDownloadJobResponse> CreateDownloadJobAsync(string baseUrl, string bearerToken, ChartHubServerCreateDownloadJobRequest request, CancellationToken cancellationToken = default)
         {
-            LastSong = song;
-            DownloadFile item = downloadItem ?? new DownloadFile(song.FileName ?? "song.sng", Path.GetTempPath(), song.DownloadLink ?? string.Empty, song.FileSize)
-            {
-                Finished = true,
-                Status = TransferStage.Completed.ToString(),
-                DownloadProgress = 100,
-            };
-
-            return Task.FromResult(new TransferResult(true, TransferStage.Completed, song.FileName, null, item));
+            LastRequest = request;
+            return Task.FromResult(new ChartHubServerDownloadJobResponse(
+                Guid.NewGuid(),
+                request.Source,
+                request.SourceId,
+                request.DisplayName,
+                request.SourceUrl,
+                "Queued",
+                0,
+                null,
+                null,
+                null,
+                null,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow));
         }
 
-        public Task<IReadOnlyList<string>> DownloadSelectedCloudFilesToLocalAsync(IEnumerable<WatcherFile> selectedCloudFiles, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<string>>([]);
+        public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
 
-        public Task<IReadOnlyList<string>> SyncCloudToLocalAdditiveAsync(IEnumerable<WatcherFile> currentCloudFiles, CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<string>>([]);
+        public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 
     private sealed class NoOpSettingsOrchestrator : ISettingsOrchestrator
     {
-        public AppConfigRoot Current { get; private set; } = new();
+        public AppConfigRoot Current { get; private set; } = new()
+        {
+            Runtime = new RuntimeAppConfig
+            {
+                ServerApiBaseUrl = "http://127.0.0.1:5001",
+                ServerApiAuthToken = "sync-token-test",
+            },
+        };
         public event Action<AppConfigRoot>? SettingsChanged;
 
         public Task<ConfigValidationResult> UpdateAsync(Action<AppConfigRoot> update, CancellationToken cancellationToken = default)

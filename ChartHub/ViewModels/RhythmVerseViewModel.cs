@@ -7,9 +7,9 @@ using System.Windows.Input;
 using Avalonia.Controls;
 using Avalonia.Threading;
 
+using ChartHub.Configuration.Interfaces;
 using ChartHub.Models;
 using ChartHub.Services;
-using ChartHub.Services.Transfers;
 using ChartHub.Strings;
 using ChartHub.Utilities;
 
@@ -83,7 +83,8 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
     public ICommand ShowFilterPaneCommand { get; }
     public ICommand ShowDownloadsPaneCommand { get; }
 
-    private readonly ITransferOrchestrator _transferOrchestrator;
+    private readonly IChartHubServerApiClient _serverApiClient;
+    private readonly ISettingsOrchestrator _settingsOrchestrator;
     private readonly LibraryCatalogService _libraryCatalog;
     private readonly SemaphoreSlim _loadDataGate = new(1, 1);
     private int _loadMoreGate;
@@ -316,20 +317,20 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
     public IRelayCommand<DownloadFile?> CancelDownloadCommand { get; }
     public IRelayCommand<DownloadFile?> ClearDownloadCommand { get; }
 
-    private readonly Dictionary<DownloadFile, CancellationTokenSource> _downloadTokens = [];
-
     public RhythmVersePageStrings PageStrings { get; }
 
     public RhythmVerseViewModel(
         IConfiguration configuration,
-        ITransferOrchestrator transferOrchestrator,
         LibraryCatalogService libraryCatalog,
-        SharedDownloadQueue sharedDownloadQueue)
+        SharedDownloadQueue sharedDownloadQueue,
+        ISettingsOrchestrator settingsOrchestrator,
+        IChartHubServerApiClient serverApiClient)
         : this(
             new ApiClientService(configuration),
-            transferOrchestrator,
             libraryCatalog,
             sharedDownloadQueue,
+            settingsOrchestrator,
+            serverApiClient,
             loadInitialData: true,
             uiInvoke: async action => await Dispatcher.UIThread.InvokeAsync(action))
     {
@@ -337,15 +338,17 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
 
     internal RhythmVerseViewModel(
         ApiClientService apiClient,
-        ITransferOrchestrator transferOrchestrator,
         LibraryCatalogService libraryCatalog,
         SharedDownloadQueue sharedDownloadQueue,
+        ISettingsOrchestrator settingsOrchestrator,
+        IChartHubServerApiClient serverApiClient,
         bool loadInitialData,
         Func<Action, Task> uiInvoke)
     {
         _uiInvoke = uiInvoke;
-        _transferOrchestrator = transferOrchestrator;
         _libraryCatalog = libraryCatalog;
+        _settingsOrchestrator = settingsOrchestrator;
+        _serverApiClient = serverApiClient;
         PageStrings = new RhythmVersePageStrings();
         _apiClient = apiClient;
         _dataItems = [];
@@ -487,35 +490,101 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             return;
         }
 
-        var downloadItem = new DownloadFile(
-            file.FileName ?? string.Empty,
-            Path.GetTempPath(),
-            file.DownloadLink ?? string.Empty,
-            file.FileSize);
-        downloadItem.SourceName = "RhythmVerse";
-        downloadItem.CancelAction = () => CancelDownload(downloadItem);
-
-        var cts = new CancellationTokenSource();
-        _downloadTokens[downloadItem] = cts;
-
-        TransferResult result = await _transferOrchestrator.QueueSongDownloadAsync(file, downloadItem, Downloads, cts.Token);
-        if (!result.Success && !string.IsNullOrWhiteSpace(result.Error))
+        if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
-            Logger.LogWarning("Transfer", "Song transfer reported failure", new Dictionary<string, object?>
+            Logger.LogWarning("ServerDownload", "Cannot queue RhythmVerse download because sync API endpoint/token is not configured.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(file.DownloadLink) || string.IsNullOrWhiteSpace(file.SourceId))
+        {
+            Logger.LogWarning("ServerDownload", "Cannot queue RhythmVerse download due to missing source metadata.", new Dictionary<string, object?>
             {
-                ["displayName"] = downloadItem.DisplayName,
-                ["error"] = result.Error,
-                ["status"] = downloadItem.Status,
+                ["sourceId"] = file.SourceId,
+                ["downloadLinkPresent"] = !string.IsNullOrWhiteSpace(file.DownloadLink),
+            });
+            return;
+        }
+
+        await QueueServerDownloadJobAsync(file, baseUrl, bearerToken).ConfigureAwait(false);
+    }
+
+    private async Task QueueServerDownloadJobAsync(ViewSong file, string baseUrl, string bearerToken)
+    {
+        string displayName = file.Title ?? file.FileName ?? "Unknown";
+        var request = new ChartHubServerCreateDownloadJobRequest(
+            Source: "RhythmVerse",
+            SourceId: file.SourceId ?? string.Empty,
+            DisplayName: displayName,
+            SourceUrl: file.DownloadLink ?? string.Empty);
+
+        try
+        {
+            ChartHubServerDownloadJobResponse job = await _serverApiClient
+                .CreateDownloadJobAsync(baseUrl, bearerToken, request)
+                .ConfigureAwait(false);
+
+            await _uiInvoke(() =>
+            {
+                DownloadFile? existing = Downloads.FirstOrDefault(item =>
+                    string.Equals(item.Url, job.JobId.ToString("D"), StringComparison.OrdinalIgnoreCase));
+                if (existing is null)
+                {
+                    var queuedItem = new DownloadFile(
+                        job.DisplayName,
+                        job.DownloadedPath ?? Path.GetTempPath(),
+                        job.JobId.ToString("D"),
+                        file.FileSize)
+                    {
+                        SourceName = job.Source,
+                        Status = job.Stage,
+                        DownloadProgress = Math.Clamp(job.ProgressPercent, 0, 100),
+                        Finished = IsTerminalServerStage(job.Stage),
+                        ErrorMessage = job.Error,
+                    };
+                    Downloads.Insert(0, queuedItem);
+                }
+            });
+
+            await _uiInvoke(() =>
+            {
+                file.IsInLibrary = false;
             });
         }
-
-        if (result.Success)
+        catch (Exception ex)
         {
-            file.IsInLibrary = false;
+            Logger.LogError("ServerDownload", "Failed to submit download job to server", ex, new Dictionary<string, object?>
+            {
+                ["source"] = "RhythmVerse",
+                ["sourceId"] = file.SourceId,
+                ["displayName"] = displayName,
+            });
+        }
+    }
+
+    private bool TryGetServerConnection(out string baseUrl, out string bearerToken)
+    {
+        string? configuredBaseUrl = _settingsOrchestrator.Current.Runtime.ServerApiBaseUrl;
+        baseUrl = NormalizeApiBaseUrl(configuredBaseUrl);
+        bearerToken = _settingsOrchestrator.Current.Runtime.ServerApiAuthToken?.Trim() ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(baseUrl) && !string.IsNullOrWhiteSpace(bearerToken);
+    }
+
+    private static string NormalizeApiBaseUrl(string? value)
+    {
+        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri))
+        {
+            return string.Empty;
         }
 
-        _downloadTokens.Remove(downloadItem);
-        cts.Dispose();
+        return uri.GetLeftPart(UriPartial.Authority);
+    }
+
+    private static bool IsTerminalServerStage(string stage)
+    {
+        return string.Equals(stage, "Completed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(stage, "Failed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(stage, "Cancelled", StringComparison.OrdinalIgnoreCase);
     }
 
     private void CancelDownload(DownloadFile? downloadItem)
@@ -525,12 +594,19 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (_downloadTokens.TryGetValue(downloadItem, out CancellationTokenSource? cts))
+        if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
-            downloadItem.Status = TransferStage.Cancelling.ToString();
-            downloadItem.ErrorMessage = null;
-            cts.Cancel();
+            return;
         }
+
+        if (!Guid.TryParse(downloadItem.Url, out Guid jobId))
+        {
+            return;
+        }
+
+        downloadItem.Status = "Cancelling";
+        downloadItem.ErrorMessage = null;
+        ObserveBackgroundTask(_serverApiClient.RequestCancelDownloadJobAsync(baseUrl, bearerToken, jobId), "RhythmVerse cancel server download job");
     }
 
     private void ClearDownload(DownloadFile? downloadItem)

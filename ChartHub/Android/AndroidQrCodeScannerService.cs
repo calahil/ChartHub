@@ -3,6 +3,7 @@
 using Android.App;
 using Android.Gms.Common.Apis;
 using Android.Gms.Extensions;
+
 using Xamarin.Google.MLKit.Vision.Barcode.Common;
 using Xamarin.Google.MLKit.Vision.CodeScanner;
 

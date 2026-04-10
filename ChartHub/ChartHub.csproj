@@ -29,6 +29,7 @@
 		<ApplicationId>com.calahilstudios.charthub</ApplicationId>
 		<AndroidManifest>Android/AndroidManifest.xml</AndroidManifest>
 		<RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
+		<JavaSdkDirectory Condition="'$(JavaSdkDirectory)'=='' and Exists('/usr/lib/jvm/java-21-openjdk-amd64')">/usr/lib/jvm/java-21-openjdk-amd64</JavaSdkDirectory>
 	</PropertyGroup>
 
 	<ItemGroup>

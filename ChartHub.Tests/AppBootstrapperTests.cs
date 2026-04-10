@@ -4,7 +4,6 @@ using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Migration;
 using ChartHub.Configuration.Stores;
 using ChartHub.Services;
-using ChartHub.Services.Transfers;
 using ChartHub.Utilities;
 using ChartHub.ViewModels;
 
@@ -25,10 +24,9 @@ public class AppBootstrapperTests
         Assert.NotNull(provider.GetService<IAppConfigStore>());
         Assert.NotNull(provider.GetService<ISettingsOrchestrator>());
         Assert.NotNull(provider.GetService<AppGlobalSettings>());
-        Assert.NotNull(provider.GetService<ITransferOrchestrator>());
-        Assert.NotNull(provider.GetService<IGoogleDriveClient>());
-        Assert.NotNull(provider.GetService<ILocalIngestionPushService>());
-        Assert.NotNull(provider.GetService<ILocalDownloadFileCatalogService>());
+        Assert.NotNull(provider.GetService<IChartHubServerApiClient>());
+        Assert.NotNull(provider.GetService<IGoogleAuthProvider>());
+        Assert.NotNull(provider.GetService<DownloadService>());
     }
 
     [Fact]

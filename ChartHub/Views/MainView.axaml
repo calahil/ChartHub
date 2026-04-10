@@ -248,11 +248,6 @@
                          IsVisible="{Binding IsCloneHeroTabVisible}">
                     <ContentControl Content="{Binding CloneHeroViewModel}" />
                 </TabItem>
-                <TabItem Header="{Binding PageStrings.Sync}"
-                         FontSize="16"
-                         IsVisible="{Binding IsSyncTabVisible}">
-                    <ContentControl Content="{Binding SyncViewModel}" />
-                </TabItem>
                 <TabItem Header="{Binding PageStrings.Settings}"
                          FontSize="16"
                          IsVisible="{Binding IsSettingsTabVisible}">
@@ -305,12 +300,6 @@
                                 Height="44"
                                         Width="220"
                                         IsVisible="{Binding IsCloneHeroTabVisible}" />
-                                <Button Content="{Binding PageStrings.Sync}"
-                                        Command="{Binding GoSyncCommand}"
-                                        HorizontalContentAlignment="Left"
-                                Height="44"
-                                        Width="220"
-                                        IsVisible="{Binding IsSyncTabVisible}" />
                                 <Button Content="{Binding PageStrings.Settings}"
                                         Command="{Binding GoSettingsCommand}"
                                         HorizontalContentAlignment="Left"

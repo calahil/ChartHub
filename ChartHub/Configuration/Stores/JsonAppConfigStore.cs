@@ -197,79 +197,22 @@ public sealed class JsonAppConfigStore : IAppConfigStore
             config.Runtime.CloneHeroDataDirectory = ReadString(rootNode, "CloneHeroDataDirectory");
         }
 
-        if (rootNode["SyncApiAuthToken"] is not null)
+        if (rootNode["ServerApiAuthToken"] is not null)
         {
-            config.Runtime.SyncApiAuthToken = rootNode["SyncApiAuthToken"]?.GetValue<string>() ?? config.Runtime.SyncApiAuthToken;
+            config.Runtime.ServerApiAuthToken = rootNode["ServerApiAuthToken"]?.GetValue<string>() ?? config.Runtime.ServerApiAuthToken;
+        }
+        else if (rootNode["SyncApiAuthToken"] is not null)
+        {
+            config.Runtime.ServerApiAuthToken = rootNode["SyncApiAuthToken"]?.GetValue<string>() ?? config.Runtime.ServerApiAuthToken;
         }
 
-        if (rootNode["SyncApiDeviceLabel"] is not null)
+        if (rootNode["ServerApiBaseUrl"] is not null)
         {
-            config.Runtime.SyncApiDeviceLabel = rootNode["SyncApiDeviceLabel"]?.GetValue<string>() ?? config.Runtime.SyncApiDeviceLabel;
+            config.Runtime.ServerApiBaseUrl = rootNode["ServerApiBaseUrl"]?.GetValue<string>() ?? config.Runtime.ServerApiBaseUrl;
         }
-
-        if (rootNode["SyncApiPairCode"] is not null)
+        else if (rootNode["SyncApiPreferredBaseUrl"] is not null)
         {
-            config.Runtime.SyncApiPairCode = rootNode["SyncApiPairCode"]?.GetValue<string>() ?? config.Runtime.SyncApiPairCode;
-        }
-
-        if (rootNode["SyncApiPairCodeIssuedAtUtc"] is not null)
-        {
-            config.Runtime.SyncApiPairCodeIssuedAtUtc = rootNode["SyncApiPairCodeIssuedAtUtc"]?.GetValue<string>() ?? config.Runtime.SyncApiPairCodeIssuedAtUtc;
-        }
-
-        if (rootNode["SyncApiPairCodeTtlMinutes"] is not null)
-        {
-            config.Runtime.SyncApiPairCodeTtlMinutes = rootNode["SyncApiPairCodeTtlMinutes"]?.GetValue<int>() ?? config.Runtime.SyncApiPairCodeTtlMinutes;
-        }
-
-        if (rootNode["SyncApiLastPairedDeviceLabel"] is not null)
-        {
-            config.Runtime.SyncApiLastPairedDeviceLabel = rootNode["SyncApiLastPairedDeviceLabel"]?.GetValue<string>() ?? config.Runtime.SyncApiLastPairedDeviceLabel;
-        }
-
-        if (rootNode["SyncApiLastPairedAtUtc"] is not null)
-        {
-            config.Runtime.SyncApiLastPairedAtUtc = rootNode["SyncApiLastPairedAtUtc"]?.GetValue<string>() ?? config.Runtime.SyncApiLastPairedAtUtc;
-        }
-
-        if (rootNode["SyncApiPairingHistoryJson"] is not null)
-        {
-            config.Runtime.SyncApiPairingHistoryJson = rootNode["SyncApiPairingHistoryJson"]?.GetValue<string>() ?? config.Runtime.SyncApiPairingHistoryJson;
-        }
-
-        if (rootNode["SyncApiSavedConnectionsJson"] is not null)
-        {
-            config.Runtime.SyncApiSavedConnectionsJson = rootNode["SyncApiSavedConnectionsJson"]?.GetValue<string>() ?? config.Runtime.SyncApiSavedConnectionsJson;
-        }
-
-        if (rootNode["SyncApiPreferredBaseUrl"] is not null)
-        {
-            config.Runtime.SyncApiPreferredBaseUrl = rootNode["SyncApiPreferredBaseUrl"]?.GetValue<string>() ?? config.Runtime.SyncApiPreferredBaseUrl;
-        }
-
-        if (rootNode["AllowSyncApiStateOverride"] is not null)
-        {
-            config.Runtime.AllowSyncApiStateOverride = rootNode["AllowSyncApiStateOverride"]?.GetValue<bool>() ?? config.Runtime.AllowSyncApiStateOverride;
-        }
-
-        if (rootNode["SyncApiMaxRequestBodyBytes"] is not null)
-        {
-            config.Runtime.SyncApiMaxRequestBodyBytes = rootNode["SyncApiMaxRequestBodyBytes"]?.GetValue<int>() ?? config.Runtime.SyncApiMaxRequestBodyBytes;
-        }
-
-        if (rootNode["SyncApiBodyReadTimeoutMs"] is not null)
-        {
-            config.Runtime.SyncApiBodyReadTimeoutMs = rootNode["SyncApiBodyReadTimeoutMs"]?.GetValue<int>() ?? config.Runtime.SyncApiBodyReadTimeoutMs;
-        }
-
-        if (rootNode["SyncApiMutationWaitTimeoutMs"] is not null)
-        {
-            config.Runtime.SyncApiMutationWaitTimeoutMs = rootNode["SyncApiMutationWaitTimeoutMs"]?.GetValue<int>() ?? config.Runtime.SyncApiMutationWaitTimeoutMs;
-        }
-
-        if (rootNode["SyncApiSlowRequestThresholdMs"] is not null)
-        {
-            config.Runtime.SyncApiSlowRequestThresholdMs = rootNode["SyncApiSlowRequestThresholdMs"]?.GetValue<int>() ?? config.Runtime.SyncApiSlowRequestThresholdMs;
+            config.Runtime.ServerApiBaseUrl = rootNode["SyncApiPreferredBaseUrl"]?.GetValue<string>() ?? config.Runtime.ServerApiBaseUrl;
         }
 
         if (rootNode["InstallLogExpanded"] is not null)

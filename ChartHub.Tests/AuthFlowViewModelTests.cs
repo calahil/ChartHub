@@ -72,42 +72,29 @@ public class AuthFlowViewModelTests
     }
 
     [Fact]
-    public async Task AppShellViewModel_WhenSilentSignInFails_ShowsMainShellWithoutAuthGate()
+    public async Task AppShellViewModel_AfterSplash_ShowsMainShell()
     {
-        var cloudAccountService = new FakeCloudStorageAccountService
-        {
-            TryRestoreSessionResult = false,
-        };
         var mainViewModel = new MainViewModel();
         var serviceProvider = new SingleServiceProvider(typeof(MainViewModel), mainViewModel);
-        var sut = new AppShellViewModel(serviceProvider, cloudAccountService);
+        var sut = new AppShellViewModel(serviceProvider);
 
         SplashViewModel splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
-        Assert.False(sut.IsSignedIn);
 
         await splash.RunAsync();
 
-        Assert.Equal(1, cloudAccountService.TryRestoreSessionCallCount);
-        Assert.False(sut.IsSignedIn);
         Assert.Same(mainViewModel, sut.CurrentViewModel);
     }
 
     [Fact]
-    public async Task AppShellViewModel_WhenSilentSignInSucceeds_SkipsAuthGate()
+    public async Task AppShellViewModel_UsesProvidedMainViewModelInstance()
     {
-        var cloudAccountService = new FakeCloudStorageAccountService
-        {
-            TryRestoreSessionResult = true,
-        };
         var mainViewModel = new MainViewModel();
         var serviceProvider = new SingleServiceProvider(typeof(MainViewModel), mainViewModel);
-        var sut = new AppShellViewModel(serviceProvider, cloudAccountService);
+        var sut = new AppShellViewModel(serviceProvider);
 
         SplashViewModel splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
         await splash.RunAsync();
 
-        Assert.Equal(1, cloudAccountService.TryRestoreSessionCallCount);
-        Assert.True(sut.IsSignedIn);
         Assert.Same(mainViewModel, sut.CurrentViewModel);
     }
 

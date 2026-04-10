@@ -1,7 +1,9 @@
 #if ANDROID
 using System;
+
 using Android.App;
 using Android.Runtime;
+
 using Avalonia;
 using Avalonia.Android;
 

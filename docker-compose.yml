@@ -64,6 +64,44 @@ services:
     networks:
       - internal_env
 
+  charthub-server:
+    image: ${CHARTHUB_SERVER_IMAGE:-charthub-server:local}
+    build:
+      context: .
+      dockerfile: ChartHub.Server/Dockerfile
+    container_name: ${CHARTHUB_SERVER_CONTAINER_NAME:-charthub-server}
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${CHARTHUB_SERVER_ENVIRONMENT:-Production}
+      - ASPNETCORE_URLS=http://+:5001
+      - Auth__JwtSigningKey=${CHARTHUB_SERVER_JWT_SIGNING_KEY:-CHANGE_ME_WITH_A_32_CHAR_MINIMUM_SECRET}
+      - Auth__Issuer=${CHARTHUB_SERVER_JWT_ISSUER:-charthub-server}
+      - Auth__Audience=${CHARTHUB_SERVER_JWT_AUDIENCE:-charthub-clients}
+      - Auth__AllowedEmails__0=${CHARTHUB_SERVER_ALLOWED_EMAIL_0:-}
+      - GoogleDrive__ApiKey=${CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY:-}
+      - ServerPaths__ConfigRoot=/config
+      - ServerPaths__ChartHubRoot=/charthub
+      - ServerPaths__DownloadsDir=/charthub/downloads
+      - ServerPaths__StagingDir=/charthub/staging
+      - ServerPaths__CloneHeroRoot=/clonehero
+      - ServerPaths__SqliteDbPath=/config/charthub-server.db
+    ports:
+      - "${CHARTHUB_SERVER_PORT:-5180}:5001"
+    volumes:
+      - ${CHARTHUB_SERVER_CONFIG_PATH:-./dev-data/config}:/config
+      - ${CHARTHUB_SERVER_CHARTHUB_PATH:-./dev-data/charthub}:/charthub
+      - ${CHARTHUB_SERVER_CLONEHERO_PATH:-./dev-data/clonehero}:/clonehero
+    healthcheck:
+      interval: 30s
+      retries: 5
+      start_period: 20s
+      test:
+      - CMD-SHELL
+      - wget --spider -q http://localhost:5001/health || exit 1
+      timeout: 5s
+    restart: always
+    networks:
+      - internal_env
+
 networks:
   internal_env:
     external: true

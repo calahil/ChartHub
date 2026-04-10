@@ -7,7 +7,6 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 
-using ChartHub.Services;
 using ChartHub.Utilities;
 using ChartHub.ViewModels;
 using ChartHub.Views;
@@ -41,12 +40,8 @@ public partial class App : Avalonia.Application
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
         ServiceProvider ??= AppBootstrapper.CreateServiceProvider();
         AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
-        ICloudStorageAccountService cloudAccountService = ServiceProvider.GetRequiredService<ICloudStorageAccountService>();
-        IIngestionSyncApiHost ingestionSyncApiHost = ServiceProvider.GetRequiredService<IIngestionSyncApiHost>();
-        var shellViewModel = new AppShellViewModel(ServiceProvider, cloudAccountService);
+        var shellViewModel = new AppShellViewModel(ServiceProvider);
         Logger.LogInfo("App", "Framework initialization completed");
-
-        ObserveBackgroundTask(ingestionSyncApiHost.StartAsync(), "Ingestion sync API startup");
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktopLifetime)
         {
@@ -112,18 +107,6 @@ public partial class App : Avalonia.Application
     private static void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
     {
         Logger.LogError("App", "Unobserved task exception", e.Exception);
-    }
-
-    private static void ObserveBackgroundTask(Task task, string context)
-    {
-        _ = task.ContinueWith(t =>
-        {
-            Exception? ex = t.Exception?.GetBaseException();
-            if (ex is not null)
-            {
-                Logger.LogError("App", $"{context} failed", ex);
-            }
-        }, TaskContinuationOptions.OnlyOnFaulted);
     }
 
     private static void DisposeApplicationResourcesOnce()

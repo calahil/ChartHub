@@ -5,7 +5,6 @@ using ChartHub.Configuration.Migration;
 using ChartHub.Configuration.Models;
 using ChartHub.Configuration.Stores;
 using ChartHub.Services;
-using ChartHub.Services.Transfers;
 using ChartHub.ViewModels;
 
 using Microsoft.Extensions.Configuration;
@@ -159,8 +158,6 @@ public static class AppBootstrapper
         services.AddSingleton<IQrCodeScannerService, NoOpQrCodeScannerService>();
 #endif
 
-        services.AddSingleton<IGoogleDriveClient, GoogleDriveClient>();
-        services.AddSingleton<ICloudStorageAccountService, GoogleCloudStorageAccountService>();
         services.AddSingleton<DownloadService>();
         services.AddSingleton<EncoreApiService>();
         services.AddSingleton<SharedDownloadQueue>();
@@ -173,30 +170,23 @@ public static class AppBootstrapper
         services.AddSingleton<IOnyxPipelineService, OnyxService>();
         services.AddSingleton<ISongInstallService, SongInstallService>();
         services.AddSingleton<IDesktopPathOpener, DesktopPathOpener>();
-        services.AddSingleton<ITransferSourceResolver, TransferSourceResolver>();
-        services.AddSingleton<ILocalDestinationWriter, LocalDestinationWriter>();
-        services.AddSingleton<ITransferOrchestrator, TransferOrchestrator>();
-        services.AddSingleton<IIngestionSyncApiHost, IngestionSyncApiHost>();
-        services.AddSingleton<IDesktopSyncApiClient, DesktopSyncApiClient>();
+        services.AddSingleton<IChartHubServerApiClient, ChartHubServerApiClient>();
         services.AddSingleton<ILocalFileDeletionService, LocalFileDeletionService>();
-        services.AddSingleton<IDesktopSyncQrImageExportService, DesktopSyncQrImageExportService>();
-        services.AddSingleton<ILocalIngestionPushService, LocalIngestionPushService>();
-        services.AddSingleton<ILocalDownloadFileCatalogService, LocalDownloadFileCatalogService>();
-        services.AddSingleton<DownloadViewModel>();
-        services.AddSingleton<CloneHeroViewModel>();
-        services.AddSingleton<SyncViewModel>(serviceProvider =>
-            new SyncViewModel(
-                serviceProvider.GetRequiredService<IDesktopSyncApiClient>(),
+        services.AddSingleton<DownloadViewModel>(serviceProvider =>
+            new DownloadViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
-                serviceProvider.GetRequiredService<IQrCodeScannerService>(),
-                autoRefreshInterval: null,
-                isCompanionMode: null,
-                localIngestionPushService: serviceProvider.GetRequiredService<ILocalIngestionPushService>(),
-                localDownloadFileCatalogService: serviceProvider.GetRequiredService<ILocalDownloadFileCatalogService>(),
-                desktopSyncQrImageExportService: serviceProvider.GetRequiredService<IDesktopSyncQrImageExportService>(),
-                ingestionSyncApiHost: serviceProvider.GetRequiredService<IIngestionSyncApiHost>()));
+                serviceProvider.GetRequiredService<ISongInstallService>(),
+                serviceProvider.GetRequiredService<IChartHubServerApiClient>(),
+                serviceProvider.GetService<CloneHeroViewModel>()));
+        services.AddSingleton<CloneHeroViewModel>();
         services.AddSingleton<SettingsViewModel>();
-        services.AddSingleton<RhythmVerseViewModel>();
+        services.AddSingleton<RhythmVerseViewModel>(serviceProvider =>
+            new RhythmVerseViewModel(
+                serviceProvider.GetRequiredService<IConfiguration>(),
+                serviceProvider.GetRequiredService<LibraryCatalogService>(),
+                serviceProvider.GetRequiredService<SharedDownloadQueue>(),
+                serviceProvider.GetRequiredService<ISettingsOrchestrator>(),
+                serviceProvider.GetRequiredService<IChartHubServerApiClient>()));
         services.AddSingleton<EncoreViewModel>();
         services.AddSingleton<MainViewModel>(serviceProvider =>
             new MainViewModel(
@@ -205,7 +195,6 @@ public static class AppBootstrapper
                 serviceProvider.GetRequiredService<SharedDownloadQueue>(),
                 serviceProvider.GetRequiredService<DownloadViewModel>(),
                 serviceProvider.GetRequiredService<CloneHeroViewModel>(),
-                serviceProvider.GetRequiredService<SyncViewModel>(),
                 serviceProvider.GetRequiredService<SettingsViewModel>()
             )
         );

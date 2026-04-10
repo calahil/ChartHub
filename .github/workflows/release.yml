@@ -2,8 +2,6 @@ name: Release and Deploy
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
 
@@ -24,23 +22,11 @@ jobs:
       image_tag: ${{ steps.classify.outputs.image_tag }}
       image_tag_minor: ${{ steps.classify.outputs.image_tag_minor }}
     steps:
-      - name: Classify branch or tag
+      - name: Classify tag
         id: classify
         run: |
           REF_TYPE="${GITHUB_REF_TYPE}"
           REF_NAME="${GITHUB_REF_NAME}"
-          SHORT_SHA="${GITHUB_SHA::7}"
-
-          if [[ "$REF_TYPE" == "branch" && "$REF_NAME" == "main" ]]; then
-            echo "release_channel=dev" >> "$GITHUB_OUTPUT"
-            echo "is_tag_release=false" >> "$GITHUB_OUTPUT"
-            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
-            echo "version=main-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-            echo "android_version_code=1" >> "$GITHUB_OUTPUT"
-            echo "image_tag=main-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-            echo "image_tag_minor=" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
 
           if [[ "$REF_TYPE" != "tag" ]]; then
             echo "Unsupported ref type: ${REF_TYPE}"
@@ -48,6 +34,20 @@ jobs:
           fi
 
           TAG="${REF_NAME}"
+
+          if [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-dev$ ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+            echo "release_channel=dev" >> "$GITHUB_OUTPUT"
+            echo "is_tag_release=true" >> "$GITHUB_OUTPUT"
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "version=${MAJOR}.${MINOR}.${PATCH}-dev" >> "$GITHUB_OUTPUT"
+            echo "image_tag=${MAJOR}.${MINOR}.${PATCH}-dev" >> "$GITHUB_OUTPUT"
+            echo "image_tag_minor=" >> "$GITHUB_OUTPUT"
+            echo "android_version_code=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           if [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-rc\.([0-9]+)$ ]]; then
             MAJOR="${BASH_REMATCH[1]}"
@@ -78,7 +78,7 @@ jobs:
             exit 0
           fi
 
-          echo "Unsupported tag format '${TAG}'. Use vX.Y.Z or vX.Y.Z-rc.N"
+          echo "Unsupported tag format '${TAG}'. Use vX.Y.Z-dev, vX.Y.Z-rc.N, or vX.Y.Z"
           exit 1
 
   validate:
@@ -92,7 +92,7 @@ jobs:
 
   build-desktop:
     name: Publish desktop (${{ matrix.rid }})
-    if: needs.classify.outputs.is_tag_release == 'true'
+    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
     runs-on: ubuntu-latest
     needs: [classify, validate]
     strategy:
@@ -135,7 +135,7 @@ jobs:
 
   build-android:
     name: Build Android APK
-    if: needs.classify.outputs.is_tag_release == 'true'
+    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
     runs-on: ubuntu-latest
     needs: [classify, validate]
     steps:
@@ -247,7 +247,7 @@ jobs:
 
   publish-release:
     name: Publish GitHub Release
-    if: needs.classify.outputs.is_tag_release == 'true'
+    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
     runs-on: ubuntu-latest
     needs: [classify, build-desktop, build-android, build-api-image]
     steps:

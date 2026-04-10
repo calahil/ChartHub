@@ -18,6 +18,12 @@
         "dotnet ef": true,
         "cp": true,
         "dotnet list": true,
-        "strings": true
+        "strings": true,
+        "test": true,
+        "/^bash -n scripts/setup-local-secrets\\.sh$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "scripts/setup-local-secrets.sh": true
     }
 }

@@ -7,7 +7,6 @@ using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Services;
-using ChartHub.Services.Transfers;
 using ChartHub.Strings;
 using ChartHub.Utilities;
 
@@ -20,9 +19,8 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     public bool IsCompanionMode => OperatingSystem.IsAndroid();
     public bool IsDesktopMode => !OperatingSystem.IsAndroid();
     private readonly EncoreApiService _apiService;
-    private readonly ITransferOrchestrator _transferOrchestrator;
+    private readonly IChartHubServerApiClient _serverApiClient;
     private readonly ISettingsOrchestrator _settingsOrchestrator;
-    private readonly Dictionary<DownloadFile, CancellationTokenSource> _downloadTokens = [];
     private readonly object _stateSaveSync = new();
 
     private string _searchText = string.Empty;
@@ -383,12 +381,12 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
 
     public EncoreViewModel(
         EncoreApiService apiService,
-        ITransferOrchestrator transferOrchestrator,
+        IChartHubServerApiClient serverApiClient,
         ISettingsOrchestrator settingsOrchestrator,
         SharedDownloadQueue sharedDownloadQueue)
     {
         _apiService = apiService;
-        _transferOrchestrator = transferOrchestrator;
+        _serverApiClient = serverApiClient;
         _settingsOrchestrator = settingsOrchestrator;
 
         Downloads = sharedDownloadQueue.Downloads;
@@ -592,37 +590,62 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             return;
         }
 
-        string fileName = BuildEncoreFileName(selected);
-        var proxySong = selected.ToViewSong(fileName);
-
-        var downloadItem = new DownloadFile(
-            fileName,
-            Path.GetTempPath(),
-            selected.DownloadUrl,
-            null);
-        downloadItem.SourceName = "Encore";
-        downloadItem.CancelAction = () => CancelDownload(downloadItem);
-
-        var cts = new CancellationTokenSource();
-        _downloadTokens[downloadItem] = cts;
-
-        TransferResult result = await _transferOrchestrator.QueueSongDownloadAsync(proxySong, downloadItem, Downloads, cts.Token);
-        if (result.Success)
+        if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
+            Logger.LogWarning("ServerDownload", "Cannot queue Encore download because sync API endpoint/token is not configured.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(selected.DownloadUrl) || string.IsNullOrWhiteSpace(selected.SourceId))
+        {
+            Logger.LogWarning("ServerDownload", "Cannot queue Encore download due to missing source metadata.", new Dictionary<string, object?>
+            {
+                ["sourceId"] = selected.SourceId,
+                ["downloadUrlPresent"] = !string.IsNullOrWhiteSpace(selected.DownloadUrl),
+            });
+            return;
+        }
+
+        string fileName = BuildEncoreFileName(selected);
+
+        var request = new ChartHubServerCreateDownloadJobRequest(
+            Source: LibrarySourceNames.Encore,
+            SourceId: selected.SourceId,
+            DisplayName: fileName,
+            SourceUrl: selected.DownloadUrl);
+
+        try
+        {
+            ChartHubServerDownloadJobResponse job = await _serverApiClient
+                .CreateDownloadJobAsync(baseUrl, bearerToken, request)
+                .ConfigureAwait(false);
+
+            var downloadItem = new DownloadFile(
+                fileName,
+                job.DownloadedPath ?? Path.GetTempPath(),
+                job.JobId.ToString("D"),
+                null)
+            {
+                SourceName = LibrarySourceNames.Encore,
+                Status = job.Stage,
+                DownloadProgress = Math.Clamp(job.ProgressPercent, 0, 100),
+                Finished = IsTerminalServerStage(job.Stage),
+                ErrorMessage = job.Error,
+            };
+            downloadItem.CancelAction = () => CancelDownload(downloadItem);
+
+            Downloads.Insert(0, downloadItem);
             selected.IsInLibrary = false;
         }
-        else if (!string.IsNullOrWhiteSpace(result.Error))
+        catch (Exception ex)
         {
-            Logger.LogWarning("Encore", "Encore transfer reported failure", new Dictionary<string, object?>
+            Logger.LogError("ServerDownload", "Failed to submit Encore download job to server", ex, new Dictionary<string, object?>
             {
-                ["displayName"] = downloadItem.DisplayName,
-                ["error"] = result.Error,
-                ["status"] = downloadItem.Status,
+                ["source"] = LibrarySourceNames.Encore,
+                ["sourceId"] = selected.SourceId,
+                ["displayName"] = fileName,
             });
         }
-
-        _downloadTokens.Remove(downloadItem);
-        cts.Dispose();
     }
 
     private void CancelDownload(DownloadFile? downloadItem)
@@ -632,12 +655,43 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (_downloadTokens.TryGetValue(downloadItem, out CancellationTokenSource? cts))
+        if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
-            downloadItem.Status = TransferStage.Cancelling.ToString();
-            downloadItem.ErrorMessage = null;
-            cts.Cancel();
+            return;
         }
+
+        if (!Guid.TryParse(downloadItem.Url, out Guid jobId))
+        {
+            return;
+        }
+
+        downloadItem.Status = "Cancelling";
+        downloadItem.ErrorMessage = null;
+        ObserveBackgroundTask(_serverApiClient.RequestCancelDownloadJobAsync(baseUrl, bearerToken, jobId), "Encore cancel server download job");
+    }
+
+    private bool TryGetServerConnection(out string baseUrl, out string bearerToken)
+    {
+        baseUrl = NormalizeApiBaseUrl(_settingsOrchestrator.Current.Runtime.ServerApiBaseUrl);
+        bearerToken = _settingsOrchestrator.Current.Runtime.ServerApiAuthToken?.Trim() ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(baseUrl) && !string.IsNullOrWhiteSpace(bearerToken);
+    }
+
+    private static string NormalizeApiBaseUrl(string? value)
+    {
+        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri))
+        {
+            return string.Empty;
+        }
+
+        return uri.GetLeftPart(UriPartial.Authority);
+    }
+
+    private static bool IsTerminalServerStage(string stage)
+    {
+        return string.Equals(stage, "Completed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(stage, "Failed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(stage, "Cancelled", StringComparison.OrdinalIgnoreCase);
     }
 
     private void ClearDownload(DownloadFile? downloadItem)

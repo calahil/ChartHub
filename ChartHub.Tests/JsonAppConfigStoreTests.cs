@@ -52,7 +52,7 @@ public class JsonAppConfigStoreTests
         Assert.True(config.Runtime.UseMockData);
         Assert.Equal("/tmp/legacy-temp", config.Runtime.TempDirectory);
         Assert.Equal("/tmp/legacy-downloads", config.Runtime.DownloadDirectory);
-        Assert.Equal("legacy-sync-token", config.Runtime.SyncApiAuthToken);
+        Assert.Equal("legacy-sync-token", config.Runtime.ServerApiAuthToken);
         Assert.Equal("android-id", config.GoogleAuth.AndroidClientId);
         Assert.Equal("desktop-id", config.GoogleAuth.DesktopClientId);
     }
