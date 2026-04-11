@@ -24,6 +24,7 @@
             "approve": true,
             "matchCommandLine": true
         },
-        "scripts/setup-local-secrets.sh": true
+        "scripts/setup-local-secrets.sh": true,
+        "sysctl": true
     }
 }

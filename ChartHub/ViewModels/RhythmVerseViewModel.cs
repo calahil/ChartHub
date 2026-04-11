@@ -484,11 +484,16 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
 
     public async Task DownloadFile(ViewSong? song)
     {
-        ViewSong? file = song ?? SelectedFile;
-        if (file == null)
+        if (song is null)
         {
+            Logger.LogWarning("ServerDownload", "Cannot queue RhythmVerse download because the command parameter was null.");
             return;
         }
+
+        string sourceId = song.SourceId?.Trim() ?? string.Empty;
+        string sourceUrl = song.DownloadLink?.Trim() ?? string.Empty;
+        string displayName = song.Title ?? song.FileName ?? "Unknown";
+        long? fileSize = song.FileSize;
 
         if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
@@ -496,59 +501,73 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(file.DownloadLink) || string.IsNullOrWhiteSpace(file.SourceId))
+        if (string.IsNullOrWhiteSpace(sourceUrl) || string.IsNullOrWhiteSpace(sourceId))
         {
             Logger.LogWarning("ServerDownload", "Cannot queue RhythmVerse download due to missing source metadata.", new Dictionary<string, object?>
             {
-                ["sourceId"] = file.SourceId,
-                ["downloadLinkPresent"] = !string.IsNullOrWhiteSpace(file.DownloadLink),
+                ["sourceId"] = sourceId,
+                ["downloadLinkPresent"] = !string.IsNullOrWhiteSpace(sourceUrl),
             });
             return;
         }
 
-        await QueueServerDownloadJobAsync(file, baseUrl, bearerToken).ConfigureAwait(false);
+        var job = new PendingRhythmVerseJob(
+            SourceId: sourceId,
+            DisplayName: displayName,
+            SourceUrl: sourceUrl,
+            FileSize: fileSize);
+        await QueueServerDownloadJobAsync(song, job, baseUrl, bearerToken).ConfigureAwait(false);
     }
 
-    private async Task QueueServerDownloadJobAsync(ViewSong file, string baseUrl, string bearerToken)
+    private async Task QueueServerDownloadJobAsync(ViewSong song, PendingRhythmVerseJob pendingJob, string baseUrl, string bearerToken)
     {
-        string displayName = file.Title ?? file.FileName ?? "Unknown";
         var request = new ChartHubServerCreateDownloadJobRequest(
             Source: "RhythmVerse",
-            SourceId: file.SourceId ?? string.Empty,
-            DisplayName: displayName,
-            SourceUrl: file.DownloadLink ?? string.Empty);
+            SourceId: pendingJob.SourceId,
+            DisplayName: pendingJob.DisplayName,
+            SourceUrl: pendingJob.SourceUrl);
 
         try
         {
-            ChartHubServerDownloadJobResponse job = await _serverApiClient
+            ChartHubServerDownloadJobResponse jobResponse = await _serverApiClient
                 .CreateDownloadJobAsync(baseUrl, bearerToken, request)
                 .ConfigureAwait(false);
 
             await _uiInvoke(() =>
             {
                 DownloadFile? existing = Downloads.FirstOrDefault(item =>
-                    string.Equals(item.Url, job.JobId.ToString("D"), StringComparison.OrdinalIgnoreCase));
+                    string.Equals(item.Url, jobResponse.JobId.ToString("D"), StringComparison.OrdinalIgnoreCase));
                 if (existing is null)
                 {
                     var queuedItem = new DownloadFile(
-                        job.DisplayName,
-                        job.DownloadedPath ?? Path.GetTempPath(),
-                        job.JobId.ToString("D"),
-                        file.FileSize)
+                        jobResponse.DisplayName,
+                        jobResponse.DownloadedPath ?? Path.GetTempPath(),
+                        jobResponse.JobId.ToString("D"),
+                        pendingJob.FileSize)
                     {
-                        SourceName = job.Source,
-                        Status = job.Stage,
-                        DownloadProgress = Math.Clamp(job.ProgressPercent, 0, 100),
-                        Finished = IsTerminalServerStage(job.Stage),
-                        ErrorMessage = job.Error,
+                        SourceName = jobResponse.Source,
+                        Status = jobResponse.Stage,
+                        DownloadProgress = Math.Clamp(jobResponse.ProgressPercent, 0, 100),
+                        Finished = IsTerminalServerStage(jobResponse.Stage),
+                        ErrorMessage = jobResponse.Error,
                     };
                     Downloads.Insert(0, queuedItem);
                 }
             });
 
+            Logger.LogInfo("ServerDownload", "Queued RhythmVerse download job", new Dictionary<string, object?>
+            {
+                ["jobId"] = jobResponse.JobId,
+                ["source"] = jobResponse.Source,
+                ["sourceId"] = jobResponse.SourceId,
+                ["displayName"] = jobResponse.DisplayName,
+                ["stage"] = jobResponse.Stage,
+                ["baseUrl"] = baseUrl,
+            });
+
             await _uiInvoke(() =>
             {
-                file.IsInLibrary = false;
+                song.IsInLibrary = false;
             });
         }
         catch (Exception ex)
@@ -556,11 +575,17 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             Logger.LogError("ServerDownload", "Failed to submit download job to server", ex, new Dictionary<string, object?>
             {
                 ["source"] = "RhythmVerse",
-                ["sourceId"] = file.SourceId,
-                ["displayName"] = displayName,
+                ["sourceId"] = pendingJob.SourceId,
+                ["displayName"] = pendingJob.DisplayName,
             });
         }
     }
+
+    private sealed record PendingRhythmVerseJob(
+        string SourceId,
+        string DisplayName,
+        string SourceUrl,
+        long? FileSize);
 
     private bool TryGetServerConnection(out string baseUrl, out string bearerToken)
     {
@@ -582,7 +607,9 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
 
     private static bool IsTerminalServerStage(string stage)
     {
-        return string.Equals(stage, "Completed", StringComparison.OrdinalIgnoreCase)
+        return string.Equals(stage, "Installed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(stage, "Downloaded", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(stage, "Completed", StringComparison.OrdinalIgnoreCase)
             || string.Equals(stage, "Failed", StringComparison.OrdinalIgnoreCase)
             || string.Equals(stage, "Cancelled", StringComparison.OrdinalIgnoreCase);
     }
@@ -606,6 +633,11 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
 
         downloadItem.Status = "Cancelling";
         downloadItem.ErrorMessage = null;
+        Logger.LogInfo("ServerDownload", "Requesting cancel for RhythmVerse download job", new Dictionary<string, object?>
+        {
+            ["jobId"] = jobId,
+            ["displayName"] = downloadItem.DisplayName,
+        });
         ObserveBackgroundTask(_serverApiClient.RequestCancelDownloadJobAsync(baseUrl, bearerToken, jobId), "RhythmVerse cancel server download job");
     }
 

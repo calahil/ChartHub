@@ -445,7 +445,8 @@ public class MainViewModel : INotifyPropertyChanged
         if (!IsCompanionMode
             || sender is not DownloadFile item
             || e.PropertyName != nameof(DownloadFile.Status)
-            || !string.Equals(item.Status, "Completed", StringComparison.Ordinal))
+            || (!string.Equals(item.Status, "Installed", StringComparison.Ordinal)
+                && !string.Equals(item.Status, "Completed", StringComparison.Ordinal)))
         {
             return;
         }

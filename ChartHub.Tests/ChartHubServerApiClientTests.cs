@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using System.Text;
 
 using ChartHub.Services;
 
@@ -67,6 +68,80 @@ public sealed class ChartHubServerApiClientTests
         Assert.Equal($"http://127.0.0.1:5001/api/v1/downloads/jobs/{jobId:D}/cancel", captured.RequestUri!.ToString());
         Assert.Equal("Bearer", captured.Headers.Authorization?.Scheme);
         Assert.Equal("jwt-token", captured.Headers.Authorization?.Parameter);
+    }
+
+    [Fact]
+    public async Task StreamDownloadJobsAsync_ParsesJobsEventPayload()
+    {
+        HttpRequestMessage? captured = null;
+        string ssePayload = "event: jobs\n"
+            + "data: [{\"jobId\":\"33333333-3333-3333-3333-333333333333\",\"stage\":\"Downloading\",\"progressPercent\":42.5,\"updatedAtUtc\":\"2026-04-10T00:00:00Z\"}]\n\n";
+
+        ChartHubServerApiClient sut = new(() =>
+            new HttpClient(new StubHttpMessageHandler((request, _) =>
+            {
+                captured = request;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(ssePayload, Encoding.UTF8, "text/event-stream"),
+                });
+            })));
+
+        IReadOnlyList<ChartHubServerDownloadProgressEvent>? batch = null;
+        await foreach (IReadOnlyList<ChartHubServerDownloadProgressEvent> item in sut.StreamDownloadJobsAsync("http://127.0.0.1:5001", "jwt-token"))
+        {
+            batch = item;
+            break;
+        }
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal("http://127.0.0.1:5001/api/v1/downloads/jobs/stream", captured.RequestUri!.ToString());
+        Assert.Equal("Bearer", captured.Headers.Authorization?.Scheme);
+        Assert.Equal("jwt-token", captured.Headers.Authorization?.Parameter);
+        Assert.NotNull(batch);
+        ChartHubServerDownloadProgressEvent evt = Assert.Single(batch!);
+        Assert.Equal(Guid.Parse("33333333-3333-3333-3333-333333333333"), evt.JobId);
+        Assert.Equal("Downloading", evt.Stage);
+        Assert.Equal(42.5, evt.ProgressPercent);
+    }
+
+    [Fact]
+    public async Task ExchangeGoogleTokenAsync_InvalidTokenResponse_ThrowsTypedApiExceptionWithErrorCode()
+    {
+        ChartHubServerApiClient sut = new(() =>
+            new HttpClient(new StubHttpMessageHandler((_, _) =>
+                Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    Content = new StringContent("{\"error\":\"invalid_google_id_token\"}"),
+                }))));
+
+        ChartHubServerApiException ex = await Assert.ThrowsAsync<ChartHubServerApiException>(() =>
+            sut.ExchangeGoogleTokenAsync("http://127.0.0.1:5001", "token"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
+        Assert.Equal("invalid_google_id_token", ex.ErrorCode);
+    }
+
+    [Fact]
+    public async Task StreamDownloadJobsAsync_Unauthorized_ThrowsTypedApiException()
+    {
+        ChartHubServerApiClient sut = new(() =>
+            new HttpClient(new StubHttpMessageHandler((_, _) =>
+                Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+                {
+                    Content = new StringContent("unauthorized"),
+                }))));
+
+        ChartHubServerApiException ex = await Assert.ThrowsAsync<ChartHubServerApiException>(async () =>
+        {
+            await foreach (IReadOnlyList<ChartHubServerDownloadProgressEvent> _ in sut.StreamDownloadJobsAsync("http://127.0.0.1:5001", "bad-token"))
+            {
+            }
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, ex.StatusCode);
+        Assert.Null(ex.ErrorCode);
     }
 
     private sealed class StubHttpMessageHandler(

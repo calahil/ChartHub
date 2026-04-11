@@ -73,46 +73,104 @@ public sealed class CloneHeroEndpointsIntegrationTests
     }
 
     [Fact]
-    public async Task InstallFromStagedUnknownJobReturnsNotFound()
+    public async Task InstallDownloadJobUnknownJobReturnsNotFound()
     {
         await using TestAppFixture fixture = await TestAppFixture.CreateAsync();
 
-        HttpResponseMessage response = await fixture.Client.PostAsync($"/api/v1/clonehero/install-from-staged/{Guid.NewGuid():D}", content: null);
+        HttpResponseMessage response = await fixture.Client.PostAsync($"/api/v1/downloads/jobs/{Guid.NewGuid():D}/install", content: null);
 
         Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
-    public async Task InstallFromStagedJobWithoutStagedPathReturnsConflict()
+    public async Task InstallDownloadJobWithoutArtifactPathReturnsAcceptedAndEventuallyFailed()
     {
         var jobId = Guid.Parse("8c39d7c8-0f84-4ca7-9db0-cd31fcf4a348");
-        await using TestAppFixture fixture = await TestAppFixture.CreateAsync(store =>
-        {
-            store.Seed(new DownloadJobResponse
+        await using TestAppFixture fixture = await TestAppFixture.CreateAsync(
+            seed: store =>
             {
-                JobId = jobId,
-                Source = "rhythmverse",
-                SourceId = "song-1",
-                DisplayName = "Artist - Song",
-                SourceUrl = "https://example.test/song.zip",
-                Stage = "Staged",
-                ProgressPercent = 90,
-                DownloadedPath = null,
-                StagedPath = null,
-                InstalledPath = null,
-                Error = null,
-                CreatedAtUtc = DateTimeOffset.UtcNow,
-                UpdatedAtUtc = DateTimeOffset.UtcNow,
-            });
-        });
+                store.Seed(new DownloadJobResponse
+                {
+                    JobId = jobId,
+                    Source = "rhythmverse",
+                    SourceId = "song-1",
+                    DisplayName = "Artist - Song",
+                    SourceUrl = "https://example.test/song.zip",
+                    Stage = "Downloaded",
+                    ProgressPercent = 100,
+                    DownloadedPath = null,
+                    StagedPath = null,
+                    InstalledPath = null,
+                    Error = null,
+                    CreatedAtUtc = DateTimeOffset.UtcNow,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow,
+                });
+            },
+            configureInstall: install => install.ExceptionToThrow = new InvalidOperationException("missing artifact"));
 
-        HttpResponseMessage response = await fixture.Client.PostAsync($"/api/v1/clonehero/install-from-staged/{jobId:D}", content: null);
+        HttpResponseMessage response = await fixture.Client.PostAsync($"/api/v1/downloads/jobs/{jobId:D}/install", content: null);
 
-        Assert.Equal(System.Net.HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.Accepted, response.StatusCode);
+        DownloadJobResponse updatedJob = await WaitForJobStageAsync(fixture.Store, jobId, "Failed");
+        Assert.Equal("Failed", updatedJob.Stage);
+        Assert.Equal("missing artifact", updatedJob.Error);
     }
 
     [Fact]
-    public async Task InstallFromStagedBadArtifactPathReturnsBadRequest()
+    public async Task InstallDownloadJobWithRelativeArtifactPathResolvesAgainstContentRoot()
+    {
+        string contentRoot = Path.Combine(Path.GetTempPath(), "charthub-server-install-relative", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(contentRoot);
+
+        try
+        {
+            var jobId = Guid.Parse("09f7484b-f5f8-4fce-9bd0-74ccb62f4e0d");
+            string relativePath = Path.Combine("dev-data", "charthub", "downloads", $"school-{jobId:D}.bin");
+            string absolutePath = Path.Combine(contentRoot, relativePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);
+            await File.WriteAllBytesAsync(absolutePath, [0x01, 0x02, 0x03]);
+
+            await using TestAppFixture fixture = await TestAppFixture.CreateAsync(
+                seed: store =>
+                {
+                    store.Seed(new DownloadJobResponse
+                    {
+                        JobId = jobId,
+                        Source = "rhythmverse",
+                        SourceId = "song-relative",
+                        DisplayName = "Artist - Song",
+                        SourceUrl = "https://example.test/song.bin",
+                        Stage = "Downloaded",
+                        ProgressPercent = 100,
+                        DownloadedPath = relativePath,
+                        StagedPath = null,
+                        InstalledPath = null,
+                        Error = null,
+                        CreatedAtUtc = DateTimeOffset.UtcNow,
+                        UpdatedAtUtc = DateTimeOffset.UtcNow,
+                    });
+                },
+                configureInstall: install => install.ResultPath = Path.Combine(contentRoot, "installed"),
+                contentRootPath: contentRoot);
+
+            HttpResponseMessage response = await fixture.Client.PostAsync($"/api/v1/downloads/jobs/{jobId:D}/install", content: null);
+
+            Assert.Equal(System.Net.HttpStatusCode.Accepted, response.StatusCode);
+            DownloadJobResponse updatedJob = await WaitForJobStageAsync(fixture.Store, jobId, "Installed");
+            Assert.False(string.IsNullOrWhiteSpace(updatedJob!.StagedPath));
+            Assert.True(Path.IsPathRooted(updatedJob.StagedPath));
+        }
+        finally
+        {
+            if (Directory.Exists(contentRoot))
+            {
+                Directory.Delete(contentRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InstallDownloadJobNonInstallableStageReturnsConflict()
     {
         var jobId = Guid.Parse("37c4bf72-25f5-4975-851d-7f1df86685ac");
         await using TestAppFixture fixture = await TestAppFixture.CreateAsync(store =>
@@ -124,10 +182,10 @@ public sealed class CloneHeroEndpointsIntegrationTests
                 SourceId = "song-2",
                 DisplayName = "Artist - Song",
                 SourceUrl = "https://example.test/song.zip",
-                Stage = "Staged",
-                ProgressPercent = 90,
-                DownloadedPath = null,
-                StagedPath = Path.Combine(Path.GetTempPath(), "does-not-exist", "song.zip"),
+                Stage = "Installed",
+                ProgressPercent = 100,
+                DownloadedPath = "/tmp/song.zip",
+                StagedPath = "/tmp/song.zip",
                 InstalledPath = null,
                 Error = null,
                 CreatedAtUtc = DateTimeOffset.UtcNow,
@@ -135,63 +193,117 @@ public sealed class CloneHeroEndpointsIntegrationTests
             });
         });
 
-        HttpResponseMessage response = await fixture.Client.PostAsync($"/api/v1/clonehero/install-from-staged/{jobId:D}", content: null);
+        HttpResponseMessage response = await fixture.Client.PostAsync($"/api/v1/downloads/jobs/{jobId:D}/install", content: null);
 
-        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, response.StatusCode);
     }
 
     [Fact]
-    public async Task InstallFromStagedValidZipReturnsAcceptedAndMarksInstalled()
+    public async Task InstallDownloadJobValidDownloadedArtifactReturnsAcceptedAndMarksInstalled()
     {
-        string stageRoot = Path.Combine(Path.GetTempPath(), "charthub-server-stage", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(stageRoot);
-        string payloadRoot = Path.Combine(stageRoot, "payload");
-        Directory.CreateDirectory(payloadRoot);
-        await File.WriteAllTextAsync(Path.Combine(payloadRoot, "notes.chart"), "chart-data");
-
-        string stagedZip = Path.Combine(stageRoot, "song.zip");
-        System.IO.Compression.ZipFile.CreateFromDirectory(payloadRoot, stagedZip);
-
         var jobId = Guid.Parse("d85fad95-5f8b-4c45-81ae-2936e1e27b4f");
+        string installedPath = Path.Combine(Path.GetTempPath(), "charthub-server-installed", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(installedPath);
 
         try
         {
-            await using TestAppFixture fixture = await TestAppFixture.CreateAsync(store =>
+            await using TestAppFixture fixture = await TestAppFixture.CreateAsync(
+                seed: store =>
+                {
+                    store.Seed(new DownloadJobResponse
+                    {
+                        JobId = jobId,
+                        Source = "rhythmverse",
+                        SourceId = "song-3",
+                        DisplayName = "Artist - Song",
+                        SourceUrl = "https://example.test/song.zip",
+                        Stage = "Downloaded",
+                        ProgressPercent = 100,
+                        DownloadedPath = "/tmp/song.zip",
+                        StagedPath = "/tmp/song.zip",
+                        InstalledPath = null,
+                        Error = null,
+                        CreatedAtUtc = DateTimeOffset.UtcNow,
+                        UpdatedAtUtc = DateTimeOffset.UtcNow,
+                    });
+                },
+                configureInstall: install => install.ResultPath = installedPath);
+
+            HttpResponseMessage response = await fixture.Client.PostAsync($"/api/v1/downloads/jobs/{jobId:D}/install", content: null);
+
+            Assert.Equal(System.Net.HttpStatusCode.Accepted, response.StatusCode);
+            DownloadJobResponse updatedJob = await WaitForJobStageAsync(fixture.Store, jobId, "Installed");
+            Assert.False(string.IsNullOrWhiteSpace(updatedJob!.InstalledPath));
+            Assert.Equal(installedPath, updatedJob.InstalledPath);
+            Assert.Equal("Installed", updatedJob.Stage);
+        }
+        finally
+        {
+            if (Directory.Exists(installedPath))
+            {
+                Directory.Delete(installedPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task InstallDownloadJobWhenPipelineThrowsReturnsAcceptedAndEventuallyFailed()
+    {
+        var jobId = Guid.Parse("3f3c5d66-63fa-4b95-97c3-a1f4673432f8");
+
+        await using TestAppFixture fixture = await TestAppFixture.CreateAsync(
+            seed: store =>
             {
                 store.Seed(new DownloadJobResponse
                 {
                     JobId = jobId,
                     Source = "rhythmverse",
-                    SourceId = "song-3",
+                    SourceId = "song-4",
                     DisplayName = "Artist - Song",
                     SourceUrl = "https://example.test/song.zip",
-                    Stage = "Staged",
-                    ProgressPercent = 90,
-                    DownloadedPath = null,
-                    StagedPath = stagedZip,
+                    Stage = "Downloaded",
+                    ProgressPercent = 100,
+                    DownloadedPath = "/tmp/song.zip",
+                    StagedPath = "/tmp/song.zip",
                     InstalledPath = null,
                     Error = null,
                     CreatedAtUtc = DateTimeOffset.UtcNow,
                     UpdatedAtUtc = DateTimeOffset.UtcNow,
                 });
-            });
+            },
+            configureInstall: install => install.ExceptionToThrow = new InvalidOperationException("install failed"));
 
-            HttpResponseMessage response = await fixture.Client.PostAsync($"/api/v1/clonehero/install-from-staged/{jobId:D}", content: null);
+        HttpResponseMessage response = await fixture.Client.PostAsync($"/api/v1/downloads/jobs/{jobId:D}/install", content: null);
 
-            Assert.Equal(System.Net.HttpStatusCode.Accepted, response.StatusCode);
-            Assert.True(fixture.Store.TryGet(jobId, out DownloadJobResponse? updatedJob));
-            Assert.NotNull(updatedJob);
-            Assert.False(string.IsNullOrWhiteSpace(updatedJob!.InstalledPath));
-            Assert.True(Directory.Exists(updatedJob.InstalledPath!));
-            Assert.True(File.Exists(Path.Combine(updatedJob.InstalledPath!, "notes.chart")));
-        }
-        finally
+        Assert.Equal(System.Net.HttpStatusCode.Accepted, response.StatusCode);
+        DownloadJobResponse updatedJob = await WaitForJobStageAsync(fixture.Store, jobId, "Failed");
+        Assert.Equal("Failed", updatedJob.Stage);
+        Assert.Equal("install failed", updatedJob.Error);
+    }
+
+    private static async Task<DownloadJobResponse> WaitForJobStageAsync(
+        FakeDownloadJobStore store,
+        Guid jobId,
+        string expectedStage,
+        int maxAttempts = 50,
+        int delayMs = 20)
+    {
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
-            if (Directory.Exists(stageRoot))
+            if (store.TryGet(jobId, out DownloadJobResponse? job)
+                && job is not null
+                && string.Equals(job.Stage, expectedStage, StringComparison.OrdinalIgnoreCase))
             {
-                Directory.Delete(stageRoot, recursive: true);
+                return job;
             }
+
+            await Task.Delay(delayMs);
         }
+
+        Assert.True(store.TryGet(jobId, out DownloadJobResponse? finalJob));
+        Assert.NotNull(finalJob);
+        Assert.Equal(expectedStage, finalJob!.Stage);
+        return finalJob;
     }
 
     private sealed class TestAppFixture : IAsyncDisposable
@@ -212,12 +324,23 @@ public sealed class CloneHeroEndpointsIntegrationTests
         public FakeDownloadJobStore Store { get; }
 
         public static async Task<TestAppFixture> CreateAsync(Action<FakeDownloadJobStore>? seed = null, bool authenticatedClient = true)
+            => await CreateAsync(seed, configureInstall: null, authenticatedClient: authenticatedClient);
+
+        public static async Task<TestAppFixture> CreateAsync(
+            Action<FakeDownloadJobStore>? seed,
+            Action<FakeDownloadJobInstallService>? configureInstall,
+            bool authenticatedClient = true,
+            string? contentRootPath = null)
         {
-            string cloneHeroRoot = Path.Combine(Path.GetTempPath(), "charthub-server-clonehero", Guid.NewGuid().ToString("N"));
+            string rootBase = contentRootPath ?? Path.Combine(Path.GetTempPath(), "charthub-server-content-root", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(rootBase);
+            string cloneHeroRoot = Path.Combine(rootBase, "clonehero");
             Directory.CreateDirectory(cloneHeroRoot);
 
             FakeDownloadJobStore store = new();
             seed?.Invoke(store);
+            FakeDownloadJobInstallService installService = new();
+            configureInstall?.Invoke(installService);
 
             WebApplicationBuilder builder = WebApplication.CreateBuilder();
             builder.WebHost.UseTestServer();
@@ -237,6 +360,7 @@ public sealed class CloneHeroEndpointsIntegrationTests
 
             builder.Services.AddAuthorization();
             builder.Services.AddSingleton<IDownloadJobStore>(store);
+            builder.Services.AddSingleton<IDownloadJobInstallService>(installService);
             builder.Services.AddSingleton<ICloneHeroLibraryService>(_ =>
                 new CloneHeroLibraryService(Microsoft.Extensions.Options.Options.Create(new ServerPathOptions
                 {
@@ -247,6 +371,7 @@ public sealed class CloneHeroEndpointsIntegrationTests
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapCloneHeroEndpoints();
+            app.MapDownloadEndpoints();
 
             await app.StartAsync();
             HttpClient client = app.GetTestClient();
@@ -352,14 +477,71 @@ public sealed class CloneHeroEndpointsIntegrationTests
 
         public void UpdateProgress(Guid jobId, string stage, double progressPercent)
         {
+            if (_jobs.TryGetValue(jobId, out DownloadJobResponse? existing))
+            {
+                _jobs[jobId] = new DownloadJobResponse
+                {
+                    JobId = existing.JobId,
+                    Source = existing.Source,
+                    SourceId = existing.SourceId,
+                    DisplayName = existing.DisplayName,
+                    SourceUrl = existing.SourceUrl,
+                    Stage = stage,
+                    ProgressPercent = progressPercent,
+                    DownloadedPath = existing.DownloadedPath,
+                    StagedPath = existing.StagedPath,
+                    InstalledPath = existing.InstalledPath,
+                    Error = existing.Error,
+                    CreatedAtUtc = existing.CreatedAtUtc,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow,
+                };
+            }
         }
 
         public void MarkDownloaded(Guid jobId, string downloadedPath)
         {
+            if (_jobs.TryGetValue(jobId, out DownloadJobResponse? existing))
+            {
+                _jobs[jobId] = new DownloadJobResponse
+                {
+                    JobId = existing.JobId,
+                    Source = existing.Source,
+                    SourceId = existing.SourceId,
+                    DisplayName = existing.DisplayName,
+                    SourceUrl = existing.SourceUrl,
+                    Stage = "Downloaded",
+                    ProgressPercent = 100,
+                    DownloadedPath = downloadedPath,
+                    StagedPath = existing.StagedPath,
+                    InstalledPath = existing.InstalledPath,
+                    Error = existing.Error,
+                    CreatedAtUtc = existing.CreatedAtUtc,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow,
+                };
+            }
         }
 
         public void MarkStaged(Guid jobId, string stagedPath)
         {
+            if (_jobs.TryGetValue(jobId, out DownloadJobResponse? existing))
+            {
+                _jobs[jobId] = new DownloadJobResponse
+                {
+                    JobId = existing.JobId,
+                    Source = existing.Source,
+                    SourceId = existing.SourceId,
+                    DisplayName = existing.DisplayName,
+                    SourceUrl = existing.SourceUrl,
+                    Stage = "Staged",
+                    ProgressPercent = 92,
+                    DownloadedPath = existing.DownloadedPath,
+                    StagedPath = stagedPath,
+                    InstalledPath = existing.InstalledPath,
+                    Error = existing.Error,
+                    CreatedAtUtc = existing.CreatedAtUtc,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow,
+                };
+            }
         }
 
         public void MarkInstalled(Guid jobId, string installedPath)
@@ -373,7 +555,7 @@ public sealed class CloneHeroEndpointsIntegrationTests
                     SourceId = existing.SourceId,
                     DisplayName = existing.DisplayName,
                     SourceUrl = existing.SourceUrl,
-                    Stage = "Completed",
+                    Stage = "Installed",
                     ProgressPercent = 100,
                     DownloadedPath = existing.DownloadedPath,
                     StagedPath = existing.StagedPath,
@@ -391,8 +573,46 @@ public sealed class CloneHeroEndpointsIntegrationTests
 
         public void MarkFailed(Guid jobId, string errorMessage)
         {
+            if (_jobs.TryGetValue(jobId, out DownloadJobResponse? existing))
+            {
+                _jobs[jobId] = new DownloadJobResponse
+                {
+                    JobId = existing.JobId,
+                    Source = existing.Source,
+                    SourceId = existing.SourceId,
+                    DisplayName = existing.DisplayName,
+                    SourceUrl = existing.SourceUrl,
+                    Stage = "Failed",
+                    ProgressPercent = 100,
+                    DownloadedPath = existing.DownloadedPath,
+                    StagedPath = existing.StagedPath,
+                    InstalledPath = existing.InstalledPath,
+                    Error = errorMessage,
+                    CreatedAtUtc = existing.CreatedAtUtc,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow,
+                };
+            }
         }
 
         public int DeleteFinishedOlderThan(DateTimeOffset thresholdUtc) => 0;
+    }
+
+    private sealed class FakeDownloadJobInstallService : IDownloadJobInstallService
+    {
+        public string ResultPath { get; set; } = "/tmp/installed-song";
+
+        public string StagedPath { get; set; } = "/tmp/staged-song.zip";
+
+        public Exception? ExceptionToThrow { get; set; }
+
+        public Task<DownloadJobInstallResult> InstallJobAsync(DownloadJobResponse job, CancellationToken cancellationToken = default)
+        {
+            if (ExceptionToThrow is not null)
+            {
+                throw ExceptionToThrow;
+            }
+
+            return Task.FromResult(new DownloadJobInstallResult(StagedPath, ResultPath));
+        }
     }
 }

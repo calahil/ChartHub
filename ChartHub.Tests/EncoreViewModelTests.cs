@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
@@ -408,8 +409,37 @@ public class EncoreViewModelTests
         public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
 
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+            string baseUrl,
+            string bearerToken,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            yield break;
+        }
+
         public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(
+            string baseUrl,
+            string bearerToken,
+            Guid jobId,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerDownloadJobResponse(
+                jobId,
+                LibrarySourceNames.Encore,
+                "source-id",
+                "display-name",
+                "https://example.test/download",
+                "Installing",
+                95,
+                null,
+                null,
+                null,
+                null,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow));
     }
 
     private sealed class CapturingChartHubServerApiClient : IChartHubServerApiClient
@@ -441,8 +471,37 @@ public class EncoreViewModelTests
         public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
 
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+            string baseUrl,
+            string bearerToken,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            yield break;
+        }
+
         public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(
+            string baseUrl,
+            string bearerToken,
+            Guid jobId,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerDownloadJobResponse(
+                jobId,
+                LibrarySourceNames.Encore,
+                "source-id",
+                "display-name",
+                "https://example.test/download",
+                "Installing",
+                95,
+                null,
+                null,
+                null,
+                null,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow));
     }
 
     private sealed class NoOpSettingsOrchestrator : ISettingsOrchestrator

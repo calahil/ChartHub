@@ -1,3 +1,4 @@
+using System.Net;
 using System.Reflection;
 
 using ChartHub.Configuration.Interfaces;
@@ -219,6 +220,101 @@ public class SettingsViewModelTests
         Assert.Equal("Set Runtime.ServerApiBaseUrl before authenticating.", sut.ServerAuthenticationErrorMessage);
     }
 
+    [Fact]
+    public async Task AuthenticateServerCommand_InvalidGoogleToken_RetriesAfterSignOut()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-server-auth-retry-invalid-token");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+        var googleAuthProvider = new FakeGoogleAuthProvider
+        {
+            InteractiveCredentials =
+            [
+                CreateGoogleCredential(idToken: "stale-google-id-token"),
+                CreateGoogleCredential(idToken: "fresh-google-id-token"),
+            ],
+        };
+        var serverApiClient = new FakeChartHubServerApiClient
+        {
+            ExchangeHandler = (_, googleToken) =>
+            {
+                if (string.Equals(googleToken, "stale-google-id-token", StringComparison.Ordinal))
+                {
+                    throw new ChartHubServerApiException(HttpStatusCode.BadRequest, "Bad Request", "{\"error\":\"invalid_google_id_token\"}", "invalid_google_id_token");
+                }
+
+                return new ChartHubServerAuthExchangeResponse("server-access-token", DateTimeOffset.UtcNow.AddHours(1));
+            },
+        };
+
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
+        await Task.Yield();
+
+        await sut.AuthenticateServerCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, googleAuthProvider.AuthorizeInteractiveCallCount);
+        Assert.Equal(1, googleAuthProvider.SignOutCallCount);
+        Assert.Equal(2, serverApiClient.ExchangeCallCount);
+        Assert.Equal("server-access-token", orchestrator.Current.Runtime.ServerApiAuthToken);
+        Assert.Equal("ChartHub Server authentication succeeded.", sut.ServerAuthenticationStatusMessage);
+    }
+
+    [Fact]
+    public async Task AuthenticateServerCommand_Forbidden_ShowsAllowlistGuidance()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-server-auth-forbidden-guidance");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+        var googleAuthProvider = new FakeGoogleAuthProvider
+        {
+            InteractiveCredential = CreateGoogleCredential(idToken: "google-id-token"),
+        };
+        var serverApiClient = new FakeChartHubServerApiClient
+        {
+            ExchangeHandler = (_, _) => throw new ChartHubServerApiException(HttpStatusCode.Forbidden, "Forbidden", string.Empty, null),
+        };
+
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
+        await Task.Yield();
+
+        await sut.AuthenticateServerCommand.ExecuteAsync(null);
+
+        Assert.True(sut.HasServerAuthenticationError);
+        Assert.Equal("Your Google account is not allowlisted in ChartHub Server Auth:AllowedEmails.", sut.ServerAuthenticationErrorMessage);
+        Assert.Equal("ChartHub Server authentication failed.", sut.ServerAuthenticationStatusMessage);
+    }
+
+    [Fact]
+    public async Task AuthenticateServerCommand_DispatchesUiStateUpdatesThroughPostCallback()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-server-auth-ui-dispatch");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+        var googleAuthProvider = new FakeGoogleAuthProvider
+        {
+            InteractiveCredential = CreateGoogleCredential(idToken: "google-id-token"),
+        };
+        var serverApiClient = new FakeChartHubServerApiClient
+        {
+            ExchangeResponse = new ChartHubServerAuthExchangeResponse("server-access-token", DateTimeOffset.UtcNow.AddHours(1)),
+        };
+
+        int dispatchCount = 0;
+        Action<Action> postToUi = action =>
+        {
+            Interlocked.Increment(ref dispatchCount);
+            action();
+        };
+
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient, postToUi: postToUi);
+        await Task.Yield();
+
+        dispatchCount = 0;
+        await sut.AuthenticateServerCommand.ExecuteAsync(null);
+
+        Assert.True(dispatchCount >= 3);
+    }
+
     private static AppConfigRoot CreateConfig(string rootPath)
     {
         string tempDirectory = Path.Combine(rootPath, "Temp");
@@ -261,6 +357,7 @@ public class SettingsViewModelTests
         ISecretStore secrets,
         IGoogleAuthProvider googleAuthProvider,
         IChartHubServerApiClient serverApiClient,
+        Action<Action>? postToUi = null,
         bool? isAndroidPlatform = null)
     {
         ConstructorInfo? constructor = typeof(SettingsViewModel).GetConstructor(
@@ -283,7 +380,7 @@ public class SettingsViewModelTests
             secrets,
             googleAuthProvider,
             serverApiClient,
-            (Action<Action>)(action => action()),
+            postToUi ?? (Action<Action>)(action => action()),
             isAndroidPlatform,
         ]);
     }
@@ -375,14 +472,19 @@ public class SettingsViewModelTests
     private sealed class FakeGoogleAuthProvider : IGoogleAuthProvider
     {
         public UserCredential? InteractiveCredential { get; set; }
+        public IReadOnlyList<UserCredential> InteractiveCredentials { get; set; } = [];
         public Exception? InteractiveException { get; set; }
         public int AuthorizeInteractiveCallCount { get; private set; }
+        public int SignOutCallCount { get; private set; }
 
         public Task<UserCredential?> TryAuthorizeSilentAsync(IEnumerable<string> scopes, CancellationToken cancellationToken = default)
             => Task.FromResult<UserCredential?>(null);
 
         public Task SignOutAsync(UserCredential? credential, CancellationToken cancellationToken = default)
-            => Task.CompletedTask;
+        {
+            SignOutCallCount++;
+            return Task.CompletedTask;
+        }
 
         public Task<UserCredential> AuthorizeInteractiveAsync(IEnumerable<string> scopes, CancellationToken cancellationToken = default)
         {
@@ -390,6 +492,11 @@ public class SettingsViewModelTests
             if (InteractiveException is not null)
             {
                 throw InteractiveException;
+            }
+
+            if (AuthorizeInteractiveCallCount <= InteractiveCredentials.Count)
+            {
+                return Task.FromResult(InteractiveCredentials[AuthorizeInteractiveCallCount - 1]);
             }
 
             if (InteractiveCredential is null)
@@ -408,6 +515,7 @@ public class SettingsViewModelTests
         public string LastGoogleIdToken { get; private set; } = string.Empty;
         public ChartHubServerAuthExchangeResponse ExchangeResponse { get; set; } =
             new("test-token", DateTimeOffset.UtcNow.AddMinutes(30));
+        public Func<string, string, ChartHubServerAuthExchangeResponse>? ExchangeHandler { get; set; }
 
         public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(
             string baseUrl,
@@ -417,6 +525,11 @@ public class SettingsViewModelTests
             ExchangeCallCount++;
             LastBaseUrl = baseUrl;
             LastGoogleIdToken = googleIdToken;
+            if (ExchangeHandler is not null)
+            {
+                return Task.FromResult(ExchangeHandler(baseUrl, googleIdToken));
+            }
+
             return Task.FromResult(ExchangeResponse);
         }
 
@@ -437,7 +550,25 @@ public class SettingsViewModelTests
             throw new NotSupportedException();
         }
 
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+            string baseUrl,
+            string bearerToken,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            yield break;
+        }
+
         public Task RequestCancelDownloadJobAsync(
+            string baseUrl,
+            string bearerToken,
+            Guid jobId,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(
             string baseUrl,
             string bearerToken,
             Guid jobId,

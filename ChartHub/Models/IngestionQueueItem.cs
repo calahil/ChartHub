@@ -87,7 +87,7 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
 
     public string UpdatedText => UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
 
-    public bool CanInstall => CurrentState is IngestionState.Downloaded or IngestionState.Staged or IngestionState.Converted;
+    public bool CanInstall => CurrentState is IngestionState.Downloaded or IngestionState.Converted;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using System.Net;
 
 using ChartHub.Server.Contracts;
@@ -12,14 +11,15 @@ public sealed class DownloadPipelineHostedService(
     IDownloadJobStore jobStore,
     IHttpClientFactory httpClientFactory,
     ISourceUrlResolver sourceUrlResolver,
+    IWebHostEnvironment environment,
     IOptions<ServerPathOptions> pathOptions,
     IOptions<DownloadsOptions> downloadOptions) : BackgroundService
 {
     private readonly IDownloadJobStore _jobStore = jobStore;
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient("downloads");
     private readonly ISourceUrlResolver _sourceUrlResolver = sourceUrlResolver;
-    private readonly ServerPathOptions _paths = pathOptions.Value;
     private readonly DownloadsOptions _downloadsOptions = downloadOptions.Value;
+    private readonly string _downloadsDir = ServerContentPathResolver.Resolve(pathOptions.Value.DownloadsDir, environment.ContentRootPath);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -61,16 +61,6 @@ public sealed class DownloadPipelineHostedService(
             _jobStore.UpdateProgress(job.JobId, "Downloading", 10);
             string downloadedPath = await DownloadFileAsync(job, resolvedSource, cancellationToken).ConfigureAwait(false);
             _jobStore.MarkDownloaded(job.JobId, downloadedPath);
-
-            EnsureNotCancelled(job.JobId);
-            _jobStore.UpdateProgress(job.JobId, "Staging", 85);
-            string stagedPath = StageDownloadedArtifact(job.JobId, downloadedPath);
-            _jobStore.MarkStaged(job.JobId, stagedPath);
-
-            EnsureNotCancelled(job.JobId);
-            _jobStore.UpdateProgress(job.JobId, "Installing", 95);
-            string installedPath = InstallToCloneHero(job.JobId, stagedPath, job.DisplayName);
-            _jobStore.MarkInstalled(job.JobId, installedPath);
         }
         catch (OperationCanceledException)
         {
@@ -103,7 +93,8 @@ public sealed class DownloadPipelineHostedService(
         }
 
         string safeBaseName = MakeSafeFileName(resolvedSource.SuggestedName ?? job.DisplayName);
-        string destinationPath = Path.Combine(_paths.DownloadsDir, $"{safeBaseName}-{job.JobId:D}{extension}");
+        Directory.CreateDirectory(_downloadsDir);
+        string destinationPath = Path.Combine(_downloadsDir, $"{safeBaseName}-{job.JobId:D}{extension}");
 
         await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         await using FileStream output = new(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
@@ -135,41 +126,6 @@ public sealed class DownloadPipelineHostedService(
         return destinationPath;
     }
 
-    private string StageDownloadedArtifact(Guid jobId, string downloadedPath)
-    {
-        string stageDirectory = Path.Combine(_paths.StagingDir, jobId.ToString("D"));
-        Directory.CreateDirectory(stageDirectory);
-
-        string destinationPath = Path.Combine(stageDirectory, Path.GetFileName(downloadedPath));
-        File.Copy(downloadedPath, destinationPath, true);
-        return destinationPath;
-    }
-
-    private string InstallToCloneHero(Guid jobId, string stagedPath, string displayName)
-    {
-        string safeBaseName = MakeSafeFileName(displayName);
-        string installDirectory = Path.Combine(_paths.CloneHeroRoot, $"{safeBaseName}-{jobId:D}");
-
-        if (Directory.Exists(installDirectory))
-        {
-            Directory.Delete(installDirectory, recursive: true);
-        }
-
-        Directory.CreateDirectory(installDirectory);
-
-        if (string.Equals(Path.GetExtension(stagedPath), ".zip", StringComparison.OrdinalIgnoreCase))
-        {
-            ZipFile.ExtractToDirectory(stagedPath, installDirectory, overwriteFiles: true);
-        }
-        else
-        {
-            string destination = Path.Combine(installDirectory, Path.GetFileName(stagedPath));
-            File.Copy(stagedPath, destination, true);
-        }
-
-        return installDirectory;
-    }
-
     private void EnsureNotCancelled(Guid jobId)
     {
         if (_jobStore.IsCancelRequested(jobId))
@@ -191,4 +147,5 @@ public sealed class DownloadPipelineHostedService(
         string cleaned = new string(value.Select(ch => invalid.Contains(ch) ? '-' : ch).ToArray()).Trim();
         return string.IsNullOrWhiteSpace(cleaned) ? "download" : cleaned;
     }
+
 }

@@ -474,9 +474,13 @@ public class DownloadFile(string displayName, string filePath, string urlString,
         && !string.Equals(Status, "Cancelling", StringComparison.OrdinalIgnoreCase)
         && !string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
         && !string.Equals(Status, "Failed", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(Status, "Installed", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(Status, "Downloaded", StringComparison.OrdinalIgnoreCase)
         && !string.Equals(Status, "Completed", StringComparison.OrdinalIgnoreCase);
 
     public bool CanClear => Finished
+        || string.Equals(Status, "Downloaded", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Status, "Installed", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Status, "Failed", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Status, "Completed", StringComparison.OrdinalIgnoreCase);

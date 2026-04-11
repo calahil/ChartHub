@@ -175,8 +175,8 @@ public static class AppBootstrapper
         services.AddSingleton<DownloadViewModel>(serviceProvider =>
             new DownloadViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
-                serviceProvider.GetRequiredService<ISongInstallService>(),
                 serviceProvider.GetRequiredService<IChartHubServerApiClient>(),
+                serviceProvider.GetRequiredService<SharedDownloadQueue>(),
                 serviceProvider.GetService<CloneHeroViewModel>()));
         services.AddSingleton<CloneHeroViewModel>();
         services.AddSingleton<SettingsViewModel>();

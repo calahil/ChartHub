@@ -3,6 +3,7 @@ using ChartHub.Server.Options;
 using ChartHub.Server.Services;
 
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -73,6 +74,110 @@ public sealed class SqliteDownloadJobStoreTests : IDisposable
 
         Assert.Equal(1, removed);
         Assert.False(stillExists);
+    }
+
+    [Fact]
+    public void MarkDownloadedSetsProgressTo100()
+    {
+        SqliteDownloadJobStore sut = BuildStore();
+        DownloadJobResponse created = sut.Create(new CreateDownloadJobRequest
+        {
+            Source = "rhythmverse",
+            SourceId = "abc",
+            DisplayName = "Track",
+            SourceUrl = "https://example.com/track.zip",
+        });
+
+        sut.MarkDownloaded(created.JobId, "/downloads/track.zip");
+
+        Assert.True(sut.TryGet(created.JobId, out DownloadJobResponse? updated));
+        Assert.NotNull(updated);
+        Assert.Equal("Downloaded", updated!.Stage);
+        Assert.Equal(100, updated.ProgressPercent);
+    }
+
+    [Fact]
+    public void EnsureSchemaMigratesLegacyStagedAndCompletedStages()
+    {
+        Directory.CreateDirectory(_tempRoot);
+        string dbPath = Path.Combine(_tempRoot, "charthub-server.db");
+        string connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = dbPath,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+        }.ToString();
+
+        using (SqliteConnection connection = new(connectionString))
+        {
+            connection.Open();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE download_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    source TEXT NOT NULL,
+                    source_id TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    source_url TEXT NOT NULL,
+                    stage TEXT NOT NULL,
+                    progress_percent REAL NOT NULL,
+                    cancel_requested INTEGER NOT NULL DEFAULT 0,
+                    downloaded_path TEXT NULL,
+                    staged_path TEXT NULL,
+                    installed_path TEXT NULL,
+                    error TEXT NULL,
+                    created_at_utc TEXT NOT NULL,
+                    updated_at_utc TEXT NOT NULL,
+                    completed_at_utc TEXT NULL
+                );
+                """;
+            command.ExecuteNonQuery();
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+
+            using SqliteCommand stagedInsert = connection.CreateCommand();
+            stagedInsert.CommandText = """
+                INSERT INTO download_jobs (
+                    job_id, source, source_id, display_name, source_url, stage, progress_percent,
+                    cancel_requested, downloaded_path, staged_path, installed_path, error,
+                    created_at_utc, updated_at_utc, completed_at_utc)
+                VALUES (
+                    $jobId, 'rhythmverse', 'legacy-1', 'Legacy Staged', 'https://example.test/a.zip', 'Staged', 90,
+                    0, NULL, '/tmp/staged-a.zip', NULL, NULL,
+                    $createdAtUtc, $updatedAtUtc, NULL);
+                """;
+            stagedInsert.Parameters.AddWithValue("$jobId", Guid.NewGuid().ToString("D"));
+            stagedInsert.Parameters.AddWithValue("$createdAtUtc", now.ToString("O"));
+            stagedInsert.Parameters.AddWithValue("$updatedAtUtc", now.ToString("O"));
+            stagedInsert.ExecuteNonQuery();
+
+            using SqliteCommand completedInsert = connection.CreateCommand();
+            completedInsert.CommandText = """
+                INSERT INTO download_jobs (
+                    job_id, source, source_id, display_name, source_url, stage, progress_percent,
+                    cancel_requested, downloaded_path, staged_path, installed_path, error,
+                    created_at_utc, updated_at_utc, completed_at_utc)
+                VALUES (
+                    $jobId, 'rhythmverse', 'legacy-2', 'Legacy Completed', 'https://example.test/b.zip', 'Completed', 100,
+                    0, '/tmp/download-b.zip', NULL, '/tmp/install-b', NULL,
+                    $createdAtUtc, $updatedAtUtc, $completedAtUtc);
+                """;
+            completedInsert.Parameters.AddWithValue("$jobId", Guid.NewGuid().ToString("D"));
+            completedInsert.Parameters.AddWithValue("$createdAtUtc", now.ToString("O"));
+            completedInsert.Parameters.AddWithValue("$updatedAtUtc", now.ToString("O"));
+            completedInsert.Parameters.AddWithValue("$completedAtUtc", now.ToString("O"));
+            completedInsert.ExecuteNonQuery();
+        }
+
+        SqliteDownloadJobStore sut = BuildStore();
+        IReadOnlyList<DownloadJobResponse> all = sut.List();
+
+        DownloadJobResponse migratedStaged = Assert.Single(all, job => job.SourceId == "legacy-1");
+        Assert.Equal("Downloaded", migratedStaged.Stage);
+        Assert.Equal(100, migratedStaged.ProgressPercent);
+        Assert.Equal("/tmp/staged-a.zip", migratedStaged.DownloadedPath);
+
+        DownloadJobResponse migratedCompleted = Assert.Single(all, job => job.SourceId == "legacy-2");
+        Assert.Equal("Installed", migratedCompleted.Stage);
     }
 
     public void Dispose()

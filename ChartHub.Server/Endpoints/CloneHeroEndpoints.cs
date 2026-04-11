@@ -35,31 +35,6 @@ public static class CloneHeroEndpoints
             .WithName("RestoreCloneHeroSong")
             .WithSummary("Restore a soft-deleted Clone Hero song");
 
-        group.MapPost("/install-from-staged/{jobId:guid}", (Guid jobId, IDownloadJobStore store, ICloneHeroLibraryService service) =>
-            {
-                if (!store.TryGet(jobId, out ChartHub.Server.Contracts.DownloadJobResponse? job) || job is null)
-                {
-                    return Results.NotFound();
-                }
-
-                if (string.IsNullOrWhiteSpace(job.StagedPath))
-                {
-                    return Results.Conflict(new { error = "Job does not have a staged artifact." });
-                }
-
-                if (!service.TryInstallFromStaged(job.JobId, job.DisplayName, job.StagedPath, out ChartHub.Server.Contracts.CloneHeroSongResponse? song, out string? installedPath)
-                    || song is null
-                    || string.IsNullOrWhiteSpace(installedPath))
-                {
-                    return Results.BadRequest(new { error = "Unable to install staged artifact into Clone Hero library." });
-                }
-
-                store.MarkInstalled(job.JobId, installedPath);
-                return Results.Accepted($"/api/v1/clonehero/songs/{song.SongId}", song);
-            })
-            .WithName("InstallFromStaged")
-            .WithSummary("Trigger install from staged artifacts");
-
         return group;
     }
 }

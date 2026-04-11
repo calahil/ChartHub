@@ -635,6 +635,15 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             downloadItem.CancelAction = () => CancelDownload(downloadItem);
 
             Downloads.Insert(0, downloadItem);
+            Logger.LogInfo("ServerDownload", "Queued Encore download job", new Dictionary<string, object?>
+            {
+                ["jobId"] = job.JobId,
+                ["source"] = job.Source,
+                ["sourceId"] = job.SourceId,
+                ["displayName"] = job.DisplayName,
+                ["stage"] = job.Stage,
+                ["baseUrl"] = baseUrl,
+            });
             selected.IsInLibrary = false;
         }
         catch (Exception ex)
@@ -667,6 +676,11 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
 
         downloadItem.Status = "Cancelling";
         downloadItem.ErrorMessage = null;
+        Logger.LogInfo("ServerDownload", "Requesting cancel for Encore download job", new Dictionary<string, object?>
+        {
+            ["jobId"] = jobId,
+            ["displayName"] = downloadItem.DisplayName,
+        });
         ObserveBackgroundTask(_serverApiClient.RequestCancelDownloadJobAsync(baseUrl, bearerToken, jobId), "Encore cancel server download job");
     }
 
@@ -689,7 +703,9 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
 
     private static bool IsTerminalServerStage(string stage)
     {
-        return string.Equals(stage, "Completed", StringComparison.OrdinalIgnoreCase)
+        return string.Equals(stage, "Installed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(stage, "Downloaded", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(stage, "Completed", StringComparison.OrdinalIgnoreCase)
             || string.Equals(stage, "Failed", StringComparison.OrdinalIgnoreCase)
             || string.Equals(stage, "Cancelled", StringComparison.OrdinalIgnoreCase);
     }

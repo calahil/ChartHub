@@ -17,6 +17,14 @@ builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(G
 builder.Services.Configure<GoogleDriveOptions>(builder.Configuration.GetSection(GoogleDriveOptions.SectionName));
 builder.Services.Configure<ServerPathOptions>(builder.Configuration.GetSection(ServerPathOptions.SectionName));
 builder.Services.Configure<DownloadsOptions>(builder.Configuration.GetSection(DownloadsOptions.SectionName));
+builder.Services.Configure<ServerLoggingOptions>(builder.Configuration.GetSection(ServerLoggingOptions.SectionName));
+
+ServerLoggingOptions serverLoggingOptions = builder.Configuration
+    .GetSection(ServerLoggingOptions.SectionName)
+    .Get<ServerLoggingOptions>() ?? new ServerLoggingOptions();
+
+string serverLogDirectory = ServerContentPathResolver.Resolve(serverLoggingOptions.LogDirectory, builder.Environment.ContentRootPath);
+builder.Logging.AddProvider(new ServerFileLoggerProvider(serverLogDirectory, serverLoggingOptions.FileName));
 
 AuthOptions authOptions = builder.Configuration
     .GetSection(AuthOptions.SectionName)
@@ -52,6 +60,11 @@ builder.Services.AddSingleton<IJwtTokenIssuer, JwtTokenIssuer>();
 builder.Services.AddHttpClient("downloads");
 builder.Services.AddSingleton<ISourceUrlResolver, SourceUrlResolver>();
 builder.Services.AddSingleton<IDownloadJobStore, SqliteDownloadJobStore>();
+builder.Services.AddSingleton<IServerInstallFileTypeResolver, ServerInstallFileTypeResolver>();
+builder.Services.AddSingleton<IServerSongIniMetadataParser, ServerSongIniMetadataParser>();
+builder.Services.AddSingleton<IServerCloneHeroDirectorySchemaService, ServerCloneHeroDirectorySchemaService>();
+builder.Services.AddSingleton<IServerOnyxInstallService, ServerOnyxInstallService>();
+builder.Services.AddSingleton<IDownloadJobInstallService, DownloadJobInstallService>();
 builder.Services.AddSingleton<ICloneHeroLibraryService, CloneHeroLibraryService>();
 builder.Services.AddHostedService<ServerPathValidatorHostedService>();
 builder.Services.AddHostedService<DownloadPipelineHostedService>();

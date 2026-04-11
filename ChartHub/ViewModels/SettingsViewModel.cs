@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -421,26 +422,25 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         string baseUrl = ResolveServerApiBaseUrl();
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
-            ServerAuthenticationErrorMessage = "Set Runtime.ServerApiBaseUrl before authenticating.";
-            ServerAuthenticationStatusMessage = "ChartHub Server authentication is not configured.";
+            await RunOnUiAsync(() =>
+            {
+                ServerAuthenticationErrorMessage = "Set Runtime.ServerApiBaseUrl before authenticating.";
+                ServerAuthenticationStatusMessage = "ChartHub Server authentication is not configured.";
+            }).ConfigureAwait(false);
             return;
         }
 
-        IsServerAuthenticationBusy = true;
-        ServerAuthenticationErrorMessage = null;
-        ServerAuthenticationStatusMessage = "Opening Google sign-in...";
+        await RunOnUiAsync(() =>
+        {
+            IsServerAuthenticationBusy = true;
+            ServerAuthenticationErrorMessage = null;
+            ServerAuthenticationStatusMessage = "Opening Google sign-in...";
+        }).ConfigureAwait(false);
 
         try
         {
-            UserCredential credential = await _googleAuthProvider.AuthorizeInteractiveAsync(ServerAuthenticationScopes);
-            string? googleIdToken = credential.Token.IdToken;
-            if (string.IsNullOrWhiteSpace(googleIdToken))
-            {
-                throw new InvalidOperationException("Google sign-in succeeded but did not return an ID token.");
-            }
-
-            ServerAuthenticationStatusMessage = "Exchanging Google token with ChartHub Server...";
-            ChartHubServerAuthExchangeResponse exchange = await _serverApiClient.ExchangeGoogleTokenAsync(baseUrl, googleIdToken);
+            UserCredential credential = await _googleAuthProvider.AuthorizeInteractiveAsync(ServerAuthenticationScopes).ConfigureAwait(false);
+            ChartHubServerAuthExchangeResponse exchange = await ExchangeTokenWithRetryAsync(baseUrl, credential).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(exchange.AccessToken))
             {
                 throw new InvalidOperationException("ChartHub Server returned an empty access token.");
@@ -449,25 +449,127 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             ConfigValidationResult result = await _settings.UpdateAsync(config =>
             {
                 config.Runtime.ServerApiAuthToken = exchange.AccessToken;
-            });
+            }).ConfigureAwait(false);
 
             if (!result.IsValid)
             {
                 throw new InvalidOperationException("Failed to store ChartHub Server access token in settings.");
             }
 
-            ServerAuthenticationStatusMessage = "ChartHub Server authentication succeeded.";
+            await RunOnUiAsync(() =>
+            {
+                ServerAuthenticationStatusMessage = "ChartHub Server authentication succeeded.";
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            ServerAuthenticationErrorMessage = ex.Message;
-            ServerAuthenticationStatusMessage = "ChartHub Server authentication failed.";
+            string errorMessage = BuildServerAuthenticationErrorMessage(ex);
+            await RunOnUiAsync(() =>
+            {
+                ServerAuthenticationErrorMessage = errorMessage;
+                ServerAuthenticationStatusMessage = "ChartHub Server authentication failed.";
+            }).ConfigureAwait(false);
             Logger.LogError("Auth", "ChartHub Server authentication failed", ex);
         }
         finally
         {
-            IsServerAuthenticationBusy = false;
+            await RunOnUiAsync(() =>
+            {
+                IsServerAuthenticationBusy = false;
+            }).ConfigureAwait(false);
         }
+    }
+
+    private async Task<ChartHubServerAuthExchangeResponse> ExchangeTokenWithRetryAsync(string baseUrl, UserCredential credential)
+    {
+        string googleIdToken = GetGoogleIdTokenOrThrow(credential);
+        await RunOnUiAsync(() =>
+        {
+            ServerAuthenticationStatusMessage = "Exchanging Google token with ChartHub Server...";
+        }).ConfigureAwait(false);
+
+        try
+        {
+            return await _serverApiClient.ExchangeGoogleTokenAsync(baseUrl, googleIdToken).ConfigureAwait(false);
+        }
+        catch (ChartHubServerApiException ex) when (IsInvalidGoogleIdTokenError(ex))
+        {
+            await RunOnUiAsync(() =>
+            {
+                ServerAuthenticationStatusMessage = "Google token expired. Re-authenticating...";
+            }).ConfigureAwait(false);
+            await _googleAuthProvider.SignOutAsync(credential).ConfigureAwait(false);
+
+            UserCredential refreshedCredential = await _googleAuthProvider
+                .AuthorizeInteractiveAsync(ServerAuthenticationScopes)
+                .ConfigureAwait(false);
+            string refreshedGoogleIdToken = GetGoogleIdTokenOrThrow(refreshedCredential);
+
+            await RunOnUiAsync(() =>
+            {
+                ServerAuthenticationStatusMessage = "Retrying token exchange with ChartHub Server...";
+            }).ConfigureAwait(false);
+            return await _serverApiClient.ExchangeGoogleTokenAsync(baseUrl, refreshedGoogleIdToken).ConfigureAwait(false);
+        }
+    }
+
+    private Task RunOnUiAsync(Action action)
+    {
+        var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _postToUi(() =>
+        {
+            try
+            {
+                action();
+                tcs.TrySetResult(null);
+            }
+            catch (Exception ex)
+            {
+                tcs.TrySetException(ex);
+            }
+        });
+
+        return tcs.Task;
+    }
+
+    private static string GetGoogleIdTokenOrThrow(UserCredential credential)
+    {
+        string? googleIdToken = credential.Token.IdToken;
+        if (string.IsNullOrWhiteSpace(googleIdToken))
+        {
+            throw new InvalidOperationException("Google sign-in succeeded but did not return an ID token.");
+        }
+
+        return googleIdToken;
+    }
+
+    private static bool IsInvalidGoogleIdTokenError(ChartHubServerApiException exception)
+    {
+        return exception.StatusCode == HttpStatusCode.BadRequest
+            && string.Equals(exception.ErrorCode, "invalid_google_id_token", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildServerAuthenticationErrorMessage(Exception exception)
+    {
+        if (exception is ChartHubServerApiException apiException)
+        {
+            if (IsInvalidGoogleIdTokenError(apiException))
+            {
+                return "Google sign-in token was rejected by ChartHub Server. Sign in again and verify server audience configuration.";
+            }
+
+            if (apiException.StatusCode == HttpStatusCode.Forbidden)
+            {
+                return "Your Google account is not allowlisted in ChartHub Server Auth:AllowedEmails.";
+            }
+
+            if (apiException.StatusCode == HttpStatusCode.ServiceUnavailable)
+            {
+                return "ChartHub Server could not reach Google token validation service. Try again shortly.";
+            }
+        }
+
+        return exception.Message;
     }
 
     private string ResolveServerApiBaseUrl()

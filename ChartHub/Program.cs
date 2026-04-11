@@ -29,6 +29,11 @@ class Program
     {
         return AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .With(new X11PlatformOptions
+            {
+                // Avoid noisy/benign IBus DBus context teardown errors on Linux X11.
+                EnableIme = false,
+            })
             .UseSkia()
             .WithInterFont()
             .LogToTrace();

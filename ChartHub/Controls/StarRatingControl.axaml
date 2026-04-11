@@ -10,6 +10,7 @@
   </UserControl.Resources>
 
   <ItemsControl x:Name="StarsHost"
+                Tag="{Binding RelativeSource={RelativeSource AncestorType=controls:StarRatingControl}}"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Center">
     <ItemsControl.ItemsPanel>
@@ -20,8 +21,8 @@
     <ItemsControl.ItemTemplate>
       <DataTemplate>
         <Image Source="{ReflectionBinding IconSource, Converter={StaticResource AssetPathToImageConverter}}"
-               Width="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:StarRatingControl}}"
-               Height="{Binding FontSize, RelativeSource={RelativeSource AncestorType=controls:StarRatingControl}}"
+               Width="{ReflectionBinding $parent[ItemsControl].Tag.GlyphWidth}"
+               Height="{ReflectionBinding $parent[ItemsControl].Tag.FontSize}"
                Stretch="Uniform"
                VerticalAlignment="Center"/>
       </DataTemplate>

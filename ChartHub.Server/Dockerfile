@@ -11,6 +11,7 @@ WORKDIR /app
 RUN mkdir -p /config /charthub/downloads /charthub/staging /clonehero
 
 COPY --from=build /app/publish .
+RUN if [ -f /app/tools/onyx ]; then chmod +x /app/tools/onyx; fi
 
 ENV ASPNETCORE_URLS=http://+:5001
 EXPOSE 5001

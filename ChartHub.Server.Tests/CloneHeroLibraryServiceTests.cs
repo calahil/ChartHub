@@ -38,42 +38,6 @@ public sealed class CloneHeroLibraryServiceTests
         }
     }
 
-    [Fact]
-    public void InstallFromStagedZipInstallsAndRegistersSong()
-    {
-        string root = CreateTempDirectory();
-        string staging = CreateTempDirectory();
-        try
-        {
-            string stagedZip = Path.Combine(staging, "song.zip");
-            string payloadRoot = Path.Combine(staging, "payload");
-            Directory.CreateDirectory(payloadRoot);
-            File.WriteAllText(Path.Combine(payloadRoot, "notes.chart"), "chart-data");
-            System.IO.Compression.ZipFile.CreateFromDirectory(payloadRoot, stagedZip);
-
-            IOptions<ServerPathOptions> options = Microsoft.Extensions.Options.Options.Create(new ServerPathOptions
-            {
-                CloneHeroRoot = root,
-            });
-            CloneHeroLibraryService sut = new(options);
-
-            var jobId = Guid.Parse("7f5f9f01-e665-4a6d-bf57-f65cf62a7f12");
-            bool installed = sut.TryInstallFromStaged(jobId, "Artist - Song", stagedZip, out ChartHub.Server.Contracts.CloneHeroSongResponse? song, out string? installedPath);
-
-            Assert.True(installed);
-            Assert.NotNull(song);
-            Assert.NotNull(installedPath);
-            Assert.True(Directory.Exists(installedPath));
-            Assert.True(File.Exists(Path.Combine(installedPath, "notes.chart")));
-            Assert.True(sut.TryGetSong(song!.SongId, out _));
-        }
-        finally
-        {
-            Directory.Delete(root, recursive: true);
-            Directory.Delete(staging, recursive: true);
-        }
-    }
-
     private static string CreateTempDirectory()
     {
         string path = Path.Combine(Path.GetTempPath(), "charthub-server-tests", Guid.NewGuid().ToString("N"));

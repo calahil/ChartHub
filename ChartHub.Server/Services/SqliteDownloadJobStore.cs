@@ -311,7 +311,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                 SET
                     downloaded_path = $downloadedPath,
                     stage = 'Downloaded',
-                    progress_percent = 80,
+                    progress_percent = 100,
                     updated_at_utc = $updatedAtUtc
                 WHERE job_id = $jobId;
                 """;
@@ -355,7 +355,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                 UPDATE download_jobs
                 SET
                     installed_path = $installedPath,
-                    stage = 'Completed',
+                    stage = 'Installed',
                     progress_percent = 100,
                     completed_at_utc = $completedAtUtc,
                     updated_at_utc = $updatedAtUtc
@@ -425,7 +425,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             using SqliteCommand command = connection.CreateCommand();
             command.CommandText = """
                 DELETE FROM download_jobs
-                WHERE stage IN ('Completed', 'Failed', 'Cancelled')
+                                WHERE stage IN ('Installed', 'Failed', 'Cancelled')
                   AND completed_at_utc IS NOT NULL
                   AND completed_at_utc < $thresholdUtc;
                 """;
@@ -463,6 +463,36 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                 CREATE INDEX IF NOT EXISTS idx_download_jobs_updated ON download_jobs(updated_at_utc);
                 """;
             command.ExecuteNonQuery();
+
+            using SqliteCommand migrateLegacy = connection.CreateCommand();
+            migrateLegacy.CommandText = """
+                UPDATE download_jobs
+                SET
+                    stage = CASE
+                        WHEN stage = 'Completed' THEN 'Installed'
+                        WHEN stage = 'Staged' THEN 'Downloaded'
+                        ELSE stage
+                    END,
+                    downloaded_path = CASE
+                        WHEN stage = 'Staged' THEN COALESCE(downloaded_path, staged_path)
+                        ELSE downloaded_path
+                    END,
+                    progress_percent = CASE
+                        WHEN stage = 'Staged' THEN 100
+                        ELSE progress_percent
+                    END,
+                    completed_at_utc = CASE
+                        WHEN stage = 'Staged' THEN NULL
+                        ELSE completed_at_utc
+                    END,
+                    updated_at_utc = CASE
+                        WHEN stage IN ('Completed', 'Staged') THEN $updatedAtUtc
+                        ELSE updated_at_utc
+                    END
+                WHERE stage IN ('Completed', 'Staged');
+                """;
+            migrateLegacy.Parameters.AddWithValue("$updatedAtUtc", DateTimeOffset.UtcNow.ToString("O"));
+            migrateLegacy.ExecuteNonQuery();
         }
     }
 
@@ -499,7 +529,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     downloaded_path = CASE WHEN $clearPaths = 1 THEN NULL ELSE downloaded_path END,
                     staged_path = CASE WHEN $clearPaths = 1 THEN NULL ELSE staged_path END,
                     installed_path = CASE WHEN $clearPaths = 1 THEN NULL ELSE installed_path END,
-                    completed_at_utc = CASE WHEN $stage IN ('Completed', 'Failed', 'Cancelled') THEN COALESCE(completed_at_utc, $completedAtUtc) ELSE NULL END,
+                    completed_at_utc = CASE WHEN $stage IN ('Installed', 'Failed', 'Cancelled') THEN COALESCE(completed_at_utc, $completedAtUtc) ELSE NULL END,
                     updated_at_utc = $updatedAtUtc
                 WHERE job_id = $jobId;
                 """;

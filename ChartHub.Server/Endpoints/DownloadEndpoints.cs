@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ChartHub.Server.Endpoints;
 
-public static class DownloadEndpoints
+public static partial class DownloadEndpoints
 {
     public static RouteGroupBuilder MapDownloadEndpoints(this IEndpointRouteBuilder app)
     {
@@ -60,6 +60,51 @@ public static class DownloadEndpoints
             .WithName("CancelDownloadJob")
             .WithSummary("Cancel an active job");
 
+        group.MapPost("/jobs/{jobId:guid}/install", (
+                Guid jobId,
+                IDownloadJobStore store,
+                IDownloadJobInstallService installService,
+                ILogger<DownloadInstallEndpointLogCategory> logger) =>
+            {
+                if (!store.TryGet(jobId, out DownloadJobResponse? job) || job is null)
+                {
+                    DownloadEndpointLog.InstallJobNotFound(logger, jobId);
+                    return Results.NotFound();
+                }
+
+                bool isInstallableStage = string.Equals(job.Stage, "Downloaded", StringComparison.OrdinalIgnoreCase);
+                bool isAlreadyInstalling = string.Equals(job.Stage, "InstallQueued", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(job.Stage, "Staging", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(job.Stage, "Installing", StringComparison.OrdinalIgnoreCase);
+                if (!isInstallableStage && !isAlreadyInstalling)
+                {
+                    DownloadEndpointLog.InstallRejectedInvalidStage(logger, job.JobId, job.Stage);
+                    return Results.Conflict(new { error = "Job is not in an installable stage." });
+                }
+
+                if (isAlreadyInstalling)
+                {
+                    DownloadEndpointLog.InstallAlreadyInProgress(logger, job.JobId, job.Stage);
+                    return Results.Accepted($"/api/v1/downloads/jobs/{jobId:D}", job);
+                }
+
+                DownloadEndpointLog.InstallRequestStarted(logger, job.JobId, job.Source, job.SourceId, job.DisplayName, job.DownloadedPath);
+                store.UpdateProgress(jobId, "InstallQueued", 88);
+
+                _ = Task.Run(() => ProcessInstallInBackgroundAsync(job.JobId, store, installService, logger));
+
+                if (!store.TryGet(jobId, out DownloadJobResponse? queuedJob) || queuedJob is null)
+                {
+                    DownloadEndpointLog.InstallCompletedButReloadMissing(logger, jobId);
+                    return Results.NotFound();
+                }
+
+                DownloadEndpointLog.InstallQueued(logger, queuedJob.JobId, queuedJob.Stage, queuedJob.ProgressPercent);
+                return Results.Accepted($"/api/v1/downloads/jobs/{jobId:D}", queuedJob);
+            })
+            .WithName("InstallDownloadJob")
+            .WithSummary("Queue install pipeline for a downloaded job");
+
         group.MapGet("/jobs/{jobId:guid}/stream", async (
                 HttpContext context,
                 Guid jobId,
@@ -111,24 +156,30 @@ public static class DownloadEndpoints
             {
                 context.Response.Headers.Append("Content-Type", "text/event-stream");
                 context.Response.Headers.Append("Cache-Control", "no-cache");
-
-                while (!cancellationToken.IsCancellationRequested)
+                try
                 {
-                    IReadOnlyList<DownloadJobResponse> jobs = store.List();
-                    IEnumerable<DownloadProgressEvent> eventsPayload = jobs.Select(job => new DownloadProgressEvent
+                    while (!cancellationToken.IsCancellationRequested)
                     {
-                        JobId = job.JobId,
-                        Stage = job.Stage,
-                        ProgressPercent = job.ProgressPercent,
-                        UpdatedAtUtc = job.UpdatedAtUtc,
-                    });
+                        IReadOnlyList<DownloadJobResponse> jobs = store.List();
+                        IEnumerable<DownloadProgressEvent> eventsPayload = jobs.Select(job => new DownloadProgressEvent
+                        {
+                            JobId = job.JobId,
+                            Stage = job.Stage,
+                            ProgressPercent = job.ProgressPercent,
+                            UpdatedAtUtc = job.UpdatedAtUtc,
+                        });
 
-                    await context.Response.WriteAsync($"event: jobs\n", cancellationToken).ConfigureAwait(false);
-                    await context.Response.WriteAsync($"data: {JsonSerializer.Serialize(eventsPayload)}\n\n", cancellationToken)
-                        .ConfigureAwait(false);
-                    await context.Response.Body.FlushAsync(cancellationToken).ConfigureAwait(false);
+                        await context.Response.WriteAsync($"event: jobs\n", cancellationToken).ConfigureAwait(false);
+                        await context.Response.WriteAsync($"data: {JsonSerializer.Serialize(eventsPayload)}\n\n", cancellationToken)
+                            .ConfigureAwait(false);
+                        await context.Response.Body.FlushAsync(cancellationToken).ConfigureAwait(false);
 
-                    await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
+                        await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false);
+                    }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // Expected when client disconnects the SSE stream.
                 }
             })
             .WithName("StreamDownloadJobs")
@@ -136,4 +187,98 @@ public static class DownloadEndpoints
 
         return group;
     }
+
+    private static async Task ProcessInstallInBackgroundAsync(
+        Guid jobId,
+        IDownloadJobStore store,
+        IDownloadJobInstallService installService,
+        ILogger logger)
+    {
+        if (!store.TryGet(jobId, out DownloadJobResponse? job) || job is null)
+        {
+            DownloadEndpointLog.InstallJobNotFound(logger, jobId);
+            return;
+        }
+
+        try
+        {
+            store.UpdateProgress(jobId, "Staging", 90);
+            DownloadJobInstallResult installResult = await installService.InstallJobAsync(job, CancellationToken.None).ConfigureAwait(false);
+            store.MarkStaged(jobId, installResult.StagedPath);
+            store.UpdateProgress(jobId, "Installing", 97);
+            store.MarkInstalled(jobId, installResult.InstalledPath);
+            DownloadEndpointLog.InstallRequestSucceeded(logger, job.JobId, installResult.StagedPath, installResult.InstalledPath);
+        }
+        catch (Exception ex)
+        {
+            DownloadEndpointLog.InstallRequestFailed(logger, job.JobId, job.Source, job.SourceId, job.DisplayName, job.DownloadedPath, ex);
+            store.MarkFailed(jobId, ex.Message);
+        }
+    }
+
+    private static partial class DownloadEndpointLog
+    {
+        [LoggerMessage(
+            EventId = 2001,
+            Level = LogLevel.Warning,
+            Message = "Install request failed because job {JobId} was not found.")]
+        public static partial void InstallJobNotFound(ILogger logger, Guid jobId);
+
+        [LoggerMessage(
+            EventId = 2002,
+            Level = LogLevel.Warning,
+            Message = "Install request rejected for job {JobId} because stage '{Stage}' is not installable.")]
+        public static partial void InstallRejectedInvalidStage(ILogger logger, Guid jobId, string stage);
+
+        [LoggerMessage(
+            EventId = 2003,
+            Level = LogLevel.Information,
+            Message = "Install request started for job {JobId}. source={Source}, sourceId={SourceId}, displayName='{DisplayName}', downloadedPath='{DownloadedPath}'.")]
+        public static partial void InstallRequestStarted(
+            ILogger logger,
+            Guid jobId,
+            string source,
+            string sourceId,
+            string displayName,
+            string? downloadedPath);
+
+        [LoggerMessage(
+            EventId = 2007,
+            Level = LogLevel.Information,
+            Message = "Install request queued for job {JobId}. stage='{Stage}', progress={ProgressPercent}.")]
+        public static partial void InstallQueued(ILogger logger, Guid jobId, string stage, double progressPercent);
+
+        [LoggerMessage(
+            EventId = 2008,
+            Level = LogLevel.Information,
+            Message = "Install request for job {JobId} ignored because install is already in progress at stage '{Stage}'.")]
+        public static partial void InstallAlreadyInProgress(ILogger logger, Guid jobId, string stage);
+
+        [LoggerMessage(
+            EventId = 2004,
+            Level = LogLevel.Error,
+            Message = "Install request failed for job {JobId}. source={Source}, sourceId={SourceId}, displayName='{DisplayName}', downloadedPath='{DownloadedPath}'.")]
+        public static partial void InstallRequestFailed(
+            ILogger logger,
+            Guid jobId,
+            string source,
+            string sourceId,
+            string displayName,
+            string? downloadedPath,
+            Exception exception);
+
+        [LoggerMessage(
+            EventId = 2005,
+            Level = LogLevel.Warning,
+            Message = "Install request finished for job {JobId} but the persisted job could not be reloaded.")]
+        public static partial void InstallCompletedButReloadMissing(ILogger logger, Guid jobId);
+
+        [LoggerMessage(
+            EventId = 2006,
+            Level = LogLevel.Information,
+            Message = "Install request succeeded for job {JobId}. stagedPath='{StagedPath}', installedPath='{InstalledPath}'.")]
+        public static partial void InstallRequestSucceeded(ILogger logger, Guid jobId, string stagedPath, string installedPath);
+    }
+
+    private sealed class DownloadInstallEndpointLogCategory;
 }

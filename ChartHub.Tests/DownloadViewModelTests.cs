@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
@@ -14,11 +16,15 @@ public class DownloadViewModelTests
     public async Task CheckAllCommand_UpdatesQueueSelectionFlags()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-checks");
-        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        using AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            serverApiBaseUrl: "http://127.0.0.1:5001",
+            serverApiAuthToken: "token");
+        var sharedQueue = new SharedDownloadQueue();
         var sut = new ViewModels.DownloadViewModel(
             settings,
-            new SongInstallServiceStub(),
             new FakeChartHubServerApiClient(),
+            sharedQueue,
             uiInvoke: action =>
             {
                 action();
@@ -51,19 +57,39 @@ public class DownloadViewModelTests
     public async Task InstallSongsCommand_InstallsSelectedQueueDownloads()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-install");
-        using AppGlobalSettings settings = CreateSettings(temp.RootPath);
+        using AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            serverApiBaseUrl: "http://127.0.0.1:5001",
+            serverApiAuthToken: "token");
         string selectedFilePath = temp.GetPath("song-a.zip");
         await File.WriteAllTextAsync(selectedFilePath, "zip");
 
-        var installStub = new SongInstallServiceStub
+        var sharedQueue = new SharedDownloadQueue();
+        var fakeClient = new FakeChartHubServerApiClient
         {
-            ResultPaths = [Path.Combine(temp.RootPath, "CloneHero", "Songs", "Song A")],
+            Jobs =
+            [
+                new ChartHubServerDownloadJobResponse(
+                    new Guid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                    LibrarySourceNames.RhythmVerse,
+                    "id-1",
+                    "song-a.zip",
+                    "https://example.test/song-a",
+                    "Downloaded",
+                    100,
+                    selectedFilePath,
+                    selectedFilePath,
+                    null,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+            ],
         };
 
         var sut = new ViewModels.DownloadViewModel(
             settings,
-            installStub,
-            new FakeChartHubServerApiClient(),
+            fakeClient,
+            sharedQueue,
             uiInvoke: action =>
             {
                 action();
@@ -72,26 +98,17 @@ public class DownloadViewModelTests
 
         try
         {
-            sut.IngestionQueue.Add(new IngestionQueueItem
-            {
-                IngestionId = 1,
-                DisplayName = "song-a.zip",
-                CurrentState = IngestionState.Downloaded,
-                DownloadedLocation = selectedFilePath,
-                Checked = true,
-            });
+            bool queueLoaded = await WaitForConditionAsync(() => sut.IngestionQueue.Count == 1, TimeSpan.FromSeconds(2));
+            Assert.True(queueLoaded);
+
+            sut.IngestionQueue[0].Checked = true;
 
             await sut.InstallSongsCommand();
 
-            Assert.Equal("Installed 1 item successfully.", sut.InstallSummaryText);
-            Assert.True(sut.HasInstallSummary);
+            Assert.Single(fakeClient.InstallRequestedJobIds);
             Assert.True(sut.IsInstallPanelVisible);
-            Assert.False(sut.IsInstallActive);
-
-            sut.DismissInstallPanelCommand.Execute(null);
-
-            Assert.False(sut.IsInstallPanelVisible);
-            Assert.False(sut.HasInstallSummary);
+            Assert.True(sut.IsInstallActive);
+            Assert.DoesNotContain("No selected downloads are installable", sut.InstallStageText, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
@@ -128,11 +145,12 @@ public class DownloadViewModelTests
                     DateTimeOffset.UtcNow),
             ],
         };
+        var sharedQueue = new SharedDownloadQueue();
 
         var sut = new ViewModels.DownloadViewModel(
             settings,
-            new SongInstallServiceStub(),
             fakeClient,
+            sharedQueue,
             uiInvoke: action =>
             {
                 action();
@@ -149,6 +167,99 @@ public class DownloadViewModelTests
 
             Assert.Single(fakeClient.CancelledJobIds);
             Assert.Equal(new Guid("11111111-1111-1111-1111-111111111111"), fakeClient.CancelledJobIds[0]);
+        }
+        finally
+        {
+            await sut.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task StreamJobUpdates_RefreshesSharedDownloadCardState()
+    {
+        using var temp = new TemporaryDirectoryFixture("download-vm-stream-shared-card");
+        using AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            serverApiBaseUrl: "http://127.0.0.1:5001",
+            serverApiAuthToken: "token");
+
+        var jobId = new Guid("22222222-2222-2222-2222-222222222222");
+        var sharedQueue = new SharedDownloadQueue();
+        sharedQueue.Downloads.Add(new DownloadFile("Song B", temp.RootPath, jobId.ToString("D"), null)
+        {
+            Status = "Queued",
+            DownloadProgress = 0,
+        });
+
+        var fakeClient = new FakeChartHubServerApiClient
+        {
+            Jobs =
+            [
+                new ChartHubServerDownloadJobResponse(
+                    jobId,
+                    LibrarySourceNames.RhythmVerse,
+                    "id-2",
+                    "Song B",
+                    "https://example.test/song-b",
+                    "Queued",
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+            ],
+            StreamBatches =
+            [
+                [
+                    new ChartHubServerDownloadProgressEvent(
+                        jobId,
+                        "Installed",
+                        100,
+                        DateTimeOffset.UtcNow),
+                ],
+            ],
+        };
+        fakeClient.OnStreamBatch = _ =>
+        {
+            fakeClient.Jobs =
+            [
+                new ChartHubServerDownloadJobResponse(
+                    jobId,
+                    LibrarySourceNames.RhythmVerse,
+                    "id-2",
+                    "Song B",
+                    "https://example.test/song-b",
+                    "Installed",
+                    100,
+                    "/tmp/song-b.zip",
+                    null,
+                    "/tmp/installed/song-b",
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+            ];
+        };
+
+        var sut = new ViewModels.DownloadViewModel(
+            settings,
+            fakeClient,
+            sharedQueue,
+            uiInvoke: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
+
+        try
+        {
+            bool cardUpdated = await WaitForConditionAsync(
+                () => sharedQueue.Downloads[0].Finished && string.Equals(sharedQueue.Downloads[0].Status, "Installed", StringComparison.OrdinalIgnoreCase),
+                TimeSpan.FromSeconds(2));
+
+            Assert.True(cardUpdated);
+            Assert.Equal(100, sharedQueue.Downloads[0].DownloadProgress);
         }
         finally
         {
@@ -206,16 +317,6 @@ public class DownloadViewModelTests
         return predicate();
     }
 
-    private sealed class SongInstallServiceStub : ISongInstallService
-    {
-        public IReadOnlyList<string> ResultPaths { get; set; } = [];
-
-        public Task<IReadOnlyList<string>> InstallSelectedDownloadsAsync(IEnumerable<string> selectedFilePaths, IProgress<InstallProgressUpdate>? progress = null, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(ResultPaths);
-        }
-    }
-
     private sealed class FakeSettingsOrchestrator : ISettingsOrchestrator
     {
         public FakeSettingsOrchestrator(AppConfigRoot current)
@@ -244,6 +345,9 @@ public class DownloadViewModelTests
     {
         public IReadOnlyList<ChartHubServerDownloadJobResponse> Jobs { get; set; } = [];
         public List<Guid> CancelledJobIds { get; } = [];
+        public List<Guid> InstallRequestedJobIds { get; } = [];
+        public IReadOnlyList<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamBatches { get; set; } = [];
+        public Action<IReadOnlyList<ChartHubServerDownloadProgressEvent>>? OnStreamBatch { get; set; }
 
         public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(string baseUrl, string googleIdToken, CancellationToken cancellationToken = default)
             => Task.FromResult(new ChartHubServerAuthExchangeResponse("token", DateTimeOffset.UtcNow.AddHours(1)));
@@ -267,10 +371,52 @@ public class DownloadViewModelTests
         public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
             => Task.FromResult(Jobs);
 
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+            string baseUrl,
+            string bearerToken,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            foreach (IReadOnlyList<ChartHubServerDownloadProgressEvent> batch in StreamBatches)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                OnStreamBatch?.Invoke(batch);
+                yield return batch;
+                await Task.Yield();
+            }
+
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+
         public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
         {
             CancelledJobIds.Add(jobId);
             return Task.CompletedTask;
+        }
+
+        public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(
+            string baseUrl,
+            string bearerToken,
+            Guid jobId,
+            CancellationToken cancellationToken = default)
+        {
+            InstallRequestedJobIds.Add(jobId);
+            ChartHubServerDownloadJobResponse existing = Jobs.FirstOrDefault(job => job.JobId == jobId)
+                ?? new ChartHubServerDownloadJobResponse(
+                    jobId,
+                    LibrarySourceNames.RhythmVerse,
+                    "source-id",
+                    "display-name",
+                    "https://example.test/download",
+                    "Installing",
+                    95,
+                    null,
+                    null,
+                    null,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow);
+
+            return Task.FromResult(existing with { Stage = "Installing", ProgressPercent = Math.Max(existing.ProgressPercent, 95) });
         }
     }
 }

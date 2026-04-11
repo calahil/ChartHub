@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
@@ -51,6 +52,19 @@ public class RhythmVerseViewModelTests
     }
 
     [Fact]
+    public void DownloadFile_DownloadedStatus_IsClearableAndNotCancelable()
+    {
+        var item = new DownloadFile("Song", Path.GetTempPath(), "https://example.test/song", 10)
+        {
+            Status = "Downloaded",
+            Finished = false,
+        };
+
+        Assert.True(item.CanClear);
+        Assert.False(item.CanCancel);
+    }
+
+    [Fact]
     public async Task LoadDataAsync_ThenLoadMoreAsync_AppendsPageResults()
     {
         using var temp = new TemporaryDirectoryFixture("rhythmverse-vm-pagination-append");
@@ -87,6 +101,77 @@ public class RhythmVerseViewModelTests
         Assert.Equal(2, sut.CurrentPage);
     }
 
+    [Fact]
+    public async Task DownloadFile_WhenInvokedForDifferentSongs_QueuesDistinctServerRequests()
+    {
+        using var temp = new TemporaryDirectoryFixture("rhythmverse-vm-distinct-download-requests");
+        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var sharedQueue = new SharedDownloadQueue();
+        var serverApi = new CapturingChartHubServerApiClient();
+        RhythmVerseViewModel sut = CreateViewModelForPaging(
+            CreateApiClientWithPagedHandler(),
+            catalog,
+            sharedQueue,
+            new ConnectedSettingsOrchestrator(),
+            serverApi);
+
+        var first = new ViewSong
+        {
+            SourceId = "rv-file-1",
+            Title = "First Song",
+            FileName = "first-song.zip",
+            DownloadLink = "https://example.test/first.zip",
+            FileSize = 111,
+        };
+        var second = new ViewSong
+        {
+            SourceId = "rv-file-2",
+            Title = "Second Song",
+            FileName = "second-song.zip",
+            DownloadLink = "https://example.test/second.zip",
+            FileSize = 222,
+        };
+
+        await sut.DownloadFile(first);
+        await sut.DownloadFile(second);
+
+        Assert.Equal(2, serverApi.Requests.Count);
+        Assert.Equal("rv-file-1", serverApi.Requests[0].SourceId);
+        Assert.Equal("First Song", serverApi.Requests[0].DisplayName);
+        Assert.Equal("https://example.test/first.zip", serverApi.Requests[0].SourceUrl);
+        Assert.Equal("rv-file-2", serverApi.Requests[1].SourceId);
+        Assert.Equal("Second Song", serverApi.Requests[1].DisplayName);
+        Assert.Equal("https://example.test/second.zip", serverApi.Requests[1].SourceUrl);
+    }
+
+    [Fact]
+    public async Task DownloadFile_WhenSongParameterIsNull_DoesNotQueueSelectedFile()
+    {
+        using var temp = new TemporaryDirectoryFixture("rhythmverse-vm-null-download-parameter");
+        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var sharedQueue = new SharedDownloadQueue();
+        var serverApi = new CapturingChartHubServerApiClient();
+        RhythmVerseViewModel sut = CreateViewModelForPaging(
+            CreateApiClientWithPagedHandler(),
+            catalog,
+            sharedQueue,
+            new ConnectedSettingsOrchestrator(),
+            serverApi);
+
+        sut.SelectedFile = new ViewSong
+        {
+            SourceId = "rv-file-selected",
+            Title = "Selected Song",
+            FileName = "selected-song.zip",
+            DownloadLink = "https://example.test/selected.zip",
+            FileSize = 333,
+        };
+
+        await sut.DownloadFile(null);
+
+        Assert.Empty(serverApi.Requests);
+    }
+
     private static RhythmVerseViewModel CreateViewModelForStateTests(
         LibraryCatalogService catalog,
         SharedDownloadQueue sharedQueue)
@@ -98,6 +183,21 @@ public class RhythmVerseViewModelTests
         ApiClientService apiClient,
         LibraryCatalogService catalog,
         SharedDownloadQueue sharedQueue)
+    {
+        return CreateViewModelForPaging(
+            apiClient,
+            catalog,
+            sharedQueue,
+            new FakeSettingsOrchestrator(),
+            new FakeChartHubServerApiClient());
+    }
+
+    private static RhythmVerseViewModel CreateViewModelForPaging(
+        ApiClientService apiClient,
+        LibraryCatalogService catalog,
+        SharedDownloadQueue sharedQueue,
+        ISettingsOrchestrator settingsOrchestrator,
+        IChartHubServerApiClient serverApiClient)
     {
         ConstructorInfo? constructor = typeof(RhythmVerseViewModel).GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic,
@@ -119,11 +219,38 @@ public class RhythmVerseViewModelTests
             apiClient,
             catalog,
             sharedQueue,
-            new FakeSettingsOrchestrator(),
-            new FakeChartHubServerApiClient(),
+            settingsOrchestrator,
+            serverApiClient,
             false,
             (Func<Action, Task>)(action => { action(); return Task.CompletedTask; }),
         ]);
+    }
+
+    private sealed class ConnectedSettingsOrchestrator : ISettingsOrchestrator
+    {
+        public AppConfigRoot Current { get; } = new()
+        {
+            Runtime = new RuntimeAppConfig
+            {
+                ServerApiBaseUrl = "http://127.0.0.1:5001",
+                ServerApiAuthToken = "sync-token-test",
+            },
+        };
+
+        public event Action<AppConfigRoot>? SettingsChanged;
+
+        public Task<ConfigValidationResult> UpdateAsync(Action<AppConfigRoot> update, CancellationToken cancellationToken = default)
+        {
+            update(Current);
+            SettingsChanged?.Invoke(Current);
+            return Task.FromResult(ConfigValidationResult.Success);
+        }
+
+        public Task ReloadAsync(CancellationToken cancellationToken = default)
+        {
+            SettingsChanged?.Invoke(Current);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeSettingsOrchestrator : ISettingsOrchestrator
@@ -173,8 +300,99 @@ public class RhythmVerseViewModelTests
         public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
 
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+            string baseUrl,
+            string bearerToken,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            yield break;
+        }
+
         public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(
+            string baseUrl,
+            string bearerToken,
+            Guid jobId,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerDownloadJobResponse(
+                jobId,
+                LibrarySourceNames.RhythmVerse,
+                "source-id",
+                "display-name",
+                "https://example.test/download",
+                "Installing",
+                95,
+                null,
+                null,
+                null,
+                null,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow));
+    }
+
+    private sealed class CapturingChartHubServerApiClient : IChartHubServerApiClient
+    {
+        public List<ChartHubServerCreateDownloadJobRequest> Requests { get; } = [];
+
+        public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(string baseUrl, string googleIdToken, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerAuthExchangeResponse("token", DateTimeOffset.UtcNow.AddHours(1)));
+
+        public Task<ChartHubServerDownloadJobResponse> CreateDownloadJobAsync(string baseUrl, string bearerToken, ChartHubServerCreateDownloadJobRequest request, CancellationToken cancellationToken = default)
+        {
+            Requests.Add(request);
+            return Task.FromResult(new ChartHubServerDownloadJobResponse(
+                Guid.NewGuid(),
+                request.Source,
+                request.SourceId,
+                request.DisplayName,
+                request.SourceUrl,
+                "Queued",
+                0,
+                null,
+                null,
+                null,
+                null,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow));
+        }
+
+        public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
+
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+            string baseUrl,
+            string bearerToken,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            yield break;
+        }
+
+        public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(
+            string baseUrl,
+            string bearerToken,
+            Guid jobId,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerDownloadJobResponse(
+                jobId,
+                LibrarySourceNames.RhythmVerse,
+                "source-id",
+                "display-name",
+                "https://example.test/download",
+                "Installing",
+                95,
+                null,
+                null,
+                null,
+                null,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow));
     }
 
     private static ApiClientService CreateApiClientWithPagedHandler(int delayMs = 0)
