@@ -189,7 +189,7 @@ Before deploying, verify:
 
 - [ ] All 12 **BackupApi secrets** are present in Repo Settings → Secrets
 - [ ] All 7 **ChartHub.Server repository-level secrets** are present
-- [ ] **GitHub Environments** (`backup-api-dev`, `backup-api-staging`, `backup-api-production`, `server-dev`, `server-staging`, `server-production`) are created
+- [ ] **GitHub Environments** (`dev`, `staging`, `productions`, `server-dev`, `server-staging`, `server-production`) are created
 - [ ] Environment-level secrets are set for `server-dev`, `server-staging`, and `server-production` (4 path/port secrets each)
 - [ ] Host paths for Server exist or will be created on the runner host
 - [ ] Google OAuth credentials are valid and accessible

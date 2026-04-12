@@ -13,9 +13,9 @@ GitHub Environments provide:
 - **Audit trail**: Track who approved what and when
 
 We need **6 environments**:
-1. `backup-api-dev` (no approval)
-2. `backup-api-staging` (requires approval)
-3. `backup-api-production` (requires approval)
+1. `dev` (BackupApi dev, no approval)
+2. `staging` (BackupApi staging, requires approval)
+3. `productions` (BackupApi production, requires approval)
 4. `server-dev` (no approval)
 5. `server-staging` (requires approval, once runner is ready)
 6. `server-production` (requires approval, once runner is ready)
@@ -41,10 +41,10 @@ You should see a page titled "Environments" with an option to **"New environment
 
 ---
 
-### 2. Create `backup-api-dev`
+### 2. Create `dev` (BackupApi)
 
 1. Click **New environment**
-2. **Name**: `backup-api-dev`
+2. **Name**: `dev`
 3. Click **Configure environment**
 
 **Configuration**:
@@ -53,14 +53,14 @@ You should see a page titled "Environments" with an option to **"New environment
 - **Prevent forking repositories**: Leave unchecked (not needed for this scenario)
 - Click **Save protection rules** (if prompted)
 
-Return to Environments page. You should see `backup-api-dev` listed.
+Return to Environments page. You should see `dev` listed.
 
 ---
 
-### 3. Create `backup-api-staging`
+### 3. Create `staging` (BackupApi)
 
 1. Click **New environment**
-2. **Name**: `backup-api-staging`
+2. **Name**: `staging`
 3. Click **Configure environment**
 
 **Configuration**:
@@ -74,14 +74,14 @@ Return to Environments page. You should see `backup-api-dev` listed.
 - **Prevent forking repositories**: Leave unchecked
 - Click **Save protection rules**
 
-Return to Environments page. You should see `backup-api-staging` listed.
+Return to Environments page. You should see `staging` listed.
 
 ---
 
-### 4. Create `backup-api-production`
+### 4. Create `productions` (BackupApi)
 
 1. Click **New environment**
-2. **Name**: `backup-api-production`
+2. **Name**: `productions`
 3. Click **Configure environment**
 
 **Configuration**:
@@ -223,9 +223,9 @@ After creating all environments and secrets:
 
 1. Go to **Settings** → **Environments**
 2. You should see **6 environments**:
-   - ✅ `backup-api-dev`
-   - ✅ `backup-api-staging`
-   - ✅ `backup-api-production`
+  - ✅ `dev`
+  - ✅ `staging`
+  - ✅ `productions`
   - ✅ `server-dev`
    - ✅ `server-staging`
    - ✅ `server-production`
