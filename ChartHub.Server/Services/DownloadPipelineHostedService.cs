@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 
 using ChartHub.Server.Contracts;
 using ChartHub.Server.Options;
@@ -11,6 +12,7 @@ public sealed class DownloadPipelineHostedService(
     IDownloadJobStore jobStore,
     IHttpClientFactory httpClientFactory,
     ISourceUrlResolver sourceUrlResolver,
+    IGoogleDriveFolderArchiveService googleDriveFolderArchiveService,
     IWebHostEnvironment environment,
     IOptions<ServerPathOptions> pathOptions,
     IOptions<DownloadsOptions> downloadOptions) : BackgroundService
@@ -18,6 +20,7 @@ public sealed class DownloadPipelineHostedService(
     private readonly IDownloadJobStore _jobStore = jobStore;
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient("downloads");
     private readonly ISourceUrlResolver _sourceUrlResolver = sourceUrlResolver;
+    private readonly IGoogleDriveFolderArchiveService _googleDriveFolderArchiveService = googleDriveFolderArchiveService;
     private readonly DownloadsOptions _downloadsOptions = downloadOptions.Value;
     private readonly string _downloadsDir = ServerContentPathResolver.Resolve(pathOptions.Value.DownloadsDir, environment.ContentRootPath);
 
@@ -59,7 +62,9 @@ public sealed class DownloadPipelineHostedService(
             ResolvedSourceUrl resolvedSource = await _sourceUrlResolver.ResolveAsync(job.SourceUrl, cancellationToken).ConfigureAwait(false);
 
             _jobStore.UpdateProgress(job.JobId, "Downloading", 10);
-            string downloadedPath = await DownloadFileAsync(job, resolvedSource, cancellationToken).ConfigureAwait(false);
+            string downloadedPath = resolvedSource.IsGoogleDriveFolder
+                ? await DownloadGoogleDriveFolderAsync(job, resolvedSource, cancellationToken).ConfigureAwait(false)
+                : await DownloadFileAsync(job, resolvedSource, cancellationToken).ConfigureAwait(false);
             _jobStore.MarkDownloaded(job.JobId, downloadedPath);
         }
         catch (OperationCanceledException)
@@ -74,6 +79,11 @@ public sealed class DownloadPipelineHostedService(
 
     private async Task<string> DownloadFileAsync(DownloadJobResponse job, ResolvedSourceUrl resolvedSource, CancellationToken cancellationToken)
     {
+        if (resolvedSource.DownloadUri is null)
+        {
+            throw new InvalidOperationException("Resolved source did not provide a download URI.");
+        }
+
         Uri sourceUri = resolvedSource.DownloadUri;
         using HttpResponseMessage response = await _httpClient
             .GetAsync(sourceUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
@@ -86,11 +96,7 @@ public sealed class DownloadPipelineHostedService(
 
         response.EnsureSuccessStatusCode();
 
-        string extension = Path.GetExtension(sourceUri.AbsolutePath);
-        if (string.IsNullOrWhiteSpace(extension))
-        {
-            extension = ".bin";
-        }
+        string extension = ResolveDownloadExtension(sourceUri, resolvedSource.SuggestedName, response.Content.Headers);
 
         string safeBaseName = MakeSafeFileName(resolvedSource.SuggestedName ?? job.DisplayName);
         Directory.CreateDirectory(_downloadsDir);
@@ -126,6 +132,26 @@ public sealed class DownloadPipelineHostedService(
         return destinationPath;
     }
 
+    private async Task<string> DownloadGoogleDriveFolderAsync(DownloadJobResponse job, ResolvedSourceUrl resolvedSource, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(resolvedSource.GoogleDriveFolderId))
+        {
+            throw new InvalidOperationException("Resolved Google Drive folder did not include an identifier.");
+        }
+
+        _jobStore.UpdateProgress(job.JobId, "DownloadingFolderZip", 20);
+        string downloadedPath = await _googleDriveFolderArchiveService
+            .DownloadFolderAsZipAsync(
+                resolvedSource.GoogleDriveFolderId,
+                resolvedSource.SuggestedName ?? (job.DisplayName + ".zip"),
+                _downloadsDir,
+                job.JobId,
+                cancellationToken)
+            .ConfigureAwait(false);
+        _jobStore.UpdateProgress(job.JobId, "Downloading", 80);
+        return downloadedPath;
+    }
+
     private void EnsureNotCancelled(Guid jobId)
     {
         if (_jobStore.IsCancelRequested(jobId))
@@ -146,6 +172,80 @@ public sealed class DownloadPipelineHostedService(
         char[] invalid = Path.GetInvalidFileNameChars();
         string cleaned = new string(value.Select(ch => invalid.Contains(ch) ? '-' : ch).ToArray()).Trim();
         return string.IsNullOrWhiteSpace(cleaned) ? "download" : cleaned;
+    }
+
+    private static string ResolveDownloadExtension(Uri sourceUri, string? suggestedName, HttpContentHeaders contentHeaders)
+    {
+        string extension = Path.GetExtension(suggestedName ?? string.Empty);
+        if (!string.IsNullOrWhiteSpace(extension))
+        {
+            return extension;
+        }
+
+        string contentDispositionName = contentHeaders.ContentDisposition?.FileNameStar
+            ?? contentHeaders.ContentDisposition?.FileName
+            ?? string.Empty;
+        contentDispositionName = contentDispositionName.Trim('"');
+        extension = Path.GetExtension(contentDispositionName);
+        if (!string.IsNullOrWhiteSpace(extension))
+        {
+            return extension;
+        }
+
+        extension = Path.GetExtension(sourceUri.AbsolutePath);
+        if (!string.IsNullOrWhiteSpace(extension))
+        {
+            return extension;
+        }
+
+        if (TryInferRhythmVerseExtension(sourceUri, out string inferredExtension))
+        {
+            return inferredExtension;
+        }
+
+        return ".bin";
+    }
+
+    private static bool TryInferRhythmVerseExtension(Uri sourceUri, out string extension)
+    {
+        extension = string.Empty;
+        if (!sourceUri.Host.Contains("rhythmverse.co", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string tail = sourceUri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? string.Empty;
+        if (tail.EndsWith("_rb3con", StringComparison.OrdinalIgnoreCase))
+        {
+            extension = ".rb3con";
+            return true;
+        }
+
+        if (tail.EndsWith("_con", StringComparison.OrdinalIgnoreCase))
+        {
+            extension = ".con";
+            return true;
+        }
+
+        if (tail.EndsWith("_rar", StringComparison.OrdinalIgnoreCase))
+        {
+            extension = ".rar";
+            return true;
+        }
+
+        if (tail.EndsWith("_zip", StringComparison.OrdinalIgnoreCase))
+        {
+            extension = ".zip";
+            return true;
+        }
+
+        if (tail.EndsWith("_7z", StringComparison.OrdinalIgnoreCase))
+        {
+            extension = ".7z";
+            return true;
+        }
+
+        return false;
     }
 
 }

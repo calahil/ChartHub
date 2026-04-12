@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
+using Avalonia.Threading;
+
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Strings;
@@ -13,11 +15,15 @@ namespace ChartHub.ViewModels;
 
 public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
 {
+    public bool IsCompanionMode => OperatingSystem.IsAndroid();
+    public bool IsDesktopMode => !OperatingSystem.IsAndroid();
+
     private readonly AppGlobalSettings? _globalSettings;
     private readonly IChartHubServerApiClient? _serverApiClient;
-    private readonly IDesktopPathOpener _desktopPathOpener;
+    private readonly Func<Action, Task> _uiInvoke;
     private List<ChartHubServerCloneHeroSongResponse> _serverSongsCache = [];
     private string? _lastDeletedSongId;
+    private bool _isArtistDrilldownActive;
 
     private bool _hasInitialized;
     public bool HasInitialized
@@ -82,9 +88,34 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
 
             _selectedArtist = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(MobileHeaderTitle));
             ObserveBackgroundTask(LoadSongsForSelectedArtistAsync(), "Clone Hero artist selection changed");
         }
     }
+
+    public bool IsArtistDrilldownActive
+    {
+        get => _isArtistDrilldownActive;
+        private set
+        {
+            if (_isArtistDrilldownActive == value)
+            {
+                return;
+            }
+
+            _isArtistDrilldownActive = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ShowMobileArtistsList));
+            OnPropertyChanged(nameof(ShowMobileSongsList));
+            OnPropertyChanged(nameof(MobileHeaderTitle));
+        }
+    }
+
+    public bool ShowMobileArtistsList => IsCompanionMode && !IsArtistDrilldownActive;
+    public bool ShowMobileSongsList => IsCompanionMode && IsArtistDrilldownActive;
+    public string MobileHeaderTitle => IsArtistDrilldownActive
+        ? (string.IsNullOrWhiteSpace(SelectedArtist) ? "Songs" : SelectedArtist)
+        : "Clone Hero Artists";
 
     private ObservableCollection<CloneHeroLibrarySongItem> _songs = [];
     public ObservableCollection<CloneHeroLibrarySongItem> Songs
@@ -105,10 +136,6 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
         {
             _selectedSong = value;
             OnPropertyChanged();
-            _openSongFolderCommand.NotifyCanExecuteChanged();
-            _openSongIniCommand.NotifyCanExecuteChanged();
-            _reParseMetadataCommand.NotifyCanExecuteChanged();
-            _reconcileThisSongCommand.NotifyCanExecuteChanged();
             _deleteSongCommand.NotifyCanExecuteChanged();
             _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
         }
@@ -129,9 +156,6 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
 
             _isReconciling = value;
             OnPropertyChanged();
-            _reconcileLibraryCommand.NotifyCanExecuteChanged();
-            _reParseMetadataCommand.NotifyCanExecuteChanged();
-            _reconcileThisSongCommand.NotifyCanExecuteChanged();
             _deleteSongCommand.NotifyCanExecuteChanged();
             _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
         }
@@ -160,20 +184,8 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
     private readonly AsyncRelayCommand _refreshLibraryCommand;
     public IAsyncRelayCommand RefreshLibraryCommand => _refreshLibraryCommand;
 
-    private readonly AsyncRelayCommand _openSongFolderCommand;
-    public IAsyncRelayCommand OpenSongFolderCommand => _openSongFolderCommand;
-
-    private readonly AsyncRelayCommand _openSongIniCommand;
-    public IAsyncRelayCommand OpenSongIniCommand => _openSongIniCommand;
-
-    private readonly AsyncRelayCommand _reconcileLibraryCommand;
-    public IAsyncRelayCommand ReconcileLibraryCommand => _reconcileLibraryCommand;
-
-    private readonly AsyncRelayCommand _reParseMetadataCommand;
-    public IAsyncRelayCommand ReParseMetadataCommand => _reParseMetadataCommand;
-
-    private readonly AsyncRelayCommand _reconcileThisSongCommand;
-    public IAsyncRelayCommand ReconcileThisSongCommand => _reconcileThisSongCommand;
+    private readonly RelayCommand _showArtistListCommand;
+    public IRelayCommand ShowArtistListCommand => _showArtistListCommand;
 
     private readonly AsyncRelayCommand _deleteSongCommand;
     public IAsyncRelayCommand DeleteSongCommand => _deleteSongCommand;
@@ -182,31 +194,18 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
     public IAsyncRelayCommand RestoreLastDeletedSongCommand => _restoreLastDeletedSongCommand;
 
     public CloneHeroViewModel(
-        LibraryCatalogService libraryCatalog,
-        SongIngestionCatalogService ingestionCatalog,
-        IDesktopPathOpener desktopPathOpener,
-        ILocalFileDeletionService localFileDeletionService,
-        ICloneHeroLibraryReconciliationService? reconciliationService = null,
         AppGlobalSettings? globalSettings = null,
-        IChartHubServerApiClient? serverApiClient = null)
+        IChartHubServerApiClient? serverApiClient = null,
+        Func<Action, Task>? uiInvoke = null)
     {
-        _ = libraryCatalog;
-        _ = ingestionCatalog;
-        _ = localFileDeletionService;
-        _ = reconciliationService;
-
         _globalSettings = globalSettings;
         _serverApiClient = serverApiClient;
-        _desktopPathOpener = desktopPathOpener;
+        _uiInvoke = uiInvoke ?? (async action => await Dispatcher.UIThread.InvokeAsync(action));
 
         PageStrings = new CloneHeroPageStrings();
 
         _refreshLibraryCommand = new AsyncRelayCommand(() => RefreshArtistsAsync(CancellationToken.None));
-        _openSongFolderCommand = new AsyncRelayCommand(OpenSelectedSongFolderAsync, () => SelectedSong is not null);
-        _openSongIniCommand = new AsyncRelayCommand(OpenSelectedSongIniLocationAsync, () => SelectedSong is not null);
-        _reconcileLibraryCommand = new AsyncRelayCommand(ReconcileLibraryAsync, () => false);
-        _reParseMetadataCommand = new AsyncRelayCommand(ReParseSelectedSongMetadataAsync, () => false);
-        _reconcileThisSongCommand = new AsyncRelayCommand(ReconcileSelectedSongAsync, () => false);
+        _showArtistListCommand = new RelayCommand(ShowArtistList);
         _deleteSongCommand = new AsyncRelayCommand(DeleteSelectedSongAsync, () => SelectedSong is not null && !IsReconciling && HasServerConnection());
         _restoreLastDeletedSongCommand = new AsyncRelayCommand(RestoreLastDeletedSongAsync, CanRestoreLastDeletedSong);
     }
@@ -235,20 +234,19 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
         await RefreshArtistsAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task ReconcileLibraryAsync()
-    {
-        await Task.CompletedTask;
-    }
-
     private async Task RefreshArtistsAsync(CancellationToken cancellationToken)
     {
         if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
             _serverSongsCache = [];
-            Artists = [];
-            Songs = [];
-            SelectedArtist = null;
-            ReconciliationStatusMessage = "Configure ChartHub.Server URL and token to load Clone Hero library.";
+            await _uiInvoke(() =>
+            {
+                Artists = [];
+                Songs = [];
+                SelectedArtist = null;
+                IsArtistDrilldownActive = false;
+                ReconciliationStatusMessage = "Configure ChartHub.Server URL and token to load Clone Hero library.";
+            });
             return;
         }
 
@@ -267,33 +265,54 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             .OrderBy(artist => artist, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        Artists = new ObservableCollection<string>(serverArtists);
-
-        if (Artists.Count == 0)
+        await _uiInvoke(() =>
         {
-            Songs = [];
-            SelectedArtist = null;
+            Artists = new ObservableCollection<string>(serverArtists);
+
+            if (Artists.Count == 0)
+            {
+                Songs = [];
+                SelectedArtist = null;
+                IsArtistDrilldownActive = false;
+                ReconciliationStatusMessage = string.Empty;
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(SelectedArtist) || !Artists.Contains(SelectedArtist))
+            {
+                if (IsCompanionMode)
+                {
+                    SelectedArtist = null;
+                    Songs = [];
+                    SelectedSong = null;
+                    IsArtistDrilldownActive = false;
+                }
+                else
+                {
+                    SelectedArtist = Artists[0];
+                }
+            }
+            else
+            {
+                ApplySongsForSelectedArtist();
+            }
+
             ReconciliationStatusMessage = string.Empty;
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(SelectedArtist) || !Artists.Contains(SelectedArtist))
-        {
-            SelectedArtist = Artists[0];
-        }
-        else
-        {
-            await LoadSongsForSelectedArtistAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        ReconciliationStatusMessage = string.Empty;
+        });
     }
 
     private async Task LoadSongsForSelectedArtistAsync(CancellationToken cancellationToken = default)
     {
+        _ = cancellationToken;
+        await _uiInvoke(ApplySongsForSelectedArtist);
+    }
+
+    private void ApplySongsForSelectedArtist()
+    {
         if (string.IsNullOrWhiteSpace(SelectedArtist))
         {
             Songs = [];
+            IsArtistDrilldownActive = false;
             return;
         }
 
@@ -312,21 +331,23 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             }));
 
         SelectedSong = Songs.Count > 0 ? Songs[0] : null;
-
-        _openSongFolderCommand.NotifyCanExecuteChanged();
-        _openSongIniCommand.NotifyCanExecuteChanged();
-
-        await Task.CompletedTask;
+        if (IsCompanionMode)
+        {
+            IsArtistDrilldownActive = true;
+        }
     }
 
-    private async Task ReParseSelectedSongMetadataAsync()
+    private void ShowArtistList()
     {
-        await Task.CompletedTask;
-    }
+        if (!IsCompanionMode)
+        {
+            return;
+        }
 
-    private async Task ReconcileSelectedSongAsync()
-    {
-        await Task.CompletedTask;
+        SelectedArtist = null;
+        Songs = [];
+        SelectedSong = null;
+        IsArtistDrilldownActive = false;
     }
 
     private async Task DeleteSelectedSongAsync()
@@ -420,33 +441,6 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
         finally
         {
             IsReconciling = false;
-        }
-    }
-
-    private async Task OpenSelectedSongFolderAsync()
-    {
-        if (SelectedSong is null)
-        {
-            return;
-        }
-
-        await _desktopPathOpener.OpenDirectoryAsync(SelectedSong.LocalPath).ConfigureAwait(false);
-    }
-
-    private async Task OpenSelectedSongIniLocationAsync()
-    {
-        if (SelectedSong is null)
-        {
-            return;
-        }
-
-        string? targetDir = Directory.Exists(SelectedSong.LocalPath)
-            ? SelectedSong.LocalPath
-            : Path.GetDirectoryName(SelectedSong.SongIniPath);
-
-        if (!string.IsNullOrWhiteSpace(targetDir) && Directory.Exists(targetDir))
-        {
-            await _desktopPathOpener.OpenDirectoryAsync(targetDir).ConfigureAwait(false);
         }
     }
 

@@ -9,36 +9,29 @@ namespace ChartHub.Tests;
 public class AppGlobalSettingsTests
 {
     [Fact]
-    public async Task Constructor_WhenRuntimeDirectoriesAreFirstInstall_ResolvesAndCreatesLocalStorageDirectories()
+    public async Task Constructor_WhenServerTokenMissing_GeneratesAndPersistsToken()
     {
         AppConfigRoot config = new()
         {
             Runtime = new RuntimeAppConfig
             {
-                TempDirectory = "first_install",
-                DownloadDirectory = "first_install",
-                StagingDirectory = "first_install",
-                OutputDirectory = "first_install",
-                CloneHeroDataDirectory = "first_install",
-                CloneHeroSongDirectory = "first_install",
+                ServerApiAuthToken = string.Empty,
             },
         };
 
-        using var settings = new AppGlobalSettings(new FakeSettingsOrchestrator(config));
+        var orchestrator = new BlockingSettingsOrchestrator(config);
+        using var settings = new AppGlobalSettings(orchestrator);
+
+        Assert.False(string.IsNullOrWhiteSpace(settings.ServerApiAuthToken));
+
+        orchestrator.ReleasePendingUpdate();
 
         bool initialized = await WaitForConditionAsync(
-            () => !string.IsNullOrWhiteSpace(settings.DownloadDir)
-                && !string.Equals(settings.DownloadDir, "first_install", StringComparison.Ordinal),
+            () => orchestrator.UpdateCount > 0
+                && !string.IsNullOrWhiteSpace(orchestrator.Current.Runtime.ServerApiAuthToken),
             TimeSpan.FromSeconds(2));
 
         Assert.True(initialized);
-        Assert.StartsWith(settings.TempDir, settings.DownloadDir, StringComparison.Ordinal);
-        Assert.StartsWith(settings.TempDir, settings.StagingDir, StringComparison.Ordinal);
-        Assert.StartsWith(settings.TempDir, settings.OutputDir, StringComparison.Ordinal);
-        Assert.True(Directory.Exists(settings.TempDir));
-        Assert.True(Directory.Exists(settings.DownloadDir));
-        Assert.True(Directory.Exists(settings.StagingDir));
-        Assert.True(Directory.Exists(settings.OutputDir));
     }
 
     [Fact]
@@ -64,30 +57,13 @@ public class AppGlobalSettingsTests
 
     private static AppConfigRoot CreateConfig(string rootPath)
     {
-        string tempDirectory = Path.Combine(rootPath, "Temp");
-        string downloadDirectory = Path.Combine(rootPath, "Downloads");
-        string stagingDirectory = Path.Combine(rootPath, "Staging");
-        string outputDirectory = Path.Combine(rootPath, "Output");
-        string cloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero");
-        string cloneHeroSongDirectory = Path.Combine(cloneHeroDataDirectory, "Songs");
-
-        Directory.CreateDirectory(tempDirectory);
-        Directory.CreateDirectory(downloadDirectory);
-        Directory.CreateDirectory(stagingDirectory);
-        Directory.CreateDirectory(outputDirectory);
-        Directory.CreateDirectory(cloneHeroDataDirectory);
-        Directory.CreateDirectory(cloneHeroSongDirectory);
+        _ = rootPath;
 
         return new AppConfigRoot
         {
             Runtime = new RuntimeAppConfig
             {
-                TempDirectory = tempDirectory,
-                DownloadDirectory = downloadDirectory,
-                StagingDirectory = stagingDirectory,
-                OutputDirectory = outputDirectory,
-                CloneHeroDataDirectory = cloneHeroDataDirectory,
-                CloneHeroSongDirectory = cloneHeroSongDirectory,
+                ServerApiBaseUrl = "https://localhost:5001",
             },
         };
     }

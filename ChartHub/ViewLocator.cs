@@ -67,7 +67,6 @@ public class ViewLocator : IDataTemplate
             or CloneHeroViewModel
             or SettingsViewModel
             or AppShellViewModel
-            or SplashViewModel
-            or AuthGateViewModel;
+            or SplashViewModel;
     }
 }

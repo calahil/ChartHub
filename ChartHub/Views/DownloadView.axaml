@@ -17,7 +17,6 @@
                         IsEnabled="{Binding IsAnyChecked}"
                         Command="{Binding InstallSongs}"
                         VerticalAlignment="Stretch"
-                        IsVisible="{Binding IsDesktopMode}"
                         Width="140" />
                 <Button Content="Delete Selected"
                         HorizontalContentAlignment="Center"

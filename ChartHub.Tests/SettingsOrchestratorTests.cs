@@ -19,18 +19,18 @@ public class SettingsOrchestratorTests
 
         ConfigValidationResult result = await sut.UpdateAsync(config =>
         {
-            config.Runtime.DownloadDirectory = "/tmp/downloads";
+            config.Runtime.ServerApiBaseUrl = "https://server.example";
             config.Runtime.ServerApiAuthToken = "updated-sync-token";
             config.Runtime.RhythmVerseSource = RhythmVerseSource.ChartHubMirror;
         });
 
         Assert.True(result.IsValid);
         Assert.Equal(1, store.SaveCallCount);
-        Assert.Equal("/tmp/downloads", sut.Current.Runtime.DownloadDirectory);
+        Assert.Equal("https://server.example", sut.Current.Runtime.ServerApiBaseUrl);
         Assert.Equal("updated-sync-token", sut.Current.Runtime.ServerApiAuthToken);
         Assert.Equal(RhythmVerseSource.ChartHubMirror, sut.Current.Runtime.RhythmVerseSource);
         Assert.NotNull(observed);
-        Assert.Equal("/tmp/downloads", observed!.Runtime.DownloadDirectory);
+        Assert.Equal("https://server.example", observed!.Runtime.ServerApiBaseUrl);
         Assert.Equal("updated-sync-token", observed.Runtime.ServerApiAuthToken);
         Assert.Equal(RhythmVerseSource.ChartHubMirror, observed.Runtime.RhythmVerseSource);
     }
@@ -39,19 +39,19 @@ public class SettingsOrchestratorTests
     public async Task UpdateAsync_WhenValidationFails_DoesNotPersistOrMutateCurrent()
     {
         var store = new InMemoryAppConfigStore();
-        var validator = new RejectingValidator("Runtime.DownloadDirectory", "Download path invalid");
+        var validator = new RejectingValidator("Runtime.ServerApiBaseUrl", "Server URL invalid");
         using var sut = new SettingsOrchestrator(store, validator);
 
-        string original = sut.Current.Runtime.DownloadDirectory;
+        string original = sut.Current.Runtime.ServerApiBaseUrl;
         ConfigValidationResult result = await sut.UpdateAsync(config =>
         {
-            config.Runtime.DownloadDirectory = "/invalid";
+            config.Runtime.ServerApiBaseUrl = "invalid";
         });
 
         Assert.False(result.IsValid);
         Assert.Single(result.Failures);
         Assert.Equal(0, store.SaveCallCount);
-        Assert.Equal(original, sut.Current.Runtime.DownloadDirectory);
+        Assert.Equal(original, sut.Current.Runtime.ServerApiBaseUrl);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class SettingsOrchestratorTests
         {
             Runtime = new RuntimeAppConfig
             {
-                DownloadDirectory = "/tmp/reloaded",
+                ServerApiBaseUrl = "https://reloaded.example",
             },
         });
 
@@ -74,29 +74,29 @@ public class SettingsOrchestratorTests
 
         await sut.ReloadAsync();
 
-        Assert.Equal("/tmp/reloaded", sut.Current.Runtime.DownloadDirectory);
+        Assert.Equal("https://reloaded.example", sut.Current.Runtime.ServerApiBaseUrl);
         Assert.NotNull(observed);
-        Assert.Equal("/tmp/reloaded", observed!.Runtime.DownloadDirectory);
+        Assert.Equal("https://reloaded.example", observed!.Runtime.ServerApiBaseUrl);
     }
 
     [Fact]
     public async Task UpdateAsync_WithFailedValidation_KeepsOriginalObjectGraphState()
     {
         var store = new InMemoryAppConfigStore();
-        var validator = new RejectingValidator("Runtime.OutputDirectory", "Output path invalid");
+        var validator = new RejectingValidator("Runtime.ServerApiAuthToken", "Server token invalid");
         using var sut = new SettingsOrchestrator(store, validator);
 
-        string beforeDownloadDir = sut.Current.Runtime.DownloadDirectory;
-        string beforeOutputDir = sut.Current.Runtime.OutputDirectory;
+        string beforeBaseUrl = sut.Current.Runtime.ServerApiBaseUrl;
+        string beforeToken = sut.Current.Runtime.ServerApiAuthToken;
 
         _ = await sut.UpdateAsync(config =>
         {
-            config.Runtime.DownloadDirectory = "/tmp/new-downloads";
-            config.Runtime.OutputDirectory = "/tmp/new-output";
+            config.Runtime.ServerApiBaseUrl = "https://new.example";
+            config.Runtime.ServerApiAuthToken = "new-token";
         });
 
-        Assert.Equal(beforeDownloadDir, sut.Current.Runtime.DownloadDirectory);
-        Assert.Equal(beforeOutputDir, sut.Current.Runtime.OutputDirectory);
+        Assert.Equal(beforeBaseUrl, sut.Current.Runtime.ServerApiBaseUrl);
+        Assert.Equal(beforeToken, sut.Current.Runtime.ServerApiAuthToken);
         Assert.Equal(0, store.SaveCallCount);
     }
 
@@ -148,13 +148,8 @@ public class SettingsOrchestratorTests
                 {
                     RhythmVerseSource = source.Runtime.RhythmVerseSource,
                     UseMockData = source.Runtime.UseMockData,
-                    TempDirectory = source.Runtime.TempDirectory,
-                    DownloadDirectory = source.Runtime.DownloadDirectory,
-                    StagingDirectory = source.Runtime.StagingDirectory,
-                    OutputDirectory = source.Runtime.OutputDirectory,
-                    CloneHeroDataDirectory = source.Runtime.CloneHeroDataDirectory,
-                    CloneHeroSongDirectory = source.Runtime.CloneHeroSongDirectory,
                     ServerApiAuthToken = source.Runtime.ServerApiAuthToken,
+                    ServerApiBaseUrl = source.Runtime.ServerApiBaseUrl,
                     InstallLogExpanded = source.Runtime.InstallLogExpanded,
                 },
                 GoogleAuth = new GoogleAuthConfig

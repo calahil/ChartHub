@@ -8,7 +8,6 @@ using Avalonia.Threading;
 
 using ChartHub.Models;
 using ChartHub.Services;
-using ChartHub.Services.Transfers;
 using ChartHub.Strings;
 using ChartHub.Utilities;
 
@@ -223,7 +222,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         nameof(IngestionState.Converting),
         nameof(IngestionState.Converted),
         nameof(IngestionState.Installing),
-        nameof(IngestionState.Installed),
         nameof(IngestionState.Failed),
         nameof(IngestionState.Cancelled),
     ];
@@ -899,7 +897,9 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             .ListDownloadJobsAsync(baseUrl, bearerToken, cancellationToken)
             .ConfigureAwait(false);
 
-        IEnumerable<ChartHubServerDownloadJobResponse> filtered = jobs;
+        IEnumerable<ChartHubServerDownloadJobResponse> filtered = jobs.Where(job =>
+            !string.Equals(job.Stage, "Installed", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(job.Stage, "Completed", StringComparison.OrdinalIgnoreCase));
         if (!string.Equals(SelectedQueueStateFilter, "All", StringComparison.OrdinalIgnoreCase))
         {
             filtered = filtered.Where(job => string.Equals(job.Stage, SelectedQueueStateFilter, StringComparison.OrdinalIgnoreCase));

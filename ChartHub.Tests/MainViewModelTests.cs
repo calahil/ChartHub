@@ -25,15 +25,25 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public void Constructor_InAndroidMode_HidesCloneHero()
+    public void Constructor_InAndroidMode_ShowsCloneHero()
     {
         MainViewModel sut = CreateMainViewModel(isAndroid: true);
 
         Assert.True(sut.IsCompanionMode);
         Assert.False(sut.IsDesktopMode);
-        Assert.False(sut.IsCloneHeroTabVisible);
+        Assert.True(sut.IsCloneHeroTabVisible);
         Assert.True(sut.IsSettingsTabVisible);
         Assert.True(sut.IsDownloadTabVisible);
+    }
+
+    [Fact]
+    public void GoCloneHeroCommand_OnAndroid_SelectsCloneHeroTab()
+    {
+        MainViewModel sut = CreateMainViewModel(isAndroid: true);
+
+        sut.GoCloneHeroCommand.Execute(null);
+
+        Assert.Equal(3, sut.SelectedMainTabIndex);
     }
 
     [Fact]

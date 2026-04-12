@@ -16,7 +16,7 @@ public sealed class SourceUrlResolverTests
 
         ResolvedSourceUrl result = await sut.ResolveAsync("https://example.com/demo.zip", CancellationToken.None);
 
-        Assert.Equal("https://example.com/demo.zip", result.DownloadUri.ToString());
+        Assert.Equal("https://example.com/demo.zip", result.DownloadUri!.ToString());
         Assert.Null(result.SuggestedName);
     }
 
@@ -44,12 +44,12 @@ public sealed class SourceUrlResolverTests
         ResolvedSourceUrl result = await sut.ResolveAsync("https://drive.google.com/file/d/abc123/view?usp=sharing", CancellationToken.None);
 
         Assert.Equal(1, calls);
-        Assert.Equal("https://www.googleapis.com/drive/v3/files/abc123?alt=media&key=test-key", result.DownloadUri.ToString());
+        Assert.Equal("https://www.googleapis.com/drive/v3/files/abc123?alt=media&key=test-key", result.DownloadUri!.ToString());
         Assert.Equal("track.zip", result.SuggestedName);
     }
 
     [Fact]
-    public async Task ResolveAsyncDriveFolderThrowsNotSupported()
+    public async Task ResolveAsyncDriveFolderReturnsFolderResolution()
     {
         SourceUrlResolver sut = BuildResolver(
             (_, _) =>
@@ -59,13 +59,18 @@ public sealed class SourceUrlResolverTests
                 }),
             apiKey: "test-key");
 
-        await Assert.ThrowsAsync<NotSupportedException>(() =>
-            sut.ResolveAsync("https://drive.google.com/file/d/folder1/view", CancellationToken.None));
+        ResolvedSourceUrl result = await sut.ResolveAsync("https://drive.google.com/file/d/folder1/view", CancellationToken.None);
+
+        Assert.Null(result.DownloadUri);
+        Assert.Equal("folder1", result.GoogleDriveFolderId);
+        Assert.Equal("Folder.zip", result.SuggestedName);
+        Assert.True(result.IsGoogleDriveFolder);
     }
 
     [Theory]
     [InlineData("https://drive.google.com/file/d/abc123/view", "abc123")]
     [InlineData("https://drive.google.com/open?id=qwe987", "qwe987")]
+    [InlineData("https://drive.google.com/drive/folders/folder123", null)]
     [InlineData("https://example.com/open?id=qwe987", null)]
     public void TryExtractGoogleDriveFileIdParsesExpectedIds(string sourceUrl, string? expected)
     {
@@ -74,6 +79,21 @@ public sealed class SourceUrlResolverTests
         string? fileId = SourceUrlResolver.TryExtractGoogleDriveFileId(uri);
 
         Assert.Equal(expected, fileId);
+    }
+
+    [Theory]
+    [InlineData("https://drive.google.com/drive/folders/folder123", "folder123")]
+    [InlineData("https://drive.google.com/drive/u/0/folders/folder456", "folder456")]
+    [InlineData("https://drive.google.com/open?id=folder789", "folder789")]
+    [InlineData("https://drive.google.com/file/d/file123/view", null)]
+    [InlineData("https://example.com/drive/folders/folder123", null)]
+    public void TryExtractGoogleDriveFolderIdParsesExpectedIds(string sourceUrl, string? expected)
+    {
+        Uri uri = new(sourceUrl);
+
+        string? folderId = SourceUrlResolver.TryExtractGoogleDriveFolderId(uri);
+
+        Assert.Equal(expected, folderId);
     }
 
     private static SourceUrlResolver BuildResolver(

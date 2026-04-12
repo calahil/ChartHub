@@ -50,11 +50,13 @@ public class JsonAppConfigStoreTests
 
         Assert.Equal(2, config.ConfigVersion);
         Assert.True(config.Runtime.UseMockData);
-        Assert.Equal("/tmp/legacy-temp", config.Runtime.TempDirectory);
-        Assert.Equal("/tmp/legacy-downloads", config.Runtime.DownloadDirectory);
         Assert.Equal("legacy-sync-token", config.Runtime.ServerApiAuthToken);
         Assert.Equal("android-id", config.GoogleAuth.AndroidClientId);
         Assert.Equal("desktop-id", config.GoogleAuth.DesktopClientId);
+
+        string migrated = File.ReadAllText(configPath);
+        Assert.DoesNotContain("TempDirectory", migrated, StringComparison.Ordinal);
+        Assert.DoesNotContain("DownloadDirectory", migrated, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -65,7 +67,7 @@ public class JsonAppConfigStoreTests
 
         using var sut = new JsonAppConfigStore(configPath);
         AppConfigRoot config = sut.Load();
-        config.Runtime.OutputDirectory = "/tmp/new-output";
+        config.Runtime.ServerApiBaseUrl = "https://server.example";
 
         await sut.SaveAsync(config);
 
@@ -76,8 +78,8 @@ public class JsonAppConfigStoreTests
         using var doc = JsonDocument.Parse(text);
         string? output = doc.RootElement
             .GetProperty("Runtime")
-            .GetProperty("OutputDirectory")
+            .GetProperty("ServerApiBaseUrl")
             .GetString();
-        Assert.Equal("/tmp/new-output", output);
+        Assert.Equal("https://server.example", output);
     }
 }

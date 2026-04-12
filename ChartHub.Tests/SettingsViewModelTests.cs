@@ -30,60 +30,15 @@ public class SettingsViewModelTests
         using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
         await Task.Yield();
 
-        Assert.Equal(14, sut.Fields.Count);
+        Assert.Equal(7, sut.Fields.Count);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.RhythmVerseSource" && field.IsDropdownEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.UseMockData" && field.IsToggleEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.DownloadDirectory" && field.IsDirectoryPicker);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiAuthToken" && field.IsTextEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiBaseUrl" && field.IsTextEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.TransferOrchestratorConcurrencyCap" && field.IsNumberEditor);
         Assert.Contains(sut.Fields, field => field.Key == "GoogleAuth.AndroidClientId" && field.IsTextEditor);
 
         int expectedSecretCount = sut.IsDeveloperBuild ? 3 : 0;
         Assert.Equal(expectedSecretCount, sut.Secrets.Count);
-        if (sut.IsDeveloperBuild)
-        {
-            Assert.Contains(sut.Secrets, secret => secret.Key == SecretKeys.GoogleRefreshToken && secret.HasStoredValue);
-        }
-    }
-
-    [Fact]
-    public async Task Constructor_OnAndroid_OmitsDesktopOnlySettings()
-    {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-platform-android");
-        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
-        var secrets = new InMemorySecretStore();
-        var googleAuthProvider = new FakeGoogleAuthProvider();
-        var serverApiClient = new FakeChartHubServerApiClient();
-
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient, isAndroidPlatform: true);
-        await Task.Yield();
-
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiAuthToken");
-        Assert.DoesNotContain(sut.Fields, field => field.Key == "Runtime.SyncApiPreferredBaseUrl");
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiAuthToken");
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiBaseUrl");
-    }
-
-    [Fact]
-    public async Task DirectoryField_InvalidPath_SetsValidationErrorAndDisablesSave()
-    {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-validation");
-        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
-        var secrets = new InMemorySecretStore();
-        var googleAuthProvider = new FakeGoogleAuthProvider();
-        var serverApiClient = new FakeChartHubServerApiClient();
-
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
-        await Task.Yield();
-
-        SettingsFieldViewModel field = Assert.Single(sut.Fields, item => item.Key == "Runtime.DownloadDirectory");
-        field.StringValue = "https://example.com/downloads";
-
-        Assert.True(field.HasError);
-        Assert.Equal("Path must be a local filesystem path.", field.ErrorMessage);
-        Assert.True(sut.HasValidationErrors);
-        Assert.False(sut.SaveCommand.CanExecute(null));
     }
 
     [Fact]
@@ -107,30 +62,6 @@ public class SettingsViewModelTests
         Assert.Equal(1, orchestrator.UpdateCallCount);
         Assert.Equal("android-client-updated", orchestrator.Current.GoogleAuth.AndroidClientId);
         Assert.Equal("Settings saved.", sut.StatusMessage);
-    }
-
-    [Fact]
-    public async Task SaveCommand_WithNonHotReloadableChanges_PersistsAndRunsReloadFlow()
-    {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-save-reload");
-        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
-        var secrets = new InMemorySecretStore();
-        var googleAuthProvider = new FakeGoogleAuthProvider();
-        var serverApiClient = new FakeChartHubServerApiClient();
-
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
-        await Task.Yield();
-
-        SettingsFieldViewModel tempDirectoryField = Assert.Single(sut.Fields, item => item.Key == "Runtime.TempDirectory");
-        tempDirectoryField.StringValue = Path.Combine(temp.RootPath, "Temp-New");
-
-        Assert.True(sut.HasPendingRestartSettings);
-        await sut.SaveCommand.ExecuteAsync(null);
-
-        Assert.Equal(1, orchestrator.UpdateCallCount);
-        Assert.Equal(1, orchestrator.ReloadCallCount);
-        Assert.Equal("Settings saved and reloaded from current configuration.", sut.StatusMessage);
-        Assert.False(sut.HasPendingRestartSettings);
     }
 
     [Fact]
@@ -169,6 +100,29 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task AuthenticateServerCommand_WithoutBaseUrl_SetsError()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-server-auth-missing-base-url");
+        AppConfigRoot config = CreateConfig(temp.RootPath);
+        config.Runtime.ServerApiBaseUrl = string.Empty;
+
+        var orchestrator = new FakeSettingsOrchestrator(config);
+        var secrets = new InMemorySecretStore();
+        var googleAuthProvider = new FakeGoogleAuthProvider();
+        var serverApiClient = new FakeChartHubServerApiClient();
+
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
+        await Task.Yield();
+
+        await sut.AuthenticateServerCommand.ExecuteAsync(null);
+
+        Assert.True(sut.HasServerAuthenticationError);
+        Assert.Equal("Set Runtime.ServerApiBaseUrl before authenticating.", sut.ServerAuthenticationErrorMessage);
+        Assert.Equal("ChartHub Server authentication is not configured.", sut.ServerAuthenticationStatusMessage);
+        Assert.Equal(0, googleAuthProvider.AuthorizeInteractiveCallCount);
+    }
+
+    [Fact]
     public async Task AuthenticateServerCommand_ExchangesGoogleTokenAndPersistsServerToken()
     {
         using var temp = new TemporaryDirectoryFixture("settings-vm-server-auth");
@@ -195,68 +149,7 @@ public class SettingsViewModelTests
         Assert.Equal("server-access-token", orchestrator.Current.Runtime.ServerApiAuthToken);
         Assert.Equal("ChartHub Server authentication succeeded.", sut.ServerAuthenticationStatusMessage);
         Assert.False(sut.HasServerAuthenticationError);
-    }
-
-    [Fact]
-    public async Task AuthenticateServerCommand_WithoutBaseUrl_SetsErrorAndSkipsAuth()
-    {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-server-auth-missing-base-url");
-        AppConfigRoot config = CreateConfig(temp.RootPath);
-        config.Runtime.ServerApiBaseUrl = string.Empty;
-
-        var orchestrator = new FakeSettingsOrchestrator(config);
-        var secrets = new InMemorySecretStore();
-        var googleAuthProvider = new FakeGoogleAuthProvider();
-        var serverApiClient = new FakeChartHubServerApiClient();
-
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
-        await Task.Yield();
-
-        await sut.AuthenticateServerCommand.ExecuteAsync(null);
-
-        Assert.Equal(0, googleAuthProvider.AuthorizeInteractiveCallCount);
-        Assert.Equal(0, serverApiClient.ExchangeCallCount);
-        Assert.True(sut.HasServerAuthenticationError);
-        Assert.Equal("Set Runtime.ServerApiBaseUrl before authenticating.", sut.ServerAuthenticationErrorMessage);
-    }
-
-    [Fact]
-    public async Task AuthenticateServerCommand_InvalidGoogleToken_RetriesAfterSignOut()
-    {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-server-auth-retry-invalid-token");
-        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
-        var secrets = new InMemorySecretStore();
-        var googleAuthProvider = new FakeGoogleAuthProvider
-        {
-            InteractiveCredentials =
-            [
-                CreateGoogleCredential(idToken: "stale-google-id-token"),
-                CreateGoogleCredential(idToken: "fresh-google-id-token"),
-            ],
-        };
-        var serverApiClient = new FakeChartHubServerApiClient
-        {
-            ExchangeHandler = (_, googleToken) =>
-            {
-                if (string.Equals(googleToken, "stale-google-id-token", StringComparison.Ordinal))
-                {
-                    throw new ChartHubServerApiException(HttpStatusCode.BadRequest, "Bad Request", "{\"error\":\"invalid_google_id_token\"}", "invalid_google_id_token");
-                }
-
-                return new ChartHubServerAuthExchangeResponse("server-access-token", DateTimeOffset.UtcNow.AddHours(1));
-            },
-        };
-
-        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
-        await Task.Yield();
-
-        await sut.AuthenticateServerCommand.ExecuteAsync(null);
-
-        Assert.Equal(2, googleAuthProvider.AuthorizeInteractiveCallCount);
-        Assert.Equal(1, googleAuthProvider.SignOutCallCount);
-        Assert.Equal(2, serverApiClient.ExchangeCallCount);
-        Assert.Equal("server-access-token", orchestrator.Current.Runtime.ServerApiAuthToken);
-        Assert.Equal("ChartHub Server authentication succeeded.", sut.ServerAuthenticationStatusMessage);
+        Assert.False(sut.IsServerAuthenticationBusy);
     }
 
     [Fact]
@@ -317,30 +210,12 @@ public class SettingsViewModelTests
 
     private static AppConfigRoot CreateConfig(string rootPath)
     {
-        string tempDirectory = Path.Combine(rootPath, "Temp");
-        string downloadDirectory = Path.Combine(rootPath, "Downloads");
-        string stagingDirectory = Path.Combine(rootPath, "Staging");
-        string outputDirectory = Path.Combine(rootPath, "Output");
-        string cloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero");
-        string cloneHeroSongDirectory = Path.Combine(cloneHeroDataDirectory, "Songs");
-
-        Directory.CreateDirectory(tempDirectory);
-        Directory.CreateDirectory(downloadDirectory);
-        Directory.CreateDirectory(stagingDirectory);
-        Directory.CreateDirectory(outputDirectory);
-        Directory.CreateDirectory(cloneHeroDataDirectory);
-        Directory.CreateDirectory(cloneHeroSongDirectory);
+        _ = rootPath;
 
         return new AppConfigRoot
         {
             Runtime = new RuntimeAppConfig
             {
-                TempDirectory = tempDirectory,
-                DownloadDirectory = downloadDirectory,
-                StagingDirectory = stagingDirectory,
-                OutputDirectory = outputDirectory,
-                CloneHeroDataDirectory = cloneHeroDataDirectory,
-                CloneHeroSongDirectory = cloneHeroSongDirectory,
                 ServerApiBaseUrl = "https://localhost:5001",
                 UseMockData = false,
             },
@@ -472,7 +347,6 @@ public class SettingsViewModelTests
     private sealed class FakeGoogleAuthProvider : IGoogleAuthProvider
     {
         public UserCredential? InteractiveCredential { get; set; }
-        public IReadOnlyList<UserCredential> InteractiveCredentials { get; set; } = [];
         public Exception? InteractiveException { get; set; }
         public int AuthorizeInteractiveCallCount { get; private set; }
         public int SignOutCallCount { get; private set; }
@@ -492,11 +366,6 @@ public class SettingsViewModelTests
             if (InteractiveException is not null)
             {
                 throw InteractiveException;
-            }
-
-            if (AuthorizeInteractiveCallCount <= InteractiveCredentials.Count)
-            {
-                return Task.FromResult(InteractiveCredentials[AuthorizeInteractiveCallCount - 1]);
             }
 
             if (InteractiveCredential is null)

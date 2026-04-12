@@ -38,7 +38,7 @@
             "internalConsoleOptions": "openOnSessionStart",
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development",
-                "ASPNETCORE_URLS": "http://127.0.0.1:5180",
+                "ASPNETCORE_URLS": "http://0.0.0.0:5180",
                 "Auth__JwtSigningKey": "dev_only_local_jwt_key_1234567890_abcd"
             }
         },

@@ -13,8 +13,6 @@
                        FontSize="18"
                        FontWeight="Bold" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                <Button Content="Reconcile Library"
-                        Command="{Binding ReconcileLibraryCommand}" />
                 <Button Content="Refresh Library"
                         Command="{Binding RefreshLibraryCommand}" />
                 <Button Content="Restore Last Deleted"
@@ -50,7 +48,7 @@
             </StackPanel>
         </Border>
 
-        <Grid Grid.Row="2" ColumnDefinitions="280,*">
+        <Grid Grid.Row="2" ColumnDefinitions="280,*" IsVisible="{Binding IsDesktopMode}">
             <Border Grid.Column="0" Margin="0,0,10,0" BorderThickness="1" BorderBrush="{StaticResource ThemeBorderMidBrush}" Padding="8">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Artists" FontWeight="SemiBold" />
@@ -73,12 +71,50 @@
                     </DataGrid.Columns>
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="Open Song Folder" Command="{Binding OpenSongFolderCommand}" />
-                            <MenuItem Header="Open song.ini Location" Command="{Binding OpenSongIniCommand}" />
-                            <Separator />
-                            <MenuItem Header="Re-parse Metadata" Command="{Binding ReParseMetadataCommand}" />
-                            <MenuItem Header="Reconcile This Song" Command="{Binding ReconcileThisSongCommand}" />
-                            <Separator />
+                            <MenuItem Header="Delete Song (Server)" Command="{Binding DeleteSongCommand}" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                </DataGrid>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="2" RowDefinitions="Auto,*" IsVisible="{Binding IsCompanionMode}">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+                <Button Content="Back"
+                        Command="{Binding ShowArtistListCommand}"
+                        IsVisible="{Binding IsArtistDrilldownActive}" />
+                <TextBlock Grid.Column="1"
+                           Margin="10,0,0,0"
+                           VerticalAlignment="Center"
+                           Text="{Binding MobileHeaderTitle}"
+                           FontWeight="SemiBold" />
+            </Grid>
+
+            <Border Grid.Row="1"
+                    BorderThickness="1"
+                    BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                    Padding="8"
+                    IsVisible="{Binding ShowMobileArtistsList}">
+                <ListBox ItemsSource="{Binding Artists}"
+                         SelectedItem="{Binding SelectedArtist}" />
+            </Border>
+
+            <Border Grid.Row="1"
+                    BorderThickness="1"
+                    BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                    Padding="8"
+                    IsVisible="{Binding ShowMobileSongsList}">
+                <DataGrid ItemsSource="{Binding Songs}"
+                          SelectedItem="{Binding SelectedSong}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          CanUserSortColumns="False">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" />
+                        <DataGridTextColumn Header="Charter" Binding="{Binding Charter}" Width="160" />
+                    </DataGrid.Columns>
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
                             <MenuItem Header="Delete Song (Server)" Command="{Binding DeleteSongCommand}" />
                         </ContextMenu>
                     </DataGrid.ContextMenu>

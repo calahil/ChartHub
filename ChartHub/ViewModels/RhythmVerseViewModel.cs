@@ -89,6 +89,9 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
     private readonly SemaphoreSlim _loadDataGate = new(1, 1);
     private int _loadMoreGate;
     private readonly Func<Action, Task> _uiInvoke;
+    private readonly object _autoClearSync = new();
+    private readonly Dictionary<DownloadFile, CancellationTokenSource> _autoClearTokens = [];
+    private static readonly TimeSpan SuccessfulDownloadAutoClearDelay = TimeSpan.FromSeconds(3);
 
     private ApiClientService _apiClient;
     public ApiClientService ApiClient
@@ -428,6 +431,7 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             foreach (DownloadFile item in e.OldItems)
             {
                 item.PropertyChanged -= DownloadItem_PropertyChanged;
+                CancelAutoClear(item);
             }
         }
 
@@ -441,9 +445,88 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             || e.PropertyName == nameof(ChartHub.Services.DownloadFile.DownloadProgress)
             || e.PropertyName == nameof(ChartHub.Services.DownloadFile.ErrorMessage))
         {
+            if (sender is DownloadFile item)
+            {
+                if (ShouldAutoClearSuccessfulDownload(item))
+                {
+                    ScheduleSuccessfulDownloadAutoClear(item);
+                }
+                else
+                {
+                    CancelAutoClear(item);
+                }
+            }
+
             OnPropertyChanged(nameof(HasActiveDownloads));
             OnPropertyChanged(nameof(NoActiveDownloads));
         }
+    }
+
+    private static bool ShouldAutoClearSuccessfulDownload(DownloadFile item)
+    {
+        if (!string.IsNullOrWhiteSpace(item.ErrorMessage))
+        {
+            return false;
+        }
+
+        return string.Equals(item.Status, "Downloaded", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.Status, "Completed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.Status, "Installed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ScheduleSuccessfulDownloadAutoClear(DownloadFile item)
+    {
+        CancellationTokenSource cts = new();
+
+        lock (_autoClearSync)
+        {
+            if (_autoClearTokens.TryGetValue(item, out CancellationTokenSource? existing))
+            {
+                existing.Cancel();
+                existing.Dispose();
+            }
+
+            _autoClearTokens[item] = cts;
+        }
+
+        ObserveBackgroundTask(AutoClearSuccessfulDownloadAfterDelayAsync(item, cts.Token), "RhythmVerse auto-clear successful download");
+    }
+
+    private void CancelAutoClear(DownloadFile item)
+    {
+        lock (_autoClearSync)
+        {
+            if (!_autoClearTokens.Remove(item, out CancellationTokenSource? existing))
+            {
+                return;
+            }
+
+            existing.Cancel();
+            existing.Dispose();
+        }
+    }
+
+    private async Task AutoClearSuccessfulDownloadAfterDelayAsync(DownloadFile item, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(SuccessfulDownloadAutoClearDelay, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        await _uiInvoke(() =>
+        {
+            if (!ShouldAutoClearSuccessfulDownload(item))
+            {
+                CancelAutoClear(item);
+                return;
+            }
+
+            Downloads.Remove(item);
+        }).ConfigureAwait(false);
     }
 
     private static void ObserveBackgroundTask(Task task, string context)

@@ -70,6 +70,7 @@ public sealed class JsonAppConfigStore : IAppConfigStore
         if (rootNode is not null)
         {
             ApplyLegacyFlatMapping(rootNode, config);
+            PersistRemovedLegacyStorageKeys(rootNode);
         }
 
         if (config.ConfigVersion <= 0)
@@ -156,45 +157,9 @@ public sealed class JsonAppConfigStore : IAppConfigStore
 
     private static void ApplyLegacyFlatMapping(JsonObject rootNode, AppConfigRoot config)
     {
-        static string ReadString(JsonObject root, string key)
-        {
-            string? value = root[key]?.GetValue<string>();
-            return string.IsNullOrWhiteSpace(value) ? "first_install" : value;
-        }
-
         if (rootNode["UseMockData"] is not null)
         {
             config.Runtime.UseMockData = rootNode["UseMockData"]?.GetValue<bool>() ?? config.Runtime.UseMockData;
-        }
-
-        if (rootNode["TempDirectory"] is not null)
-        {
-            config.Runtime.TempDirectory = ReadString(rootNode, "TempDirectory");
-        }
-
-        if (rootNode["DownloadDirectory"] is not null)
-        {
-            config.Runtime.DownloadDirectory = ReadString(rootNode, "DownloadDirectory");
-        }
-
-        if (rootNode["StagingDirectory"] is not null)
-        {
-            config.Runtime.StagingDirectory = ReadString(rootNode, "StagingDirectory");
-        }
-
-        if (rootNode["OutputDirectory"] is not null)
-        {
-            config.Runtime.OutputDirectory = ReadString(rootNode, "OutputDirectory");
-        }
-
-        if (rootNode["CloneHeroSongDirectory"] is not null)
-        {
-            config.Runtime.CloneHeroSongDirectory = ReadString(rootNode, "CloneHeroSongDirectory");
-        }
-
-        if (rootNode["CloneHeroDataDirectory"] is not null)
-        {
-            config.Runtime.CloneHeroDataDirectory = ReadString(rootNode, "CloneHeroDataDirectory");
         }
 
         if (rootNode["ServerApiAuthToken"] is not null)
@@ -232,5 +197,53 @@ public sealed class JsonAppConfigStore : IAppConfigStore
                 config.GoogleAuth.DesktopClientId = googleDrive["desktop_client_id"]?.GetValue<string>();
             }
         }
+    }
+
+    private void PersistRemovedLegacyStorageKeys(JsonObject rootNode)
+    {
+        if (!StripLegacyStorageKeys(rootNode))
+        {
+            return;
+        }
+
+        _suppressWatcher = true;
+        try
+        {
+            File.WriteAllText(ConfigPath, rootNode.ToJsonString(_serializerOptions));
+        }
+        finally
+        {
+            _suppressWatcher = false;
+        }
+    }
+
+    private static bool StripLegacyStorageKeys(JsonObject rootNode)
+    {
+        bool changed = false;
+
+        string[] legacyFlatKeys =
+        [
+            "TempDirectory",
+            "DownloadDirectory",
+            "StagingDirectory",
+            "OutputDirectory",
+            "CloneHeroDataDirectory",
+            "CloneHeroSongDirectory",
+        ];
+
+        foreach (string key in legacyFlatKeys)
+        {
+            changed |= rootNode.Remove(key);
+        }
+
+        if (rootNode["Runtime"] is JsonObject runtimeNode)
+        {
+            foreach (string key in legacyFlatKeys)
+            {
+                changed |= runtimeNode.Remove(key);
+            }
+        }
+
+        return changed;
     }
 }

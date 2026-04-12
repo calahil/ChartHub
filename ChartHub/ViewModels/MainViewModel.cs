@@ -326,16 +326,11 @@ public class MainViewModel : INotifyPropertyChanged
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
 
-        bool supportsCloneHero = !isAndroid;
-
-        _isCloneHeroTabVisible = supportsCloneHero;
+        _isCloneHeroTabVisible = true;
         _isDownloadTabVisible = false;
         _isSettingsTabVisible = true;
 
-        if (supportsCloneHero)
-        {
-            ObserveBackgroundTask(InitializeCloneHeroAsync(postToUi), "Clone Hero startup reconciliation");
-        }
+        ObserveBackgroundTask(InitializeCloneHeroAsync(postToUi), "Clone Hero startup reconciliation");
 
         postToUi(() => IsDownloadTabVisible = true);
     }

@@ -251,7 +251,16 @@ public class EncoreViewModelTests
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
         var sharedQueue = new SharedDownloadQueue();
-        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), sharedQueue);
+        var sut = new EncoreViewModel(
+            api,
+            new NoOpChartHubServerApiClient(),
+            new NoOpSettingsOrchestrator(),
+            sharedQueue,
+            action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
 
         Assert.False(sut.HasActiveDownloads);
         Assert.True(sut.NoActiveDownloads);
@@ -275,7 +284,16 @@ public class EncoreViewModelTests
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
         var sharedQueue = new SharedDownloadQueue();
-        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), sharedQueue);
+        var sut = new EncoreViewModel(
+            api,
+            new NoOpChartHubServerApiClient(),
+            new NoOpSettingsOrchestrator(),
+            sharedQueue,
+            action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
         var item = new DownloadFile("Song", temp.RootPath, "https://example.test/song", 10);
         sharedQueue.Downloads.Add(item);
 
@@ -283,6 +301,82 @@ public class EncoreViewModelTests
 
         Assert.Empty(sharedQueue.Downloads);
         Assert.True(sut.NoActiveDownloads);
+    }
+
+    [Fact]
+    public void SuccessfulDownloadStatus_AutoClearsAfterDelay()
+    {
+        using var temp = new TemporaryDirectoryFixture("encore-vm-success-autoclear");
+        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var handler = new RecordingHttpHandler();
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.enchor.us"),
+        };
+
+        EncoreApiService api = CreateApiService(catalog, httpClient);
+        var sharedQueue = new SharedDownloadQueue();
+        var sut = new EncoreViewModel(
+            api,
+            new NoOpChartHubServerApiClient(),
+            new NoOpSettingsOrchestrator(),
+            sharedQueue,
+            action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
+        var item = new DownloadFile("Song", temp.RootPath, "https://example.test/song", 10)
+        {
+            Status = "Queued",
+        };
+
+        sharedQueue.Downloads.Add(item);
+        item.Status = "Completed";
+        item.ErrorMessage = null;
+
+        bool removed = SpinWait.SpinUntil(() => !sharedQueue.Downloads.Contains(item), TimeSpan.FromSeconds(5));
+
+        Assert.True(removed);
+        Assert.True(sut.NoActiveDownloads);
+    }
+
+    [Fact]
+    public async Task FailedDownloadStatus_RemainsUntilManualClear()
+    {
+        using var temp = new TemporaryDirectoryFixture("encore-vm-failure-retained");
+        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        var handler = new RecordingHttpHandler();
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.enchor.us"),
+        };
+
+        EncoreApiService api = CreateApiService(catalog, httpClient);
+        var sharedQueue = new SharedDownloadQueue();
+        var sut = new EncoreViewModel(
+            api,
+            new NoOpChartHubServerApiClient(),
+            new NoOpSettingsOrchestrator(),
+            sharedQueue,
+            action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
+        var item = new DownloadFile("Song", temp.RootPath, "https://example.test/song", 10)
+        {
+            Status = "Failed",
+            ErrorMessage = "network",
+        };
+
+        sharedQueue.Downloads.Add(item);
+        await Task.Delay(TimeSpan.FromSeconds(4));
+
+        Assert.Contains(item, sharedQueue.Downloads);
+
+        sut.ClearDownloadCommand.Execute(item);
+        Assert.Empty(sharedQueue.Downloads);
     }
 
     private sealed class RecordingHttpHandler : HttpMessageHandler

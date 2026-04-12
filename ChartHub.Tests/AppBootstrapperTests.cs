@@ -26,7 +26,6 @@ public class AppBootstrapperTests
         Assert.NotNull(provider.GetService<AppGlobalSettings>());
         Assert.NotNull(provider.GetService<IChartHubServerApiClient>());
         Assert.NotNull(provider.GetService<IGoogleAuthProvider>());
-        Assert.NotNull(provider.GetService<DownloadService>());
     }
 
     [Fact]

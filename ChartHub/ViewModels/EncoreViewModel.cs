@@ -3,6 +3,8 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
+using Avalonia.Threading;
+
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 using ChartHub.Models;
@@ -21,7 +23,11 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     private readonly EncoreApiService _apiService;
     private readonly IChartHubServerApiClient _serverApiClient;
     private readonly ISettingsOrchestrator _settingsOrchestrator;
+    private readonly Func<Action, Task> _uiInvoke;
     private readonly object _stateSaveSync = new();
+    private readonly object _autoClearSync = new();
+    private readonly Dictionary<DownloadFile, CancellationTokenSource> _autoClearTokens = [];
+    private static readonly TimeSpan SuccessfulDownloadAutoClearDelay = TimeSpan.FromSeconds(3);
 
     private string _searchText = string.Empty;
     private bool _isLoading;
@@ -383,11 +389,13 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
         EncoreApiService apiService,
         IChartHubServerApiClient serverApiClient,
         ISettingsOrchestrator settingsOrchestrator,
-        SharedDownloadQueue sharedDownloadQueue)
+        SharedDownloadQueue sharedDownloadQueue,
+        Func<Action, Task>? uiInvoke = null)
     {
         _apiService = apiService;
         _serverApiClient = serverApiClient;
         _settingsOrchestrator = settingsOrchestrator;
+        _uiInvoke = uiInvoke ?? (async action => await Dispatcher.UIThread.InvokeAsync(action));
 
         Downloads = sharedDownloadQueue.Downloads;
 
@@ -423,6 +431,7 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             foreach (DownloadFile item in e.OldItems)
             {
                 item.PropertyChanged -= DownloadItem_PropertyChanged;
+                CancelAutoClear(item);
             }
         }
 
@@ -436,9 +445,88 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             || e.PropertyName == nameof(DownloadFile.DownloadProgress)
             || e.PropertyName == nameof(DownloadFile.ErrorMessage))
         {
+            if (sender is DownloadFile item)
+            {
+                if (ShouldAutoClearSuccessfulDownload(item))
+                {
+                    ScheduleSuccessfulDownloadAutoClear(item);
+                }
+                else
+                {
+                    CancelAutoClear(item);
+                }
+            }
+
             OnPropertyChanged(nameof(HasActiveDownloads));
             OnPropertyChanged(nameof(NoActiveDownloads));
         }
+    }
+
+    private static bool ShouldAutoClearSuccessfulDownload(DownloadFile item)
+    {
+        if (!string.IsNullOrWhiteSpace(item.ErrorMessage))
+        {
+            return false;
+        }
+
+        return string.Equals(item.Status, "Downloaded", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.Status, "Completed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.Status, "Installed", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void ScheduleSuccessfulDownloadAutoClear(DownloadFile item)
+    {
+        CancellationTokenSource cts = new();
+
+        lock (_autoClearSync)
+        {
+            if (_autoClearTokens.TryGetValue(item, out CancellationTokenSource? existing))
+            {
+                existing.Cancel();
+                existing.Dispose();
+            }
+
+            _autoClearTokens[item] = cts;
+        }
+
+        ObserveBackgroundTask(AutoClearSuccessfulDownloadAfterDelayAsync(item, cts.Token), "Encore auto-clear successful download");
+    }
+
+    private void CancelAutoClear(DownloadFile item)
+    {
+        lock (_autoClearSync)
+        {
+            if (!_autoClearTokens.Remove(item, out CancellationTokenSource? existing))
+            {
+                return;
+            }
+
+            existing.Cancel();
+            existing.Dispose();
+        }
+    }
+
+    private async Task AutoClearSuccessfulDownloadAfterDelayAsync(DownloadFile item, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(SuccessfulDownloadAutoClearDelay, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        await _uiInvoke(() =>
+        {
+            if (!ShouldAutoClearSuccessfulDownload(item))
+            {
+                CancelAutoClear(item);
+                return;
+            }
+
+            Downloads.Remove(item);
+        }).ConfigureAwait(false);
     }
 
     private void ScheduleStateSave()

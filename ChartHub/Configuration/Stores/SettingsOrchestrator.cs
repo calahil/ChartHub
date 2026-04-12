@@ -83,12 +83,6 @@ public sealed class SettingsOrchestrator : ISettingsOrchestrator, IDisposable
             {
                 RhythmVerseSource = source.Runtime.RhythmVerseSource,
                 UseMockData = source.Runtime.UseMockData,
-                TempDirectory = source.Runtime.TempDirectory,
-                DownloadDirectory = source.Runtime.DownloadDirectory,
-                StagingDirectory = source.Runtime.StagingDirectory,
-                OutputDirectory = source.Runtime.OutputDirectory,
-                CloneHeroDataDirectory = source.Runtime.CloneHeroDataDirectory,
-                CloneHeroSongDirectory = source.Runtime.CloneHeroSongDirectory,
                 ServerApiAuthToken = source.Runtime.ServerApiAuthToken,
                 ServerApiBaseUrl = source.Runtime.ServerApiBaseUrl,
                 InstallLogExpanded = source.Runtime.InstallLogExpanded,

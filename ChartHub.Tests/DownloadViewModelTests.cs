@@ -175,6 +175,87 @@ public class DownloadViewModelTests
     }
 
     [Fact]
+    public async Task RefreshQueue_HidesInstalledAndCompletedJobs()
+    {
+        using var temp = new TemporaryDirectoryFixture("download-vm-hide-installed");
+        using AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            serverApiBaseUrl: "http://127.0.0.1:5001",
+            serverApiAuthToken: "token");
+
+        var fakeClient = new FakeChartHubServerApiClient
+        {
+            Jobs =
+            [
+                new ChartHubServerDownloadJobResponse(
+                    new Guid("33333333-3333-3333-3333-333333333333"),
+                    LibrarySourceNames.RhythmVerse,
+                    "id-a",
+                    "Installed Song",
+                    "https://example.test/song-a",
+                    "Installed",
+                    100,
+                    "/tmp/song-a.zip",
+                    null,
+                    "/tmp/installed/song-a",
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+                new ChartHubServerDownloadJobResponse(
+                    new Guid("44444444-4444-4444-4444-444444444444"),
+                    LibrarySourceNames.RhythmVerse,
+                    "id-b",
+                    "Completed Song",
+                    "https://example.test/song-b",
+                    "Completed",
+                    100,
+                    "/tmp/song-b.zip",
+                    null,
+                    "/tmp/installed/song-b",
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+                new ChartHubServerDownloadJobResponse(
+                    new Guid("55555555-5555-5555-5555-555555555555"),
+                    LibrarySourceNames.RhythmVerse,
+                    "id-c",
+                    "Downloaded Song",
+                    "https://example.test/song-c",
+                    "Downloaded",
+                    100,
+                    "/tmp/song-c.zip",
+                    null,
+                    null,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+            ],
+        };
+
+        var sut = new ViewModels.DownloadViewModel(
+            settings,
+            fakeClient,
+            new SharedDownloadQueue(),
+            uiInvoke: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
+
+        try
+        {
+            bool queueLoaded = await WaitForConditionAsync(() => sut.IngestionQueue.Count == 1, TimeSpan.FromSeconds(2));
+            Assert.True(queueLoaded);
+            Assert.Single(sut.IngestionQueue);
+            Assert.Equal("Downloaded Song", sut.IngestionQueue[0].DisplayName);
+        }
+        finally
+        {
+            await sut.DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task StreamJobUpdates_RefreshesSharedDownloadCardState()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-stream-shared-card");
@@ -287,12 +368,6 @@ public class DownloadViewModelTests
         {
             Runtime = new RuntimeAppConfig
             {
-                TempDirectory = Path.Combine(rootPath, "Temp"),
-                DownloadDirectory = Path.Combine(rootPath, "Downloads"),
-                StagingDirectory = Path.Combine(rootPath, "Staging"),
-                OutputDirectory = Path.Combine(rootPath, "Output"),
-                CloneHeroDataDirectory = Path.Combine(rootPath, "CloneHero"),
-                CloneHeroSongDirectory = Path.Combine(rootPath, "CloneHero", "Songs"),
                 ServerApiBaseUrl = serverApiBaseUrl,
                 ServerApiAuthToken = serverApiAuthToken,
             },

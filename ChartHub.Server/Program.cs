@@ -59,6 +59,7 @@ builder.Services.AddSingleton<IGoogleIdTokenValidator, GoogleIdTokenValidator>()
 builder.Services.AddSingleton<IJwtTokenIssuer, JwtTokenIssuer>();
 builder.Services.AddHttpClient("downloads");
 builder.Services.AddSingleton<ISourceUrlResolver, SourceUrlResolver>();
+builder.Services.AddSingleton<IGoogleDriveFolderArchiveService, GoogleDriveFolderArchiveService>();
 builder.Services.AddSingleton<IDownloadJobStore, SqliteDownloadJobStore>();
 builder.Services.AddSingleton<IServerInstallFileTypeResolver, ServerInstallFileTypeResolver>();
 builder.Services.AddSingleton<IServerSongIniMetadataParser, ServerSongIniMetadataParser>();

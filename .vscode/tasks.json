@@ -107,12 +107,34 @@
             "group": "test"
         },
         {
+            "label": "android-start-emulator",
+            "command": "bash",
+            "type": "shell",
+            "args": [
+                "-lc",
+                "if ! ${HOME}/Android/Sdk/platform-tools/adb devices | grep -q '^emulator-5554\\s'; then setsid -f ${HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save </dev/null >/tmp/charthub-emulator.log 2>&1; fi"
+            ],
+            "problemMatcher": [],
+            "group": "test"
+        },
+        {
+            "label": "android-wait-for-emulator-5554",
+            "command": "bash",
+            "type": "shell",
+            "args": [
+                "-lc",
+                "${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 wait-for-device; until [ \"$(${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')\" = \"1\" ]; do sleep 2; done; until ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd package list packages >/dev/null 2>&1; do sleep 2; done"
+            ],
+            "problemMatcher": [],
+            "group": "test"
+        },
+        {
             "label": "android-ensure-emulator-5554",
             "command": "bash",
             "type": "shell",
             "args": [
                 "-lc",
-                "if ! ${HOME}/Android/Sdk/platform-tools/adb devices | grep -q '^emulator-5554\\s'; then ${HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save >/tmp/charthub-emulator.log 2>&1 & fi; ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 wait-for-device; until [ \"$(${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')\" = \"1\" ]; do sleep 2; done; until ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd package list packages >/dev/null 2>&1; do sleep 2; done"
+                "if ! ${HOME}/Android/Sdk/platform-tools/adb devices | grep -q '^emulator-5554\\s'; then setsid -f ${HOME}/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36 -netdelay none -netspeed full -no-snapshot-load -no-snapshot-save </dev/null >/tmp/charthub-emulator.log 2>&1; fi; ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 wait-for-device; until [ \"$(${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\\r')\" = \"1\" ]; do sleep 2; done; until ${HOME}/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd package list packages >/dev/null 2>&1; do sleep 2; done"
             ],
             "problemMatcher": []
         },

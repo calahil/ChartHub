@@ -118,9 +118,6 @@ public class CloneHeroViewModelTests
         await sut.InitializeAsync();
 
         Assert.NotNull(sut.SelectedSong);
-        Assert.False(sut.ReconcileLibraryCommand.CanExecute(null));
-        Assert.False(sut.ReParseMetadataCommand.CanExecute(null));
-        Assert.False(sut.ReconcileThisSongCommand.CanExecute(null));
         Assert.True(sut.DeleteSongCommand.CanExecute(null));
     }
 
@@ -212,58 +209,27 @@ public class CloneHeroViewModelTests
         AppGlobalSettings settings,
         IChartHubServerApiClient serverApiClient)
     {
-        var catalog = new LibraryCatalogService(Path.Combine(rootPath, "library-catalog.db"));
-        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(rootPath, "library-catalog.db"));
-        var opener = new NoopDesktopPathOpener();
+        _ = rootPath;
         return new CloneHeroViewModel(
-            catalog,
-            ingestionCatalog,
-            opener,
-            new LocalFileDeletionService(),
-            reconciliationService: null,
-            globalSettings: settings,
-            serverApiClient: serverApiClient);
+            settings,
+            serverApiClient,
+            action => { action(); return Task.CompletedTask; });
     }
 
     private static AppGlobalSettings CreateSettings(string rootPath, string baseUrl, string token)
     {
-        string tempDir = Path.Combine(rootPath, "Temp");
-        string downloadDir = Path.Combine(rootPath, "Downloads");
-        string stagingDir = Path.Combine(rootPath, "Staging");
-        string outputDir = Path.Combine(rootPath, "Output");
-        string cloneHeroData = Path.Combine(rootPath, "CloneHero");
-        string cloneHeroSongs = Path.Combine(cloneHeroData, "Songs");
-
-        Directory.CreateDirectory(tempDir);
-        Directory.CreateDirectory(downloadDir);
-        Directory.CreateDirectory(stagingDir);
-        Directory.CreateDirectory(outputDir);
-        Directory.CreateDirectory(cloneHeroSongs);
+        _ = rootPath;
 
         AppConfigRoot config = new()
         {
             Runtime = new RuntimeAppConfig
             {
-                TempDirectory = tempDir,
-                DownloadDirectory = downloadDir,
-                StagingDirectory = stagingDir,
-                OutputDirectory = outputDir,
-                CloneHeroDataDirectory = cloneHeroData,
-                CloneHeroSongDirectory = cloneHeroSongs,
                 ServerApiBaseUrl = baseUrl,
                 ServerApiAuthToken = token,
             },
         };
 
         return new AppGlobalSettings(new FakeSettingsOrchestrator(config));
-    }
-
-    private sealed class NoopDesktopPathOpener : IDesktopPathOpener
-    {
-        public Task OpenDirectoryAsync(string directoryPath, CancellationToken cancellationToken = default)
-        {
-            return Task.CompletedTask;
-        }
     }
 
     private sealed class FakeServerApiClient : IChartHubServerApiClient

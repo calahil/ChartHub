@@ -139,21 +139,10 @@ public static class AppBootstrapper
 #else
         services.AddSingleton<IQrCodeScannerService, NoOpQrCodeScannerService>();
 #endif
-
-        services.AddSingleton<DownloadService>();
         services.AddSingleton<EncoreApiService>();
         services.AddSingleton<SharedDownloadQueue>();
         services.AddSingleton(_ => new LibraryCatalogService(Path.Combine(configDir, "library-catalog.db")));
-        services.AddSingleton(_ => new SongIngestionCatalogService(Path.Combine(configDir, "library-catalog.db")));
-        services.AddSingleton<SongIngestionStateMachine>();
-        services.AddSingleton<ISongIniMetadataParser, SongIniMetadataParser>();
-        services.AddSingleton<ICloneHeroDirectorySchemaService, CloneHeroDirectorySchemaService>();
-        services.AddSingleton<ICloneHeroLibraryReconciliationService, CloneHeroLibraryReconciliationService>();
-        services.AddSingleton<IOnyxPipelineService, OnyxService>();
-        services.AddSingleton<ISongInstallService, SongInstallService>();
-        services.AddSingleton<IDesktopPathOpener, DesktopPathOpener>();
         services.AddSingleton<IChartHubServerApiClient, ChartHubServerApiClient>();
-        services.AddSingleton<ILocalFileDeletionService, LocalFileDeletionService>();
         services.AddSingleton<DownloadViewModel>(serviceProvider =>
             new DownloadViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
@@ -162,11 +151,6 @@ public static class AppBootstrapper
                 serviceProvider.GetService<CloneHeroViewModel>()));
         services.AddSingleton<CloneHeroViewModel>(serviceProvider =>
             new CloneHeroViewModel(
-                serviceProvider.GetRequiredService<LibraryCatalogService>(),
-                serviceProvider.GetRequiredService<SongIngestionCatalogService>(),
-                serviceProvider.GetRequiredService<IDesktopPathOpener>(),
-                serviceProvider.GetRequiredService<ILocalFileDeletionService>(),
-                serviceProvider.GetService<ICloneHeroLibraryReconciliationService>(),
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
                 serviceProvider.GetRequiredService<IChartHubServerApiClient>()));
         services.AddSingleton<SettingsViewModel>();
