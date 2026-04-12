@@ -1,5 +1,9 @@
 version: '3.8'
 
+# This compose file is used by server-dev, server-staging, and server-production
+# deploy jobs in .github/workflows/release.yml. Environment-specific behavior
+# comes from .env.deploy values written by each deploy job.
+
 services:
   charthub-server:
     image: ${CHARTHUB_SERVER_IMAGE:-charthub-server:latest}
@@ -18,7 +22,7 @@ services:
       ServerPaths__DownloadsDir: /charthub/downloads
       ServerPaths__StagingDir: /charthub/staging
       ServerPaths__CloneHeroRoot: /clonehero
-      ServerPaths__SqliteDbPath: /charthub/server.db
+      ServerPaths__SqliteDbPath: /config/server.db
       ServerLogging__LogDirectory: /logs
       ServerLogging__FileName: charthub-server.log
     ports:

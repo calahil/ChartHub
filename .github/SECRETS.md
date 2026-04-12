@@ -67,9 +67,18 @@ These secrets **must be created** before Server deployments are enabled in the w
 
 ### Environment-Level Secrets
 
-**Scope**: Specific to each GitHub Environment (set per environment: `server-staging`, `server-production`)
+**Scope**: Specific to each GitHub Environment (set per environment: `server-dev`, `server-staging`, `server-production`)
 
 These are **per-environment overrides** for host-specific paths and ports. Store these in GitHub Environments, not the repository global secrets.
+
+#### For `server-dev` Environment
+
+| Secret Name | Required | Type | Description | Example |
+|-------------|----------|------|-------------|---------|
+| `CHARTHUB_SERVER_CONFIG_PATH` | ✅ Yes | Path | Host path for ChartHub.Server config directory | `/etc/charthub-server/config-dev` |
+| `CHARTHUB_SERVER_CHARTHUB_ROOT` | ✅ Yes | Path | Host path for ChartHub data (charts, downloads) | `/data/dev/charthub` |
+| `CHARTHUB_SERVER_CLONEHERO_ROOT` | ✅ Yes | Path | Host path for Clone Hero library root | `/data/dev/clonehero` |
+| `CHARTHUB_SERVER_CHARTHUB_PORT` | ✅ Yes | Integer | Exposed port for ChartHub.Server (host) | `5180` |
 
 #### For `server-staging` Environment
 
@@ -79,7 +88,6 @@ These are **per-environment overrides** for host-specific paths and ports. Store
 | `CHARTHUB_SERVER_CHARTHUB_ROOT` | ✅ Yes | Path | Host path for ChartHub data (charts, downloads) | `/data/staging/charthub` or `/mnt/charthub/staging` |
 | `CHARTHUB_SERVER_CLONEHERO_ROOT` | ✅ Yes | Path | Host path for Clone Hero library root | `/data/staging/clonehero` or `/mnt/clonehero/staging` |
 | `CHARTHUB_SERVER_CHARTHUB_PORT` | ✅ Yes | Integer | Exposed port for ChartHub.Server (host) | `5180` |
-| `CHARTHUB_SERVER_SQLITE_DB_PATH` | ✅ Yes | Path | Host path for Server's SQLite database file | `/data/staging/charthub/server.db` (contained within `CHARTHUB_SERVER_CHARTHUB_ROOT`) |
 
 #### For `server-production` Environment
 
@@ -89,10 +97,9 @@ These are **per-environment overrides** for host-specific paths and ports. Store
 | `CHARTHUB_SERVER_CHARTHUB_ROOT` | ✅ Yes | Path | Host path for ChartHub data (charts, downloads) | `/data/charthub` or `/mnt/charthub/prod` |
 | `CHARTHUB_SERVER_CLONEHERO_ROOT` | ✅ Yes | Path | Host path for Clone Hero library root | `/data/clonehero` or `/mnt/clonehero/prod` |
 | `CHARTHUB_SERVER_CHARTHUB_PORT` | ✅ Yes | Integer | Exposed port for ChartHub.Server (host) | `5180` |
-| `CHARTHUB_SERVER_SQLITE_DB_PATH` | ✅ Yes | Path | Host path for Server's SQLite database file | `/data/charthub/server.db` (contained within `CHARTHUB_SERVER_CHARTHUB_ROOT`) |
 
 **How Used**:
-- Loaded by `deploy-server-staging` and `deploy-server-production` jobs
+- Loaded by `deploy-server-dev`, `deploy-server-staging`, and `deploy-server-production` jobs
 - Written to `.env.deploy` file
 - Passed to docker-compose as environment variables
 - Mounted as volumes on the container
@@ -133,6 +140,7 @@ These are **per-environment overrides** for host-specific paths and ports. Store
 ### ChartHub.Server Environment-Level Secrets (Create)
 
 1. **Create GitHub Environments** (see [.github/ENVIRONMENTS.md](.github/ENVIRONMENTS.md) for detailed steps):
+   - `server-dev`
    - `server-staging`
    - `server-production`
 
@@ -162,7 +170,6 @@ When `release.yml` deployment jobs run, they convert GitHub secrets into environ
 | `CHARTHUB_SERVER_CONFIG_PATH` | `ServerPaths__ConfigRoot` | `ServerPaths:ConfigRoot` | `/etc/charthub-server/config` |
 | `CHARTHUB_SERVER_CHARTHUB_ROOT` | `ServerPaths__ChartHubRoot` | `ServerPaths:ChartHubRoot` | `/data/charthub` |
 | `CHARTHUB_SERVER_CLONEHERO_ROOT` | `ServerPaths__CloneHeroRoot` | `ServerPaths:CloneHeroRoot` | `/data/clonehero` |
-| `CHARTHUB_SERVER_SQLITE_DB_PATH` | `ConnectionStrings__DefaultConnection` | `ConnectionStrings:DefaultConnection` | `Data Source=/data/charthub/server.db` |
 
 ### Volume Mounts in docker-compose
 
@@ -173,7 +180,6 @@ docker-compose binds host paths to container paths:
 | `CHARTHUB_SERVER_CONFIG_PATH` | `/etc/charthub-server/config` | `/config` | Runtime app configuration |
 | `CHARTHUB_SERVER_CHARTHUB_ROOT` | `/data/charthub` | `/charthub` | Chart charts, downloads, staging |
 | `CHARTHUB_SERVER_CLONEHERO_ROOT` | `/data/clonehero` | `/clonehero` | Clone Hero library |
-| `CHARTHUB_SERVER_SQLITE_DB_PATH` | `/data/charthub/server.db` | Container SQLite db location | App SQLite database |
 
 ---
 
@@ -183,8 +189,8 @@ Before deploying, verify:
 
 - [ ] All 12 **BackupApi secrets** are present in Repo Settings → Secrets
 - [ ] All 7 **ChartHub.Server repository-level secrets** are present
-- [ ] **GitHub Environments** (`backup-api-dev`, `backup-api-staging`, `backup-api-production`, `server-staging`, `server-production`) are created
-- [ ] Environment-level secrets are set for `server-staging` and `server-production` (5 path/port secrets each)
+- [ ] **GitHub Environments** (`backup-api-dev`, `backup-api-staging`, `backup-api-production`, `server-dev`, `server-staging`, `server-production`) are created
+- [ ] Environment-level secrets are set for `server-dev`, `server-staging`, and `server-production` (4 path/port secrets each)
 - [ ] Host paths for Server exist or will be created on the runner host
 - [ ] Google OAuth credentials are valid and accessible
 

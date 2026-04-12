@@ -12,12 +12,13 @@ GitHub Environments provide:
 - **Deployment protection rules**: Limit which branches/tags can deploy
 - **Audit trail**: Track who approved what and when
 
-We need **5 environments**:
+We need **6 environments**:
 1. `backup-api-dev` (no approval)
 2. `backup-api-staging` (requires approval)
 3. `backup-api-production` (requires approval)
-4. `server-staging` (requires approval, once runner is ready)
-5. `server-production` (requires approval, once runner is ready)
+4. `server-dev` (no approval)
+5. `server-staging` (requires approval, once runner is ready)
+6. `server-production` (requires approval, once runner is ready)
 
 ---
 
@@ -96,7 +97,27 @@ Return to Environments page.
 
 ---
 
-### 5. Create `server-staging`
+### 5. Create `server-dev`
+
+1. Click **New environment**
+2. **Name**: `server-dev`
+3. Click **Configure environment**
+
+**Configuration**:
+- **Deployment branches and tags**: Leave as default (allow all)
+- **Required reviewers**: ❌ **Do NOT check** (dev should auto-deploy without approval)
+- **Prevent forking repositories**: Leave unchecked
+- Click **Save protection rules**
+
+**Then add environment-specific secrets** (see [Add Environment Secrets](#add-environment-secrets)):
+- `CHARTHUB_SERVER_CONFIG_PATH`
+- `CHARTHUB_SERVER_CHARTHUB_ROOT`
+- `CHARTHUB_SERVER_CLONEHERO_ROOT`
+- `CHARTHUB_SERVER_CHARTHUB_PORT`
+
+---
+
+### 6. Create `server-staging`
 
 1. Click **New environment**
 2. **Name**: `server-staging`
@@ -115,11 +136,10 @@ Return to Environments page.
 - `CHARTHUB_SERVER_CHARTHUB_ROOT`
 - `CHARTHUB_SERVER_CLONEHERO_ROOT`
 - `CHARTHUB_SERVER_CHARTHUB_PORT`
-- `CHARTHUB_SERVER_SQLITE_DB_PATH`
 
 ---
 
-### 6. Create `server-production`
+### 7. Create `server-production`
 
 1. Click **New environment**
 2. **Name**: `server-production`
@@ -139,7 +159,6 @@ Return to Environments page.
 - `CHARTHUB_SERVER_CHARTHUB_ROOT`
 - `CHARTHUB_SERVER_CLONEHERO_ROOT`
 - `CHARTHUB_SERVER_CHARTHUB_PORT`
-- `CHARTHUB_SERVER_SQLITE_DB_PATH`
 
 ---
 
@@ -147,13 +166,30 @@ Return to Environments page.
 
 Environment secrets are specific to a particular environment and override repository-level secrets when that environment is used.
 
+### For `server-dev`:
+
+1. Go to **Settings** → **Environments** → **server-dev**
+2. Scroll to **Environment secrets**
+3. Click **Add environment secret** (or **New secret** button)
+
+Add these **4 secrets** (use dev-specific paths/port):
+
+| Secret Name | Example Value |
+|-------------|---------------|
+| `CHARTHUB_SERVER_CONFIG_PATH` | `/etc/charthub-server/config-dev` |
+| `CHARTHUB_SERVER_CHARTHUB_ROOT` | `/data/dev/charthub` |
+| `CHARTHUB_SERVER_CLONEHERO_ROOT` | `/data/dev/clonehero` |
+| `CHARTHUB_SERVER_CHARTHUB_PORT` | `5180` |
+
+For each, click **Add secret**, enter the name and value, then click **Add secret**.
+
 ### For `server-staging`:
 
 1. Go to **Settings** → **Environments** → **server-staging**
 2. Scroll to **Environment secrets**
 3. Click **Add environment secret** (or **New secret** button)
 
-Add these **5 secrets** (use staging-specific paths/ports):
+Add these **4 secrets** (use staging-specific paths/ports):
 
 | Secret Name | Example Value |
 |-------------|---------------|
@@ -161,7 +197,6 @@ Add these **5 secrets** (use staging-specific paths/ports):
 | `CHARTHUB_SERVER_CHARTHUB_ROOT` | `/data/staging/charthub` |
 | `CHARTHUB_SERVER_CLONEHERO_ROOT` | `/data/staging/clonehero` |
 | `CHARTHUB_SERVER_CHARTHUB_PORT` | `5180` |
-| `CHARTHUB_SERVER_SQLITE_DB_PATH` | `/data/staging/charthub/server.db` |
 
 For each, click **Add secret**, enter the name and value, then click **Add secret**.
 
@@ -171,7 +206,7 @@ For each, click **Add secret**, enter the name and value, then click **Add secre
 2. Scroll to **Environment secrets**
 3. Click **Add environment secret**
 
-Add the **same 5 secrets** (use production-specific paths/ports):
+Add the **same 4 secrets** (use production-specific paths/ports):
 
 | Secret Name | Example Value |
 |-------------|---------------|
@@ -179,7 +214,6 @@ Add the **same 5 secrets** (use production-specific paths/ports):
 | `CHARTHUB_SERVER_CHARTHUB_ROOT` | `/data/charthub` |
 | `CHARTHUB_SERVER_CLONEHERO_ROOT` | `/data/clonehero` |
 | `CHARTHUB_SERVER_CHARTHUB_PORT` | `5180` |
-| `CHARTHUB_SERVER_SQLITE_DB_PATH` | `/data/charthub/server.db` |
 
 ---
 
@@ -188,16 +222,17 @@ Add the **same 5 secrets** (use production-specific paths/ports):
 After creating all environments and secrets:
 
 1. Go to **Settings** → **Environments**
-2. You should see **5 environments**:
+2. You should see **6 environments**:
    - ✅ `backup-api-dev`
    - ✅ `backup-api-staging`
    - ✅ `backup-api-production`
+  - ✅ `server-dev`
    - ✅ `server-staging`
    - ✅ `server-production`
 
 3. Click each environment to verify:
    - Protection rules are configured (tag matching, reviewer requirements)
-   - Environment secrets are populated (for `server-staging` and `server-production`)
+  - Environment secrets are populated (for `server-dev`, `server-staging`, and `server-production`)
 
 4. Go to **Settings** → **Secrets and variables** → **Actions**
 5. Verify **all 7 repository-level ChartHub.Server secrets** are present:
