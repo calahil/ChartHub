@@ -65,22 +65,6 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     public List<string?> Difficulties { get; } = [null, "0", "1", "2", "3", "4", "5", "6"];
     public List<string?> DrumTypes { get; } = [null, "pro-drums", "five-lane"];
 
-    private string _downloadStatusMessage = string.Empty;
-    public string DownloadStatusMessage
-    {
-        get => _downloadStatusMessage;
-        private set
-        {
-            if (_downloadStatusMessage == value)
-            {
-                return;
-            }
-
-            _downloadStatusMessage = value;
-            OnPropertyChanged();
-        }
-    }
-
     public string SearchText
     {
         get => _searchText;
@@ -603,14 +587,12 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
         EncoreSong? selected = song ?? SelectedSong;
         if (selected is null)
         {
-            DownloadStatusMessage = "Select a song to download.";
             return;
         }
 
         if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
             Logger.LogWarning("ServerDownload", "Cannot queue Encore download because sync API endpoint/token is not configured.");
-            DownloadStatusMessage = "Configure ChartHub Server URL and token in Settings to download songs.";
             return;
         }
 
@@ -621,7 +603,6 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
                 ["sourceId"] = selected.SourceId,
                 ["downloadUrlPresent"] = !string.IsNullOrWhiteSpace(selected.DownloadUrl),
             });
-            DownloadStatusMessage = "Song metadata is incomplete. Cannot download.";
             return;
         }
 
@@ -663,12 +644,10 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
                 ["stage"] = job.Stage,
                 ["baseUrl"] = baseUrl,
             });
-            DownloadStatusMessage = string.Empty;
             selected.IsInLibrary = false;
         }
         catch (Exception ex)
         {
-            DownloadStatusMessage = "Failed to queue download on server. Check connectivity and token.";
             Logger.LogError("ServerDownload", "Failed to submit Encore download job to server", ex, new Dictionary<string, object?>
             {
                 ["source"] = LibrarySourceNames.Encore,
