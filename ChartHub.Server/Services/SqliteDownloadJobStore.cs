@@ -29,7 +29,15 @@ public interface IDownloadJobStore
 
     void MarkStaged(Guid jobId, string stagedPath);
 
-    void MarkInstalled(Guid jobId, string installedPath);
+    void MarkInstalled(
+        Guid jobId,
+        string installedPath,
+        string? installedRelativePath = null,
+        string? artist = null,
+        string? title = null,
+        string? charter = null,
+        string? sourceMd5 = null,
+        string? sourceChartHash = null);
 
     void MarkCancelled(Guid jobId);
 
@@ -84,6 +92,12 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     stage,
                     progress_percent,
                     cancel_requested,
+                    artist,
+                    title,
+                    charter,
+                    source_md5,
+                    source_chart_hash,
+                    installed_relative_path,
                     created_at_utc,
                     updated_at_utc
                 ) VALUES (
@@ -95,6 +109,12 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     $stage,
                     $progressPercent,
                     0,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
                     $createdAtUtc,
                     $updatedAtUtc
                 );
@@ -132,6 +152,12 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     downloaded_path,
                     staged_path,
                     installed_path,
+                    installed_relative_path,
+                    artist,
+                    title,
+                    charter,
+                    source_md5,
+                    source_chart_hash,
                     error,
                     created_at_utc,
                     updated_at_utc
@@ -168,6 +194,12 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     downloaded_path,
                     staged_path,
                     installed_path,
+                    installed_relative_path,
+                    artist,
+                    title,
+                    charter,
+                    source_md5,
+                    source_chart_hash,
                     error,
                     created_at_utc,
                     updated_at_utc
@@ -255,6 +287,12 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     downloaded_path,
                     staged_path,
                     installed_path,
+                    installed_relative_path,
+                    artist,
+                    title,
+                    charter,
+                    source_md5,
+                    source_chart_hash,
                     error,
                     created_at_utc,
                     updated_at_utc
@@ -344,7 +382,15 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
         }
     }
 
-    public void MarkInstalled(Guid jobId, string installedPath)
+    public void MarkInstalled(
+        Guid jobId,
+        string installedPath,
+        string? installedRelativePath = null,
+        string? artist = null,
+        string? title = null,
+        string? charter = null,
+        string? sourceMd5 = null,
+        string? sourceChartHash = null)
     {
         lock (_syncLock)
         {
@@ -355,6 +401,12 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                 UPDATE download_jobs
                 SET
                     installed_path = $installedPath,
+                    installed_relative_path = $installedRelativePath,
+                    artist = COALESCE($artist, artist),
+                    title = COALESCE($title, title),
+                    charter = COALESCE($charter, charter),
+                    source_md5 = COALESCE($sourceMd5, source_md5),
+                    source_chart_hash = COALESCE($sourceChartHash, source_chart_hash),
                     stage = 'Installed',
                     progress_percent = 100,
                     completed_at_utc = $completedAtUtc,
@@ -363,6 +415,12 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                 """;
             command.Parameters.AddWithValue("$jobId", jobId.ToString("D"));
             command.Parameters.AddWithValue("$installedPath", installedPath);
+            command.Parameters.AddWithValue("$installedRelativePath", DbValueOrNull(installedRelativePath));
+            command.Parameters.AddWithValue("$artist", DbValueOrNull(artist));
+            command.Parameters.AddWithValue("$title", DbValueOrNull(title));
+            command.Parameters.AddWithValue("$charter", DbValueOrNull(charter));
+            command.Parameters.AddWithValue("$sourceMd5", DbValueOrNull(sourceMd5));
+            command.Parameters.AddWithValue("$sourceChartHash", DbValueOrNull(sourceChartHash));
             command.Parameters.AddWithValue("$completedAtUtc", now.ToString("O"));
             command.Parameters.AddWithValue("$updatedAtUtc", now.ToString("O"));
             command.ExecuteNonQuery();
@@ -453,6 +511,12 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     downloaded_path TEXT NULL,
                     staged_path TEXT NULL,
                     installed_path TEXT NULL,
+                    installed_relative_path TEXT NULL,
+                    artist TEXT NULL,
+                    title TEXT NULL,
+                    charter TEXT NULL,
+                    source_md5 TEXT NULL,
+                    source_chart_hash TEXT NULL,
                     error TEXT NULL,
                     created_at_utc TEXT NOT NULL,
                     updated_at_utc TEXT NOT NULL,
@@ -463,6 +527,13 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                 CREATE INDEX IF NOT EXISTS idx_download_jobs_updated ON download_jobs(updated_at_utc);
                 """;
             command.ExecuteNonQuery();
+
+            EnsureColumnExists(connection, "installed_relative_path", "TEXT NULL");
+            EnsureColumnExists(connection, "artist", "TEXT NULL");
+            EnsureColumnExists(connection, "title", "TEXT NULL");
+            EnsureColumnExists(connection, "charter", "TEXT NULL");
+            EnsureColumnExists(connection, "source_md5", "TEXT NULL");
+            EnsureColumnExists(connection, "source_chart_hash", "TEXT NULL");
 
             using SqliteCommand migrateLegacy = connection.CreateCommand();
             migrateLegacy.CommandText = """
@@ -529,6 +600,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     downloaded_path = CASE WHEN $clearPaths = 1 THEN NULL ELSE downloaded_path END,
                     staged_path = CASE WHEN $clearPaths = 1 THEN NULL ELSE staged_path END,
                     installed_path = CASE WHEN $clearPaths = 1 THEN NULL ELSE installed_path END,
+                    installed_relative_path = CASE WHEN $clearPaths = 1 THEN NULL ELSE installed_relative_path END,
                     completed_at_utc = CASE WHEN $stage IN ('Installed', 'Failed', 'Cancelled') THEN COALESCE(completed_at_utc, $completedAtUtc) ELSE NULL END,
                     updated_at_utc = $updatedAtUtc
                 WHERE job_id = $jobId;
@@ -559,9 +631,41 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             DownloadedPath = reader.IsDBNull(7) ? null : reader.GetString(7),
             StagedPath = reader.IsDBNull(8) ? null : reader.GetString(8),
             InstalledPath = reader.IsDBNull(9) ? null : reader.GetString(9),
-            Error = reader.IsDBNull(10) ? null : reader.GetString(10),
-            CreatedAtUtc = DateTimeOffset.Parse(reader.GetString(11)),
-            UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(12)),
+            InstalledRelativePath = reader.IsDBNull(10) ? null : reader.GetString(10),
+            Artist = reader.IsDBNull(11) ? null : reader.GetString(11),
+            Title = reader.IsDBNull(12) ? null : reader.GetString(12),
+            Charter = reader.IsDBNull(13) ? null : reader.GetString(13),
+            SourceMd5 = reader.IsDBNull(14) ? null : reader.GetString(14),
+            SourceChartHash = reader.IsDBNull(15) ? null : reader.GetString(15),
+            Error = reader.IsDBNull(16) ? null : reader.GetString(16),
+            CreatedAtUtc = DateTimeOffset.Parse(reader.GetString(17)),
+            UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(18)),
         };
+    }
+
+    private static object DbValueOrNull(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? DBNull.Value
+            : value.Trim();
+    }
+
+    private static void EnsureColumnExists(SqliteConnection connection, string columnName, string columnDefinition)
+    {
+        using SqliteCommand pragma = connection.CreateCommand();
+        pragma.CommandText = "PRAGMA table_info(download_jobs);";
+        using SqliteDataReader reader = pragma.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+        }
+
+        reader.Close();
+        using SqliteCommand alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE download_jobs ADD COLUMN {columnName} {columnDefinition};";
+        alter.ExecuteNonQuery();
     }
 }

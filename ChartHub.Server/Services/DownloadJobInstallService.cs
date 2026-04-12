@@ -16,7 +16,16 @@ public interface IDownloadJobInstallService
     Task<DownloadJobInstallResult> InstallJobAsync(DownloadJobResponse job, CancellationToken cancellationToken = default);
 }
 
-public sealed record DownloadJobInstallResult(string StagedPath, string InstalledPath);
+public sealed record DownloadJobInstallResult(
+    string StagedPath,
+    string InstalledPath,
+    string InstalledRelativePath,
+    ServerSongMetadata Metadata);
+
+public sealed record ServerRehomeInstallResult(
+    string InstalledPath,
+    string InstalledRelativePath,
+    ServerSongMetadata Metadata);
 
 public sealed partial class DownloadJobInstallService : IDownloadJobInstallService
 {
@@ -72,7 +81,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
             string source = _schemaService.NormalizeSource(job.Source);
             InstallLog.ArtifactTypeResolved(_logger, job.JobId, type, source);
 
-            string installedPath = type switch
+            ServerRehomeInstallResult installedPath = type switch
             {
                 ServerInstallFileType.Zip or ServerInstallFileType.Rar or ServerInstallFileType.SevenZip
                     => await InstallArchiveAsync(stagedPath, source, cancellationToken).ConfigureAwait(false),
@@ -81,8 +90,12 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
                 _ => throw new InvalidOperationException("Unsupported install artifact format."),
             };
 
-            InstallLog.InstallCompleted(_logger, job.JobId, installedPath);
-            return new DownloadJobInstallResult(stagedPath, installedPath);
+            InstallLog.InstallCompleted(_logger, job.JobId, installedPath.InstalledPath);
+            return new DownloadJobInstallResult(
+                stagedPath,
+                installedPath.InstalledPath,
+                installedPath.InstalledRelativePath,
+                installedPath.Metadata);
         }
         catch (Exception ex)
         {
@@ -91,7 +104,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         }
     }
 
-    private async Task<string> InstallArchiveAsync(string artifactPath, string source, CancellationToken cancellationToken)
+    private async Task<ServerRehomeInstallResult> InstallArchiveAsync(string artifactPath, string source, CancellationToken cancellationToken)
     {
         string installWorkspace = Path.Combine(_stagingDir, "install", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(installWorkspace);
@@ -125,7 +138,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         }
     }
 
-    private async Task<string> InstallOnyxAsync(string artifactPath, string source, CancellationToken cancellationToken)
+    private async Task<ServerRehomeInstallResult> InstallOnyxAsync(string artifactPath, string source, CancellationToken cancellationToken)
     {
         InstallLog.OnyxInstallStarted(_logger, artifactPath, source);
         ServerOnyxInstallResult result = await _onyxInstallService.ConvertAsync(artifactPath, source, cancellationToken).ConfigureAwait(false);
@@ -133,7 +146,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         return await RehomeInstalledDirectoryAsync(result.OutputDirectory, source, Path.GetFileNameWithoutExtension(artifactPath), cancellationToken, result.Metadata).ConfigureAwait(false);
     }
 
-    private Task<string> RehomeInstalledDirectoryAsync(
+    private Task<ServerRehomeInstallResult> RehomeInstalledDirectoryAsync(
         string currentDirectory,
         string source,
         string? fallbackTitle,
@@ -163,7 +176,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
 
         if (string.Equals(layout.FullPath, currentDirectory, StringComparison.Ordinal))
         {
-            return Task.FromResult(currentDirectory);
+            return Task.FromResult(new ServerRehomeInstallResult(currentDirectory, layout.RelativePath, metadata));
         }
 
         string? parent = Path.GetDirectoryName(layout.FullPath);
@@ -174,7 +187,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
 
         Directory.Move(currentDirectory, layout.FullPath);
         InstallLog.RehomedInstallDirectory(_logger, currentDirectory, layout.FullPath, layout.RelativePath);
-        return Task.FromResult(layout.FullPath);
+        return Task.FromResult(new ServerRehomeInstallResult(layout.FullPath, layout.RelativePath, metadata));
     }
 
     private string MoveArtifactToStaging(Guid jobId, string artifactPath)

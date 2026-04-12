@@ -14,7 +14,7 @@ public class CloneHeroViewModelTests
     public void InitialState_ShowsStartupBlockingState()
     {
         using var temp = new TemporaryDirectoryFixture("clonehero-vm-initial");
-        CloneHeroViewModel sut = CreateViewModel(temp.RootPath, new ImmediateReconciliationService());
+        CloneHeroViewModel sut = CreateViewModel(temp.RootPath, CreateSettings(temp.RootPath, string.Empty, string.Empty), new FakeServerApiClient());
 
         Assert.False(sut.HasInitialized);
         Assert.True(sut.ShowStartupBlockingState);
@@ -22,73 +22,58 @@ public class CloneHeroViewModelTests
     }
 
     [Fact]
-    public async Task InitializeAsync_ShowsBlockingStateUntilReconciliationCompletes()
+    public async Task InitializeAsync_WithoutServerConnection_ShowsConfigurationMessage()
     {
-        using var temp = new TemporaryDirectoryFixture("clonehero-vm-startup-block");
-        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        CloneHeroViewModel sut = CreateViewModel(temp.RootPath, new GatedReconciliationService(gate.Task));
+        using var temp = new TemporaryDirectoryFixture("clonehero-vm-no-server");
+        CloneHeroViewModel sut = CreateViewModel(temp.RootPath, CreateSettings(temp.RootPath, string.Empty, string.Empty), new FakeServerApiClient());
 
-        Task initTask = sut.InitializeAsync();
-
-        Assert.True(SpinWait.SpinUntil(() => sut.IsStartupScanInProgress, TimeSpan.FromSeconds(2)));
-        Assert.True(sut.ShowStartupBlockingState);
-
-        gate.SetResult();
-        await initTask;
+        await sut.InitializeAsync();
 
         Assert.True(sut.HasInitialized);
-        Assert.False(sut.IsStartupScanInProgress);
-        Assert.False(sut.ShowStartupBlockingState);
+        Assert.Empty(sut.Artists);
+        Assert.Empty(sut.Songs);
+        Assert.Contains("Configure ChartHub.Server URL and token", sut.ReconciliationStatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task ReParseMetadataCommand_IsDisabled_WhenNoSongSelected()
+    public async Task InitializeAsync_LoadsArtistsAndFiltersSongsFromServer()
     {
-        using var temp = new TemporaryDirectoryFixture("clonehero-vm-reparse-guard");
-        CloneHeroViewModel sut = CreateViewModel(temp.RootPath, new ImmediateReconciliationService());
-        await sut.InitializeAsync();
+        using var temp = new TemporaryDirectoryFixture("clonehero-vm-server-filter");
+        var fakeServer = new FakeServerApiClient();
+        fakeServer.Songs =
+        [
+            new ChartHubServerCloneHeroSongResponse(
+                SongId: "song-a-1",
+                Source: "rhythmverse",
+                SourceId: "rv-a1",
+                Artist: "Artist A",
+                Title: "Song One",
+                Charter: "Charter A",
+                SourceMd5: null,
+                SourceChartHash: null,
+                SourceUrl: "https://example.test/a1",
+                InstalledPath: "/songs/Artist A/Song One/Charter A__rhythmverse",
+                InstalledRelativePath: "Artist A/Song One/Charter A__rhythmverse",
+                UpdatedAtUtc: DateTimeOffset.UtcNow),
+            new ChartHubServerCloneHeroSongResponse(
+                SongId: "song-b-1",
+                Source: "encore",
+                SourceId: "encore|chartId=5|md5=abcd",
+                Artist: "Artist B",
+                Title: "Song Two",
+                Charter: "Charter B",
+                SourceMd5: "abcd",
+                SourceChartHash: null,
+                SourceUrl: "https://example.test/b1",
+                InstalledPath: "/songs/Artist B/Song Two/Charter B__encore",
+                InstalledRelativePath: "Artist B/Song Two/Charter B__encore",
+                UpdatedAtUtc: DateTimeOffset.UtcNow),
+        ];
 
-        Assert.Null(sut.SelectedSong);
-        Assert.False(sut.ReParseMetadataCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public async Task ReconcileThisSongCommand_IsDisabled_WhenNoSongSelected()
-    {
-        using var temp = new TemporaryDirectoryFixture("clonehero-vm-reconcilethis-guard");
-        CloneHeroViewModel sut = CreateViewModel(temp.RootPath, new ImmediateReconciliationService());
-        await sut.InitializeAsync();
-
-        Assert.Null(sut.SelectedSong);
-        Assert.False(sut.ReconcileThisSongCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public async Task InitializeAsync_LoadsArtistsAndFiltersSongsBySelectedArtist()
-    {
-        using var temp = new TemporaryDirectoryFixture("clonehero-vm-artist-filter");
-        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
-        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
-
-        await catalog.UpsertAsync(new LibraryCatalogEntry(
-            Source: LibrarySourceNames.RhythmVerse,
-            SourceId: "artist-a-song-1",
-            Title: "Song One",
-            Artist: "Artist A",
-            Charter: "Charter A",
-            LocalPath: Path.Combine(temp.RootPath, "songs", "Artist A", "Song One", "Charter A__rhythmverse"),
-            AddedAtUtc: DateTimeOffset.UtcNow));
-
-        await catalog.UpsertAsync(new LibraryCatalogEntry(
-            Source: LibrarySourceNames.RhythmVerse,
-            SourceId: "artist-b-song-1",
-            Title: "Song Two",
-            Artist: "Artist B",
-            Charter: "Charter B",
-            LocalPath: Path.Combine(temp.RootPath, "songs", "Artist B", "Song Two", "Charter B__rhythmverse"),
-            AddedAtUtc: DateTimeOffset.UtcNow));
-
-        var sut = new CloneHeroViewModel(catalog, ingestionCatalog, new NoopDesktopPathOpener(), new LocalFileDeletionService(), new ImmediateReconciliationService());
+        CloneHeroViewModel sut = CreateViewModel(
+            temp.RootPath,
+            CreateSettings(temp.RootPath, "http://localhost:5000", "token"),
+            fakeServer);
 
         await sut.InitializeAsync();
 
@@ -102,75 +87,175 @@ public class CloneHeroViewModelTests
     }
 
     [Fact]
-    public async Task ReParseMetadataCommand_SetsStatusMessage_AfterCompletion()
+    public async Task DeleteCommand_IsEnabledInServerMode_WhenSongSelected()
     {
-        using var temp = new TemporaryDirectoryFixture("clonehero-vm-reparse-status");
-        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        using var temp = new TemporaryDirectoryFixture("clonehero-vm-delete-enabled");
+        var fakeServer = new FakeServerApiClient
+        {
+            Songs =
+            [
+                new ChartHubServerCloneHeroSongResponse(
+                    SongId: "song-a-1",
+                    Source: "rhythmverse",
+                    SourceId: "rv-a1",
+                    Artist: "Artist A",
+                    Title: "Song One",
+                    Charter: "Charter A",
+                    SourceMd5: null,
+                    SourceChartHash: null,
+                    SourceUrl: "https://example.test/a1",
+                    InstalledPath: "/songs/Artist A/Song One/Charter A__rhythmverse",
+                    InstalledRelativePath: "Artist A/Song One/Charter A__rhythmverse",
+                    UpdatedAtUtc: DateTimeOffset.UtcNow),
+            ],
+        };
 
-        // Seed a catalog entry so SelectedSong gets populated after init
-        string songDir = Path.Combine(temp.RootPath, "songs", "Artista", "Titulo", "Charter__rhythmverse");
-        Directory.CreateDirectory(songDir);
-        File.WriteAllText(Path.Combine(songDir, "song.ini"), "[song]\nartist = Artista\ntitle = Titulo\ncharter = Charter\n");
-        await catalog.UpsertAsync(new LibraryCatalogEntry(
-            Source: LibrarySourceNames.RhythmVerse, SourceId: "test-id",
-            Title: "Titulo", Artist: "Artista", Charter: "Charter",
-            LocalPath: songDir, AddedAtUtc: DateTimeOffset.UtcNow));
+        CloneHeroViewModel sut = CreateViewModel(
+            temp.RootPath,
+            CreateSettings(temp.RootPath, "http://localhost:5000", "token"),
+            fakeServer);
 
-        var opener = new NoopDesktopPathOpener();
-        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
-        var sut = new CloneHeroViewModel(catalog, ingestionCatalog, opener, new LocalFileDeletionService(), new ImmediateReconciliationService());
         await sut.InitializeAsync();
 
-        // SelectedSong should now be set (at least one artist/song was seeded)
         Assert.NotNull(sut.SelectedSong);
-
-        await sut.ReParseMetadataCommand.ExecuteAsync(null);
-
-        Assert.Contains("Metadata updated", sut.ReconciliationStatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.False(sut.ReconcileLibraryCommand.CanExecute(null));
+        Assert.False(sut.ReParseMetadataCommand.CanExecute(null));
+        Assert.False(sut.ReconcileThisSongCommand.CanExecute(null));
+        Assert.True(sut.DeleteSongCommand.CanExecute(null));
     }
 
     [Fact]
-    public async Task DeleteSongCommand_DeletesLocalPathAndRemovesCatalogEntries()
+    public async Task DeleteSongCommand_CallsServerDeleteAndRefreshesSongs()
     {
-        using var temp = new TemporaryDirectoryFixture("clonehero-vm-delete-song");
-        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
-        var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+        using var temp = new TemporaryDirectoryFixture("clonehero-vm-delete-calls-server");
+        var fakeServer = new FakeServerApiClient
+        {
+            Songs =
+            [
+                new ChartHubServerCloneHeroSongResponse(
+                    SongId: "song-a-1",
+                    Source: "rhythmverse",
+                    SourceId: "rv-a1",
+                    Artist: "Artist A",
+                    Title: "Song One",
+                    Charter: "Charter A",
+                    SourceMd5: null,
+                    SourceChartHash: null,
+                    SourceUrl: "https://example.test/a1",
+                    InstalledPath: "/songs/Artist A/Song One/Charter A__rhythmverse",
+                    InstalledRelativePath: "Artist A/Song One/Charter A__rhythmverse",
+                    UpdatedAtUtc: DateTimeOffset.UtcNow),
+            ],
+        };
 
-        string songDir = Path.Combine(temp.RootPath, "songs", "Delete Artist", "Delete Song", "Delete Charter__rhythmverse");
-        Directory.CreateDirectory(songDir);
-        File.WriteAllText(Path.Combine(songDir, "song.ini"), "[song]\nartist = Delete Artist\ntitle = Delete Song\ncharter = Delete Charter\n");
+        CloneHeroViewModel sut = CreateViewModel(
+            temp.RootPath,
+            CreateSettings(temp.RootPath, "http://localhost:5000", "token"),
+            fakeServer);
 
-        await catalog.UpsertAsync(new LibraryCatalogEntry(
-            Source: LibrarySourceNames.RhythmVerse,
-            SourceId: "delete-source-id",
-            Title: "Delete Song",
-            Artist: "Delete Artist",
-            Charter: "Delete Charter",
-            LocalPath: songDir,
-            AddedAtUtc: DateTimeOffset.UtcNow));
-
-        SongIngestionRecord ingestion = await ingestionCatalog.GetOrCreateIngestionAsync(
-            source: LibrarySourceNames.RhythmVerse,
-            sourceId: "delete-source-id",
-            sourceLink: "https://example.com/delete-song");
-
-        var sut = new CloneHeroViewModel(catalog, ingestionCatalog, new NoopDesktopPathOpener(), new LocalFileDeletionService(), new ImmediateReconciliationService());
         await sut.InitializeAsync();
-
         Assert.NotNull(sut.SelectedSong);
+
         await sut.DeleteSongCommand.ExecuteAsync(null);
 
-        Assert.False(Directory.Exists(songDir));
-        Assert.False(await catalog.IsInLibraryAsync(LibrarySourceNames.RhythmVerse, "delete-source-id"));
-        Assert.Null(await ingestionCatalog.GetIngestionByIdAsync(ingestion.Id));
+        Assert.Single(fakeServer.DeletedSongIds);
+        Assert.Equal("song-a-1", fakeServer.DeletedSongIds[0]);
+        Assert.Empty(sut.Songs);
+        Assert.Contains("deleted from server library", sut.ReconciliationStatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static CloneHeroViewModel CreateViewModel(string rootPath, ICloneHeroLibraryReconciliationService reconciliationService)
+    [Fact]
+    public async Task RestoreLastDeletedSongCommand_RestoresSongInServerLibrary()
+    {
+        using var temp = new TemporaryDirectoryFixture("clonehero-vm-restore-last");
+        var fakeServer = new FakeServerApiClient
+        {
+            Songs =
+            [
+                new ChartHubServerCloneHeroSongResponse(
+                    SongId: "song-a-1",
+                    Source: "rhythmverse",
+                    SourceId: "rv-a1",
+                    Artist: "Artist A",
+                    Title: "Song One",
+                    Charter: "Charter A",
+                    SourceMd5: null,
+                    SourceChartHash: null,
+                    SourceUrl: "https://example.test/a1",
+                    InstalledPath: "/songs/Artist A/Song One/Charter A__rhythmverse",
+                    InstalledRelativePath: "Artist A/Song One/Charter A__rhythmverse",
+                    UpdatedAtUtc: DateTimeOffset.UtcNow),
+            ],
+        };
+
+        CloneHeroViewModel sut = CreateViewModel(
+            temp.RootPath,
+            CreateSettings(temp.RootPath, "http://localhost:5000", "token"),
+            fakeServer);
+
+        await sut.InitializeAsync();
+        await sut.DeleteSongCommand.ExecuteAsync(null);
+
+        Assert.Empty(sut.Songs);
+        Assert.True(sut.RestoreLastDeletedSongCommand.CanExecute(null));
+
+        await sut.RestoreLastDeletedSongCommand.ExecuteAsync(null);
+
+        Assert.Single(fakeServer.RestoredSongIds);
+        Assert.Equal("song-a-1", fakeServer.RestoredSongIds[0]);
+        Assert.Single(sut.Songs);
+        Assert.Contains("restored", sut.ReconciliationStatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static CloneHeroViewModel CreateViewModel(
+        string rootPath,
+        AppGlobalSettings settings,
+        IChartHubServerApiClient serverApiClient)
     {
         var catalog = new LibraryCatalogService(Path.Combine(rootPath, "library-catalog.db"));
         var ingestionCatalog = new SongIngestionCatalogService(Path.Combine(rootPath, "library-catalog.db"));
         var opener = new NoopDesktopPathOpener();
-        return new CloneHeroViewModel(catalog, ingestionCatalog, opener, new LocalFileDeletionService(), reconciliationService);
+        return new CloneHeroViewModel(
+            catalog,
+            ingestionCatalog,
+            opener,
+            new LocalFileDeletionService(),
+            reconciliationService: null,
+            globalSettings: settings,
+            serverApiClient: serverApiClient);
+    }
+
+    private static AppGlobalSettings CreateSettings(string rootPath, string baseUrl, string token)
+    {
+        string tempDir = Path.Combine(rootPath, "Temp");
+        string downloadDir = Path.Combine(rootPath, "Downloads");
+        string stagingDir = Path.Combine(rootPath, "Staging");
+        string outputDir = Path.Combine(rootPath, "Output");
+        string cloneHeroData = Path.Combine(rootPath, "CloneHero");
+        string cloneHeroSongs = Path.Combine(cloneHeroData, "Songs");
+
+        Directory.CreateDirectory(tempDir);
+        Directory.CreateDirectory(downloadDir);
+        Directory.CreateDirectory(stagingDir);
+        Directory.CreateDirectory(outputDir);
+        Directory.CreateDirectory(cloneHeroSongs);
+
+        AppConfigRoot config = new()
+        {
+            Runtime = new RuntimeAppConfig
+            {
+                TempDirectory = tempDir,
+                DownloadDirectory = downloadDir,
+                StagingDirectory = stagingDir,
+                OutputDirectory = outputDir,
+                CloneHeroDataDirectory = cloneHeroData,
+                CloneHeroSongDirectory = cloneHeroSongs,
+                ServerApiBaseUrl = baseUrl,
+                ServerApiAuthToken = token,
+            },
+        };
+
+        return new AppGlobalSettings(new FakeSettingsOrchestrator(config));
     }
 
     private sealed class NoopDesktopPathOpener : IDesktopPathOpener
@@ -181,40 +266,89 @@ public class CloneHeroViewModelTests
         }
     }
 
-    private sealed class ImmediateReconciliationService : ICloneHeroLibraryReconciliationService
+    private sealed class FakeServerApiClient : IChartHubServerApiClient
     {
-        public Task<CloneHeroReconciliationResult> ReconcileAsync(IProgress<CloneHeroReconciliationProgress>? progress = null, CancellationToken cancellationToken = default)
+        public IReadOnlyList<ChartHubServerCloneHeroSongResponse> Songs { get; set; } = [];
+        public List<string> DeletedSongIds { get; } = [];
+        public List<string> RestoredSongIds { get; } = [];
+        private readonly Dictionary<string, ChartHubServerCloneHeroSongResponse> _deletedSongs = new(StringComparer.Ordinal);
+
+        public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(string baseUrl, string googleIdToken, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<ChartHubServerDownloadJobResponse> CreateDownloadJobAsync(string baseUrl, string bearerToken, ChartHubServerCreateDownloadJobRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
+
+        public IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => AsyncEnumerable.Empty<IReadOnlyList<ChartHubServerDownloadProgressEvent>>();
+
+        public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task<IReadOnlyList<ChartHubServerCloneHeroSongResponse>> ListCloneHeroSongsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => Task.FromResult(Songs);
+
+        public Task<ChartHubServerCloneHeroSongResponse> GetCloneHeroSongAsync(string baseUrl, string bearerToken, string songId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(new CloneHeroReconciliationResult(Scanned: 0, Updated: 0, Renamed: 0, Failed: 0));
+            ChartHubServerCloneHeroSongResponse? song = Songs.FirstOrDefault(item => string.Equals(item.SongId, songId, StringComparison.Ordinal));
+            if (song is null)
+            {
+                throw new InvalidOperationException("Song not found.");
+            }
+
+            return Task.FromResult(song);
         }
 
-        public Task<bool> ReconcileSongDirectoryAsync(string songDirectory, CancellationToken cancellationToken = default)
+        public Task RequestDeleteCloneHeroSongAsync(string baseUrl, string bearerToken, string songId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(false);
+            DeletedSongIds.Add(songId);
+            ChartHubServerCloneHeroSongResponse? deletedSong = Songs.FirstOrDefault(song => string.Equals(song.SongId, songId, StringComparison.Ordinal));
+            if (deletedSong is not null)
+            {
+                _deletedSongs[songId] = deletedSong;
+            }
+
+            Songs = Songs.Where(song => !string.Equals(song.SongId, songId, StringComparison.Ordinal)).ToArray();
+            return Task.CompletedTask;
         }
 
-        public Task<bool> ReParseMetadataAsync(string songDirectory, CancellationToken cancellationToken = default)
+        public Task<ChartHubServerCloneHeroSongResponse> RequestRestoreCloneHeroSongAsync(string baseUrl, string bearerToken, string songId, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(true);
+            if (!_deletedSongs.TryGetValue(songId, out ChartHubServerCloneHeroSongResponse? deletedSong))
+            {
+                throw new InvalidOperationException("Song was not deleted.");
+            }
+
+            RestoredSongIds.Add(songId);
+            Songs = [.. Songs, deletedSong];
+            _deletedSongs.Remove(songId);
+            return Task.FromResult(deletedSong);
         }
     }
 
-    private sealed class GatedReconciliationService(Task gate) : ICloneHeroLibraryReconciliationService
+    private sealed class FakeSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator
     {
-        public async Task<CloneHeroReconciliationResult> ReconcileAsync(IProgress<CloneHeroReconciliationProgress>? progress = null, CancellationToken cancellationToken = default)
+        public AppConfigRoot Current { get; private set; } = current;
+
+        public event Action<AppConfigRoot>? SettingsChanged;
+
+        public Task<ConfigValidationResult> UpdateAsync(Action<AppConfigRoot> update, CancellationToken cancellationToken = default)
         {
-            await gate.WaitAsync(cancellationToken);
-            return new CloneHeroReconciliationResult(Scanned: 1, Updated: 1, Renamed: 0, Failed: 0);
+            update(Current);
+            SettingsChanged?.Invoke(Current);
+            return Task.FromResult(ConfigValidationResult.Success);
         }
 
-        public Task<bool> ReconcileSongDirectoryAsync(string songDirectory, CancellationToken cancellationToken = default)
+        public Task ReloadAsync(CancellationToken cancellationToken = default)
         {
-            return Task.FromResult(false);
-        }
-
-        public Task<bool> ReParseMetadataAsync(string songDirectory, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(false);
+            SettingsChanged?.Invoke(Current);
+            return Task.CompletedTask;
         }
     }
 }

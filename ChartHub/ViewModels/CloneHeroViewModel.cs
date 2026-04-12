@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -13,11 +13,11 @@ namespace ChartHub.ViewModels;
 
 public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
 {
-    private readonly LibraryCatalogService _libraryCatalog;
-    private readonly SongIngestionCatalogService _ingestionCatalog;
+    private readonly AppGlobalSettings? _globalSettings;
+    private readonly IChartHubServerApiClient? _serverApiClient;
     private readonly IDesktopPathOpener _desktopPathOpener;
-    private readonly ILocalFileDeletionService _localFileDeletionService;
-    private readonly ICloneHeroLibraryReconciliationService? _reconciliationService;
+    private List<ChartHubServerCloneHeroSongResponse> _serverSongsCache = [];
+    private string? _lastDeletedSongId;
 
     private bool _hasInitialized;
     public bool HasInitialized
@@ -107,9 +107,10 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             OnPropertyChanged();
             _openSongFolderCommand.NotifyCanExecuteChanged();
             _openSongIniCommand.NotifyCanExecuteChanged();
-            _reParseMetadataCommand?.NotifyCanExecuteChanged();
-            _reconcileThisSongCommand?.NotifyCanExecuteChanged();
-            _deleteSongCommand?.NotifyCanExecuteChanged();
+            _reParseMetadataCommand.NotifyCanExecuteChanged();
+            _reconcileThisSongCommand.NotifyCanExecuteChanged();
+            _deleteSongCommand.NotifyCanExecuteChanged();
+            _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -129,13 +130,14 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             _isReconciling = value;
             OnPropertyChanged();
             _reconcileLibraryCommand.NotifyCanExecuteChanged();
-            _reParseMetadataCommand?.NotifyCanExecuteChanged();
-            _reconcileThisSongCommand?.NotifyCanExecuteChanged();
-            _deleteSongCommand?.NotifyCanExecuteChanged();
+            _reParseMetadataCommand.NotifyCanExecuteChanged();
+            _reconcileThisSongCommand.NotifyCanExecuteChanged();
+            _deleteSongCommand.NotifyCanExecuteChanged();
+            _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
         }
     }
 
-    private string _reconciliationStatusMessage = "";
+    private string _reconciliationStatusMessage = string.Empty;
     public string ReconciliationStatusMessage
     {
         get => _reconciliationStatusMessage;
@@ -176,27 +178,37 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
     private readonly AsyncRelayCommand _deleteSongCommand;
     public IAsyncRelayCommand DeleteSongCommand => _deleteSongCommand;
 
+    private readonly AsyncRelayCommand _restoreLastDeletedSongCommand;
+    public IAsyncRelayCommand RestoreLastDeletedSongCommand => _restoreLastDeletedSongCommand;
+
     public CloneHeroViewModel(
         LibraryCatalogService libraryCatalog,
         SongIngestionCatalogService ingestionCatalog,
         IDesktopPathOpener desktopPathOpener,
         ILocalFileDeletionService localFileDeletionService,
-        ICloneHeroLibraryReconciliationService? reconciliationService = null)
+        ICloneHeroLibraryReconciliationService? reconciliationService = null,
+        AppGlobalSettings? globalSettings = null,
+        IChartHubServerApiClient? serverApiClient = null)
     {
-        _libraryCatalog = libraryCatalog;
-        _ingestionCatalog = ingestionCatalog;
+        _ = libraryCatalog;
+        _ = ingestionCatalog;
+        _ = localFileDeletionService;
+        _ = reconciliationService;
+
+        _globalSettings = globalSettings;
+        _serverApiClient = serverApiClient;
         _desktopPathOpener = desktopPathOpener;
-        _localFileDeletionService = localFileDeletionService;
-        _reconciliationService = reconciliationService;
+
         PageStrings = new CloneHeroPageStrings();
 
         _refreshLibraryCommand = new AsyncRelayCommand(() => RefreshArtistsAsync(CancellationToken.None));
         _openSongFolderCommand = new AsyncRelayCommand(OpenSelectedSongFolderAsync, () => SelectedSong is not null);
         _openSongIniCommand = new AsyncRelayCommand(OpenSelectedSongIniLocationAsync, () => SelectedSong is not null);
-        _reconcileLibraryCommand = new AsyncRelayCommand(ReconcileLibraryAsync, () => !IsReconciling);
-        _reParseMetadataCommand = new AsyncRelayCommand(ReParseSelectedSongMetadataAsync, () => SelectedSong is not null && !IsReconciling);
-        _reconcileThisSongCommand = new AsyncRelayCommand(ReconcileSelectedSongAsync, () => SelectedSong is not null && !IsReconciling);
-        _deleteSongCommand = new AsyncRelayCommand(DeleteSelectedSongAsync, () => SelectedSong is not null && !IsReconciling);
+        _reconcileLibraryCommand = new AsyncRelayCommand(ReconcileLibraryAsync, () => false);
+        _reParseMetadataCommand = new AsyncRelayCommand(ReParseSelectedSongMetadataAsync, () => false);
+        _reconcileThisSongCommand = new AsyncRelayCommand(ReconcileSelectedSongAsync, () => false);
+        _deleteSongCommand = new AsyncRelayCommand(DeleteSelectedSongAsync, () => SelectedSong is not null && !IsReconciling && HasServerConnection());
+        _restoreLastDeletedSongCommand = new AsyncRelayCommand(RestoreLastDeletedSongAsync, CanRestoreLastDeletedSong);
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
@@ -209,8 +221,7 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
         IsStartupScanInProgress = true;
         try
         {
-            await RunReconciliationAsync(isStartup: true, cancellationToken);
-            await RefreshArtistsAsync(cancellationToken);
+            await RefreshArtistsAsync(cancellationToken).ConfigureAwait(false);
             HasInitialized = true;
         }
         finally
@@ -219,69 +230,50 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    /// <summary>
-    /// Refreshes the Clone Hero library from the database. Called after installs complete to update the UI.
-    /// </summary>
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        await RefreshArtistsAsync(cancellationToken);
+        await RefreshArtistsAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ReconcileLibraryAsync()
     {
-        await RunReconciliationAsync(isStartup: false, CancellationToken.None);
-        await RefreshArtistsAsync(CancellationToken.None);
-    }
-
-    private async Task RunReconciliationAsync(bool isStartup, CancellationToken cancellationToken)
-    {
-        if (_reconciliationService is null || IsReconciling)
-        {
-            return;
-        }
-
-        IsReconciling = true;
-        ReconciliationStatusMessage = isStartup
-            ? "Reconciling Clone Hero library..."
-            : "Running library reconciliation...";
-
-        try
-        {
-            var progress = new Progress<CloneHeroReconciliationProgress>(update =>
-            {
-                if (update.TotalSongs > 0)
-                {
-                    ReconciliationStatusMessage = $"{update.Message} ({update.ProcessedSongs}/{update.TotalSongs})";
-                }
-                else
-                {
-                    ReconciliationStatusMessage = update.Message;
-                }
-            });
-
-            CloneHeroReconciliationResult result = await _reconciliationService.ReconcileAsync(progress, cancellationToken);
-            ReconciliationStatusMessage = $"Reconciliation complete. Scanned {result.Scanned}, updated {result.Updated}, renamed {result.Renamed}, failed {result.Failed}.";
-        }
-        catch (Exception ex)
-        {
-            ReconciliationStatusMessage = $"Reconciliation failed: {ex.Message}";
-            Logger.LogError("CloneHero", "Library reconciliation failed", ex);
-        }
-        finally
-        {
-            IsReconciling = false;
-        }
+        await Task.CompletedTask;
     }
 
     private async Task RefreshArtistsAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<string> artists = await _libraryCatalog.GetArtistsAsync(cancellationToken);
-        Artists = new ObservableCollection<string>(artists);
+        if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
+        {
+            _serverSongsCache = [];
+            Artists = [];
+            Songs = [];
+            SelectedArtist = null;
+            ReconciliationStatusMessage = "Configure ChartHub.Server URL and token to load Clone Hero library.";
+            return;
+        }
+
+        IReadOnlyList<ChartHubServerCloneHeroSongResponse> songs = await _serverApiClient!
+            .ListCloneHeroSongsAsync(baseUrl, bearerToken, cancellationToken)
+            .ConfigureAwait(false);
+
+        _serverSongsCache = songs
+            .OrderBy(song => song.Artist, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(song => song.Title, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        IReadOnlyList<string> serverArtists = _serverSongsCache
+            .Select(song => string.IsNullOrWhiteSpace(song.Artist) ? "Unknown Artist" : song.Artist)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(artist => artist, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        Artists = new ObservableCollection<string>(serverArtists);
 
         if (Artists.Count == 0)
         {
             Songs = [];
             SelectedArtist = null;
+            ReconciliationStatusMessage = string.Empty;
             return;
         }
 
@@ -291,8 +283,10 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
         }
         else
         {
-            await LoadSongsForSelectedArtistAsync(cancellationToken);
+            await LoadSongsForSelectedArtistAsync(cancellationToken).ConfigureAwait(false);
         }
+
+        ReconciliationStatusMessage = string.Empty;
     }
 
     private async Task LoadSongsForSelectedArtistAsync(CancellationToken cancellationToken = default)
@@ -303,86 +297,36 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        IReadOnlyList<LibraryCatalogEntry> entries = await _libraryCatalog.GetEntriesByArtistAsync(SelectedArtist, cancellationToken);
-        Songs = new ObservableCollection<CloneHeroLibrarySongItem>(entries
-            .Where(entry => !string.IsNullOrWhiteSpace(entry.LocalPath))
-            .Select(entry => new CloneHeroLibrarySongItem
+        Songs = new ObservableCollection<CloneHeroLibrarySongItem>(_serverSongsCache
+            .Where(song => string.Equals(song.Artist, SelectedArtist, StringComparison.OrdinalIgnoreCase))
+            .Select(song => new CloneHeroLibrarySongItem
             {
-                Artist = string.IsNullOrWhiteSpace(entry.Artist) ? "Unknown Artist" : entry.Artist,
-                Title = string.IsNullOrWhiteSpace(entry.Title) ? "Unknown Song" : entry.Title,
-                Charter = string.IsNullOrWhiteSpace(entry.Charter) ? "Unknown Charter" : entry.Charter,
-                Source = entry.Source,
-                SourceId = entry.SourceId,
-                LocalPath = entry.LocalPath!,
+                SongId = song.SongId,
+                Artist = string.IsNullOrWhiteSpace(song.Artist) ? "Unknown Artist" : song.Artist,
+                Title = string.IsNullOrWhiteSpace(song.Title) ? "Unknown Song" : song.Title,
+                Charter = string.IsNullOrWhiteSpace(song.Charter) ? "Unknown Charter" : song.Charter,
+                Source = song.Source,
+                SourceId = song.SourceId,
+                LocalPath = song.InstalledPath ?? string.Empty,
+                InstallRelativePath = song.InstalledRelativePath ?? string.Empty,
             }));
 
-        if (Songs.Count > 0)
-        {
-            SelectedSong = Songs[0];
-        }
-        else
-        {
-            SelectedSong = null;
-        }
+        SelectedSong = Songs.Count > 0 ? Songs[0] : null;
 
         _openSongFolderCommand.NotifyCanExecuteChanged();
         _openSongIniCommand.NotifyCanExecuteChanged();
+
+        await Task.CompletedTask;
     }
 
     private async Task ReParseSelectedSongMetadataAsync()
     {
-        if (SelectedSong is null || _reconciliationService is null)
-        {
-            return;
-        }
-
-        IsReconciling = true;
-        ReconciliationStatusMessage = "Re-parsing metadata...";
-        try
-        {
-            bool updated = await _reconciliationService.ReParseMetadataAsync(SelectedSong.LocalPath, CancellationToken.None);
-            ReconciliationStatusMessage = updated
-                ? "Metadata updated from song.ini."
-                : "No changes — song.ini not found or entry unchanged.";
-            await RefreshArtistsAsync(CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            ReconciliationStatusMessage = $"Failed to re-parse metadata: {ex.Message}";
-            Logger.LogError("CloneHero", "Re-parse metadata failed", ex);
-        }
-        finally
-        {
-            IsReconciling = false;
-        }
+        await Task.CompletedTask;
     }
 
     private async Task ReconcileSelectedSongAsync()
     {
-        if (SelectedSong is null || _reconciliationService is null)
-        {
-            return;
-        }
-
-        IsReconciling = true;
-        ReconciliationStatusMessage = "Reconciling song...";
-        try
-        {
-            bool updated = await _reconciliationService.ReconcileSongDirectoryAsync(SelectedSong.LocalPath, CancellationToken.None);
-            ReconciliationStatusMessage = updated
-                ? "Song reconciled and catalog updated."
-                : "No changes needed for this song.";
-            await RefreshArtistsAsync(CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            ReconciliationStatusMessage = $"Failed to reconcile song: {ex.Message}";
-            Logger.LogError("CloneHero", "Reconcile this song failed", ex);
-        }
-        finally
-        {
-            IsReconciling = false;
-        }
+        await Task.CompletedTask;
     }
 
     private async Task DeleteSelectedSongAsync()
@@ -392,33 +336,85 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        CloneHeroLibrarySongItem selected = SelectedSong;
-        IsReconciling = true;
-        ReconciliationStatusMessage = "Deleting selected song...";
+        if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
+        {
+            ReconciliationStatusMessage = "Configure ChartHub.Server URL and token to delete Clone Hero songs.";
+            return;
+        }
 
+        if (string.IsNullOrWhiteSpace(SelectedSong.SongId))
+        {
+            ReconciliationStatusMessage = "Selected song is missing server ID and cannot be deleted.";
+            return;
+        }
+
+        string deletedSongId = SelectedSong.SongId;
+
+        IsReconciling = true;
         try
         {
-            await _localFileDeletionService.DeletePathIfExistsAsync(selected.LocalPath, CancellationToken.None);
-            await _libraryCatalog.RemoveAsync(selected.Source, selected.SourceId, CancellationToken.None);
+            await _serverApiClient!
+                .RequestDeleteCloneHeroSongAsync(baseUrl, bearerToken, deletedSongId, CancellationToken.None)
+                .ConfigureAwait(false);
 
-            SongIngestionRecord? linkedIngestion = await _ingestionCatalog
-                .GetLatestIngestionBySourceKeyAsync(selected.Source, selected.SourceId, CancellationToken.None);
-            if (linkedIngestion is not null)
-            {
-                await _ingestionCatalog.RemoveIngestionAsync(linkedIngestion.Id, CancellationToken.None);
-            }
-
-            ReconciliationStatusMessage = "Selected song deleted from disk and catalog.";
-            await RefreshArtistsAsync(CancellationToken.None);
+            _lastDeletedSongId = deletedSongId;
+            _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
+            await RefreshArtistsAsync(CancellationToken.None).ConfigureAwait(false);
+            ReconciliationStatusMessage = "Selected song deleted from server library.";
         }
         catch (Exception ex)
         {
             ReconciliationStatusMessage = $"Failed to delete song: {ex.Message}";
-            Logger.LogError("CloneHero", "Delete selected song failed", ex, new Dictionary<string, object?>
+            Logger.LogError("CloneHero", "Delete selected song from server failed", ex, new Dictionary<string, object?>
             {
-                ["source"] = selected.Source,
-                ["sourceId"] = selected.SourceId,
-                ["localPath"] = selected.LocalPath,
+                ["songId"] = deletedSongId,
+            });
+        }
+        finally
+        {
+            IsReconciling = false;
+        }
+    }
+
+    private bool CanRestoreLastDeletedSong()
+    {
+        return !string.IsNullOrWhiteSpace(_lastDeletedSongId) && !IsReconciling && HasServerConnection();
+    }
+
+    private async Task RestoreLastDeletedSongAsync()
+    {
+        if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
+        {
+            ReconciliationStatusMessage = "Configure ChartHub.Server URL and token to restore Clone Hero songs.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_lastDeletedSongId))
+        {
+            ReconciliationStatusMessage = "No recently deleted song is available to restore.";
+            return;
+        }
+
+        string deletedSongId = _lastDeletedSongId;
+
+        IsReconciling = true;
+        try
+        {
+            await _serverApiClient!
+                .RequestRestoreCloneHeroSongAsync(baseUrl, bearerToken, deletedSongId, CancellationToken.None)
+                .ConfigureAwait(false);
+
+            _lastDeletedSongId = null;
+            _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
+            await RefreshArtistsAsync(CancellationToken.None).ConfigureAwait(false);
+            ReconciliationStatusMessage = "Last deleted song restored.";
+        }
+        catch (Exception ex)
+        {
+            ReconciliationStatusMessage = $"Failed to restore song: {ex.Message}";
+            Logger.LogError("CloneHero", "Restore deleted song failed", ex, new Dictionary<string, object?>
+            {
+                ["songId"] = deletedSongId,
             });
         }
         finally
@@ -434,7 +430,7 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        await _desktopPathOpener.OpenDirectoryAsync(SelectedSong.LocalPath);
+        await _desktopPathOpener.OpenDirectoryAsync(SelectedSong.LocalPath).ConfigureAwait(false);
     }
 
     private async Task OpenSelectedSongIniLocationAsync()
@@ -450,7 +446,7 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
 
         if (!string.IsNullOrWhiteSpace(targetDir) && Directory.Exists(targetDir))
         {
-            await _desktopPathOpener.OpenDirectoryAsync(targetDir);
+            await _desktopPathOpener.OpenDirectoryAsync(targetDir).ConfigureAwait(false);
         }
     }
 
@@ -476,5 +472,34 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
     public void Dispose()
     {
         // no-op for now
+    }
+
+    private bool TryGetServerConnection(out string baseUrl, out string bearerToken)
+    {
+        if (_globalSettings is null || _serverApiClient is null)
+        {
+            baseUrl = string.Empty;
+            bearerToken = string.Empty;
+            return false;
+        }
+
+        baseUrl = NormalizeApiBaseUrl(_globalSettings.ServerApiBaseUrl);
+        bearerToken = _globalSettings.ServerApiAuthToken?.Trim() ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(baseUrl) && !string.IsNullOrWhiteSpace(bearerToken);
+    }
+
+    private bool HasServerConnection()
+    {
+        return TryGetServerConnection(out _, out _);
+    }
+
+    private static string NormalizeApiBaseUrl(string? value)
+    {
+        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out Uri? uri))
+        {
+            return string.Empty;
+        }
+
+        return uri.GetLeftPart(UriPartial.Authority);
     }
 }

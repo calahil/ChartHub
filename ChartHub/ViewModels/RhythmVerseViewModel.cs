@@ -314,8 +314,25 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
     public IAsyncRelayCommand<ViewSong?> DownloadFileCommand { get; }
     public IAsyncRelayCommand LoadMoreCommand { get; }
     public IAsyncRelayCommand<ViewSong?> ViewCreatorCommand { get; }
+
     public IRelayCommand<DownloadFile?> CancelDownloadCommand { get; }
     public IRelayCommand<DownloadFile?> ClearDownloadCommand { get; }
+
+    private string _downloadStatusMessage = string.Empty;
+    public string DownloadStatusMessage
+    {
+        get => _downloadStatusMessage;
+        private set
+        {
+            if (_downloadStatusMessage == value)
+            {
+                return;
+            }
+
+            _downloadStatusMessage = value;
+            OnPropertyChanged();
+        }
+    }
 
     public RhythmVersePageStrings PageStrings { get; }
 
@@ -487,6 +504,7 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         if (song is null)
         {
             Logger.LogWarning("ServerDownload", "Cannot queue RhythmVerse download because the command parameter was null.");
+            DownloadStatusMessage = "Select a song to download.";
             return;
         }
 
@@ -498,6 +516,7 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
             Logger.LogWarning("ServerDownload", "Cannot queue RhythmVerse download because sync API endpoint/token is not configured.");
+            DownloadStatusMessage = "Configure ChartHub Server URL and token in Settings to download songs.";
             return;
         }
 
@@ -508,6 +527,7 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
                 ["sourceId"] = sourceId,
                 ["downloadLinkPresent"] = !string.IsNullOrWhiteSpace(sourceUrl),
             });
+            DownloadStatusMessage = "Song metadata is incomplete. Cannot download.";
             return;
         }
 
@@ -564,6 +584,7 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
                 ["stage"] = jobResponse.Stage,
                 ["baseUrl"] = baseUrl,
             });
+            DownloadStatusMessage = string.Empty;
 
             await _uiInvoke(() =>
             {
@@ -572,6 +593,7 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         }
         catch (Exception ex)
         {
+            DownloadStatusMessage = "Failed to queue download on server. Check connectivity and token.";
             Logger.LogError("ServerDownload", "Failed to submit download job to server", ex, new Dictionary<string, object?>
             {
                 ["source"] = "RhythmVerse",

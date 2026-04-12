@@ -96,6 +96,11 @@
                                                                        HasActiveDownloads="{Binding HasActiveDownloads}"
                                                                        CancelCommand="{Binding CancelDownloadCommand}"
                                                                        ClearCommand="{Binding ClearDownloadCommand}" />
+                                        <TextBlock Grid.Row="0"
+                                                   Grid.Column="0"
+                                                   Margin="0,78,0,0"
+                                                   Text="{Binding DownloadStatusMessage}"
+                                                   Foreground="{StaticResource ThemeAccentBrush}" />
 
                                         <!-- Song List -->
                                         <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
@@ -374,6 +379,10 @@
                                                                                HasActiveDownloads="{Binding HasActiveDownloads}"
                                                                                CancelCommand="{Binding CancelDownloadCommand}"
                                                                                ClearCommand="{Binding ClearDownloadCommand}" />
+                                                <TextBlock Grid.Row="0"
+                                                           Margin="0,56,0,0"
+                                                           Text="{Binding DownloadStatusMessage}"
+                                                           Foreground="{StaticResource ThemeAccentBrush}" />
 
                                                 <Border Grid.Row="1"
                                                         BorderBrush="{StaticResource ThemeBorderMidBrush}"

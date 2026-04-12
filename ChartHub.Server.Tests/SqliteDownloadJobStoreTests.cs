@@ -97,6 +97,38 @@ public sealed class SqliteDownloadJobStoreTests : IDisposable
     }
 
     [Fact]
+    public void MarkInstalledPersistsNormalizedMetadata()
+    {
+        SqliteDownloadJobStore sut = BuildStore();
+        DownloadJobResponse created = sut.Create(new CreateDownloadJobRequest
+        {
+            Source = "encore",
+            SourceId = "encore|chartId=42|md5=abcd",
+            DisplayName = "Encore Track",
+            SourceUrl = "https://example.com/encore/track.zip",
+        });
+
+        sut.MarkInstalled(
+            created.JobId,
+            "/clonehero/Artist/Title/Charter__encore",
+            "Artist/Title/Charter__encore",
+            "Artist",
+            "Title",
+            "Charter",
+            "abcd",
+            null);
+
+        Assert.True(sut.TryGet(created.JobId, out DownloadJobResponse? updated));
+        Assert.NotNull(updated);
+        Assert.Equal("Installed", updated!.Stage);
+        Assert.Equal("Artist", updated.Artist);
+        Assert.Equal("Title", updated.Title);
+        Assert.Equal("Charter", updated.Charter);
+        Assert.Equal("abcd", updated.SourceMd5);
+        Assert.Equal("Artist/Title/Charter__encore", updated.InstalledRelativePath);
+    }
+
+    [Fact]
     public void EnsureSchemaMigratesLegacyStagedAndCompletedStages()
     {
         Directory.CreateDirectory(_tempRoot);

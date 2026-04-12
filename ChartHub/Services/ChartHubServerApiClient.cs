@@ -21,6 +21,41 @@ public interface IChartHubServerApiClient
     Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default);
 
     Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ChartHubServerCloneHeroSongResponse>> ListCloneHeroSongsAsync(
+        string baseUrl,
+        string bearerToken,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<IReadOnlyList<ChartHubServerCloneHeroSongResponse>>([]);
+    }
+
+    Task<ChartHubServerCloneHeroSongResponse> GetCloneHeroSongAsync(
+        string baseUrl,
+        string bearerToken,
+        string songId,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Clone Hero song details are not supported by this API client implementation.");
+    }
+
+    Task RequestDeleteCloneHeroSongAsync(
+        string baseUrl,
+        string bearerToken,
+        string songId,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Clone Hero delete is not supported by this API client implementation.");
+    }
+
+    Task<ChartHubServerCloneHeroSongResponse> RequestRestoreCloneHeroSongAsync(
+        string baseUrl,
+        string bearerToken,
+        string songId,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Clone Hero restore is not supported by this API client implementation.");
+    }
 }
 
 public sealed record ChartHubServerAuthExchangeResponse(string AccessToken, DateTimeOffset ExpiresAtUtc);
@@ -44,6 +79,26 @@ public sealed record ChartHubServerDownloadJobResponse(
     string? InstalledPath,
     string? Error,
     DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    string? InstalledRelativePath = null,
+    string? Artist = null,
+    string? Title = null,
+    string? Charter = null,
+    string? SourceMd5 = null,
+    string? SourceChartHash = null);
+
+public sealed record ChartHubServerCloneHeroSongResponse(
+    string SongId,
+    string Source,
+    string SourceId,
+    string Artist,
+    string Title,
+    string Charter,
+    string? SourceMd5,
+    string? SourceChartHash,
+    string? SourceUrl,
+    string? InstalledPath,
+    string? InstalledRelativePath,
     DateTimeOffset UpdatedAtUtc);
 
 public sealed record ChartHubServerDownloadProgressEvent(
@@ -252,6 +307,70 @@ public sealed class ChartHubServerApiClient : IChartHubServerApiClient
         using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, $"/api/v1/downloads/jobs/{jobId:D}/install", bearerToken);
         using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
         return await ReadJsonAsync<ChartHubServerDownloadJobResponse>(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<ChartHubServerCloneHeroSongResponse>> ListCloneHeroSongsAsync(
+        string baseUrl,
+        string bearerToken,
+        CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Get, baseUrl, "/api/v1/clonehero/songs", bearerToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+        List<ChartHubServerCloneHeroSongResponse>? payload = await ReadJsonAsync<List<ChartHubServerCloneHeroSongResponse>>(response, cancellationToken).ConfigureAwait(false);
+        return payload ?? [];
+    }
+
+    public async Task<ChartHubServerCloneHeroSongResponse> GetCloneHeroSongAsync(
+        string baseUrl,
+        string bearerToken,
+        string songId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(songId))
+        {
+            throw new InvalidOperationException("songId is required.");
+        }
+
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Get, baseUrl, $"/api/v1/clonehero/songs/{Uri.EscapeDataString(songId)}", bearerToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        return await ReadJsonAsync<ChartHubServerCloneHeroSongResponse>(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task RequestDeleteCloneHeroSongAsync(
+        string baseUrl,
+        string bearerToken,
+        string songId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(songId))
+        {
+            throw new InvalidOperationException("songId is required.");
+        }
+
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Delete, baseUrl, $"/api/v1/clonehero/songs/{Uri.EscapeDataString(songId)}", bearerToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw CreateRequestFailedException(response.StatusCode, response.ReasonPhrase, responseBody);
+        }
+    }
+
+    public async Task<ChartHubServerCloneHeroSongResponse> RequestRestoreCloneHeroSongAsync(
+        string baseUrl,
+        string bearerToken,
+        string songId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(songId))
+        {
+            throw new InvalidOperationException("songId is required.");
+        }
+
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, $"/api/v1/clonehero/songs/{Uri.EscapeDataString(songId)}/restore", bearerToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        return await ReadJsonAsync<ChartHubServerCloneHeroSongResponse>(response, cancellationToken).ConfigureAwait(false);
     }
 
     private static HttpRequestMessage BuildRequest(HttpMethod method, string baseUrl, string relativePath, string? token)

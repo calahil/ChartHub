@@ -17,6 +17,8 @@
                         Command="{Binding ReconcileLibraryCommand}" />
                 <Button Content="Refresh Library"
                         Command="{Binding RefreshLibraryCommand}" />
+                <Button Content="Restore Last Deleted"
+                    Command="{Binding RestoreLastDeletedSongCommand}" />
             </StackPanel>
         </Grid>
 
@@ -77,7 +79,7 @@
                             <MenuItem Header="Re-parse Metadata" Command="{Binding ReParseMetadataCommand}" />
                             <MenuItem Header="Reconcile This Song" Command="{Binding ReconcileThisSongCommand}" />
                             <Separator />
-                            <MenuItem Header="Delete Song (File + DB)" Command="{Binding DeleteSongCommand}" />
+                            <MenuItem Header="Delete Song (Server)" Command="{Binding DeleteSongCommand}" />
                         </ContextMenu>
                     </DataGrid.ContextMenu>
                 </DataGrid>

@@ -51,24 +51,6 @@ public static class AppBootstrapper
     {
         try
         {
-            int removed = await provider.GetRequiredService<LibraryCatalogService>()
-                .RemoveMissingLocalFilesAsync()
-                .ConfigureAwait(false);
-            Logger.LogInfo("Bootstrap", "Catalog reconciliation completed", new Dictionary<string, object?>
-            {
-                ["removedEntries"] = removed,
-            });
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning("Bootstrap", "Catalog reconciliation failed", new Dictionary<string, object?>
-            {
-                ["error"] = ex.Message,
-            });
-        }
-
-        try
-        {
             Logger.LogInfo("Bootstrap", "Starting settings migration");
             if (migrationActionOverride is not null)
             {
@@ -178,7 +160,15 @@ public static class AppBootstrapper
                 serviceProvider.GetRequiredService<IChartHubServerApiClient>(),
                 serviceProvider.GetRequiredService<SharedDownloadQueue>(),
                 serviceProvider.GetService<CloneHeroViewModel>()));
-        services.AddSingleton<CloneHeroViewModel>();
+        services.AddSingleton<CloneHeroViewModel>(serviceProvider =>
+            new CloneHeroViewModel(
+                serviceProvider.GetRequiredService<LibraryCatalogService>(),
+                serviceProvider.GetRequiredService<SongIngestionCatalogService>(),
+                serviceProvider.GetRequiredService<IDesktopPathOpener>(),
+                serviceProvider.GetRequiredService<ILocalFileDeletionService>(),
+                serviceProvider.GetService<ICloneHeroLibraryReconciliationService>(),
+                serviceProvider.GetRequiredService<AppGlobalSettings>(),
+                serviceProvider.GetRequiredService<IChartHubServerApiClient>()));
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<RhythmVerseViewModel>(serviceProvider =>
             new RhythmVerseViewModel(

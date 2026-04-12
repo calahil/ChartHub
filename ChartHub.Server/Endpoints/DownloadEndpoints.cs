@@ -64,6 +64,7 @@ public static partial class DownloadEndpoints
                 Guid jobId,
                 IDownloadJobStore store,
                 IDownloadJobInstallService installService,
+                ICloneHeroLibraryService cloneHeroLibraryService,
                 ILogger<DownloadInstallEndpointLogCategory> logger) =>
             {
                 if (!store.TryGet(jobId, out DownloadJobResponse? job) || job is null)
@@ -91,7 +92,7 @@ public static partial class DownloadEndpoints
                 DownloadEndpointLog.InstallRequestStarted(logger, job.JobId, job.Source, job.SourceId, job.DisplayName, job.DownloadedPath);
                 store.UpdateProgress(jobId, "InstallQueued", 88);
 
-                _ = Task.Run(() => ProcessInstallInBackgroundAsync(job.JobId, store, installService, logger));
+                _ = Task.Run(() => ProcessInstallInBackgroundAsync(job.JobId, store, installService, cloneHeroLibraryService, logger));
 
                 if (!store.TryGet(jobId, out DownloadJobResponse? queuedJob) || queuedJob is null)
                 {
@@ -192,6 +193,7 @@ public static partial class DownloadEndpoints
         Guid jobId,
         IDownloadJobStore store,
         IDownloadJobInstallService installService,
+        ICloneHeroLibraryService cloneHeroLibraryService,
         ILogger logger)
     {
         if (!store.TryGet(jobId, out DownloadJobResponse? job) || job is null)
@@ -206,7 +208,29 @@ public static partial class DownloadEndpoints
             DownloadJobInstallResult installResult = await installService.InstallJobAsync(job, CancellationToken.None).ConfigureAwait(false);
             store.MarkStaged(jobId, installResult.StagedPath);
             store.UpdateProgress(jobId, "Installing", 97);
-            store.MarkInstalled(jobId, installResult.InstalledPath);
+            (string? sourceMd5, string? sourceChartHash) = ExtractSourceHashes(job.Source, job.SourceId);
+            store.MarkInstalled(
+                jobId,
+                installResult.InstalledPath,
+                installResult.InstalledRelativePath,
+                installResult.Metadata.Artist,
+                installResult.Metadata.Title,
+                installResult.Metadata.Charter,
+                sourceMd5,
+                sourceChartHash);
+
+            cloneHeroLibraryService.UpsertInstalledSong(new CloneHeroLibraryUpsertRequest(
+                Source: job.Source,
+                SourceId: job.SourceId,
+                Artist: installResult.Metadata.Artist,
+                Title: installResult.Metadata.Title,
+                Charter: installResult.Metadata.Charter,
+                SourceMd5: sourceMd5,
+                SourceChartHash: sourceChartHash,
+                SourceUrl: job.SourceUrl,
+                InstalledPath: installResult.InstalledPath,
+                InstalledRelativePath: installResult.InstalledRelativePath));
+
             DownloadEndpointLog.InstallRequestSucceeded(logger, job.JobId, installResult.StagedPath, installResult.InstalledPath);
         }
         catch (Exception ex)
@@ -214,6 +238,46 @@ public static partial class DownloadEndpoints
             DownloadEndpointLog.InstallRequestFailed(logger, job.JobId, job.Source, job.SourceId, job.DisplayName, job.DownloadedPath, ex);
             store.MarkFailed(jobId, ex.Message);
         }
+    }
+
+    private static (string? Md5, string? ChartHash) ExtractSourceHashes(string source, string sourceId)
+    {
+        if (!string.Equals(source, "encore", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(sourceId))
+        {
+            return (null, null);
+        }
+
+        string? md5 = null;
+        string? chartHash = null;
+        string[] parts = sourceId.Split('|', StringSplitOptions.RemoveEmptyEntries);
+        foreach (string part in parts)
+        {
+            int separator = part.IndexOf('=');
+            if (separator <= 0 || separator >= part.Length - 1)
+            {
+                continue;
+            }
+
+            string key = part[..separator].Trim();
+            string value = Uri.UnescapeDataString(part[(separator + 1)..].Trim());
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            if (key.Equals("md5", StringComparison.OrdinalIgnoreCase))
+            {
+                md5 = value;
+            }
+            else if (key.Equals("charthash", StringComparison.OrdinalIgnoreCase)
+                || key.Equals("chartHash", StringComparison.OrdinalIgnoreCase))
+            {
+                chartHash = value;
+            }
+        }
+
+        return (md5, chartHash);
     }
 
     private static partial class DownloadEndpointLog

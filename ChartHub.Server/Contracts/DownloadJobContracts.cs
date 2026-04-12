@@ -33,6 +33,18 @@ public sealed class DownloadJobResponse
 
     public string? InstalledPath { get; init; }
 
+    public string? InstalledRelativePath { get; init; }
+
+    public string? Artist { get; init; }
+
+    public string? Title { get; init; }
+
+    public string? Charter { get; init; }
+
+    public string? SourceMd5 { get; init; }
+
+    public string? SourceChartHash { get; init; }
+
     public string? Error { get; init; }
 
     public required DateTimeOffset CreatedAtUtc { get; init; }

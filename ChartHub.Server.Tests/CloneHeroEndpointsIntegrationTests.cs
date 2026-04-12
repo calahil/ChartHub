@@ -9,8 +9,11 @@ using ChartHub.Server.Services;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -52,6 +55,17 @@ public sealed class CloneHeroEndpointsIntegrationTests
     public async Task DeleteThenRestoreSongUsesExpectedHttpStatusCodes()
     {
         await using TestAppFixture fixture = await TestAppFixture.CreateAsync();
+        fixture.LibraryService.UpsertInstalledSong(new CloneHeroLibraryUpsertRequest(
+            Source: "rhythmverse",
+            SourceId: "song-restore-1",
+            Artist: "Artist",
+            Title: "Title",
+            Charter: "Charter",
+            SourceMd5: null,
+            SourceChartHash: null,
+            SourceUrl: "https://example.test/song.zip",
+            InstalledPath: "/clonehero/Artist/Title/Charter__rhythmverse",
+            InstalledRelativePath: "Artist/Title/Charter__rhythmverse"));
 
         HttpResponseMessage listResponse = await fixture.Client.GetAsync("/api/v1/clonehero/songs");
         listResponse.EnsureSuccessStatusCode();
@@ -311,17 +325,25 @@ public sealed class CloneHeroEndpointsIntegrationTests
         private readonly string _cloneHeroRoot;
         private readonly WebApplication _app;
 
-        private TestAppFixture(string cloneHeroRoot, WebApplication app, HttpClient client, FakeDownloadJobStore store)
+        private TestAppFixture(
+            string cloneHeroRoot,
+            WebApplication app,
+            HttpClient client,
+            FakeDownloadJobStore store,
+            ICloneHeroLibraryService libraryService)
         {
             _cloneHeroRoot = cloneHeroRoot;
             _app = app;
             Client = client;
             Store = store;
+            LibraryService = libraryService;
         }
 
         public HttpClient Client { get; }
 
         public FakeDownloadJobStore Store { get; }
+
+        public ICloneHeroLibraryService LibraryService { get; }
 
         public static async Task<TestAppFixture> CreateAsync(Action<FakeDownloadJobStore>? seed = null, bool authenticatedClient = true)
             => await CreateAsync(seed, configureInstall: null, authenticatedClient: authenticatedClient);
@@ -365,7 +387,8 @@ public sealed class CloneHeroEndpointsIntegrationTests
                 new CloneHeroLibraryService(Microsoft.Extensions.Options.Options.Create(new ServerPathOptions
                 {
                     CloneHeroRoot = cloneHeroRoot,
-                })));
+                    SqliteDbPath = Path.Combine(rootBase, "charthub-server.db"),
+                }), new TestHostEnvironment(rootBase), new ServerCloneHeroDirectorySchemaService()));
 
             WebApplication app = builder.Build();
             app.UseAuthentication();
@@ -375,8 +398,9 @@ public sealed class CloneHeroEndpointsIntegrationTests
 
             await app.StartAsync();
             HttpClient client = app.GetTestClient();
+            ICloneHeroLibraryService libraryService = app.Services.GetRequiredService<ICloneHeroLibraryService>();
 
-            return new TestAppFixture(cloneHeroRoot, app, client, store);
+            return new TestAppFixture(cloneHeroRoot, app, client, store, libraryService);
         }
 
         public async ValueTask DisposeAsync()
@@ -544,7 +568,15 @@ public sealed class CloneHeroEndpointsIntegrationTests
             }
         }
 
-        public void MarkInstalled(Guid jobId, string installedPath)
+        public void MarkInstalled(
+            Guid jobId,
+            string installedPath,
+            string? installedRelativePath = null,
+            string? artist = null,
+            string? title = null,
+            string? charter = null,
+            string? sourceMd5 = null,
+            string? sourceChartHash = null)
         {
             if (_jobs.TryGetValue(jobId, out DownloadJobResponse? existing))
             {
@@ -560,6 +592,12 @@ public sealed class CloneHeroEndpointsIntegrationTests
                     DownloadedPath = existing.DownloadedPath,
                     StagedPath = existing.StagedPath,
                     InstalledPath = installedPath,
+                    InstalledRelativePath = installedRelativePath,
+                    Artist = artist ?? existing.Artist,
+                    Title = title ?? existing.Title,
+                    Charter = charter ?? existing.Charter,
+                    SourceMd5 = sourceMd5 ?? existing.SourceMd5,
+                    SourceChartHash = sourceChartHash ?? existing.SourceChartHash,
                     Error = existing.Error,
                     CreatedAtUtc = existing.CreatedAtUtc,
                     UpdatedAtUtc = DateTimeOffset.UtcNow,
@@ -612,7 +650,26 @@ public sealed class CloneHeroEndpointsIntegrationTests
                 throw ExceptionToThrow;
             }
 
-            return Task.FromResult(new DownloadJobInstallResult(StagedPath, ResultPath));
+            return Task.FromResult(new DownloadJobInstallResult(
+                StagedPath,
+                ResultPath,
+                "Artist/Title/Charter__rhythmverse",
+                new ServerSongMetadata("Artist", "Title", "Charter")));
         }
+    }
+
+    private sealed class TestHostEnvironment(string contentRootPath) : IWebHostEnvironment
+    {
+        public string ApplicationName { get; set; } = "ChartHub.Server.Tests";
+
+        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
+
+        public string WebRootPath { get; set; } = contentRootPath;
+
+        public string EnvironmentName { get; set; } = Environments.Development;
+
+        public string ContentRootPath { get; set; } = contentRootPath;
+
+        public IFileProvider ContentRootFileProvider { get; set; } = new PhysicalFileProvider(contentRootPath);
     }
 }
