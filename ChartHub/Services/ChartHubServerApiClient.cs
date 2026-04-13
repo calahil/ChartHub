@@ -98,6 +98,41 @@ public interface IChartHubServerApiClient
     {
         return AsyncEnumerable.Empty<IReadOnlyList<ChartHubServerDesktopEntryResponse>>();
     }
+
+    Task<ChartHubServerVolumeStateResponse> GetVolumeStateAsync(
+        string baseUrl,
+        string bearerToken,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Volume state is not supported by this API client implementation.");
+    }
+
+    Task<ChartHubServerVolumeActionResponse> SetMasterVolumeAsync(
+        string baseUrl,
+        string bearerToken,
+        int valuePercent,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Master volume control is not supported by this API client implementation.");
+    }
+
+    Task<ChartHubServerVolumeActionResponse> SetSessionVolumeAsync(
+        string baseUrl,
+        string bearerToken,
+        string sessionId,
+        int valuePercent,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Per-application volume control is not supported by this API client implementation.");
+    }
+
+    IAsyncEnumerable<ChartHubServerVolumeStateResponse> StreamVolumeAsync(
+        string baseUrl,
+        string bearerToken,
+        CancellationToken cancellationToken = default)
+    {
+        return AsyncEnumerable.Empty<ChartHubServerVolumeStateResponse>();
+    }
 }
 
 public sealed record ChartHubServerAuthExchangeResponse(string AccessToken, DateTimeOffset ExpiresAtUtc);
@@ -160,6 +195,33 @@ public sealed record ChartHubServerDesktopEntryActionResponse(
     string EntryId,
     string Status,
     int? ProcessId,
+    string Message);
+
+public sealed record ChartHubServerVolumeStateResponse(
+    DateTimeOffset UpdatedAtUtc,
+    ChartHubServerVolumeMasterResponse Master,
+    IReadOnlyList<ChartHubServerVolumeSessionResponse> Sessions,
+    bool SupportsPerApplicationSessions,
+    string? SessionSupportMessage);
+
+public sealed record ChartHubServerVolumeMasterResponse(
+    int ValuePercent,
+    bool IsMuted);
+
+public sealed record ChartHubServerVolumeSessionResponse(
+    string SessionId,
+    string Name,
+    int? ProcessId,
+    string? ApplicationName,
+    int ValuePercent,
+    bool IsMuted);
+
+public sealed record ChartHubServerVolumeActionResponse(
+    string TargetId,
+    string TargetKind,
+    string Name,
+    int ValuePercent,
+    bool IsMuted,
     string Message);
 
 public sealed class ChartHubServerApiException : InvalidOperationException
@@ -565,6 +627,135 @@ public sealed class ChartHubServerApiClient : IChartHubServerApiClient
         }
     }
 
+    public async Task<ChartHubServerVolumeStateResponse> GetVolumeStateAsync(
+        string baseUrl,
+        string bearerToken,
+        CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Get, baseUrl, "/api/v1/volume", bearerToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        return await ReadJsonAsync<ChartHubServerVolumeStateResponse>(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<ChartHubServerVolumeActionResponse> SetMasterVolumeAsync(
+        string baseUrl,
+        string bearerToken,
+        int valuePercent,
+        CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, "/api/v1/volume/master", bearerToken);
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(new { valuePercent }),
+            Encoding.UTF8,
+            "application/json");
+
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        return await ReadJsonAsync<ChartHubServerVolumeActionResponse>(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<ChartHubServerVolumeActionResponse> SetSessionVolumeAsync(
+        string baseUrl,
+        string bearerToken,
+        string sessionId,
+        int valuePercent,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            throw new InvalidOperationException("sessionId is required.");
+        }
+
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, $"/api/v1/volume/sessions/{Uri.EscapeDataString(sessionId)}", bearerToken);
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(new { valuePercent }),
+            Encoding.UTF8,
+            "application/json");
+
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        return await ReadJsonAsync<ChartHubServerVolumeActionResponse>(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async IAsyncEnumerable<ChartHubServerVolumeStateResponse> StreamVolumeAsync(
+        string baseUrl,
+        string bearerToken,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Get, baseUrl, "/api/v1/volume/stream", bearerToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+
+        using HttpClient client = _createClient();
+        client.Timeout = Timeout.InfiniteTimeSpan;
+
+        using HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw CreateRequestFailedException(response.StatusCode, response.ReasonPhrase, responseBody);
+        }
+
+        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using var reader = new StreamReader(stream);
+
+        string eventName = string.Empty;
+        string? line;
+        var dataBuilder = new StringBuilder();
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            line = await reader.ReadLineAsync().ConfigureAwait(false);
+            if (line is null)
+            {
+                yield break;
+            }
+
+            if (line.Length == 0)
+            {
+                if (!string.Equals(eventName, "volume", StringComparison.OrdinalIgnoreCase)
+                    || dataBuilder.Length == 0)
+                {
+                    eventName = string.Empty;
+                    dataBuilder.Clear();
+                    continue;
+                }
+
+                string payloadJson = dataBuilder.ToString();
+                dataBuilder.Clear();
+                eventName = string.Empty;
+
+                VolumeSnapshotEnvelope? payload;
+                try
+                {
+                    payload = JsonSerializer.Deserialize<VolumeSnapshotEnvelope>(payloadJson, JsonOptions);
+                }
+                catch (JsonException ex)
+                {
+                    throw new InvalidOperationException("ChartHub.Server stream returned invalid volume payload.", ex);
+                }
+
+                if (payload?.State is not null)
+                {
+                    yield return payload.State;
+                }
+            }
+
+            if (line.StartsWith("event:", StringComparison.OrdinalIgnoreCase))
+            {
+                eventName = line["event:".Length..].Trim();
+                continue;
+            }
+
+            if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                if (dataBuilder.Length > 0)
+                {
+                    dataBuilder.Append('\n');
+                }
+
+                dataBuilder.Append(line["data:".Length..].TrimStart());
+            }
+        }
+    }
+
     private static HttpRequestMessage BuildRequest(HttpMethod method, string baseUrl, string relativePath, string? token)
     {
         if (string.IsNullOrWhiteSpace(baseUrl))
@@ -653,5 +844,12 @@ public sealed class ChartHubServerApiClient : IChartHubServerApiClient
         public DateTimeOffset UpdatedAtUtc { get; init; }
 
         public List<ChartHubServerDesktopEntryResponse>? Items { get; init; }
+    }
+
+    private sealed class VolumeSnapshotEnvelope
+    {
+        public DateTimeOffset UpdatedAtUtc { get; init; }
+
+        public ChartHubServerVolumeStateResponse? State { get; init; }
     }
 }

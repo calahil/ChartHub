@@ -21,6 +21,7 @@ public class MainViewModelTests
         Assert.False(sut.IsCompanionMode);
         Assert.True(sut.IsCloneHeroTabVisible);
         Assert.True(sut.IsDesktopEntryTabVisible);
+        Assert.True(sut.IsVolumeTabVisible);
         Assert.True(sut.IsSettingsTabVisible);
         Assert.True(sut.IsDownloadTabVisible);
     }
@@ -34,6 +35,7 @@ public class MainViewModelTests
         Assert.False(sut.IsDesktopMode);
         Assert.True(sut.IsCloneHeroTabVisible);
         Assert.True(sut.IsDesktopEntryTabVisible);
+        Assert.True(sut.IsVolumeTabVisible);
         Assert.True(sut.IsSettingsTabVisible);
         Assert.True(sut.IsDownloadTabVisible);
     }
@@ -55,7 +57,7 @@ public class MainViewModelTests
 
         sut.GoSettingsCommand.Execute(null);
 
-        Assert.Equal(5, sut.SelectedMainTabIndex);
+        Assert.Equal(6, sut.SelectedMainTabIndex);
     }
 
     [Fact]
@@ -66,6 +68,16 @@ public class MainViewModelTests
         sut.GoDesktopEntryCommand.Execute(null);
 
         Assert.Equal(4, sut.SelectedMainTabIndex);
+    }
+
+    [Fact]
+    public void GoVolumeCommand_SelectsVolumeTab()
+    {
+        MainViewModel sut = CreateMainViewModel(isAndroid: true);
+
+        sut.GoVolumeCommand.Execute(null);
+
+        Assert.Equal(5, sut.SelectedMainTabIndex);
     }
 
     [Fact]
@@ -109,6 +121,7 @@ public class MainViewModelTests
                 typeof(DownloadViewModel),
                 typeof(CloneHeroViewModel),
                 typeof(DesktopEntryViewModel),
+                typeof(VolumeViewModel),
                 typeof(SettingsViewModel),
                 typeof(Action<Action>),
                 typeof(bool),
@@ -126,6 +139,7 @@ public class MainViewModelTests
             CreateUninitialized<DownloadViewModel>(),
             CreateUninitialized<CloneHeroViewModel>(),
             CreateUninitialized<DesktopEntryViewModel>(),
+            CreateUninitialized<VolumeViewModel>(),
             CreateUninitialized<SettingsViewModel>(),
             (Action<Action>)(action => action()),
             isAndroid,

@@ -136,8 +136,10 @@ public static class AppBootstrapper
 
 #if ANDROID
         services.AddSingleton<IQrCodeScannerService, AndroidQrCodeScannerService>();
+        services.AddSingleton<IVolumeHardwareButtonSource, AndroidVolumeHardwareButtonSource>();
 #else
         services.AddSingleton<IQrCodeScannerService, NoOpQrCodeScannerService>();
+        services.AddSingleton<IVolumeHardwareButtonSource, NoOpVolumeHardwareButtonSource>();
 #endif
         services.AddSingleton<EncoreApiService>();
         services.AddSingleton<SharedDownloadQueue>();
@@ -157,6 +159,11 @@ public static class AppBootstrapper
             new DesktopEntryViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
                 serviceProvider.GetRequiredService<IChartHubServerApiClient>()));
+        services.AddSingleton<VolumeViewModel>(serviceProvider =>
+            new VolumeViewModel(
+                serviceProvider.GetRequiredService<AppGlobalSettings>(),
+                serviceProvider.GetRequiredService<IChartHubServerApiClient>(),
+                serviceProvider.GetRequiredService<IVolumeHardwareButtonSource>()));
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<RhythmVerseViewModel>(serviceProvider =>
             new RhythmVerseViewModel(
@@ -174,6 +181,7 @@ public static class AppBootstrapper
                 serviceProvider.GetRequiredService<DownloadViewModel>(),
                 serviceProvider.GetRequiredService<CloneHeroViewModel>(),
                 serviceProvider.GetRequiredService<DesktopEntryViewModel>(),
+                serviceProvider.GetRequiredService<VolumeViewModel>(),
                 serviceProvider.GetRequiredService<SettingsViewModel>()
             )
         );

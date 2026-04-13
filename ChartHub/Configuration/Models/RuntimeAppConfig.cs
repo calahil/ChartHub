@@ -33,4 +33,10 @@ public sealed class RuntimeAppConfig
     [SettingEditor(SettingEditorKind.Toggle)]
     [SettingHotReloadable(true)]
     public bool InstallLogExpanded { get; set; } = true;
+
+    [SettingGroup("ChartHub Server")]
+    [SettingDisplay("Android Volume Buttons Control Server Volume")]
+    [SettingEditor(SettingEditorKind.Toggle)]
+    [SettingHotReloadable(true)]
+    public bool AndroidVolumeButtonsControlServerVolume { get; set; }
 }

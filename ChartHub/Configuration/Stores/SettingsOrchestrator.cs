@@ -86,6 +86,7 @@ public sealed class SettingsOrchestrator : ISettingsOrchestrator, IDisposable
                 ServerApiAuthToken = source.Runtime.ServerApiAuthToken,
                 ServerApiBaseUrl = source.Runtime.ServerApiBaseUrl,
                 InstallLogExpanded = source.Runtime.InstallLogExpanded,
+                AndroidVolumeButtonsControlServerVolume = source.Runtime.AndroidVolumeButtonsControlServerVolume,
             },
             GoogleAuth = new GoogleAuthConfig
             {

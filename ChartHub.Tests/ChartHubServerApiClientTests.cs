@@ -144,6 +144,42 @@ public sealed class ChartHubServerApiClientTests
         Assert.Null(ex.ErrorCode);
     }
 
+    [Fact]
+    public async Task StreamVolumeAsync_ParsesVolumeEventPayload()
+    {
+        HttpRequestMessage? captured = null;
+        string ssePayload = "event: volume\n"
+            + "data: {\"updatedAtUtc\":\"2026-04-13T00:00:00Z\",\"state\":{\"updatedAtUtc\":\"2026-04-13T00:00:00Z\",\"master\":{\"valuePercent\":35,\"isMuted\":false},\"sessions\":[{\"sessionId\":\"42\",\"name\":\"RetroArch\",\"processId\":1234,\"applicationName\":\"RetroArch\",\"valuePercent\":50,\"isMuted\":false}],\"supportsPerApplicationSessions\":true,\"sessionSupportMessage\":null}}\n\n";
+
+        ChartHubServerApiClient sut = new(() =>
+            new HttpClient(new StubHttpMessageHandler((request, _) =>
+            {
+                captured = request;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(ssePayload, Encoding.UTF8, "text/event-stream"),
+                });
+            })));
+
+        ChartHubServerVolumeStateResponse? state = null;
+        await foreach (ChartHubServerVolumeStateResponse item in sut.StreamVolumeAsync("http://127.0.0.1:5001", "jwt-token"))
+        {
+            state = item;
+            break;
+        }
+
+        Assert.NotNull(captured);
+        Assert.Equal(HttpMethod.Get, captured!.Method);
+        Assert.Equal("http://127.0.0.1:5001/api/v1/volume/stream", captured.RequestUri!.ToString());
+        Assert.Equal("Bearer", captured.Headers.Authorization?.Scheme);
+        Assert.Equal("jwt-token", captured.Headers.Authorization?.Parameter);
+        Assert.NotNull(state);
+        Assert.Equal(35, state!.Master.ValuePercent);
+        ChartHubServerVolumeSessionResponse session = Assert.Single(state.Sessions);
+        Assert.Equal("42", session.SessionId);
+        Assert.Equal("RetroArch", session.Name);
+    }
+
     private sealed class StubHttpMessageHandler(
         Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> sendAsync) : HttpMessageHandler
     {

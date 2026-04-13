@@ -185,6 +185,12 @@ public sealed class JsonAppConfigStore : IAppConfigStore
             config.Runtime.InstallLogExpanded = rootNode["InstallLogExpanded"]?.GetValue<bool>() ?? config.Runtime.InstallLogExpanded;
         }
 
+        if (rootNode["AndroidVolumeButtonsControlServerVolume"] is not null)
+        {
+            config.Runtime.AndroidVolumeButtonsControlServerVolume = rootNode["AndroidVolumeButtonsControlServerVolume"]?.GetValue<bool>()
+                ?? config.Runtime.AndroidVolumeButtonsControlServerVolume;
+        }
+
         if (rootNode["GoogleDrive"] is JsonObject googleDrive)
         {
             if (googleDrive["android_client_id"] is not null)

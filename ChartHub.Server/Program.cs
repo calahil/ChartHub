@@ -69,6 +69,7 @@ builder.Services.AddSingleton<IServerOnyxInstallService, ServerOnyxInstallServic
 builder.Services.AddSingleton<IDownloadJobInstallService, DownloadJobInstallService>();
 builder.Services.AddSingleton<ICloneHeroLibraryService, CloneHeroLibraryService>();
 builder.Services.AddSingleton<IDesktopEntryService, DesktopEntryService>();
+builder.Services.AddSingleton<IVolumeService, VolumeService>();
 builder.Services.AddHostedService<ServerPathValidatorHostedService>();
 builder.Services.AddHostedService<DownloadPipelineHostedService>();
 builder.Services.AddHostedService<DesktopEntryStartupHostedService>();
@@ -112,6 +113,7 @@ app.MapAuthEndpoints();
 app.MapDownloadEndpoints();
 app.MapCloneHeroEndpoints();
 app.MapDesktopEntryEndpoints();
+app.MapVolumeEndpoints();
 
 app.Run();
 

@@ -2,9 +2,14 @@
 using Android.App;
 using Android.Content.PM;
 using Android.OS;
+using Android.Views;
 
 using Avalonia;
 using Avalonia.Android;
+
+using ChartHub.Services;
+
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChartHub;
 
@@ -24,6 +29,17 @@ public class MainActivity : AvaloniaMainActivity
         {
             Window?.SetDecorFitsSystemWindows(true);
         }
+    }
+
+    public override bool OnKeyDown(Keycode keyCode, KeyEvent? e)
+    {
+        if (App.ServiceProvider?.GetService<IVolumeHardwareButtonSource>() is { } source
+            && source.TryHandlePlatformKey((int)keyCode))
+        {
+            return true;
+        }
+
+        return base.OnKeyDown(keyCode, e);
     }
 }
 #endif

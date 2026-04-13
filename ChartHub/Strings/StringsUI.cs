@@ -21,6 +21,7 @@ public class MainViewPageStrings : StringsUI
     public string Encore { get; } = "Encore";
     public string Downloads { get; } = "Downloads";
     public string DesktopEntry { get; } = "Apps";
+    public string Volume { get; } = "Volume";
     public string InstallSongs { get; } = "Install Songs";
     public string Settings { get; } = "Settings";
     public string Cancel { get; } = "avares://ChartHub/Resources/Svg/cancel_24dp.svg";

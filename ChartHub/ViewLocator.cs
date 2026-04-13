@@ -66,6 +66,7 @@ public class ViewLocator : IDataTemplate
             or DownloadViewModel
             or CloneHeroViewModel
             or DesktopEntryViewModel
+            or VolumeViewModel
             or SettingsViewModel
             or AppShellViewModel
             or SplashViewModel;

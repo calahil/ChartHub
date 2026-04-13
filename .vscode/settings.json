@@ -25,6 +25,10 @@
             "matchCommandLine": true
         },
         "scripts/setup-local-secrets.sh": true,
-        "sysctl": true
+        "sysctl": true,
+        "/^perl -0pi -e 's/\\^    services\\\\\\.AddSingleton<IVolumeHardwareButtonSource, AndroidVolumeHardwareButtonSource>\\\\\\(\\\\\\);\\$/        services\\.AddSingleton<IVolumeHardwareButtonSource, AndroidVolumeHardwareButtonSource>\\(\\);/m' ChartHub/Utilities/AppBootstrapper\\.cs$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }

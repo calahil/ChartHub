@@ -57,6 +57,12 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         set => QueueConfigUpdate(config => config.Runtime.InstallLogExpanded = value);
     }
 
+    public bool AndroidVolumeButtonsControlServerVolume
+    {
+        get => Runtime.AndroidVolumeButtonsControlServerVolume;
+        set => QueueConfigUpdate(config => config.Runtime.AndroidVolumeButtonsControlServerVolume = value);
+    }
+
     public AppGlobalSettings(ISettingsOrchestrator settingsOrchestrator)
     {
         _settingsOrchestrator = settingsOrchestrator;
@@ -130,6 +136,7 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(ServerApiAuthToken));
         OnPropertyChanged(nameof(ServerApiBaseUrl));
         OnPropertyChanged(nameof(InstallLogExpanded));
+        OnPropertyChanged(nameof(AndroidVolumeButtonsControlServerVolume));
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
