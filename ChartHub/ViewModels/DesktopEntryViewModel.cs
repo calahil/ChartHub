@@ -4,7 +4,9 @@ using System.Runtime.CompilerServices;
 
 using Avalonia.Threading;
 
+using ChartHub.Localization;
 using ChartHub.Services;
+using ChartHub.Strings;
 using ChartHub.Utilities;
 
 using CommunityToolkit.Mvvm.Input;
@@ -22,6 +24,8 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
     public bool IsCompanionMode => OperatingSystem.IsAndroid();
 
     public bool IsDesktopMode => !OperatingSystem.IsAndroid();
+
+    public DesktopEntryPageStrings PageStrings { get; } = new();
 
     private ObservableCollection<DesktopEntryCardItem> _entries = [];
     public ObservableCollection<DesktopEntryCardItem> Entries
@@ -53,7 +57,7 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    private string _statusMessage = "Desktop entry control not initialized.";
+    private string _statusMessage = UiLocalization.Get("DesktopEntry.NotInitialized");
     public string StatusMessage
     {
         get => _statusMessage;
@@ -114,7 +118,7 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
             await _uiInvoke(() =>
             {
                 Entries = [];
-                StatusMessage = "Configure ChartHub.Server URL and token to load desktop entries.";
+                StatusMessage = UiLocalization.Get("DesktopEntry.ConfigureLoad");
             });
             return;
         }
@@ -126,13 +130,13 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
             IReadOnlyList<ChartHubServerDesktopEntryResponse> items = await _serverApiClient
                 .ListDesktopEntriesAsync(baseUrl, bearerToken)
                 .ConfigureAwait(false);
-            await ApplySnapshotAsync(items, baseUrl, "Desktop entry list refreshed.").ConfigureAwait(false);
+            await ApplySnapshotAsync(items, baseUrl, UiLocalization.Get("DesktopEntry.ListRefreshed")).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = $"Failed to refresh desktop entries: {ex.Message}";
+                StatusMessage = UiLocalization.Format("DesktopEntry.RefreshFailed", ex.Message);
             });
         }
         finally
@@ -152,7 +156,7 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = "Configure ChartHub.Server URL and token to execute desktop entries.";
+                StatusMessage = UiLocalization.Get("DesktopEntry.ConfigureExecute");
             });
             return;
         }
@@ -175,14 +179,14 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = "Desktop entry is already running.";
+                StatusMessage = UiLocalization.Get("DesktopEntry.AlreadyRunning");
             });
         }
         catch (Exception ex)
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = $"Failed to execute desktop entry: {ex.Message}";
+                StatusMessage = UiLocalization.Format("DesktopEntry.ExecuteFailed", ex.Message);
             });
         }
         finally
@@ -202,7 +206,7 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = "Configure ChartHub.Server URL and token to stop desktop entries.";
+                StatusMessage = UiLocalization.Get("DesktopEntry.ConfigureStop");
             });
             return;
         }
@@ -225,14 +229,14 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = "SIGTERM sent but process is still running.";
+                StatusMessage = UiLocalization.Get("DesktopEntry.StillRunningAfterSigTerm");
             });
         }
         catch (Exception ex)
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = $"Failed to stop desktop entry: {ex.Message}";
+                StatusMessage = UiLocalization.Format("DesktopEntry.StopFailed", ex.Message);
             });
         }
         finally
@@ -255,7 +259,7 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
                                .WithCancellation(cancellationToken)
                                .ConfigureAwait(false))
             {
-                await ApplySnapshotAsync(items, baseUrl, "Desktop entry status updated.").ConfigureAwait(false);
+                await ApplySnapshotAsync(items, baseUrl, UiLocalization.Get("DesktopEntry.StatusUpdated")).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -265,7 +269,7 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = $"Desktop entry stream disconnected: {ex.Message}";
+                StatusMessage = UiLocalization.Format("DesktopEntry.StreamDisconnected", ex.Message);
             });
         }
     }
@@ -451,7 +455,9 @@ public sealed class DesktopEntryCardItem : INotifyPropertyChanged
 
     public bool CanKill => IsRunning;
 
-    public string PidLabel => ProcessId.HasValue ? $"PID: {ProcessId.Value}" : "PID: -";
+    public string PidLabel => ProcessId.HasValue
+        ? UiLocalization.Format("DesktopEntry.PidFormat", ProcessId.Value)
+        : UiLocalization.Get("DesktopEntry.PidMissing");
 
     public void Apply(string status, int? processId)
     {

@@ -44,6 +44,7 @@
                           Background="{StaticResource ThemeBackgroundBrush}">
                         <Button Grid.Row="0"
                                 Margin="10,0,0,0"
+                            CornerRadius="10"
                                 Command="{Binding ShowFiltersPaneCommand}"
                                 HorizontalAlignment="Right">
                             <Image Source="{Binding RhythmVerseViewModel.PageStrings.ShowFilters, Converter={StaticResource AssetPathToImageConverter}}"
@@ -56,13 +57,14 @@
                             IsVisible="{Binding IsFilterPaneOpen}"
                             BorderBrush="{StaticResource ThemeBorderMidBrush}"
                             BorderThickness="1"
+                            CornerRadius="8"
                             Padding="12"
                             Background="{StaticResource ListBoxBackground}">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <Grid>
                                 <StackPanel Spacing="12"
                                             IsVisible="{Binding ShowRhythmVerseFilters}">
-                                    <TextBlock Text="RhythmVerse Filters"
+                                            <TextBlock Text="{Binding RhythmVerseViewModel.PageStrings.FilterSectionTitle}"
                                                FontSize="16"
                                                FontWeight="Bold"
                                                Foreground="{StaticResource ThemeForegroundBrush}" />
@@ -96,117 +98,119 @@
                                         </ListBox.ItemTemplate>
                                     </ListBox>
 
-                                    <Button Command="{Binding RhythmVerseViewModel.RefreshButtonCommand}">
-                                        <TextBlock Text="Apply RhythmVerse Filters" />
+                                    <Button Command="{Binding RhythmVerseViewModel.RefreshButtonCommand}"
+                                            CornerRadius="10">
+                                        <TextBlock Text="{Binding RhythmVerseViewModel.PageStrings.ApplyFilters}" />
                                     </Button>
                                 </StackPanel>
 
                                 <StackPanel Spacing="10"
                                             IsVisible="{Binding ShowEncoreFilters}">
-                                    <TextBlock Text="Encore Advanced Filters"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.FilterSectionTitle}"
                                                FontSize="16"
                                                FontWeight="Bold"
                                                Foreground="{StaticResource ThemeForegroundBrush}" />
 
-                                    <TextBlock Text="Instrument"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.FilterLabelInstrument}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
                                     <ComboBox ItemsSource="{Binding EncoreViewModel.Instruments}"
                                               SelectedItem="{Binding EncoreViewModel.SelectedInstrument}" />
-                                    <TextBlock Text="Difficulty"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.FilterLabelDifficulty}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
                                     <ComboBox ItemsSource="{Binding EncoreViewModel.Difficulties}"
                                               SelectedItem="{Binding EncoreViewModel.SelectedDifficulty}" />
-                                    <TextBlock Text="Drum Type"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.FilterLabelDrumType}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
                                     <ComboBox ItemsSource="{Binding EncoreViewModel.DrumTypes}"
                                               SelectedItem="{Binding EncoreViewModel.SelectedDrumType}" />
-                                    <TextBlock Text="Sort Column"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.FilterLabelSortColumn}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
                                     <ComboBox ItemsSource="{Binding EncoreViewModel.PageStrings.SortColumns}"
                                               SelectedItem="{Binding EncoreViewModel.SelectedSort}" />
-                                    <TextBlock Text="Sort Direction"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.FilterLabelSortDirection}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
                                     <ComboBox ItemsSource="{Binding EncoreViewModel.PageStrings.SortDirections}"
                                               SelectedItem="{Binding EncoreViewModel.SelectedSortDirection}" />
 
-                                    <TextBlock Text="Advanced Name"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelAdvancedName}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <TextBox PlaceholderText="Advanced name"
+                                    <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderName}"
                                              Text="{Binding EncoreViewModel.AdvancedName}" />
-                                    <TextBlock Text="Advanced Artist"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelAdvancedArtist}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <TextBox PlaceholderText="Advanced artist"
+                                    <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderArtist}"
                                              Text="{Binding EncoreViewModel.AdvancedArtist}" />
-                                    <TextBlock Text="Advanced Charter"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelAdvancedCharter}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <TextBox PlaceholderText="Advanced charter"
+                                    <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderCharter}"
                                              Text="{Binding EncoreViewModel.AdvancedCharter}" />
-                                    <TextBlock Text="Advanced Album"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelAdvancedAlbum}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <TextBox PlaceholderText="Advanced album"
+                                    <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderAlbum}"
                                              Text="{Binding EncoreViewModel.AdvancedAlbum}" />
-                                    <TextBlock Text="Advanced Genre"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelAdvancedGenre}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <TextBox PlaceholderText="Advanced genre"
+                                    <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderGenre}"
                                              Text="{Binding EncoreViewModel.AdvancedGenre}" />
-                                    <TextBlock Text="Advanced Year"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelAdvancedYear}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <TextBox PlaceholderText="Advanced year"
+                                    <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderYear}"
                                              Text="{Binding EncoreViewModel.AdvancedYear}" />
-                                    <TextBlock Text="Min Year"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelMinYear}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <TextBox PlaceholderText="Min year"
+                                    <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderMinYear}"
                                              Text="{Binding EncoreViewModel.MinYear}" />
-                                    <TextBlock Text="Max Year"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelMaxYear}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <TextBox PlaceholderText="Max year"
+                                    <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderMaxYear}"
                                              Text="{Binding EncoreViewModel.MaxYear}" />
-                                    <TextBlock Text="Min Length (ms)"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelMinLength}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <TextBox PlaceholderText="Min length (ms)"
+                                    <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderMinLength}"
                                              Text="{Binding EncoreViewModel.MinLength}" />
-                                    <TextBlock Text="Max Length (ms)"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelMaxLength}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <TextBox PlaceholderText="Max length (ms)"
+                                    <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderMaxLength}"
                                              Text="{Binding EncoreViewModel.MaxLength}" />
 
-                                    <TextBlock Text="Drums Reviewed"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelDrumsReviewed}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <CheckBox Content="Drums reviewed"
+                                    <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckDrumsReviewed}"
                                               IsChecked="{Binding EncoreViewModel.DrumsReviewed}" />
-                                    <TextBlock Text="Has Video"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelHasVideo}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <CheckBox Content="Has video"
+                                    <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckHasVideo}"
                                               IsThreeState="True"
                                               IsChecked="{Binding EncoreViewModel.HasVideoBackground}" />
-                                    <TextBlock Text="Has Lyrics"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelHasLyrics}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <CheckBox Content="Has lyrics"
+                                    <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckHasLyrics}"
                                               IsThreeState="True"
                                               IsChecked="{Binding EncoreViewModel.HasLyrics}" />
-                                    <TextBlock Text="Has Vocals"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelHasVocals}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <CheckBox Content="Has vocals"
+                                    <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckHasVocals}"
                                               IsThreeState="True"
                                               IsChecked="{Binding EncoreViewModel.HasVocals}" />
-                                    <TextBlock Text="Has 2x Kick"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.Label2xKick}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <CheckBox Content="Has 2x kick"
+                                    <CheckBox Content="{Binding EncoreViewModel.PageStrings.Check2xKick}"
                                               IsThreeState="True"
                                               IsChecked="{Binding EncoreViewModel.Has2xKick}" />
-                                    <TextBlock Text="Has Issues"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelHasIssues}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <CheckBox Content="Has issues"
+                                    <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckHasIssues}"
                                               IsThreeState="True"
                                               IsChecked="{Binding EncoreViewModel.HasIssues}" />
-                                    <TextBlock Text="Modchart"
+                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.LabelModchart}"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                    <CheckBox Content="Modchart"
+                                    <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckModchart}"
                                               IsThreeState="True"
                                               IsChecked="{Binding EncoreViewModel.Modchart}" />
 
-                                    <Button Command="{Binding EncoreViewModel.RefreshCommand}">
-                                        <TextBlock Text="Apply Encore Filters" />
+                                    <Button Command="{Binding EncoreViewModel.RefreshCommand}"
+                                            CornerRadius="10">
+                                        <TextBlock Text="{Binding EncoreViewModel.PageStrings.ApplyFilters}" />
                                     </Button>
                                 </StackPanel>
 
@@ -214,11 +218,11 @@
                                             HorizontalAlignment="Center"
                                             VerticalAlignment="Center"
                                             IsVisible="{Binding ShowFilterFallback}">
-                                    <TextBlock Text="Filters"
+                                            <TextBlock Text="{Binding PageStrings.FilterFallbackTitle}"
                                                FontSize="16"
                                                FontWeight="Bold"
                                                HorizontalAlignment="Center" />
-                                    <TextBlock Text="Select either the RhythmVerse or Encore tab to view filters."
+                                            <TextBlock Text="{Binding PageStrings.FilterFallbackMessage}"
                                                TextWrapping="Wrap"
                                                HorizontalAlignment="Center"
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
@@ -284,46 +288,53 @@
                                 Spacing="10"
                                         HorizontalAlignment="Left"
                                         VerticalAlignment="Top">
-                            <TextBlock Text="Navigation"
+                                    <TextBlock Text="{Binding PageStrings.NavSectionTitle}"
                                    Margin="0,2,0,8"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource ThemeForegroundLowBrush}" />
                                 <Button Content="{Binding PageStrings.RhythmVerse}"
                                         Command="{Binding GoRhythmVerseCommand}"
+                                    CornerRadius="10"
                                         HorizontalContentAlignment="Left"
                                 Height="44"
                                         Width="220" />
                                 <Button Content="{Binding PageStrings.Encore}"
                                         Command="{Binding GoEncoreCommand}"
+                                    CornerRadius="10"
                                         HorizontalContentAlignment="Left"
                                 Height="44"
                                         Width="220" />
                                 <Button Content="{Binding PageStrings.Downloads}"
                                         Command="{Binding GoDownloadsCommand}"
+                                    CornerRadius="10"
                                         HorizontalContentAlignment="Left"
                                 Height="44"
                                         Width="220"
                                         IsVisible="{Binding IsDownloadTabVisible}" />
                                 <Button Content="{Binding PageStrings.CloneHero}"
                                         Command="{Binding GoCloneHeroCommand}"
+                                    CornerRadius="10"
                                         HorizontalContentAlignment="Left"
                                 Height="44"
                                         Width="220"
                                         IsVisible="{Binding IsCloneHeroTabVisible}" />
                                 <Button Content="{Binding PageStrings.DesktopEntry}"
                                     Command="{Binding GoDesktopEntryCommand}"
+                                    CornerRadius="10"
                                     HorizontalContentAlignment="Left"
                                 Height="44"
                                     Width="220"
                                     IsVisible="{Binding IsDesktopEntryTabVisible}" />
                                 <Button Content="{Binding PageStrings.Volume}"
                                     Command="{Binding GoVolumeCommand}"
+                                    CornerRadius="10"
                                     HorizontalContentAlignment="Left"
                                 Height="44"
                                     Width="220"
                                     IsVisible="{Binding IsVolumeTabVisible}" />
                                 <Button Content="{Binding PageStrings.Settings}"
                                         Command="{Binding GoSettingsCommand}"
+                                    CornerRadius="10"
                                         HorizontalContentAlignment="Left"
                                 Height="44"
                                         Width="220"
@@ -335,7 +346,8 @@
                                         Spacing="8"
                                         HorizontalAlignment="Stretch"
                                         VerticalAlignment="Top">
-                                <Button Content="Back To Navigation"
+                                    <Button Content="{Binding PageStrings.BackToNavigation}"
+                                        CornerRadius="10"
                                         HorizontalAlignment="Left"
                                     Height="40"
                                         Command="{Binding ShowAndroidNavListCommand}" />
@@ -343,7 +355,7 @@
                                     <Grid>
                                         <StackPanel Spacing="12"
                                                     IsVisible="{Binding ShowRhythmVerseFilters}">
-                                            <TextBlock Text="RhythmVerse Filters"
+                                                    <TextBlock Text="{Binding RhythmVerseViewModel.PageStrings.FilterSectionTitle}"
                                                        FontSize="16"
                                                        FontWeight="Bold"
                                                        Foreground="{StaticResource ThemeForegroundBrush}" />
@@ -361,14 +373,15 @@
                                                     </DataTemplate>
                                                 </ListBox.ItemTemplate>
                                             </ListBox>
-                                            <Button Command="{Binding RhythmVerseViewModel.RefreshButtonCommand}">
-                                                <TextBlock Text="Apply RhythmVerse Filters" />
+                                            <Button Command="{Binding RhythmVerseViewModel.RefreshButtonCommand}"
+                                                    CornerRadius="10">
+                                                <TextBlock Text="{Binding RhythmVerseViewModel.PageStrings.ApplyFilters}" />
                                             </Button>
                                         </StackPanel>
 
                                         <StackPanel Spacing="10"
                                                     IsVisible="{Binding ShowEncoreFilters}">
-                                            <TextBlock Text="Encore Advanced Filters"
+                                                    <TextBlock Text="{Binding EncoreViewModel.PageStrings.FilterSectionTitle}"
                                                        FontSize="16"
                                                        FontWeight="Bold"
                                                        Foreground="{StaticResource ThemeForegroundBrush}" />
@@ -382,48 +395,49 @@
                                                       SelectedItem="{Binding EncoreViewModel.SelectedSort}" />
                                             <ComboBox ItemsSource="{Binding EncoreViewModel.PageStrings.SortDirections}"
                                                       SelectedItem="{Binding EncoreViewModel.SelectedSortDirection}" />
-                                            <TextBox PlaceholderText="Advanced name"
+                                            <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderName}"
                                                      Text="{Binding EncoreViewModel.AdvancedName}" />
-                                            <TextBox PlaceholderText="Advanced artist"
+                                            <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderArtist}"
                                                      Text="{Binding EncoreViewModel.AdvancedArtist}" />
-                                            <TextBox PlaceholderText="Advanced charter"
+                                            <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderCharter}"
                                                      Text="{Binding EncoreViewModel.AdvancedCharter}" />
-                                            <TextBox PlaceholderText="Advanced album"
+                                            <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderAlbum}"
                                                      Text="{Binding EncoreViewModel.AdvancedAlbum}" />
-                                            <TextBox PlaceholderText="Advanced genre"
+                                            <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderGenre}"
                                                      Text="{Binding EncoreViewModel.AdvancedGenre}" />
-                                            <TextBox PlaceholderText="Advanced year"
+                                            <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderYear}"
                                                      Text="{Binding EncoreViewModel.AdvancedYear}" />
-                                            <TextBox PlaceholderText="Min year"
+                                            <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderMinYear}"
                                                      Text="{Binding EncoreViewModel.MinYear}" />
-                                            <TextBox PlaceholderText="Max year"
+                                            <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderMaxYear}"
                                                      Text="{Binding EncoreViewModel.MaxYear}" />
-                                            <TextBox PlaceholderText="Min length (ms)"
+                                            <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderMinLength}"
                                                      Text="{Binding EncoreViewModel.MinLength}" />
-                                            <TextBox PlaceholderText="Max length (ms)"
+                                            <TextBox PlaceholderText="{Binding EncoreViewModel.PageStrings.PlaceholderMaxLength}"
                                                      Text="{Binding EncoreViewModel.MaxLength}" />
-                                            <CheckBox Content="Drums reviewed"
+                                            <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckDrumsReviewed}"
                                                       IsChecked="{Binding EncoreViewModel.DrumsReviewed}" />
-                                            <CheckBox Content="Has video"
+                                            <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckHasVideo}"
                                                       IsThreeState="True"
                                                       IsChecked="{Binding EncoreViewModel.HasVideoBackground}" />
-                                            <CheckBox Content="Has lyrics"
+                                            <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckHasLyrics}"
                                                       IsThreeState="True"
                                                       IsChecked="{Binding EncoreViewModel.HasLyrics}" />
-                                            <CheckBox Content="Has vocals"
+                                            <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckHasVocals}"
                                                       IsThreeState="True"
                                                       IsChecked="{Binding EncoreViewModel.HasVocals}" />
-                                            <CheckBox Content="Has 2x kick"
+                                            <CheckBox Content="{Binding EncoreViewModel.PageStrings.Check2xKick}"
                                                       IsThreeState="True"
                                                       IsChecked="{Binding EncoreViewModel.Has2xKick}" />
-                                            <CheckBox Content="Has issues"
+                                            <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckHasIssues}"
                                                       IsThreeState="True"
                                                       IsChecked="{Binding EncoreViewModel.HasIssues}" />
-                                            <CheckBox Content="Modchart"
+                                            <CheckBox Content="{Binding EncoreViewModel.PageStrings.CheckModchart}"
                                                       IsThreeState="True"
                                                       IsChecked="{Binding EncoreViewModel.Modchart}" />
-                                            <Button Command="{Binding EncoreViewModel.RefreshCommand}">
-                                                <TextBlock Text="Apply Encore Filters" />
+                                            <Button Command="{Binding EncoreViewModel.RefreshCommand}"
+                                                    CornerRadius="10">
+                                                <TextBlock Text="{Binding EncoreViewModel.PageStrings.ApplyFilters}" />
                                             </Button>
                                         </StackPanel>
 
@@ -431,11 +445,11 @@
                                                     HorizontalAlignment="Center"
                                                     VerticalAlignment="Center"
                                                     IsVisible="{Binding ShowFilterFallback}">
-                                            <TextBlock Text="Filters"
+                                                    <TextBlock Text="{Binding PageStrings.FilterFallbackTitle}"
                                                        FontSize="16"
                                                        FontWeight="Bold"
                                                        HorizontalAlignment="Center" />
-                                            <TextBlock Text="Open RhythmVerse or Encore to configure filters."
+                                                    <TextBlock Text="{Binding PageStrings.FilterFallbackMessageAndroid}"
                                                        TextWrapping="Wrap"
                                                        HorizontalAlignment="Center"
                                                        Foreground="{StaticResource ThemeForegroundLowBrush}" />
@@ -446,7 +460,8 @@
                         </Grid>
 
                         <Button Grid.Row="1"
-                                Content="Filters"
+                                Content="{Binding PageStrings.FiltersButton}"
+                            CornerRadius="10"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Bottom"
                             Height="44"
@@ -464,7 +479,8 @@
                         BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="Auto,*">
                         <Button Grid.Column="0"
-                                Content="Menu"
+                                Content="{Binding PageStrings.MenuButton}"
+                            CornerRadius="10"
                             Height="40"
                                 Command="{Binding ToggleAndroidNavPaneCommand}" />
                         <TextBlock Grid.Column="1"

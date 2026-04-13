@@ -34,6 +34,14 @@ public sealed class RuntimeAppConfig
     [SettingHotReloadable(true)]
     public bool InstallLogExpanded { get; set; } = true;
 
+    [SettingGroup("UI")]
+    [SettingDisplay("UI Culture")]
+    [SettingDescription("Culture name used for localized UI text (example: en-US).")]
+    [SettingEditor(SettingEditorKind.Text)]
+    [SettingHotReloadable(false)]
+    [SettingRequiresRestart]
+    public string UiCulture { get; set; } = "en-US";
+
     [SettingGroup("ChartHub Server")]
     [SettingDisplay("Android Volume Buttons Control Server Volume")]
     [SettingEditor(SettingEditorKind.Toggle)]

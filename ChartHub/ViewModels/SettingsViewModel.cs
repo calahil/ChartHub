@@ -15,7 +15,9 @@ using ChartHub.Configuration.Metadata;
 using ChartHub.Configuration.Models;
 using ChartHub.Configuration.Secrets;
 using ChartHub.Configuration.Stores;
+using ChartHub.Localization;
 using ChartHub.Services;
+using ChartHub.Strings;
 using ChartHub.Utilities;
 
 using CommunityToolkit.Mvvm.Input;
@@ -51,7 +53,9 @@ public sealed class SettingsFieldViewModel : INotifyPropertyChanged
     public bool IsDirectoryPicker => EditorKind == SettingEditorKind.DirectoryPicker;
     public bool IsFilePicker => EditorKind == SettingEditorKind.FilePicker;
     public bool IsPathPicker => IsDirectoryPicker || IsFilePicker;
-    public string BrowseButtonText => IsDirectoryPicker ? "Browse Folder" : "Browse File";
+    public string BrowseButtonText => IsDirectoryPicker
+        ? UiLocalization.Get("Settings.BrowseFolder")
+        : UiLocalization.Get("Settings.BrowseFile");
     public bool HasDescription => !string.IsNullOrWhiteSpace(Description);
     public IReadOnlyList<string> Options { get; init; } = Array.Empty<string>();
 
@@ -215,7 +219,9 @@ public sealed class SecretFieldViewModel : INotifyPropertyChanged
 
     public bool HasDraftValue => !string.IsNullOrWhiteSpace(Value);
 
-    public string StorageStatus => HasStoredValue ? "Stored" : "Not set";
+    public string StorageStatus => HasStoredValue
+        ? UiLocalization.Get("Settings.StorageStored")
+        : UiLocalization.Get("Settings.StorageNotSet");
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -229,6 +235,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 {
 
     private readonly ISettingsOrchestrator _settings;
+    public SettingsPageStrings PageStrings { get; } = new();
     private readonly ISecretStore _secretStore;
     private readonly IGoogleAuthProvider _googleAuthProvider;
     private readonly IChartHubServerApiClient _serverApiClient;
@@ -241,7 +248,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private bool _isSaving;
     private bool _showDeveloperSettings;
     private bool _isServerAuthenticationBusy;
-    private string _serverAuthenticationStatusMessage = "Not authenticated with ChartHub Server.";
+    private string _serverAuthenticationStatusMessage = UiLocalization.Get("Settings.NotAuthenticated");
     private string? _serverAuthenticationErrorMessage;
 
     public ObservableCollection<SettingsFieldViewModel> Fields { get; } = [];
@@ -424,8 +431,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         {
             await RunOnUiAsync(() =>
             {
-                ServerAuthenticationErrorMessage = "Set Runtime.ServerApiBaseUrl before authenticating.";
-                ServerAuthenticationStatusMessage = "ChartHub Server authentication is not configured.";
+                ServerAuthenticationErrorMessage = UiLocalization.Get("Settings.AuthBaseUrlRequired");
+                ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthNotConfigured");
             }).ConfigureAwait(false);
             return;
         }
@@ -434,7 +441,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         {
             IsServerAuthenticationBusy = true;
             ServerAuthenticationErrorMessage = null;
-            ServerAuthenticationStatusMessage = "Opening Google sign-in...";
+            ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthOpeningGoogleSignIn");
         }).ConfigureAwait(false);
 
         try
@@ -458,7 +465,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
             await RunOnUiAsync(() =>
             {
-                ServerAuthenticationStatusMessage = "ChartHub Server authentication succeeded.";
+                ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthSucceeded");
             }).ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -467,7 +474,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             await RunOnUiAsync(() =>
             {
                 ServerAuthenticationErrorMessage = errorMessage;
-                ServerAuthenticationStatusMessage = "ChartHub Server authentication failed.";
+                ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthFailed");
             }).ConfigureAwait(false);
             Logger.LogError("Auth", "ChartHub Server authentication failed", ex);
         }
@@ -485,7 +492,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         string googleIdToken = GetGoogleIdTokenOrThrow(credential);
         await RunOnUiAsync(() =>
         {
-            ServerAuthenticationStatusMessage = "Exchanging Google token with ChartHub Server...";
+            ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthExchangingGoogleToken");
         }).ConfigureAwait(false);
 
         try
@@ -496,7 +503,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         {
             await RunOnUiAsync(() =>
             {
-                ServerAuthenticationStatusMessage = "Google token expired. Re-authenticating...";
+                ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthTokenExpired");
             }).ConfigureAwait(false);
             await _googleAuthProvider.SignOutAsync(credential).ConfigureAwait(false);
 
@@ -507,7 +514,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
             await RunOnUiAsync(() =>
             {
-                ServerAuthenticationStatusMessage = "Retrying token exchange with ChartHub Server...";
+                ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthRetryExchange");
             }).ConfigureAwait(false);
             return await _serverApiClient.ExchangeGoogleTokenAsync(baseUrl, refreshedGoogleIdToken).ConfigureAwait(false);
         }
@@ -588,8 +595,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     {
         bool hasToken = !string.IsNullOrWhiteSpace(_settings.Current.Runtime.ServerApiAuthToken);
         ServerAuthenticationStatusMessage = hasToken
-            ? "ChartHub Server token is configured."
-            : "Not authenticated with ChartHub Server.";
+            ? UiLocalization.Get("Settings.AuthTokenConfigured")
+            : UiLocalization.Get("Settings.NotAuthenticated");
 
         if (!hasToken)
         {
@@ -915,7 +922,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                     ["fieldKeys"] = string.Join(",", Fields.Where(f => f.HasError).Select(f => f.Key)),
                     ["elapsedMs"] = saveStopwatch.ElapsedMilliseconds,
                 });
-                StatusMessage = "Settings validation failed. Review highlighted fields.";
+                StatusMessage = UiLocalization.Get("Settings.ValidationFailed");
                 return;
             }
 
@@ -945,7 +952,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                     ["fieldKeys"] = string.Join(",", result.Failures.Select(f => f.Key)),
                     ["elapsedMs"] = saveStopwatch.ElapsedMilliseconds,
                 });
-                StatusMessage = "Settings validation failed. Review highlighted fields.";
+                StatusMessage = UiLocalization.Get("Settings.ValidationFailed");
                 return;
             }
 
@@ -958,11 +965,11 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             if (requiresReloadAfterSave)
             {
                 await _settings.ReloadAsync();
-                StatusMessage = "Settings saved and reloaded from current configuration.";
+                StatusMessage = UiLocalization.Get("Settings.SavedReloaded");
             }
             else
             {
-                StatusMessage = "Settings saved.";
+                StatusMessage = UiLocalization.Get("Settings.Saved");
             }
         }
         catch (Exception ex)
@@ -972,7 +979,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 ["fieldCount"] = Fields.Count,
                 ["elapsedMs"] = saveStopwatch.ElapsedMilliseconds,
             });
-            StatusMessage = "Settings save failed. See logs for details.";
+            StatusMessage = UiLocalization.Get("Settings.SaveFailed");
         }
         finally
         {
@@ -1048,12 +1055,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         string value = field.StringValue?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(value))
         {
-            return "A path value is required.";
+            return UiLocalization.Get("Settings.PathRequired");
         }
 
         if (Uri.TryCreate(value, UriKind.Absolute, out Uri? uri) && !uri.IsFile)
         {
-            return "Path must be a local filesystem path.";
+            return UiLocalization.Get("Settings.PathMustBeLocal");
         }
 
         string path = value;
@@ -1080,7 +1087,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
         if (File.Exists(path))
         {
-            return "Expected a directory path, but the path points to a file.";
+            return UiLocalization.Get("Settings.DirectoryExpected");
         }
 
         string? parent = Path.GetDirectoryName(path);
@@ -1089,7 +1096,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             return null;
         }
 
-        return "Directory does not exist and parent folder is not available.";
+        return UiLocalization.Get("Settings.DirectoryParentMissing");
     }
 
     private static string? ValidateFilePath(string path)
@@ -1101,7 +1108,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
         if (Directory.Exists(path))
         {
-            return "Expected a file path, but the path points to a directory.";
+            return UiLocalization.Get("Settings.FileExpected");
         }
 
         string? parent = Path.GetDirectoryName(path);
@@ -1110,7 +1117,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             return null;
         }
 
-        return "File does not exist and parent folder is not available.";
+        return UiLocalization.Get("Settings.FileParentMissing");
     }
 
     private static void ApplyField(AppConfigRoot config, SettingsFieldViewModel field)
@@ -1171,7 +1178,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             await _secretStore.SetAsync(field.Key, field.Value.Trim());
             field.Value = string.Empty;
             field.HasStoredValue = true;
-            StatusMessage = $"Saved secret: {field.Label}";
+            StatusMessage = UiLocalization.Format("Settings.SecretSaved", field.Label);
         }
         catch (Exception ex)
         {
@@ -1180,7 +1187,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 ["secretKey"] = field.Key,
                 ["label"] = field.Label,
             });
-            StatusMessage = $"Failed to save secret: {field.Label}";
+            StatusMessage = UiLocalization.Format("Settings.SecretSaveFailed", field.Label);
         }
         finally
         {
@@ -1201,7 +1208,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             await _secretStore.RemoveAsync(field.Key);
             field.Value = string.Empty;
             field.HasStoredValue = false;
-            StatusMessage = $"Cleared secret: {field.Label}";
+            StatusMessage = UiLocalization.Format("Settings.SecretCleared", field.Label);
         }
         catch (Exception ex)
         {
@@ -1210,7 +1217,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 ["secretKey"] = field.Key,
                 ["label"] = field.Label,
             });
-            StatusMessage = $"Failed to clear secret: {field.Label}";
+            StatusMessage = UiLocalization.Format("Settings.SecretClearFailed", field.Label);
         }
         finally
         {

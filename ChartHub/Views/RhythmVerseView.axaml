@@ -306,7 +306,7 @@
                                                                                                                 BorderBrush="{StaticResource ThemeAccentBrush}"
                                                                                                                 Background="{StaticResource ThemeControlMidBrush}"
                                                                                                                 IsVisible="{Binding IsInLibrary}">
-                                                                                                                <TextBlock Text="In Library"
+                                                                                                                <TextBlock Text="{Binding #SongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.InLibrary}"
                                                                                                                            FontSize="11"
                                                                                                                            FontWeight="SemiBold"
                                                                                                                            Foreground="{StaticResource ThemeAccentBrush}" />
@@ -444,7 +444,7 @@
                                                                                                 BorderBrush="{StaticResource ThemeAccentBrush}"
                                                                                                 Background="{StaticResource ThemeControlMidBrush}"
                                                                                                 IsVisible="{Binding IsInLibrary}">
-                                                                                                <TextBlock Text="In Library"
+                                                                                                <TextBlock Text="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.InLibrary}"
                                                                                                            FontSize="11"
                                                                                                            FontWeight="SemiBold"
                                                                                                            Foreground="{StaticResource ThemeAccentBrush}" />

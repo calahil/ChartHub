@@ -14,12 +14,14 @@
             <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
                 <Button Content="{Binding PageStrings.InstallSongs}"
                         HorizontalContentAlignment="Center"
+                        CornerRadius="10"
                         IsEnabled="{Binding IsAnyChecked}"
                         Command="{Binding InstallSongs}"
                         VerticalAlignment="Stretch"
                         Width="140" />
-                <Button Content="Delete Selected"
+                    <Button Content="{Binding PageStrings.DeleteSelected}"
                         HorizontalContentAlignment="Center"
+                        CornerRadius="10"
                         IsEnabled="{Binding IsAnyChecked}"
                         Command="{Binding DeleteSelectedDownloadsCommand}"
                     VerticalAlignment="Stretch"
@@ -31,12 +33,13 @@
                 Padding="10"
                 BorderBrush="{StaticResource ThemeBorderMidBrush}"
                 BorderThickness="1"
+            CornerRadius="8"
                 IsVisible="{Binding IsInstallPanelVisible}">
                 <Grid RowDefinitions="Auto,Auto,Auto,*">
                 <Grid Grid.Row="0"
                         ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto">
                     <TextBlock Grid.Column="0"
-                           Text="Install Progress"
+                           Text="{Binding PageStrings.InstallProgressLabel}"
                            FontWeight="Bold"
                            VerticalAlignment="Center" />
                     <TextBlock Grid.Column="1"
@@ -55,20 +58,24 @@
                     </Border>
                     <Button Grid.Column="3"
                             Margin="10,0,0,0"
+                        CornerRadius="10"
                         Content="{Binding InstallLogToggleText}"
                         Command="{Binding ToggleInstallLogCommand}" />
                     <Button Grid.Column="4"
                             Margin="10,0,0,0"
-                        Content="Clear Log"
+                        CornerRadius="10"
+                        Content="{Binding PageStrings.ClearLog}"
                         Command="{Binding ClearInstallLogCommand}" />
                     <Button Grid.Column="5"
                             Margin="10,0,0,0"
-                        Content="Cancel"
+                        CornerRadius="10"
+                        Content="{Binding PageStrings.Cancel}"
                         Command="{Binding CancelInstallCommand}"
                         IsEnabled="{Binding IsInstallActive}" />
                     <Button Grid.Column="6"
                             Margin="10,0,0,0"
-                        Content="Dismiss"
+                        CornerRadius="10"
+                        Content="{Binding PageStrings.Dismiss}"
                         Command="{Binding DismissInstallPanelCommand}"
                         IsEnabled="{Binding IsInstallIdle}" />
                 </Grid>
@@ -98,13 +105,14 @@
                         MaxHeight="260"
                         BorderBrush="{StaticResource ThemeBorderMidBrush}"
                         BorderThickness="1"
+                    CornerRadius="8"
                         IsVisible="{Binding IsInstallLogExpanded}">
                     <ScrollViewer x:Name="InstallLogScrollViewer"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled">
                         <ScrollViewer.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="Copy All Logs"
+                                <MenuItem Header="{Binding #InstallLogScrollViewer.((viewmodels:DownloadViewModel)DataContext).PageStrings.CopyAllLogs}"
                                           IsEnabled="{Binding CanCopyAllInstallLogs}"
                                           Click="CopyAllLogs_Click" />
                             </ContextMenu>
@@ -118,7 +126,7 @@
                                                    TextWrapping="Wrap">
                                             <TextBlock.ContextMenu>
                                                 <ContextMenu>
-                                                    <MenuItem Header="Copy"
+                                                    <MenuItem Header="{Binding #InstallLogItemsControl.((viewmodels:DownloadViewModel)DataContext).PageStrings.CopyLog}"
                                                               Click="CopyLogItem_Click" />
                                                 </ContextMenu>
                                             </TextBlock.ContextMenu>
@@ -138,17 +146,17 @@
                         Orientation="Horizontal"
                         Spacing="8"
                         HorizontalAlignment="Right">
-                <TextBlock Text="State"
+                    <TextBlock Text="{Binding PageStrings.StateLabel}"
                            VerticalAlignment="Center" />
                 <ComboBox ItemsSource="{Binding QueueStateFilters}"
                           SelectedItem="{Binding SelectedQueueStateFilter}"
                           Width="170" />
-                <TextBlock Text="Sort"
+                    <TextBlock Text="{Binding PageStrings.SortLabel}"
                            VerticalAlignment="Center" />
                 <ComboBox ItemsSource="{Binding QueueSortOptions}"
                           SelectedItem="{Binding SelectedQueueSort}"
                           Width="140" />
-                <CheckBox Content="Descending"
+                    <CheckBox Content="{Binding PageStrings.Descending}"
                           IsChecked="{Binding IsQueueSortDescending}"
                           VerticalAlignment="Center" />
             </StackPanel>
@@ -157,6 +165,7 @@
                     Margin="0,8,0,0"
                     BorderBrush="{StaticResource ThemeBorderMidBrush}"
                     BorderThickness="1"
+                    CornerRadius="8"
                     Padding="10">
                 <Grid>
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
@@ -167,7 +176,7 @@
                                 <DataTemplate>
                                     <Border Margin="0,0,0,6"
                                             Padding="10"
-                                            CornerRadius="10"
+                                            CornerRadius="8"
                                             BorderBrush="{StaticResource ThemeBorderMidBrush}"
                                             BorderThickness="1"
                                             Background="{StaticResource ThemeControlLowBrush}">
@@ -223,12 +232,12 @@
                     </ScrollViewer>
                     <Border IsVisible="{Binding ShowQueueEmptyState}"
                             Padding="10"
-                            CornerRadius="10"
+                            CornerRadius="8"
                             BorderBrush="{StaticResource ThemeBorderMidBrush}"
                             BorderThickness="1"
                             Background="{StaticResource ThemeControlLowBrush}">
                         <StackPanel Spacing="4">
-                            <TextBlock Text="No downloads are available from ChartHub.Server with the current filters."
+                            <TextBlock Text="{Binding PageStrings.EmptyState}"
                                        TextWrapping="Wrap"
                                        Foreground="{StaticResource ThemeForegroundLowBrush}" />
                         </StackPanel>

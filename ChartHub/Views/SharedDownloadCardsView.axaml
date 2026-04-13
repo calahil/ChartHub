@@ -37,6 +37,7 @@
     <Border Classes="download-card-root"
             BorderBrush="{StaticResource ThemeBorderMidBrush}"
             BorderThickness="1"
+            CornerRadius="8"
             IsVisible="{Binding HasActiveDownloads, ElementName=Root}">
         <StackPanel Spacing="8">
             <TextBlock Text="{Binding Title, ElementName=Root}"
@@ -67,6 +68,7 @@
                                        Grid.Column="1">
                                     <Button Width="24"
                                             Height="24"
+                                            CornerRadius="10"
                                             Command="{Binding CancelCommand, ElementName=Root}"
                                             CommandParameter="{Binding}"
                                             IsVisible="{Binding CanCancel}">
@@ -79,6 +81,7 @@
                                     </Button>
                                     <Button Width="24"
                                             Height="24"
+                                            CornerRadius="10"
                                             Command="{Binding ClearCommand, ElementName=Root}"
                                             CommandParameter="{Binding}"
                                             IsVisible="{Binding CanClear}">

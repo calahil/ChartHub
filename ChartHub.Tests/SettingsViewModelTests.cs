@@ -30,11 +30,12 @@ public class SettingsViewModelTests
         using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, googleAuthProvider, serverApiClient);
         await Task.Yield();
 
-        Assert.Equal(8, sut.Fields.Count);
+        Assert.Equal(9, sut.Fields.Count);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.RhythmVerseSource" && field.IsDropdownEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.UseMockData" && field.IsToggleEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiAuthToken" && field.IsTextEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiBaseUrl" && field.IsTextEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.UiCulture" && field.IsTextEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.AndroidVolumeButtonsControlServerVolume" && field.IsToggleEditor);
         Assert.Contains(sut.Fields, field => field.Key == "GoogleAuth.AndroidClientId" && field.IsTextEditor);
 

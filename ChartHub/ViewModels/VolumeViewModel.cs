@@ -4,7 +4,9 @@ using System.Runtime.CompilerServices;
 
 using Avalonia.Threading;
 
+using ChartHub.Localization;
 using ChartHub.Services;
+using ChartHub.Strings;
 using ChartHub.Utilities;
 
 using CommunityToolkit.Mvvm.Input;
@@ -14,6 +16,7 @@ namespace ChartHub.ViewModels;
 public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly AppGlobalSettings? _globalSettings;
+    public VolumePageStrings PageStrings { get; } = new();
     private readonly IChartHubServerApiClient? _serverApiClient;
     private readonly IVolumeHardwareButtonSource? _hardwareButtonSource;
     private readonly Func<Action, Task> _uiInvoke;
@@ -26,8 +29,8 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
     private bool _masterMuted;
     private bool _isBusy;
     private bool _supportsPerApplicationSessions;
-    private string _sessionSupportMessage = "Per-application volume session support is not available.";
-    private string _statusMessage = "Volume control not initialized.";
+    private string _sessionSupportMessage = UiLocalization.Get("Volume.PerApplicationUnsupported");
+    private string _statusMessage = UiLocalization.Get("Volume.NotInitialized");
 
     public bool IsCompanionMode => OperatingSystem.IsAndroid();
 
@@ -83,8 +86,11 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
             _pendingMasterVolume = clamped;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsMasterDirty));
+            OnPropertyChanged(nameof(PendingMasterLabel));
         }
     }
+
+    public string PendingMasterLabel => PageStrings.FormatPendingPercent(PendingMasterVolume);
 
     public bool IsMasterDirty => PendingMasterVolume != CurrentMasterVolume;
 
@@ -104,7 +110,9 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    public string MasterStateLabel => MasterMuted ? "Muted" : $"Current: {CurrentMasterVolume}%";
+    public string MasterStateLabel => MasterMuted
+        ? UiLocalization.Get("Common.Muted")
+        : UiLocalization.Format("Common.CurrentPercent", CurrentMasterVolume);
 
     public bool IsBusy
     {
@@ -232,7 +240,7 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
             await _uiInvoke(() =>
             {
                 Sessions = [];
-                StatusMessage = "Configure ChartHub.Server URL and token to load volume state.";
+                StatusMessage = UiLocalization.Get("Volume.ConfigureLoad");
             });
             return;
         }
@@ -243,14 +251,14 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
             ChartHubServerVolumeStateResponse state = await _serverApiClient!
                 .GetVolumeStateAsync(baseUrl, bearerToken)
                 .ConfigureAwait(false);
-            await ApplySnapshotAsync(state, "Volume state refreshed.").ConfigureAwait(false);
+            await ApplySnapshotAsync(state, UiLocalization.Get("Volume.StateRefreshed")).ConfigureAwait(false);
             EnsureStreamStarted();
         }
         catch (Exception ex)
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = $"Failed to refresh volume state: {ex.Message}";
+                StatusMessage = UiLocalization.Format("Volume.RefreshFailed", ex.Message);
             });
         }
         finally
@@ -261,7 +269,7 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task ApplyMasterAsync()
     {
-        await ApplyMasterVolumeCoreAsync(PendingMasterVolume, "Master volume updated.").ConfigureAwait(false);
+        await ApplyMasterVolumeCoreAsync(PendingMasterVolume, UiLocalization.Get("Volume.MasterUpdated")).ConfigureAwait(false);
     }
 
     public async Task AdjustMasterVolumeAsync(int delta)
@@ -272,7 +280,7 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
             int target = Math.Clamp(PendingMasterVolume + delta, 0, 100);
             await ApplyMasterVolumeCoreAsync(
                     target,
-                    delta >= 0 ? "Master volume increased." : "Master volume decreased.")
+                    delta >= 0 ? UiLocalization.Get("Volume.MasterIncreased") : UiLocalization.Get("Volume.MasterDecreased"))
                 .ConfigureAwait(false);
         }
         finally
@@ -287,7 +295,7 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = "Configure ChartHub.Server URL and token to change master volume.";
+                StatusMessage = UiLocalization.Get("Volume.ConfigureMasterChange");
             });
             return;
         }
@@ -311,7 +319,7 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = $"Failed to update master volume: {ex.Message}";
+                StatusMessage = UiLocalization.Format("Volume.MasterUpdateFailed", ex.Message);
             });
         }
         finally
@@ -331,7 +339,7 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = "Configure ChartHub.Server URL and token to change per-application volume.";
+                StatusMessage = UiLocalization.Get("Volume.ConfigureSessionChange");
             });
             return;
         }
@@ -359,7 +367,7 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = $"Failed to update per-application volume: {ex.Message}";
+                StatusMessage = UiLocalization.Format("Volume.SessionUpdateFailed", ex.Message);
             });
         }
         finally
@@ -393,7 +401,7 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
                                .WithCancellation(cancellationToken)
                                .ConfigureAwait(false))
             {
-                await ApplySnapshotAsync(state, "Volume state updated.").ConfigureAwait(false);
+                await ApplySnapshotAsync(state, UiLocalization.Get("Volume.StateUpdated")).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -403,7 +411,7 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
         {
             await _uiInvoke(() =>
             {
-                StatusMessage = $"Volume stream disconnected: {ex.Message}";
+                StatusMessage = UiLocalization.Format("Volume.StreamDisconnected", ex.Message);
             });
         }
     }
@@ -422,7 +430,7 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
             MasterMuted = state.Master.IsMuted;
             SupportsPerApplicationSessions = state.SupportsPerApplicationSessions;
             SessionSupportMessage = string.IsNullOrWhiteSpace(state.SessionSupportMessage)
-                ? "Per-application volume session support is not available."
+                ? UiLocalization.Get("Volume.PerApplicationUnsupported")
                 : state.SessionSupportMessage;
 
             var existing = Sessions.ToDictionary(item => item.SessionId, item => item, StringComparer.Ordinal);
@@ -613,8 +621,11 @@ public sealed class VolumeSessionCardItem : INotifyPropertyChanged
             _pendingVolume = clamped;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsDirty));
+            OnPropertyChanged(nameof(PendingLabel));
         }
     }
+
+    public string PendingLabel => UiLocalization.Format("Volume.PendingPercent", PendingVolume);
 
     public bool IsMuted
     {
@@ -632,7 +643,9 @@ public sealed class VolumeSessionCardItem : INotifyPropertyChanged
         }
     }
 
-    public string CurrentLabel => IsMuted ? "Muted" : $"Current: {CurrentVolume}%";
+    public string CurrentLabel => IsMuted
+        ? UiLocalization.Get("Common.Muted")
+        : UiLocalization.Format("Common.CurrentPercent", CurrentVolume);
 
     public bool IsDirty => PendingVolume != CurrentVolume;
 

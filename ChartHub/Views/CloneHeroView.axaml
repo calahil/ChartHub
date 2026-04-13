@@ -5,17 +5,20 @@
              xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="ChartHub.Views.CloneHeroView"
+             x:Name="Root"
              x:DataType="viewmodels:CloneHeroViewModel">
 
     <Grid Margin="10" RowDefinitions="Auto,Auto,*">
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-            <TextBlock Text="Clone Hero Library"
+            <TextBlock Text="{Binding PageStrings.PageHeader}"
                        FontSize="18"
                        FontWeight="Bold" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                <Button Content="Refresh Library"
+                <Button Content="{Binding PageStrings.RefreshLibrary}"
+                        CornerRadius="10"
                         Command="{Binding RefreshLibraryCommand}" />
-                <Button Content="Restore Last Deleted"
+                <Button Content="{Binding PageStrings.RestoreLastDeleted}"
+                        CornerRadius="10"
                     Command="{Binding RestoreLastDeletedSongCommand}" />
             </StackPanel>
         </Grid>
@@ -26,7 +29,8 @@
                 Padding="8"
                 BorderThickness="1"
                 BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                Background="{StaticResource ThemeControlLowBrush}">
+                Background="{StaticResource ThemeControlLowBrush}"
+                CornerRadius="8">
             <TextBlock Text="{Binding ReconciliationStatusMessage}"
                        TextWrapping="Wrap"
                        Foreground="{StaticResource ThemeForegroundLowBrush}" />
@@ -38,9 +42,10 @@
                 Padding="12"
                 BorderThickness="1"
                 BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                Background="{StaticResource ThemeControlLowBrush}">
+            Background="{StaticResource ThemeControlLowBrush}"
+            CornerRadius="8">
             <StackPanel Spacing="6">
-                <TextBlock Text="Preparing Clone Hero library..."
+                <TextBlock Text="{Binding PageStrings.PreparingLibrary}"
                            FontWeight="SemiBold" />
                 <TextBlock Text="{Binding ReconciliationStatusMessage}"
                            TextWrapping="Wrap"
@@ -49,29 +54,53 @@
         </Border>
 
         <Grid Grid.Row="2" ColumnDefinitions="280,*" IsVisible="{Binding IsDesktopMode}">
-            <Border Grid.Column="0" Margin="0,0,10,0" BorderThickness="1" BorderBrush="{StaticResource ThemeBorderMidBrush}" Padding="8">
+            <Border Grid.Column="0" Margin="0,0,10,0" BorderThickness="1" BorderBrush="{StaticResource ThemeBorderMidBrush}" Padding="8" CornerRadius="8">
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Artists" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding PageStrings.Artists}" FontWeight="SemiBold" />
                     <ListBox ItemsSource="{Binding Artists}"
                              SelectedItem="{Binding SelectedArtist}" />
                 </StackPanel>
             </Border>
 
-            <Border Grid.Column="1" BorderThickness="1" BorderBrush="{StaticResource ThemeBorderMidBrush}" Padding="8">
+            <Border Grid.Column="1" BorderThickness="1" BorderBrush="{StaticResource ThemeBorderMidBrush}" Padding="8" CornerRadius="8">
                 <DataGrid ItemsSource="{Binding Songs}"
                           SelectedItem="{Binding SelectedSong}"
                           CanUserSortColumns="True"
                           AutoGenerateColumns="False"
                           IsReadOnly="True">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" />
-                        <DataGridTextColumn Header="Artist" Binding="{Binding Artist}" Width="180" />
-                        <DataGridTextColumn Header="Charter" Binding="{Binding Charter}" Width="180" />
-                        <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="120" />
+                        <DataGridTextColumn Binding="{Binding Title}" Width="*">
+                            <DataGridTextColumn.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding #Root.((viewmodels:CloneHeroViewModel)DataContext).PageStrings.ColumnTitle}" />
+                                </DataTemplate>
+                            </DataGridTextColumn.HeaderTemplate>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Binding="{Binding Artist}" Width="180">
+                            <DataGridTextColumn.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding #Root.((viewmodels:CloneHeroViewModel)DataContext).PageStrings.ColumnArtist}" />
+                                </DataTemplate>
+                            </DataGridTextColumn.HeaderTemplate>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Binding="{Binding Charter}" Width="180">
+                            <DataGridTextColumn.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding #Root.((viewmodels:CloneHeroViewModel)DataContext).PageStrings.ColumnCharter}" />
+                                </DataTemplate>
+                            </DataGridTextColumn.HeaderTemplate>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Binding="{Binding Source}" Width="120">
+                            <DataGridTextColumn.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding #Root.((viewmodels:CloneHeroViewModel)DataContext).PageStrings.ColumnSource}" />
+                                </DataTemplate>
+                            </DataGridTextColumn.HeaderTemplate>
+                        </DataGridTextColumn>
                     </DataGrid.Columns>
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="Delete Song (Server)" Command="{Binding DeleteSongCommand}" />
+                            <MenuItem Header="{Binding PageStrings.DeleteSong}" Command="{Binding DeleteSongCommand}" />
                         </ContextMenu>
                     </DataGrid.ContextMenu>
                 </DataGrid>
@@ -80,7 +109,8 @@
 
         <Grid Grid.Row="2" RowDefinitions="Auto,*" IsVisible="{Binding IsCompanionMode}">
             <Grid Grid.Row="0" ColumnDefinitions="Auto,*" Margin="0,0,0,8">
-                <Button Content="Back"
+                <Button Content="{Binding PageStrings.Back}"
+                        CornerRadius="10"
                         Command="{Binding ShowArtistListCommand}"
                         IsVisible="{Binding IsArtistDrilldownActive}" />
                 <TextBlock Grid.Column="1"
@@ -94,6 +124,7 @@
                     BorderThickness="1"
                     BorderBrush="{StaticResource ThemeBorderMidBrush}"
                     Padding="8"
+                    CornerRadius="8"
                     IsVisible="{Binding ShowMobileArtistsList}">
                 <ListBox ItemsSource="{Binding Artists}"
                          SelectedItem="{Binding SelectedArtist}" />
@@ -103,6 +134,7 @@
                     BorderThickness="1"
                     BorderBrush="{StaticResource ThemeBorderMidBrush}"
                     Padding="8"
+                    CornerRadius="8"
                     IsVisible="{Binding ShowMobileSongsList}">
                 <DataGrid ItemsSource="{Binding Songs}"
                           SelectedItem="{Binding SelectedSong}"
@@ -110,12 +142,24 @@
                           IsReadOnly="True"
                           CanUserSortColumns="False">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" />
-                        <DataGridTextColumn Header="Charter" Binding="{Binding Charter}" Width="160" />
+                        <DataGridTextColumn Binding="{Binding Title}" Width="*">
+                            <DataGridTextColumn.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding #Root.((viewmodels:CloneHeroViewModel)DataContext).PageStrings.ColumnTitle}" />
+                                </DataTemplate>
+                            </DataGridTextColumn.HeaderTemplate>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Binding="{Binding Charter}" Width="160">
+                            <DataGridTextColumn.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding #Root.((viewmodels:CloneHeroViewModel)DataContext).PageStrings.ColumnCharter}" />
+                                </DataTemplate>
+                            </DataGridTextColumn.HeaderTemplate>
+                        </DataGridTextColumn>
                     </DataGrid.Columns>
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="Delete Song (Server)" Command="{Binding DeleteSongCommand}" />
+                            <MenuItem Header="{Binding PageStrings.DeleteSong}" Command="{Binding DeleteSongCommand}" />
                         </ContextMenu>
                     </DataGrid.ContextMenu>
                 </DataGrid>

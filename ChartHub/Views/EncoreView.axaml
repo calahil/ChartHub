@@ -201,7 +201,7 @@
                                                             BorderBrush="{StaticResource ThemeAccentBrush}"
                                                             Background="{StaticResource ThemeControlMidBrush}"
                                                             IsVisible="{Binding IsInLibrary}">
-                                                        <TextBlock Text="In Library"
+                                                        <TextBlock Text="{Binding #EncoreSongsListBox.((viewmodels:EncoreViewModel)DataContext).PageStrings.InLibrary}"
                                                                    FontSize="11"
                                                                    FontWeight="SemiBold"
                                                                    Foreground="{StaticResource ThemeAccentBrush}" />
@@ -339,7 +339,7 @@
                                                     BorderBrush="{StaticResource ThemeAccentBrush}"
                                                     Background="{StaticResource ThemeControlMidBrush}"
                                                     IsVisible="{Binding IsInLibrary}">
-                                                <TextBlock Text="In Library"
+                                                <TextBlock Text="{Binding #MobileSongsListBox.((viewmodels:EncoreViewModel)DataContext).PageStrings.InLibrary}"
                                                            FontSize="11"
                                                            FontWeight="SemiBold"
                                                            Foreground="{StaticResource ThemeAccentBrush}" />

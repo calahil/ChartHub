@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 
 using Avalonia.Threading;
 
+using ChartHub.Localization;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Strings;
@@ -114,8 +115,8 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
     public bool ShowMobileArtistsList => IsCompanionMode && !IsArtistDrilldownActive;
     public bool ShowMobileSongsList => IsCompanionMode && IsArtistDrilldownActive;
     public string MobileHeaderTitle => IsArtistDrilldownActive
-        ? (string.IsNullOrWhiteSpace(SelectedArtist) ? "Songs" : SelectedArtist)
-        : "Clone Hero Artists";
+        ? (string.IsNullOrWhiteSpace(SelectedArtist) ? UiLocalization.Get("CloneHero.MobileSongsHeader") : SelectedArtist)
+        : UiLocalization.Get("CloneHero.MobileArtistsHeader");
 
     private ObservableCollection<CloneHeroLibrarySongItem> _songs = [];
     public ObservableCollection<CloneHeroLibrarySongItem> Songs
@@ -245,7 +246,7 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
                 Songs = [];
                 SelectedArtist = null;
                 IsArtistDrilldownActive = false;
-                ReconciliationStatusMessage = "Configure ChartHub.Server URL and token to load Clone Hero library.";
+                ReconciliationStatusMessage = UiLocalization.Get("CloneHero.ConfigureLoad");
             });
             return;
         }
@@ -260,7 +261,7 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             .ToList();
 
         IReadOnlyList<string> serverArtists = _serverSongsCache
-            .Select(song => string.IsNullOrWhiteSpace(song.Artist) ? "Unknown Artist" : song.Artist)
+            .Select(song => string.IsNullOrWhiteSpace(song.Artist) ? UiLocalization.Get("CloneHero.UnknownArtist") : song.Artist)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(artist => artist, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -321,9 +322,9 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             .Select(song => new CloneHeroLibrarySongItem
             {
                 SongId = song.SongId,
-                Artist = string.IsNullOrWhiteSpace(song.Artist) ? "Unknown Artist" : song.Artist,
-                Title = string.IsNullOrWhiteSpace(song.Title) ? "Unknown Song" : song.Title,
-                Charter = string.IsNullOrWhiteSpace(song.Charter) ? "Unknown Charter" : song.Charter,
+                Artist = string.IsNullOrWhiteSpace(song.Artist) ? UiLocalization.Get("CloneHero.UnknownArtist") : song.Artist,
+                Title = string.IsNullOrWhiteSpace(song.Title) ? UiLocalization.Get("CloneHero.UnknownSong") : song.Title,
+                Charter = string.IsNullOrWhiteSpace(song.Charter) ? UiLocalization.Get("CloneHero.UnknownCharter") : song.Charter,
                 Source = song.Source,
                 SourceId = song.SourceId,
                 LocalPath = song.InstalledPath ?? string.Empty,
@@ -359,13 +360,13 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
 
         if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
-            ReconciliationStatusMessage = "Configure ChartHub.Server URL and token to delete Clone Hero songs.";
+            ReconciliationStatusMessage = UiLocalization.Get("CloneHero.ConfigureDelete");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(SelectedSong.SongId))
         {
-            ReconciliationStatusMessage = "Selected song is missing server ID and cannot be deleted.";
+            ReconciliationStatusMessage = UiLocalization.Get("CloneHero.MissingServerId");
             return;
         }
 
@@ -381,11 +382,11 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             _lastDeletedSongId = deletedSongId;
             _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
             await RefreshArtistsAsync(CancellationToken.None).ConfigureAwait(false);
-            ReconciliationStatusMessage = "Selected song deleted from server library.";
+            ReconciliationStatusMessage = UiLocalization.Get("CloneHero.Deleted");
         }
         catch (Exception ex)
         {
-            ReconciliationStatusMessage = $"Failed to delete song: {ex.Message}";
+            ReconciliationStatusMessage = UiLocalization.Format("CloneHero.DeleteFailed", ex.Message);
             Logger.LogError("CloneHero", "Delete selected song from server failed", ex, new Dictionary<string, object?>
             {
                 ["songId"] = deletedSongId,
@@ -406,13 +407,13 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
     {
         if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
-            ReconciliationStatusMessage = "Configure ChartHub.Server URL and token to restore Clone Hero songs.";
+            ReconciliationStatusMessage = UiLocalization.Get("CloneHero.ConfigureRestore");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(_lastDeletedSongId))
         {
-            ReconciliationStatusMessage = "No recently deleted song is available to restore.";
+            ReconciliationStatusMessage = UiLocalization.Get("CloneHero.NoRestoreTarget");
             return;
         }
 
@@ -428,11 +429,11 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
             _lastDeletedSongId = null;
             _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
             await RefreshArtistsAsync(CancellationToken.None).ConfigureAwait(false);
-            ReconciliationStatusMessage = "Last deleted song restored.";
+            ReconciliationStatusMessage = UiLocalization.Get("CloneHero.Restored");
         }
         catch (Exception ex)
         {
-            ReconciliationStatusMessage = $"Failed to restore song: {ex.Message}";
+            ReconciliationStatusMessage = UiLocalization.Format("CloneHero.RestoreFailed", ex.Message);
             Logger.LogError("CloneHero", "Restore deleted song failed", ex, new Dictionary<string, object?>
             {
                 ["songId"] = deletedSongId,

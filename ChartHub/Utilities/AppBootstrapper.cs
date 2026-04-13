@@ -4,6 +4,7 @@ using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Migration;
 using ChartHub.Configuration.Models;
 using ChartHub.Configuration.Stores;
+using ChartHub.Localization;
 using ChartHub.Services;
 using ChartHub.ViewModels;
 
@@ -89,6 +90,7 @@ public static class AppBootstrapper
 
         IConfigurationRoot config = configBuilder.Build();
         services.AddSingleton<IConfiguration>(config);
+        UiLocalization.ConfigureCulture(config["Runtime:UiCulture"]);
 
         string configPath = Path.Combine(configDir, "appsettings.json");
         services.AddSingleton<IAppConfigStore>(_ => new JsonAppConfigStore(configPath));

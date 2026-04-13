@@ -18,11 +18,12 @@
 
     <Grid Margin="10" RowDefinitions="Auto,Auto,*">
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-            <TextBlock Text="Desktop Entries"
+                <TextBlock Text="{Binding PageStrings.PageHeader}"
                        FontSize="18"
                        FontWeight="Bold" />
             <Button Grid.Column="1"
-                    Content="Refresh"
+                    Content="{Binding PageStrings.Refresh}"
+                    CornerRadius="10"
                     Command="{Binding RefreshCommand}"
                     IsEnabled="{Binding !IsBusy}" />
         </Grid>
@@ -32,7 +33,8 @@
                 Padding="8"
                 BorderThickness="1"
                 BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                Background="{StaticResource ThemeControlLowBrush}">
+            Background="{StaticResource ThemeControlLowBrush}"
+            CornerRadius="8">
             <TextBlock Text="{Binding StatusMessage}"
                        TextWrapping="Wrap"
                        Foreground="{StaticResource ThemeForegroundLowBrush}" />
@@ -40,7 +42,7 @@
 
         <Grid Grid.Row="2" RowDefinitions="Auto,*">
             <TextBlock Grid.Row="0"
-                       Text="No desktop entries found."
+                       Text="{Binding PageStrings.NoEntries}"
                        IsVisible="{Binding !HasEntries}"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center"
@@ -65,7 +67,7 @@
                                     <Border Grid.RowSpan="2"
                                             Width="48"
                                             Height="48"
-                                            CornerRadius="6"
+                                            CornerRadius="10"
                                             Background="{StaticResource ThemeBackgroundBrush}"
                                             BorderThickness="1"
                                             BorderBrush="{StaticResource ThemeBorderMidBrush}">
@@ -95,11 +97,13 @@
                                                 Orientation="Horizontal"
                                                 Spacing="8"
                                                 VerticalAlignment="Center">
-                                        <Button Content="Execute"
+                                        <Button Content="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).PageStrings.Execute}"
+                                                CornerRadius="10"
                                             Command="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).ExecuteCommand}"
                                                 CommandParameter="{Binding}"
                                                 IsEnabled="{Binding CanExecute}" />
-                                        <Button Content="Kill"
+                                        <Button Content="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).PageStrings.Kill}"
+                                                CornerRadius="10"
                                             Command="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).KillCommand}"
                                                 CommandParameter="{Binding}"
                                                 IsEnabled="{Binding CanKill}" />

@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <data name="Main.Home" xml:space="preserve"><value>Home</value></data>
+  <data name="Main.CloneHero" xml:space="preserve"><value>Clone Hero</value></data>
+  <data name="Main.RhythmVerse" xml:space="preserve"><value>RhythmVerse</value></data>
+  <data name="Main.Encore" xml:space="preserve"><value>Encore</value></data>
+  <data name="Main.Downloads" xml:space="preserve"><value>Downloads</value></data>
+  <data name="Main.DesktopEntry" xml:space="preserve"><value>Apps</value></data>
+  <data name="Main.Volume" xml:space="preserve"><value>Volume</value></data>
+  <data name="Main.InstallSongs" xml:space="preserve"><value>Install Songs</value></data>
+  <data name="Main.Settings" xml:space="preserve"><value>Settings</value></data>
+  <data name="Main.FilterSectionRhythmVerse" xml:space="preserve"><value>RhythmVerse Filters</value></data>
+  <data name="Main.FilterSectionEncore" xml:space="preserve"><value>Encore Advanced Filters</value></data>
+  <data name="Main.FilterFallbackTitle" xml:space="preserve"><value>Filters</value></data>
+  <data name="Main.FilterFallbackMessage" xml:space="preserve"><value>Select either the RhythmVerse or Encore tab to view filters.</value></data>
+  <data name="Main.FilterFallbackMessageAndroid" xml:space="preserve"><value>Open RhythmVerse or Encore to configure filters.</value></data>
+  <data name="Main.NavSectionTitle" xml:space="preserve"><value>Navigation</value></data>
+  <data name="Main.BackToNavigation" xml:space="preserve"><value>Back To Navigation</value></data>
+  <data name="Main.FiltersButton" xml:space="preserve"><value>Filters</value></data>
+  <data name="Main.MenuButton" xml:space="preserve"><value>Menu</value></data>
+
+  <data name="Install.Title" xml:space="preserve"><value>Install Songs Page</value></data>
+  <data name="Install.StartButton" xml:space="preserve"><value>Start Progress</value></data>
+  <data name="Install.GoBack" xml:space="preserve"><value>Go Back</value></data>
+  <data name="Install.StartProcess" xml:space="preserve"><value>Song install has begun...\n</value></data>
+  <data name="Install.Done" xml:space="preserve"><value>Done\n</value></data>
+  <data name="Install.UnzipFile" xml:space="preserve"><value>Begin unziping '%filename%' into staging directory...</value></data>
+  <data name="Install.ExtractFile" xml:space="preserve"><value>Begin extracting '%filename%' into staging directory...</value></data>
+  <data name="Install.UnRarFile" xml:space="preserve"><value>Begin unraring '%filename%' into staging directory...</value></data>
+  <data name="Install.OnyxImport" xml:space="preserve"><value>Onyx importing '%filename%'...\n</value></data>
+  <data name="Install.OnyxBuild" xml:space="preserve"><value>Clone Hero Song build started...\n</value></data>
+  <data name="Install.OnyxFinish" xml:space="preserve"><value>Onyx finishing...\n</value></data>
+  <data name="Install.InstallSongs" xml:space="preserve"><value>Installing songs to your Clone Hero song directory...\n</value></data>
+  <data name="Install.Finished" xml:space="preserve"><value>Finished\n</value></data>
+
+  <data name="Download.Title" xml:space="preserve"><value>Downloads</value></data>
+  <data name="Download.DisplayName" xml:space="preserve"><value>Display Name</value></data>
+  <data name="Download.FileType" xml:space="preserve"><value>File Type</value></data>
+  <data name="Download.FileSize" xml:space="preserve"><value>File Size</value></data>
+  <data name="Download.InstallSongs" xml:space="preserve"><value>Install Songs</value></data>
+  <data name="Download.UploadCloud" xml:space="preserve"><value>Google Drive</value></data>
+  <data name="Download.Install" xml:space="preserve"><value>Install</value></data>
+  <data name="Download.DeleteSelected" xml:space="preserve"><value>Delete Selected</value></data>
+  <data name="Download.InstallProgressLabel" xml:space="preserve"><value>Install Progress</value></data>
+  <data name="Download.ClearLog" xml:space="preserve"><value>Clear Log</value></data>
+  <data name="Download.Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Download.Dismiss" xml:space="preserve"><value>Dismiss</value></data>
+  <data name="Download.CopyAllLogs" xml:space="preserve"><value>Copy All Logs</value></data>
+  <data name="Download.CopyLog" xml:space="preserve"><value>Copy</value></data>
+  <data name="Download.StateLabel" xml:space="preserve"><value>State</value></data>
+  <data name="Download.SortLabel" xml:space="preserve"><value>Sort</value></data>
+  <data name="Download.Descending" xml:space="preserve"><value>Descending</value></data>
+  <data name="Download.EmptyState" xml:space="preserve"><value>No downloads are available from ChartHub.Server with the current filters.</value></data>
+
+  <data name="CloneHero.Title" xml:space="preserve"><value>Clone Hero Song Library</value></data>
+  <data name="CloneHero.PageHeader" xml:space="preserve"><value>Clone Hero Library</value></data>
+  <data name="CloneHero.RefreshLibrary" xml:space="preserve"><value>Refresh Library</value></data>
+  <data name="CloneHero.RestoreLastDeleted" xml:space="preserve"><value>Restore Last Deleted</value></data>
+  <data name="CloneHero.PreparingLibrary" xml:space="preserve"><value>Preparing Clone Hero library...</value></data>
+  <data name="CloneHero.Artists" xml:space="preserve"><value>Artists</value></data>
+  <data name="CloneHero.ColumnTitle" xml:space="preserve"><value>Title</value></data>
+  <data name="CloneHero.ColumnArtist" xml:space="preserve"><value>Artist</value></data>
+  <data name="CloneHero.ColumnCharter" xml:space="preserve"><value>Charter</value></data>
+  <data name="CloneHero.ColumnSource" xml:space="preserve"><value>Source</value></data>
+  <data name="CloneHero.DeleteSong" xml:space="preserve"><value>Delete Song (Server)</value></data>
+  <data name="CloneHero.Back" xml:space="preserve"><value>Back</value></data>
+  <data name="CloneHero.Select" xml:space="preserve"><value>Select</value></data>
+  <data name="CloneHero.DisplayName" xml:space="preserve"><value>Display Name</value></data>
+  <data name="CloneHero.FileType" xml:space="preserve"><value>File Type</value></data>
+  <data name="CloneHero.FileSize" xml:space="preserve"><value>File Size</value></data>
+  <data name="CloneHero.MobileSongsHeader" xml:space="preserve"><value>Songs</value></data>
+  <data name="CloneHero.MobileArtistsHeader" xml:space="preserve"><value>Clone Hero Artists</value></data>
+  <data name="CloneHero.ConfigureLoad" xml:space="preserve"><value>Configure ChartHub.Server URL and token to load Clone Hero library.</value></data>
+  <data name="CloneHero.ConfigureDelete" xml:space="preserve"><value>Configure ChartHub.Server URL and token to delete Clone Hero songs.</value></data>
+  <data name="CloneHero.ConfigureRestore" xml:space="preserve"><value>Configure ChartHub.Server URL and token to restore Clone Hero songs.</value></data>
+  <data name="CloneHero.MissingServerId" xml:space="preserve"><value>Selected song is missing server ID and cannot be deleted.</value></data>
+  <data name="CloneHero.Deleted" xml:space="preserve"><value>Selected song deleted from server library.</value></data>
+  <data name="CloneHero.NoRestoreTarget" xml:space="preserve"><value>No recently deleted song is available to restore.</value></data>
+  <data name="CloneHero.Restored" xml:space="preserve"><value>Last deleted song restored.</value></data>
+  <data name="CloneHero.DeleteFailed" xml:space="preserve"><value>Failed to delete song: {0}</value></data>
+  <data name="CloneHero.RestoreFailed" xml:space="preserve"><value>Failed to restore song: {0}</value></data>
+  <data name="CloneHero.UnknownArtist" xml:space="preserve"><value>Unknown Artist</value></data>
+  <data name="CloneHero.UnknownSong" xml:space="preserve"><value>Unknown Song</value></data>
+  <data name="CloneHero.UnknownCharter" xml:space="preserve"><value>Unknown Charter</value></data>
+
+  <data name="SongSource.NoResults" xml:space="preserve"><value>No Results...  So empty</value></data>
+  <data name="SongSource.LoadingResults" xml:space="preserve"><value>Loading Results...</value></data>
+  <data name="SongSource.Title" xml:space="preserve"><value>Song Source</value></data>
+  <data name="SongSource.SearchText" xml:space="preserve"><value>Song Source Search...</value></data>
+  <data name="SongSource.InLibrary" xml:space="preserve"><value>In Library</value></data>
+
+  <data name="RhythmVerse.Title" xml:space="preserve"><value>RhythmVerse</value></data>
+  <data name="RhythmVerse.FilterTitle" xml:space="preserve"><value>Filters</value></data>
+  <data name="RhythmVerse.FilterSectionTitle" xml:space="preserve"><value>RhythmVerse Filters</value></data>
+  <data name="RhythmVerse.ApplyFilters" xml:space="preserve"><value>Apply RhythmVerse Filters</value></data>
+  <data name="RhythmVerse.FilterArtist" xml:space="preserve"><value>Artist</value></data>
+  <data name="RhythmVerse.FilterDownloads" xml:space="preserve"><value>Downloads</value></data>
+  <data name="RhythmVerse.FilterSongLength" xml:space="preserve"><value>Song Length</value></data>
+  <data name="RhythmVerse.FilterTitleText" xml:space="preserve"><value>Title</value></data>
+  <data name="RhythmVerse.OrderAscending" xml:space="preserve"><value>Ascending</value></data>
+  <data name="RhythmVerse.OrderDescending" xml:space="preserve"><value>Descending</value></data>
+  <data name="RhythmVerse.Difficulty" xml:space="preserve"><value>Difficulty:</value></data>
+  <data name="RhythmVerse.SearchText" xml:space="preserve"><value>Search RhythmVerse charts...</value></data>
+  <data name="RhythmVerse.Total" xml:space="preserve"><value>Total: </value></data>
+
+  <data name="Encore.Title" xml:space="preserve"><value>Chorus Encore</value></data>
+  <data name="Encore.SearchText" xml:space="preserve"><value>Search Encore charts...</value></data>
+  <data name="Encore.FilterSectionTitle" xml:space="preserve"><value>Encore Advanced Filters</value></data>
+  <data name="Encore.FilterLabelInstrument" xml:space="preserve"><value>Instrument</value></data>
+  <data name="Encore.FilterLabelDifficulty" xml:space="preserve"><value>Difficulty</value></data>
+  <data name="Encore.FilterLabelDrumType" xml:space="preserve"><value>Drum Type</value></data>
+  <data name="Encore.FilterLabelSortColumn" xml:space="preserve"><value>Sort Column</value></data>
+  <data name="Encore.FilterLabelSortDirection" xml:space="preserve"><value>Sort Direction</value></data>
+  <data name="Encore.LabelAdvancedName" xml:space="preserve"><value>Advanced Name</value></data>
+  <data name="Encore.PlaceholderName" xml:space="preserve"><value>Advanced name</value></data>
+  <data name="Encore.LabelAdvancedArtist" xml:space="preserve"><value>Advanced Artist</value></data>
+  <data name="Encore.PlaceholderArtist" xml:space="preserve"><value>Advanced artist</value></data>
+  <data name="Encore.LabelAdvancedCharter" xml:space="preserve"><value>Advanced Charter</value></data>
+  <data name="Encore.PlaceholderCharter" xml:space="preserve"><value>Advanced charter</value></data>
+  <data name="Encore.LabelAdvancedAlbum" xml:space="preserve"><value>Advanced Album</value></data>
+  <data name="Encore.PlaceholderAlbum" xml:space="preserve"><value>Advanced album</value></data>
+  <data name="Encore.LabelAdvancedGenre" xml:space="preserve"><value>Advanced Genre</value></data>
+  <data name="Encore.PlaceholderGenre" xml:space="preserve"><value>Advanced genre</value></data>
+  <data name="Encore.LabelAdvancedYear" xml:space="preserve"><value>Advanced Year</value></data>
+  <data name="Encore.PlaceholderYear" xml:space="preserve"><value>Advanced year</value></data>
+  <data name="Encore.LabelMinYear" xml:space="preserve"><value>Min Year</value></data>
+  <data name="Encore.PlaceholderMinYear" xml:space="preserve"><value>Min year</value></data>
+  <data name="Encore.LabelMaxYear" xml:space="preserve"><value>Max Year</value></data>
+  <data name="Encore.PlaceholderMaxYear" xml:space="preserve"><value>Max year</value></data>
+  <data name="Encore.LabelMinLength" xml:space="preserve"><value>Min Length (ms)</value></data>
+  <data name="Encore.PlaceholderMinLength" xml:space="preserve"><value>Min length (ms)</value></data>
+  <data name="Encore.LabelMaxLength" xml:space="preserve"><value>Max Length (ms)</value></data>
+  <data name="Encore.PlaceholderMaxLength" xml:space="preserve"><value>Max length (ms)</value></data>
+  <data name="Encore.LabelDrumsReviewed" xml:space="preserve"><value>Drums Reviewed</value></data>
+  <data name="Encore.CheckDrumsReviewed" xml:space="preserve"><value>Drums reviewed</value></data>
+  <data name="Encore.LabelHasVideo" xml:space="preserve"><value>Has Video</value></data>
+  <data name="Encore.CheckHasVideo" xml:space="preserve"><value>Has video</value></data>
+  <data name="Encore.LabelHasLyrics" xml:space="preserve"><value>Has Lyrics</value></data>
+  <data name="Encore.CheckHasLyrics" xml:space="preserve"><value>Has lyrics</value></data>
+  <data name="Encore.LabelHasVocals" xml:space="preserve"><value>Has Vocals</value></data>
+  <data name="Encore.CheckHasVocals" xml:space="preserve"><value>Has vocals</value></data>
+  <data name="Encore.Label2xKick" xml:space="preserve"><value>Has 2x Kick</value></data>
+  <data name="Encore.Check2xKick" xml:space="preserve"><value>Has 2x kick</value></data>
+  <data name="Encore.LabelHasIssues" xml:space="preserve"><value>Has Issues</value></data>
+  <data name="Encore.CheckHasIssues" xml:space="preserve"><value>Has issues</value></data>
+  <data name="Encore.LabelModchart" xml:space="preserve"><value>Modchart</value></data>
+  <data name="Encore.CheckModchart" xml:space="preserve"><value>Modchart</value></data>
+  <data name="Encore.ApplyFilters" xml:space="preserve"><value>Apply Encore Filters</value></data>
+
+  <data name="Common.Muted" xml:space="preserve"><value>Muted</value></data>
+  <data name="Common.CurrentPercent" xml:space="preserve"><value>Current: {0}%</value></data>
+
+  <data name="DesktopEntry.NotInitialized" xml:space="preserve"><value>Desktop entry control not initialized.</value></data>
+  <data name="DesktopEntry.PageHeader" xml:space="preserve"><value>Desktop Entries</value></data>
+  <data name="DesktopEntry.Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="DesktopEntry.NoEntries" xml:space="preserve"><value>No desktop entries found.</value></data>
+  <data name="DesktopEntry.Execute" xml:space="preserve"><value>Execute</value></data>
+  <data name="DesktopEntry.Kill" xml:space="preserve"><value>Kill</value></data>
+  <data name="DesktopEntry.ConfigureLoad" xml:space="preserve"><value>Configure ChartHub.Server URL and token to load desktop entries.</value></data>
+  <data name="DesktopEntry.ConfigureExecute" xml:space="preserve"><value>Configure ChartHub.Server URL and token to execute desktop entries.</value></data>
+  <data name="DesktopEntry.AlreadyRunning" xml:space="preserve"><value>Desktop entry is already running.</value></data>
+  <data name="DesktopEntry.ConfigureStop" xml:space="preserve"><value>Configure ChartHub.Server URL and token to stop desktop entries.</value></data>
+  <data name="DesktopEntry.StillRunningAfterSigTerm" xml:space="preserve"><value>SIGTERM sent but process is still running.</value></data>
+  <data name="DesktopEntry.StatusUpdated" xml:space="preserve"><value>Desktop entry status updated.</value></data>
+  <data name="DesktopEntry.ListRefreshed" xml:space="preserve"><value>Desktop entry list refreshed.</value></data>
+  <data name="DesktopEntry.RefreshFailed" xml:space="preserve"><value>Failed to refresh desktop entries: {0}</value></data>
+  <data name="DesktopEntry.ExecuteFailed" xml:space="preserve"><value>Failed to execute desktop entry: {0}</value></data>
+  <data name="DesktopEntry.StopFailed" xml:space="preserve"><value>Failed to stop desktop entry: {0}</value></data>
+  <data name="DesktopEntry.StreamDisconnected" xml:space="preserve"><value>Desktop entry stream disconnected: {0}</value></data>
+  <data name="DesktopEntry.PidFormat" xml:space="preserve"><value>PID: {0}</value></data>
+  <data name="DesktopEntry.PidMissing" xml:space="preserve"><value>PID: -</value></data>
+
+  <data name="Volume.NotInitialized" xml:space="preserve"><value>Volume control not initialized.</value></data>
+  <data name="Volume.PageHeader" xml:space="preserve"><value>Volume Control</value></data>
+  <data name="Volume.PageDescription" xml:space="preserve"><value>Control server master volume and active application sessions.</value></data>
+  <data name="Volume.Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="Volume.AndroidHardwareBindingLabel" xml:space="preserve"><value>Android volume buttons control server volume</value></data>
+  <data name="Volume.MasterVolumeTitle" xml:space="preserve"><value>Master Volume</value></data>
+  <data name="Volume.PendingPercent" xml:space="preserve"><value>Pending: {0}%</value></data>
+  <data name="Volume.ApplyMaster" xml:space="preserve"><value>Apply Master</value></data>
+  <data name="Volume.SessionsTitle" xml:space="preserve"><value>Application Sessions</value></data>
+  <data name="Volume.NoActiveSessions" xml:space="preserve"><value>No active application audio sessions found.</value></data>
+  <data name="Volume.ApplySession" xml:space="preserve"><value>Apply Session</value></data>
+  <data name="Volume.PerApplicationUnsupported" xml:space="preserve"><value>Per-application volume session support is not available.</value></data>
+  <data name="Volume.ConfigureLoad" xml:space="preserve"><value>Configure ChartHub.Server URL and token to load volume state.</value></data>
+  <data name="Volume.StateRefreshed" xml:space="preserve"><value>Volume state refreshed.</value></data>
+  <data name="Volume.RefreshFailed" xml:space="preserve"><value>Failed to refresh volume state: {0}</value></data>
+  <data name="Volume.MasterUpdated" xml:space="preserve"><value>Master volume updated.</value></data>
+  <data name="Volume.MasterIncreased" xml:space="preserve"><value>Master volume increased.</value></data>
+  <data name="Volume.MasterDecreased" xml:space="preserve"><value>Master volume decreased.</value></data>
+  <data name="Volume.ConfigureMasterChange" xml:space="preserve"><value>Configure ChartHub.Server URL and token to change master volume.</value></data>
+  <data name="Volume.MasterUpdateFailed" xml:space="preserve"><value>Failed to update master volume: {0}</value></data>
+  <data name="Volume.ConfigureSessionChange" xml:space="preserve"><value>Configure ChartHub.Server URL and token to change per-application volume.</value></data>
+  <data name="Volume.SessionUpdateFailed" xml:space="preserve"><value>Failed to update per-application volume: {0}</value></data>
+  <data name="Volume.StateUpdated" xml:space="preserve"><value>Volume state updated.</value></data>
+  <data name="Volume.StreamDisconnected" xml:space="preserve"><value>Volume stream disconnected: {0}</value></data>
+
+  <data name="Settings.BrowseFolder" xml:space="preserve"><value>Browse Folder</value></data>
+  <data name="Settings.BrowseFile" xml:space="preserve"><value>Browse File</value></data>
+  <data name="Settings.SaveButton" xml:space="preserve"><value>Save</value></data>
+  <data name="Settings.AuthTitle" xml:space="preserve"><value>ChartHub Server Authentication</value></data>
+  <data name="Settings.AuthStatusLabel" xml:space="preserve"><value>Status</value></data>
+  <data name="Settings.AuthenticateGoogle" xml:space="preserve"><value>Authenticate With Google</value></data>
+  <data name="Settings.Working" xml:space="preserve"><value>Working...</value></data>
+  <data name="Settings.ValidationBanner" xml:space="preserve"><value>Fix highlighted fields before saving.</value></data>
+  <data name="Settings.RestartBanner" xml:space="preserve"><value>Some changes are non-hot-reloadable and will be reloaded from configuration when you save.</value></data>
+  <data name="Settings.DeveloperSettingsLabel" xml:space="preserve"><value>Developer Settings</value></data>
+  <data name="Settings.SecretsTitle" xml:space="preserve"><value>Secrets</value></data>
+  <data name="Settings.SecretsDescription" xml:space="preserve"><value>Secret values are stored in secure storage and never written to appsettings.json.</value></data>
+  <data name="Settings.ProviderConfiguration" xml:space="preserve"><value>Provider Configuration</value></data>
+  <data name="Settings.SecretValuePlaceholder" xml:space="preserve"><value>Enter new value</value></data>
+  <data name="Settings.SecretSaveButton" xml:space="preserve"><value>Save</value></data>
+  <data name="Settings.SecretClearButton" xml:space="preserve"><value>Clear</value></data>
+  <data name="Settings.StorageStored" xml:space="preserve"><value>Stored</value></data>
+  <data name="Settings.StorageNotSet" xml:space="preserve"><value>Not set</value></data>
+  <data name="Settings.NotAuthenticated" xml:space="preserve"><value>Not authenticated with ChartHub Server.</value></data>
+  <data name="Settings.AuthNotConfigured" xml:space="preserve"><value>ChartHub Server authentication is not configured.</value></data>
+  <data name="Settings.AuthBaseUrlRequired" xml:space="preserve"><value>Set Runtime.ServerApiBaseUrl before authenticating.</value></data>
+  <data name="Settings.AuthOpeningGoogleSignIn" xml:space="preserve"><value>Opening Google sign-in...</value></data>
+  <data name="Settings.AuthSucceeded" xml:space="preserve"><value>ChartHub Server authentication succeeded.</value></data>
+  <data name="Settings.AuthFailed" xml:space="preserve"><value>ChartHub Server authentication failed.</value></data>
+  <data name="Settings.AuthExchangingGoogleToken" xml:space="preserve"><value>Exchanging Google token with ChartHub Server...</value></data>
+  <data name="Settings.AuthTokenExpired" xml:space="preserve"><value>Google token expired. Re-authenticating...</value></data>
+  <data name="Settings.AuthRetryExchange" xml:space="preserve"><value>Retrying token exchange with ChartHub Server...</value></data>
+  <data name="Settings.AuthTokenConfigured" xml:space="preserve"><value>ChartHub Server token is configured.</value></data>
+  <data name="Settings.ValidationFailed" xml:space="preserve"><value>Settings validation failed. Review highlighted fields.</value></data>
+  <data name="Settings.SavedReloaded" xml:space="preserve"><value>Settings saved and reloaded from current configuration.</value></data>
+  <data name="Settings.Saved" xml:space="preserve"><value>Settings saved.</value></data>
+  <data name="Settings.SaveFailed" xml:space="preserve"><value>Settings save failed. See logs for details.</value></data>
+  <data name="Settings.PathRequired" xml:space="preserve"><value>A path value is required.</value></data>
+  <data name="Settings.PathMustBeLocal" xml:space="preserve"><value>Path must be a local filesystem path.</value></data>
+  <data name="Settings.DirectoryExpected" xml:space="preserve"><value>Expected a directory path, but the path points to a file.</value></data>
+  <data name="Settings.DirectoryParentMissing" xml:space="preserve"><value>Directory does not exist and parent folder is not available.</value></data>
+  <data name="Settings.FileExpected" xml:space="preserve"><value>Expected a file path, but the path points to a directory.</value></data>
+  <data name="Settings.FileParentMissing" xml:space="preserve"><value>File does not exist and parent folder is not available.</value></data>
+  <data name="Settings.SecretSaved" xml:space="preserve"><value>Saved secret: {0}</value></data>
+  <data name="Settings.SecretSaveFailed" xml:space="preserve"><value>Failed to save secret: {0}</value></data>
+  <data name="Settings.SecretCleared" xml:space="preserve"><value>Cleared secret: {0}</value></data>
+  <data name="Settings.SecretClearFailed" xml:space="preserve"><value>Failed to clear secret: {0}</value></data>
+</root>

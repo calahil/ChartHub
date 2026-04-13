@@ -57,6 +57,12 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         set => QueueConfigUpdate(config => config.Runtime.InstallLogExpanded = value);
     }
 
+    public string UiCulture
+    {
+        get => Runtime.UiCulture;
+        set => QueueConfigUpdate(config => config.Runtime.UiCulture = string.IsNullOrWhiteSpace(value) ? "en-US" : value.Trim());
+    }
+
     public bool AndroidVolumeButtonsControlServerVolume
     {
         get => Runtime.AndroidVolumeButtonsControlServerVolume;
@@ -81,13 +87,16 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
             ? GenerateSyncApiToken()
             : Runtime.ServerApiAuthToken;
         string serverApiBaseUrl = Runtime.ServerApiBaseUrl?.Trim() ?? string.Empty;
+        string uiCulture = string.IsNullOrWhiteSpace(Runtime.UiCulture) ? "en-US" : Runtime.UiCulture.Trim();
         Runtime.ServerApiAuthToken = serverApiAuthToken;
         Runtime.ServerApiBaseUrl = serverApiBaseUrl;
+        Runtime.UiCulture = uiCulture;
 
         QueueConfigUpdate(config =>
         {
             config.Runtime.ServerApiAuthToken = serverApiAuthToken;
             config.Runtime.ServerApiBaseUrl = serverApiBaseUrl;
+            config.Runtime.UiCulture = uiCulture;
         });
     }
 
@@ -136,6 +145,7 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(ServerApiAuthToken));
         OnPropertyChanged(nameof(ServerApiBaseUrl));
         OnPropertyChanged(nameof(InstallLogExpanded));
+        OnPropertyChanged(nameof(UiCulture));
         OnPropertyChanged(nameof(AndroidVolumeButtonsControlServerVolume));
     }
 

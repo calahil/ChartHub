@@ -16,7 +16,8 @@
                 <Grid Grid.Row="0"
                             ColumnDefinitions="Auto,*">
             <Button Grid.Column="0"
-                    Content="Save"
+                    Content="{Binding PageStrings.SaveButton}"
+                    CornerRadius="10"
                     Command="{Binding SaveCommand}" />
                         <TextBlock Grid.Column="1"
                    Margin="8,0,0,0"
@@ -29,9 +30,9 @@
                 BorderThickness="1"
                 BorderBrush="{StaticResource ThemeBorderMidBrush}"
                 Background="{StaticResource ThemeControlLowBrush}"
-                CornerRadius="6">
+            CornerRadius="8">
             <StackPanel Spacing="8">
-                <TextBlock Text="ChartHub Server Authentication"
+                <TextBlock Text="{Binding PageStrings.AuthTitle}"
                            FontSize="16"
                            FontWeight="Bold" />
 
@@ -39,7 +40,7 @@
                                             RowDefinitions="Auto,Auto,Auto">
                     <TextBlock Grid.Row="0"
                                Grid.Column="0"
-                               Text="Status"
+                               Text="{Binding PageStrings.AuthStatusLabel}"
                                                              Margin="0,0,10,6"
                                FontWeight="SemiBold" />
                     <TextBlock Grid.Row="0"
@@ -59,10 +60,11 @@
                                 Grid.Column="1"
                                 Orientation="Horizontal"
                                 Spacing="8">
-                        <Button Content="Authenticate With Google"
+                            <Button Content="{Binding PageStrings.AuthenticateGoogle}"
+                                    CornerRadius="10"
                                 Command="{Binding AuthenticateServerCommand}" />
                         <TextBlock VerticalAlignment="Center"
-                                   Text="Working..."
+                                   Text="{Binding PageStrings.Working}"
                                    Foreground="{StaticResource ThemeForegroundLowBrush}"
                                    IsVisible="{Binding IsServerAuthenticationBusy}" />
                     </StackPanel>
@@ -76,10 +78,10 @@
             Background="{StaticResource ThemeControlMidBrush}"
             BorderBrush="{StaticResource SemanticWarning}"
             BorderThickness="1"
-            CornerRadius="6"
+            CornerRadius="8"
             IsVisible="{Binding HasValidationErrors}">
             <StackPanel Spacing="6">
-                <TextBlock Text="Fix highlighted fields before saving."
+                <TextBlock Text="{Binding PageStrings.ValidationBanner}"
                            Foreground="{StaticResource SemanticWarning}" />
                 <ItemsControl ItemsSource="{Binding ValidationIssueSummaries}">
                     <ItemsControl.ItemsPanel>
@@ -111,9 +113,9 @@
                 Background="{StaticResource ThemeControlMidBrush}"
                 BorderBrush="{StaticResource ThemeBorderMidBrush}"
                 BorderThickness="1"
-                CornerRadius="6"
+                CornerRadius="8"
                 IsVisible="{Binding HasPendingRestartSettings}">
-            <TextBlock Text="Some changes are non-hot-reloadable and will be reloaded from configuration when you save."
+            <TextBlock Text="{Binding PageStrings.RestartBanner}"
                        Foreground="{StaticResource ThemeForegroundLowBrush}" />
         </Border>
 
@@ -123,12 +125,12 @@
             Background="{StaticResource ThemeControlMidBrush}"
             BorderBrush="{StaticResource ThemeBorderMidBrush}"
             BorderThickness="1"
-            CornerRadius="6"
+            CornerRadius="8"
             IsVisible="{Binding IsDeveloperBuild}">
             <Grid ColumnDefinitions="*,Auto"
               VerticalAlignment="Center">
             <TextBlock Grid.Column="0"
-                   Text="Developer Settings"
+                                     Text="{Binding PageStrings.DeveloperSettingsLabel}"
                    VerticalAlignment="Center"
                    Foreground="{StaticResource ThemeForegroundLowBrush}" />
             <ToggleSwitch Grid.Column="1"
@@ -142,19 +144,19 @@
                 BorderThickness="1"
                 BorderBrush="{StaticResource ThemeBorderMidBrush}"
                 Background="{StaticResource ThemeControlLowBrush}"
-            CornerRadius="6"
+            CornerRadius="8"
             IsVisible="{Binding IsSecretsPanelVisible}">
             <StackPanel Spacing="8">
-                <TextBlock Text="Secrets"
+                <TextBlock Text="{Binding PageStrings.SecretsTitle}"
                            FontSize="16"
                            FontWeight="Bold" />
 
-                <TextBlock Text="Secret values are stored in secure storage and never written to appsettings.json."
+                <TextBlock Text="{Binding PageStrings.SecretsDescription}"
                            TextWrapping="Wrap"
                            Foreground="{StaticResource ThemeForegroundLowBrush}" />
 
                 <Border Padding="8,4"
-                        CornerRadius="6"
+                    CornerRadius="8"
                         BorderThickness="1"
                         BorderBrush="{StaticResource ThemeBorderMidBrush}"
                         Background="{StaticResource ThemeControlMidBrush}">
@@ -171,7 +173,7 @@
                                     BorderThickness="1"
                                     BorderBrush="{StaticResource ThemeBorderMidBrush}"
                                     Background="{StaticResource ThemeControlMidBrush}"
-                                    CornerRadius="6">
+                                    CornerRadius="8">
                                 <Grid RowDefinitions="Auto,Auto,Auto"
                                       ColumnDefinitions="*,Auto,Auto">
                                     <TextBlock Grid.Row="0"
@@ -193,19 +195,21 @@
                                              Margin="0,8,8,0"
                                              Text="{Binding Value}"
                                              PasswordChar="*"
-                                             PlaceholderText="Enter new value" />
+                                                 PlaceholderText="{Binding #SettingsViewRoot.DataContext.PageStrings.SecretValuePlaceholder}" />
 
                                     <Button Grid.Row="2"
                                             Grid.Column="1"
                                             Margin="0,8,8,0"
-                                            Content="Save"
+                                            CornerRadius="10"
+                                                Content="{Binding #SettingsViewRoot.DataContext.PageStrings.SecretSaveButton}"
                                             Command="{Binding #SettingsViewRoot.DataContext.SaveSecretCommand}"
                                             CommandParameter="{Binding}" />
 
                                     <Button Grid.Row="2"
                                             Grid.Column="2"
                                             Margin="0,8,0,0"
-                                            Content="Clear"
+                                            CornerRadius="10"
+                                                Content="{Binding #SettingsViewRoot.DataContext.PageStrings.SecretClearButton}"
                                             Command="{Binding #SettingsViewRoot.DataContext.ClearSecretCommand}"
                                             CommandParameter="{Binding}" />
 
@@ -233,8 +237,8 @@
                         BorderThickness="1"
                         BorderBrush="{StaticResource ThemeBorderMidBrush}"
                         Background="{StaticResource ThemeControlMidBrush}"
-                        CornerRadius="6">
-                    <TextBlock Text="Provider Configuration"
+                    CornerRadius="8">
+                    <TextBlock Text="{Binding PageStrings.ProviderConfiguration}"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
                 </Border>
@@ -256,7 +260,7 @@
                                     BorderThickness="1"
                                     BorderBrush="{StaticResource ThemeBorderMidBrush}"
                                     Background="{StaticResource ThemeControlLowBrush}"
-                                    CornerRadius="6">
+                                    CornerRadius="8">
                                 <Grid RowDefinitions="Auto,Auto,Auto,Auto"
                                       ColumnDefinitions="*,Auto">
                                     <TextBlock Grid.Row="0"
@@ -301,6 +305,7 @@
                                                                                 <Button Grid.Column="1"
                                                                                                 Margin="8,0,0,0"
                                                                                                 MinHeight="34"
+                                                                                                        CornerRadius="10"
                                                                                                 Content="{Binding BrowseButtonText}"
                                                                                                 Click="OnBrowsePathClick" />
                                                                         </Grid>
