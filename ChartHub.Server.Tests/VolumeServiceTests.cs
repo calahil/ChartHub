@@ -12,8 +12,9 @@ public sealed class VolumeServiceTests
     public async Task GetStateAsyncReturnsMasterAndSessionState()
     {
         FakeProcessRunner runner = new();
-        runner.AddResult("amixer", ["get", "Master"], new VolumeService.ProcessExecutionResult(0, "Mono: Playback 43691 [67%] [-21.00dB] [on]\n", string.Empty));
         runner.AddResult("pactl", ["info"], new VolumeService.ProcessExecutionResult(0, "Server String: /tmp/pulse\n", string.Empty));
+        runner.AddResult("pactl", ["get-sink-volume", "@DEFAULT_SINK@"], new VolumeService.ProcessExecutionResult(0, "Volume: front-left: 44040 / 67% / -10.62 dB,   front-right: 44040 / 67% / -10.62 dB\n", string.Empty));
+        runner.AddResult("pactl", ["get-sink-mute", "@DEFAULT_SINK@"], new VolumeService.ProcessExecutionResult(0, "Mute: no\n", string.Empty));
         runner.AddResult("pactl", ["list", "sink-inputs"], new VolumeService.ProcessExecutionResult(0, "Sink Input #42\n    Volume: front-left: 32768 / 50% / -18.06 dB,   front-right: 32768 / 50% / -18.06 dB\n    Mute: no\n    Property List:\n        application.name = \"RetroArch\"\n        media.name = \"Game Audio\"\n        application.process.id = \"1234\"\n", string.Empty));
 
         VolumeService sut = new(NullLogger<VolumeService>.Instance, runner);
@@ -21,12 +22,47 @@ public sealed class VolumeServiceTests
         VolumeStateResponse state = await sut.GetStateAsync(CancellationToken.None);
 
         Assert.Equal(67, state.Master.ValuePercent);
+        Assert.False(state.Master.IsMuted);
         Assert.True(state.SupportsPerApplicationSessions);
         VolumeSessionResponse session = Assert.Single(state.Sessions);
         Assert.Equal("42", session.SessionId);
         Assert.Equal("Game Audio", session.Name);
         Assert.Equal(1234, session.ProcessId);
         Assert.Equal(50, session.ValuePercent);
+    }
+
+    [Fact]
+    public async Task GetStateAsyncWithoutPactlFallsBackToAmixer()
+    {
+        FakeProcessRunner runner = new();
+        runner.AddResult("pactl", ["info"], new VolumeService.ProcessExecutionResult(127, string.Empty, "pactl not found"));
+        runner.AddResult("amixer", ["get", "Master"], new VolumeService.ProcessExecutionResult(0, "Mono: Playback 43691 [67%] [-21.00dB] [on]\n", string.Empty));
+
+        VolumeService sut = new(NullLogger<VolumeService>.Instance, runner);
+
+        VolumeStateResponse state = await sut.GetStateAsync(CancellationToken.None);
+
+        Assert.Equal(67, state.Master.ValuePercent);
+        Assert.False(state.SupportsPerApplicationSessions);
+        Assert.Empty(state.Sessions);
+    }
+
+    [Fact]
+    public async Task SetMasterVolumeAsyncViaPactlUpdatesVolume()
+    {
+        FakeProcessRunner runner = new();
+        runner.AddResult("pactl", ["info"], new VolumeService.ProcessExecutionResult(0, "Server String: /tmp/pulse\n", string.Empty));
+        runner.AddResult("pactl", ["set-sink-volume", "@DEFAULT_SINK@", "50%"], new VolumeService.ProcessExecutionResult(0, string.Empty, string.Empty));
+        runner.AddResult("pactl", ["get-sink-volume", "@DEFAULT_SINK@"], new VolumeService.ProcessExecutionResult(0, "Volume: front-left: 32768 / 50% / -18.06 dB,   front-right: 32768 / 50% / -18.06 dB\n", string.Empty));
+        runner.AddResult("pactl", ["get-sink-mute", "@DEFAULT_SINK@"], new VolumeService.ProcessExecutionResult(0, "Mute: no\n", string.Empty));
+
+        VolumeService sut = new(NullLogger<VolumeService>.Instance, runner);
+
+        VolumeActionResponse response = await sut.SetMasterVolumeAsync(50, CancellationToken.None);
+
+        Assert.Equal(50, response.ValuePercent);
+        Assert.False(response.IsMuted);
+        Assert.Equal("master", response.TargetKind);
     }
 
     [Fact]
@@ -48,6 +84,7 @@ public sealed class VolumeServiceTests
     public async Task SetMasterVolumeAsyncWhenAmixerUnavailableThrowsNotImplemented()
     {
         FakeProcessRunner runner = new();
+        runner.AddResult("pactl", ["info"], new VolumeService.ProcessExecutionResult(127, string.Empty, "pactl not found"));
         runner.AddResult("amixer", ["set", "Master", "50%"], new VolumeService.ProcessExecutionResult(1, string.Empty, "Unable to find simple control 'Master'"));
 
         VolumeService sut = new(NullLogger<VolumeService>.Instance, runner);

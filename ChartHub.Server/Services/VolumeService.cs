@@ -31,13 +31,17 @@ public sealed partial class VolumeService(ILogger<VolumeService> logger) : IVolu
     {
         EnsureLinux();
 
-        VolumeMasterStateResponse master = await GetMasterVolumeAsync(cancellationToken).ConfigureAwait(false);
+        bool pactlAvailable = await IsPactlAvailableAsync(cancellationToken).ConfigureAwait(false);
+
+        VolumeMasterStateResponse master = pactlAvailable
+            ? await GetMasterVolumeViaPactlAsync(cancellationToken).ConfigureAwait(false)
+            : await GetMasterVolumeViaAmixerAsync(cancellationToken).ConfigureAwait(false);
 
         IReadOnlyList<VolumeSessionResponse> sessions = [];
         bool supportsPerApplicationSessions = false;
         string? sessionSupportMessage = null;
 
-        if (await IsPactlAvailableAsync(cancellationToken).ConfigureAwait(false))
+        if (pactlAvailable)
         {
             supportsPerApplicationSessions = true;
             sessions = await ListSessionsAsync(cancellationToken).ConfigureAwait(false);
@@ -62,20 +66,43 @@ public sealed partial class VolumeService(ILogger<VolumeService> logger) : IVolu
         EnsureLinux();
         EnsureValidVolume(valuePercent);
 
-        ProcessExecutionResult result = await _processRunner
-            .RunAsync("amixer", ["set", "Master", $"{valuePercent}%"], cancellationToken)
-            .ConfigureAwait(false);
+        VolumeMasterStateResponse master;
 
-        if (result.ExitCode != 0)
+        if (await IsPactlAvailableAsync(cancellationToken).ConfigureAwait(false))
         {
-            LogMasterVolumeUpdateFailed(_logger, result.StandardError);
-            throw new VolumeServiceException(
-                StatusCodes.Status501NotImplemented,
-                "master_volume_unavailable",
-                "Master volume control is unavailable on this server host.");
+            ProcessExecutionResult result = await _processRunner
+                .RunAsync("pactl", ["set-sink-volume", "@DEFAULT_SINK@", $"{valuePercent}%"], cancellationToken)
+                .ConfigureAwait(false);
+
+            if (result.ExitCode != 0)
+            {
+                LogMasterVolumeUpdateFailed(_logger, result.StandardError);
+                throw new VolumeServiceException(
+                    StatusCodes.Status501NotImplemented,
+                    "master_volume_unavailable",
+                    "Master volume control is unavailable on this server host.");
+            }
+
+            master = await GetMasterVolumeViaPactlAsync(cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            ProcessExecutionResult result = await _processRunner
+                .RunAsync("amixer", ["set", "Master", $"{valuePercent}%"], cancellationToken)
+                .ConfigureAwait(false);
+
+            if (result.ExitCode != 0)
+            {
+                LogMasterVolumeUpdateFailed(_logger, result.StandardError);
+                throw new VolumeServiceException(
+                    StatusCodes.Status501NotImplemented,
+                    "master_volume_unavailable",
+                    "Master volume control is unavailable on this server host.");
+            }
+
+            master = await GetMasterVolumeViaAmixerAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        VolumeMasterStateResponse master = await GetMasterVolumeAsync(cancellationToken).ConfigureAwait(false);
         NotifyChanged();
 
         return new VolumeActionResponse
@@ -156,7 +183,7 @@ public sealed partial class VolumeService(ILogger<VolumeService> logger) : IVolu
         return completed == signal.Task;
     }
 
-    private async Task<VolumeMasterStateResponse> GetMasterVolumeAsync(CancellationToken cancellationToken)
+    private async Task<VolumeMasterStateResponse> GetMasterVolumeViaAmixerAsync(CancellationToken cancellationToken)
     {
         ProcessExecutionResult result = await _processRunner
             .RunAsync("amixer", ["get", "Master"], cancellationToken)
@@ -181,6 +208,36 @@ public sealed partial class VolumeService(ILogger<VolumeService> logger) : IVolu
         }
 
         bool isMuted = result.StandardOutput.Contains("[off]", StringComparison.OrdinalIgnoreCase);
+
+        return new VolumeMasterStateResponse
+        {
+            ValuePercent = Math.Clamp(valuePercent, 0, 100),
+            IsMuted = isMuted,
+        };
+    }
+
+    private async Task<VolumeMasterStateResponse> GetMasterVolumeViaPactlAsync(CancellationToken cancellationToken)
+    {
+        ProcessExecutionResult volumeResult = await _processRunner
+            .RunAsync("pactl", ["get-sink-volume", "@DEFAULT_SINK@"], cancellationToken)
+            .ConfigureAwait(false);
+
+        if (volumeResult.ExitCode != 0)
+        {
+            LogMasterVolumeLookupFailed(_logger, volumeResult.StandardError);
+            throw new VolumeServiceException(
+                StatusCodes.Status501NotImplemented,
+                "master_volume_unavailable",
+                "Master volume control is unavailable on this server host.");
+        }
+
+        ProcessExecutionResult muteResult = await _processRunner
+            .RunAsync("pactl", ["get-sink-mute", "@DEFAULT_SINK@"], cancellationToken)
+            .ConfigureAwait(false);
+
+        int valuePercent = ParseFirstPercentage(volumeResult.StandardOutput, 0);
+        bool isMuted = muteResult.ExitCode == 0
+            && muteResult.StandardOutput.Contains("yes", StringComparison.OrdinalIgnoreCase);
 
         return new VolumeMasterStateResponse
         {
