@@ -33,8 +33,16 @@ jobs:
         with:
           dotnet-version: ${{ inputs.dotnet_version }}
 
-      - name: Restore
-        run: dotnet restore ChartHub.sln
+      - name: Restore service and test projects
+        run: |
+          dotnet restore ChartHub.Server/ChartHub.Server.csproj
+          dotnet restore ChartHub.Tests/ChartHub.Tests.csproj
+
+      - name: Restore BackupApi test projects
+        if: ${{ inputs.run_backupapi_tests }}
+        run: |
+          dotnet restore ChartHub.BackupApi/ChartHub.BackupApi.csproj
+          dotnet restore ChartHub.BackupApi.Tests/ChartHub.BackupApi.Tests.csproj
 
       - name: Install ripgrep
         run: sudo apt-get update && sudo apt-get install -y ripgrep
@@ -51,10 +59,22 @@ jobs:
           fi
 
       - name: Verify formatting
-        run: dotnet format ChartHub.sln --verify-no-changes --severity error --no-restore
+        run: |
+          dotnet format ChartHub.Server/ChartHub.Server.csproj --verify-no-changes --severity error --no-restore
+          dotnet format ChartHub.Tests/ChartHub.Tests.csproj --verify-no-changes --severity error --no-restore
+          if [ "${{ inputs.run_backupapi_tests }}" = "true" ]; then
+            dotnet format ChartHub.BackupApi/ChartHub.BackupApi.csproj --verify-no-changes --severity error --no-restore
+            dotnet format ChartHub.BackupApi.Tests/ChartHub.BackupApi.Tests.csproj --verify-no-changes --severity error --no-restore
+          fi
 
       - name: Build
-        run: dotnet build ChartHub.sln --configuration Release --no-restore
+        run: |
+          dotnet build ChartHub.Server/ChartHub.Server.csproj --configuration Release --no-restore
+          dotnet build ChartHub.Tests/ChartHub.Tests.csproj --configuration Release --no-restore
+          if [ "${{ inputs.run_backupapi_tests }}" = "true" ]; then
+            dotnet build ChartHub.BackupApi/ChartHub.BackupApi.csproj --configuration Release --no-restore
+            dotnet build ChartHub.BackupApi.Tests/ChartHub.BackupApi.Tests.csproj --configuration Release --no-restore
+          fi
 
       - name: Test ChartHub with coverage threshold
         run: >-
