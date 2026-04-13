@@ -715,15 +715,14 @@ jobs:
           CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
         run: |
           EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
-          install -m 600 /dev/null /srv/appdata/charthub/config/charthub-server.env
+          ENV_FILE="/srv/appdata/charthub/config/charthub-server.env"
+          install -m 600 /dev/null "$ENV_FILE"
           {
             echo "ASPNETCORE_URLS=http://+:5001"
             echo "Auth__JwtSigningKey=${AUTH_JWT_SIGNING_KEY}"
             echo "Auth__Issuer=${AUTH_ISSUER}"
             echo "Auth__Audience=${AUTH_AUDIENCE}"
-            echo "Auth__AllowedEmails__0=${AUTH_ALLOWED_EMAIL}"
             echo "Auth__AccessTokenMinutes=60"
-            echo "GoogleAuth__AllowedAudiences__0=${GOOGLE_ALLOWED_AUDIENCE}"
             echo "GoogleDrive__ApiKey=${GOOGLE_DRIVE_API_KEY}"
             echo "ServerPaths__ConfigRoot=/srv/appdata/charthub/config"
             echo "ServerPaths__ChartHubRoot=/srv/appdata/charthub/data"
@@ -734,8 +733,30 @@ jobs:
             echo "ServerLogging__LogDirectory=/srv/appdata/charthub/logs"
             echo "ServerLogging__FileName=charthub-server.log"
             echo "CHARTHUB_SERVER_PORT=${EFFECTIVE_PORT}"
-          } > /srv/appdata/charthub/config/charthub-server.env
-          chmod 600 /srv/appdata/charthub/config/charthub-server.env
+          } > "$ENV_FILE"
+
+          # Support single or comma-separated lists in secrets.
+          auth_allowed_index=0
+          IFS=',' read -r -a auth_allowed_items <<< "${AUTH_ALLOWED_EMAIL:-}"
+          for item in "${auth_allowed_items[@]}"; do
+            trimmed=$(echo "$item" | xargs)
+            if [[ -n "$trimmed" ]]; then
+              printf 'Auth__AllowedEmails__%d=%s\n' "$auth_allowed_index" "$trimmed" >> "$ENV_FILE"
+              auth_allowed_index=$((auth_allowed_index + 1))
+            fi
+          done
+
+          google_audience_index=0
+          IFS=',' read -r -a google_audience_items <<< "${GOOGLE_ALLOWED_AUDIENCE:-}"
+          for item in "${google_audience_items[@]}"; do
+            trimmed=$(echo "$item" | xargs)
+            if [[ -n "$trimmed" ]]; then
+              printf 'GoogleAuth__AllowedAudiences__%d=%s\n' "$google_audience_index" "$trimmed" >> "$ENV_FILE"
+              google_audience_index=$((google_audience_index + 1))
+            fi
+          done
+
+          chmod 600 "$ENV_FILE"
 
       - name: Install release bundle
         env:

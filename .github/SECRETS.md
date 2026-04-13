@@ -34,6 +34,13 @@ These are required for Server runtime config and can be stored as repository sec
 - `CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES`
 - `CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY`
 
+Formatting note:
+- `CHARTHUB_SERVER_JWT_ALLOWED_EMAILS` and `CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES` can be either:
+	- a single value, or
+	- a comma-separated list.
+- Do not add quotes around entries.
+- Example: `client-id-desktop.apps.googleusercontent.com,client-id-android.apps.googleusercontent.com`
+
 ### Environment-level secrets (`server-production`)
 
 Server deploy is stable-only and targets the `server-production` environment.

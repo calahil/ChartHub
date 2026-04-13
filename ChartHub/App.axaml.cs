@@ -71,12 +71,19 @@ public partial class App : Avalonia.Application
     private static void OnApplicationExit(object? sender, ControlledApplicationLifetimeExitEventArgs e)
     {
         Logger.LogInfo("App", $"OnApplicationExit called. Exit code: {e.ApplicationExitCode}");
-        DisposeApplicationResourcesOnce();
+        _ = DisposeApplicationResourcesOnceAsync();
     }
 
     private static void OnProcessExit(object? sender, EventArgs e)
     {
-        DisposeApplicationResourcesOnce();
+        try
+        {
+            DisposeApplicationResourcesOnceAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("App", "Process-exit cleanup failed", ex);
+        }
     }
 
     private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
@@ -109,7 +116,7 @@ public partial class App : Avalonia.Application
         Logger.LogError("App", "Unobserved task exception", e.Exception);
     }
 
-    private static void DisposeApplicationResourcesOnce()
+    private static async Task DisposeApplicationResourcesOnceAsync()
     {
         if (Interlocked.Exchange(ref _shutdownHandled, 1) != 0)
         {
@@ -129,7 +136,19 @@ public partial class App : Avalonia.Application
             if (ServiceProvider is IAsyncDisposable asyncDisposable)
             {
                 Logger.LogInfo("App", "Disposing ServiceProvider (async)");
-                asyncDisposable.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                Task disposeTask = asyncDisposable.DisposeAsync().AsTask();
+                Task completed = await Task.WhenAny(disposeTask, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
+                if (completed != disposeTask)
+                {
+                    Logger.LogError(
+                        "App",
+                        "ServiceProvider async dispose timed out; shutdown will continue.",
+                        new TimeoutException("ServiceProvider disposal exceeded 5 seconds."));
+                }
+                else
+                {
+                    await disposeTask.ConfigureAwait(false);
+                }
             }
             else if (ServiceProvider is IDisposable disposable)
             {
