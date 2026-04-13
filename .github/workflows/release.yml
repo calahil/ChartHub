@@ -398,7 +398,7 @@ jobs:
       - name: Pull and deploy
         run: |
           docker compose --project-name charthub-dev --env-file .env.deploy pull backup-api
-          docker compose --project-name charthub-dev --env-file .env.deploy up -d --no-build
+          docker compose --project-name charthub-dev --env-file .env.deploy up -d --no-build backup-api
 
       - name: Verify health
         env:
@@ -489,7 +489,7 @@ jobs:
       - name: Pull and deploy
         run: |
           docker compose --project-name charthub-staging --env-file .env.deploy pull backup-api
-          docker compose --project-name charthub-staging --env-file .env.deploy up -d --no-build
+          docker compose --project-name charthub-staging --env-file .env.deploy up -d --no-build backup-api
 
       - name: Verify health
         env:
@@ -612,7 +612,7 @@ jobs:
       - name: Pull and deploy
         run: |
           docker compose --project-name charthub-prod --env-file .env.deploy pull backup-api
-          docker compose --project-name charthub-prod --env-file .env.deploy up -d --no-build
+          docker compose --project-name charthub-prod --env-file .env.deploy up -d --no-build backup-api
 
       - name: Verify health
         env:
