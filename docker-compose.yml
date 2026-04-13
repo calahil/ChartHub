@@ -66,9 +66,6 @@ services:
 
   charthub-server:
     image: ${CHARTHUB_SERVER_IMAGE:-charthub-server:local}
-    build:
-      context: .
-      dockerfile: ChartHub.Server/Dockerfile
     container_name: ${CHARTHUB_SERVER_CONTAINER_NAME:-charthub-server}
     environment:
       - ASPNETCORE_ENVIRONMENT=${CHARTHUB_SERVER_ENVIRONMENT:-Production}

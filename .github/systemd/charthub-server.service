@@ -1,0 +1,17 @@
+[Unit]
+Description=ChartHub Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/appdata/charthub/current
+EnvironmentFile=/srv/appdata/charthub/config/charthub-server.env
+ExecStart=/srv/appdata/charthub/current/ChartHub.Server
+Restart=always
+RestartSec=5
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

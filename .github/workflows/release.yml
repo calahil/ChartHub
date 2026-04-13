@@ -245,83 +245,50 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  build-server-image:
-    name: Build and push ChartHub.Server image
+  build-server-bundle:
+    name: Publish ChartHub.Server (linux-x64)
+    if: needs.classify.outputs.release_channel == 'stable'
     runs-on: ubuntu-latest
     needs: [classify, validate]
-    outputs:
-      image_digest: ${{ steps.push.outputs.digest }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - uses: actions/setup-dotnet@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          dotnet-version: 10.0.x
 
-      - name: Compute image tags
-        id: tags
-        env:
-          REPO_OWNER: ${{ github.repository_owner }}
-          CHANNEL: ${{ needs.classify.outputs.release_channel }}
-          IMAGE_TAG: ${{ needs.classify.outputs.image_tag }}
-          IMAGE_TAG_MINOR: ${{ needs.classify.outputs.image_tag_minor }}
+      - name: Restore
+        run: dotnet restore ChartHub.Server/ChartHub.Server.csproj -r linux-x64
+
+      - name: Publish
+        run: >-
+          dotnet publish ChartHub.Server/ChartHub.Server.csproj
+          --configuration Release
+          --no-restore
+          -r linux-x64
+          --self-contained true
+          -p:Version=${{ needs.classify.outputs.version }}
+          -o ./publish/server-linux-x64
+
+      - name: Archive
         run: |
-          BASE="ghcr.io/${REPO_OWNER}/charthub-server"
-          if [[ "$CHANNEL" == "dev" ]]; then
-            {
-              echo "tags<<EOF"
-              echo "${BASE}:${IMAGE_TAG}"
-              echo "${BASE}:dev-latest"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          cd publish
+          zip -r ../charthub-server-${{ needs.classify.outputs.version }}-linux-x64.zip server-linux-x64
 
-          if [[ "$CHANNEL" == "rc" ]]; then
-            {
-              echo "tags<<EOF"
-              echo "${BASE}:${IMAGE_TAG}"
-              echo "${BASE}:rc-latest"
-              echo "EOF"
-            } >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          {
-            echo "tags<<EOF"
-            echo "${BASE}:${IMAGE_TAG}"
-            echo "${BASE}:${IMAGE_TAG_MINOR}"
-            echo "${BASE}:latest"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Build and push
-        id: push
-        uses: docker/build-push-action@v6
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          context: .
-          file: ChartHub.Server/Dockerfile
-          push: true
-          tags: ${{ steps.tags.outputs.tags }}
-          labels: |
-            org.opencontainers.image.title=ChartHub Server
-            org.opencontainers.image.vendor=Calahil Studios
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.version=${{ needs.classify.outputs.version }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          name: server-linux-x64
+          path: charthub-server-${{ needs.classify.outputs.version }}-linux-x64.zip
+          retention-days: 1
 
   publish-release:
     name: Publish GitHub Release
-    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
+    if: >-
+      (needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable') &&
+      (needs.build-server-bundle.result == 'success' || needs.build-server-bundle.result == 'skipped')
     runs-on: ubuntu-latest
-    needs: [classify, build-desktop, build-android, build-api-image, build-server-image]
+    needs: [classify, build-desktop, build-android, build-api-image, build-server-bundle]
     steps:
       - name: Download desktop artifacts
         uses: actions/download-artifact@v4
@@ -334,6 +301,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: android-apk
+          path: ./release-assets
+
+      - name: Download Server Linux artifact
+        if: needs.classify.outputs.release_channel == 'stable'
+        uses: actions/download-artifact@v4
+        with:
+          name: server-linux-x64
           path: ./release-assets
 
       - name: Create GitHub Release
@@ -358,8 +332,8 @@ jobs:
         env:
           VERSION: ${{ needs.classify.outputs.version }}
           BACKUP_API_DIGEST: ${{ needs.build-api-image.outputs.image_digest }}
-          SERVER_DIGEST: ${{ needs.build-server-image.outputs.image_digest }}
           REPO_OWNER: ${{ github.repository_owner }}
+          RELEASE_CHANNEL: ${{ needs.classify.outputs.release_channel }}
         run: |
           {
             echo "## ChartHub ${VERSION}"
@@ -367,10 +341,11 @@ jobs:
             echo "### Backup API"
             echo "- Image: ghcr.io/${REPO_OWNER}/charthub-backup-api:${VERSION}"
             echo "- Digest: ${BACKUP_API_DIGEST}"
-            echo ""
-            echo "### ChartHub Server"
-            echo "- Image: ghcr.io/${REPO_OWNER}/charthub-server:${VERSION}"
-            echo "- Digest: ${SERVER_DIGEST}"
+            if [[ "$RELEASE_CHANNEL" == "stable" ]]; then
+              echo ""
+              echo "### ChartHub Server"
+              echo "- Linux bundle: charthub-server-${VERSION}-linux-x64.zip"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
   deploy-dev:
@@ -691,256 +666,86 @@ jobs:
         if: always()
         run: rm -f .env.deploy
 
-  deploy-server-dev:
-    name: Deploy ChartHub Server to dev
-    if: needs.classify.outputs.release_channel == 'dev'
-    runs-on: [self-hosted, linux, charthub-server-host]
-    needs: [classify, build-server-image]
-    environment: server-dev
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Write env file
-        env:
-          CHARTHUB_SERVER_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-server:${{ needs.classify.outputs.image_tag }}
-          Auth__JwtSigningKey: ${{ secrets.CHARTHUB_SERVER_JWT_SIGNING_KEY }}
-          Auth__Issuer: ${{ secrets.CHARTHUB_SERVER_JWT_ISSUER }}
-          Auth__Audience: ${{ secrets.CHARTHUB_SERVER_JWT_AUDIENCE }}
-          Auth__AllowedEmails__0: ${{ secrets.CHARTHUB_SERVER_JWT_ALLOWED_EMAILS }}
-          Auth__AccessTokenMinutes: ${{ secrets.CHARTHUB_SERVER_JWT_ACCESS_TOKEN_MINUTES }}
-          GoogleAuth__AllowedAudiences__0: ${{ secrets.CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES }}
-          GoogleDrive__ApiKey: ${{ secrets.CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY }}
-          ServerPaths__ConfigRoot: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
-          ServerPaths__ChartHubRoot: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_ROOT }}
-          ServerPaths__CloneHeroRoot: ${{ secrets.CHARTHUB_SERVER_CLONEHERO_ROOT }}
-          CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
-          CHARTHUB_SERVER_CONTAINER_NAME: charthub-dev-server
-        run: |
-          printenv CHARTHUB_SERVER_IMAGE        | xargs -I{} printf 'CHARTHUB_SERVER_IMAGE=%s\n' "{}" > .env.deploy
-          printenv Auth__JwtSigningKey          | xargs -I{} printf 'Auth__JwtSigningKey=%s\n' "{}" >> .env.deploy
-          printenv Auth__Issuer                 | xargs -I{} printf 'Auth__Issuer=%s\n' "{}" >> .env.deploy
-          printenv Auth__Audience               | xargs -I{} printf 'Auth__Audience=%s\n' "{}" >> .env.deploy
-          printenv Auth__AllowedEmails__0       | xargs -I{} printf 'Auth__AllowedEmails__0=%s\n' "{}" >> .env.deploy
-          printenv Auth__AccessTokenMinutes     | xargs -I{} printf 'Auth__AccessTokenMinutes=%s\n' "{}" >> .env.deploy
-          printenv GoogleAuth__AllowedAudiences__0 | xargs -I{} printf 'GoogleAuth__AllowedAudiences__0=%s\n' "{}" >> .env.deploy
-          printenv GoogleDrive__ApiKey          | xargs -I{} printf 'GoogleDrive__ApiKey=%s\n' "{}" >> .env.deploy
-          printenv ServerPaths__ConfigRoot      | xargs -I{} printf 'ServerPaths__ConfigRoot=%s\n' "{}" >> .env.deploy
-          printenv ServerPaths__ChartHubRoot    | xargs -I{} printf 'ServerPaths__ChartHubRoot=%s\n' "{}" >> .env.deploy
-          printenv ServerPaths__CloneHeroRoot   | xargs -I{} printf 'ServerPaths__CloneHeroRoot=%s\n' "{}" >> .env.deploy
-          printenv CHARTHUB_SERVER_PORT         | xargs -I{} printf 'CHARTHUB_SERVER_PORT=%s\n' "{}" >> .env.deploy
-          printenv CHARTHUB_SERVER_CONTAINER_NAME | xargs -I{} printf 'CHARTHUB_SERVER_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
-
-      - name: Pull and deploy
-        run: |
-          docker compose --project-name charthub-dev --env-file .env.deploy -f docker-compose.server.yml pull charthub-server
-          docker compose --project-name charthub-dev --env-file .env.deploy -f docker-compose.server.yml up -d --no-build
-
-      - name: Verify health
-        env:
-          CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
-        run: |
-          EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
-          if [[ -z "${CHARTHUB_SERVER_PORT:-}" ]]; then
-            echo "CHARTHUB_SERVER_PORT secret is not set; using compose default port ${EFFECTIVE_PORT}"
-          fi
-          if ! [[ "$EFFECTIVE_PORT" =~ ^[0-9]+$ ]]; then
-            echo "Invalid Server port: '${EFFECTIVE_PORT}'"
-            exit 1
-          fi
-
-          for i in $(seq 1 24); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${EFFECTIVE_PORT}/health" 2>/dev/null || echo "000")
-            if [[ "$STATUS" == "200" ]]; then
-              break
-            fi
-            if [[ "$i" == "24" ]]; then
-              echo "Dev /health check failed on port ${EFFECTIVE_PORT}"
-              docker compose --project-name charthub-dev ps || true
-              docker compose --project-name charthub-dev logs --tail 200 charthub-server || true
-              exit 1
-            fi
-            sleep 5
-          done
-
-      - name: Clean up env file
-        if: always()
-        run: rm -f .env.deploy
-
-  deploy-server-staging:
-    name: Deploy ChartHub Server to staging
-    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
-    runs-on: [self-hosted, linux, charthub-server-host]
-    needs: [classify, build-server-image]
-    outputs:
-      staged_image_ref: ${{ steps.capture-staged-image.outputs.staged_image_ref }}
-    environment: server-staging
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Write env file
-        env:
-          CHARTHUB_SERVER_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-server@${{ needs.build-server-image.outputs.image_digest }}
-          Auth__JwtSigningKey: ${{ secrets.CHARTHUB_SERVER_JWT_SIGNING_KEY }}
-          Auth__Issuer: ${{ secrets.CHARTHUB_SERVER_JWT_ISSUER }}
-          Auth__Audience: ${{ secrets.CHARTHUB_SERVER_JWT_AUDIENCE }}
-          Auth__AllowedEmails__0: ${{ secrets.CHARTHUB_SERVER_JWT_ALLOWED_EMAILS }}
-          Auth__AccessTokenMinutes: ${{ secrets.CHARTHUB_SERVER_JWT_ACCESS_TOKEN_MINUTES }}
-          GoogleAuth__AllowedAudiences__0: ${{ secrets.CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES }}
-          GoogleDrive__ApiKey: ${{ secrets.CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY }}
-          ServerPaths__ConfigRoot: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
-          ServerPaths__ChartHubRoot: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_ROOT }}
-          ServerPaths__CloneHeroRoot: ${{ secrets.CHARTHUB_SERVER_CLONEHERO_ROOT }}
-          CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
-          CHARTHUB_SERVER_CONTAINER_NAME: charthub-staging-server
-        run: |
-          printenv CHARTHUB_SERVER_IMAGE        | xargs -I{} printf 'CHARTHUB_SERVER_IMAGE=%s\n' "{}" > .env.deploy
-          printenv Auth__JwtSigningKey          | xargs -I{} printf 'Auth__JwtSigningKey=%s\n' "{}" >> .env.deploy
-          printenv Auth__Issuer                 | xargs -I{} printf 'Auth__Issuer=%s\n' "{}" >> .env.deploy
-          printenv Auth__Audience               | xargs -I{} printf 'Auth__Audience=%s\n' "{}" >> .env.deploy
-          printenv Auth__AllowedEmails__0       | xargs -I{} printf 'Auth__AllowedEmails__0=%s\n' "{}" >> .env.deploy
-          printenv Auth__AccessTokenMinutes     | xargs -I{} printf 'Auth__AccessTokenMinutes=%s\n' "{}" >> .env.deploy
-          printenv GoogleAuth__AllowedAudiences__0 | xargs -I{} printf 'GoogleAuth__AllowedAudiences__0=%s\n' "{}" >> .env.deploy
-          printenv GoogleDrive__ApiKey          | xargs -I{} printf 'GoogleDrive__ApiKey=%s\n' "{}" >> .env.deploy
-          printenv ServerPaths__ConfigRoot      | xargs -I{} printf 'ServerPaths__ConfigRoot=%s\n' "{}" >> .env.deploy
-          printenv ServerPaths__ChartHubRoot    | xargs -I{} printf 'ServerPaths__ChartHubRoot=%s\n' "{}" >> .env.deploy
-          printenv ServerPaths__CloneHeroRoot   | xargs -I{} printf 'ServerPaths__CloneHeroRoot=%s\n' "{}" >> .env.deploy
-          printenv CHARTHUB_SERVER_PORT         | xargs -I{} printf 'CHARTHUB_SERVER_PORT=%s\n' "{}" >> .env.deploy
-          printenv CHARTHUB_SERVER_CONTAINER_NAME | xargs -I{} printf 'CHARTHUB_SERVER_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
-
-      - name: Pull and deploy
-        env:
-          CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
-        run: |
-          EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
-          docker compose --project-name charthub-staging --env-file .env.deploy -f docker-compose.server.yml pull charthub-server
-          docker compose --project-name charthub-staging --env-file .env.deploy -f docker-compose.server.yml up -d --no-build
-
-      - name: Verify health
-        env:
-          CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
-        run: |
-          EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
-          if [[ -z "${CHARTHUB_SERVER_PORT:-}" ]]; then
-            echo "CHARTHUB_SERVER_PORT secret is not set; using compose default port ${EFFECTIVE_PORT}"
-          fi
-          if ! [[ "$EFFECTIVE_PORT" =~ ^[0-9]+$ ]]; then
-            echo "Invalid Server port: '${EFFECTIVE_PORT}'"
-            exit 1
-          fi
-
-          for i in $(seq 1 24); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${EFFECTIVE_PORT}/health" 2>/dev/null || echo "000")
-            if [[ "$STATUS" == "200" ]]; then
-              break
-            fi
-            if [[ "$i" == "24" ]]; then
-              echo "Staging /health check failed on port ${EFFECTIVE_PORT}"
-              docker compose --project-name charthub-staging ps || true
-              docker compose --project-name charthub-staging logs --tail 200 charthub-server || true
-              exit 1
-            fi
-            sleep 5
-          done
-
-      - name: Verify staged image digest
-        id: capture-staged-image
-        env:
-          EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-server@${{ needs.build-server-image.outputs.image_digest }}
-        run: |
-          EXPECTED_IMAGE_ID=$(docker image inspect "$EXPECTED_IMAGE_REF" --format '{{ .Id }}')
-          ACTUAL_IMAGE_ID=$(docker inspect charthub-staging-server --format '{{ .Image }}')
-          ACTUAL_IMAGE_REF=$(docker inspect charthub-staging-server --format '{{ .Config.Image }}')
-          if [[ "$ACTUAL_IMAGE_ID" != "$EXPECTED_IMAGE_ID" ]]; then
-            echo "Staging deployed unexpected image"
-            echo "Expected: $EXPECTED_IMAGE_REF"
-            echo "Expected image ID: $EXPECTED_IMAGE_ID"
-            echo "Actual image ID:   $ACTUAL_IMAGE_ID"
-            echo "Container image:   $ACTUAL_IMAGE_REF"
-            exit 1
-          fi
-          echo "staged_image_ref=$EXPECTED_IMAGE_REF" >> "$GITHUB_OUTPUT"
-
-      - name: Clean up env file
-        if: always()
-        run: rm -f .env.deploy
-
   deploy-server-production:
-    name: Deploy ChartHub Server to production
+    name: Deploy ChartHub Server bundle to production
     if: needs.classify.outputs.release_channel == 'stable'
     runs-on: [self-hosted, linux, charthub-server-host]
-    needs: [classify, build-server-image, deploy-server-staging]
+    needs: [classify, build-server-bundle]
     environment: server-production
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Download Server Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: server-linux-x64
+          path: ./.server-release
 
-      - name: Verify promotion digest from staging
-        env:
-          EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-server@${{ needs.build-server-image.outputs.image_digest }}
-          STAGED_IMAGE_REF: ${{ needs.deploy-server-staging.outputs.staged_image_ref }}
+      - name: Prepare install directories
         run: |
-          if [[ -z "$STAGED_IMAGE_REF" ]]; then
-            echo "Staging image reference is missing"
-            exit 1
-          fi
-          if [[ "$STAGED_IMAGE_REF" != "$EXPECTED_IMAGE_REF" ]]; then
-            echo "Production blocked: staging image does not match expected digest"
-            echo "Expected: $EXPECTED_IMAGE_REF"
-            echo "Staged:   $STAGED_IMAGE_REF"
-            exit 1
-          fi
+          sudo mkdir -p /srv/appdata/charthub/releases
+          sudo mkdir -p /srv/appdata/charthub/config
+          sudo mkdir -p /srv/appdata/charthub/db
+          sudo mkdir -p /srv/appdata/charthub/logs
+          sudo mkdir -p /srv/appdata/charthub/data
+          sudo mkdir -p /srv/appdata/charthub/music
 
-      - name: Write env file
+      - name: Write runtime environment file
         env:
-          CHARTHUB_SERVER_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-server@${{ needs.build-server-image.outputs.image_digest }}
-          Auth__JwtSigningKey: ${{ secrets.CHARTHUB_SERVER_JWT_SIGNING_KEY }}
-          Auth__Issuer: ${{ secrets.CHARTHUB_SERVER_JWT_ISSUER }}
-          Auth__Audience: ${{ secrets.CHARTHUB_SERVER_JWT_AUDIENCE }}
-          Auth__AllowedEmails__0: ${{ secrets.CHARTHUB_SERVER_JWT_ALLOWED_EMAILS }}
-          Auth__AccessTokenMinutes: ${{ secrets.CHARTHUB_SERVER_JWT_ACCESS_TOKEN_MINUTES }}
-          GoogleAuth__AllowedAudiences__0: ${{ secrets.CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES }}
-          GoogleDrive__ApiKey: ${{ secrets.CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY }}
-          ServerPaths__ConfigRoot: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
-          ServerPaths__ChartHubRoot: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_ROOT }}
-          ServerPaths__CloneHeroRoot: ${{ secrets.CHARTHUB_SERVER_CLONEHERO_ROOT }}
-          CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
-          CHARTHUB_SERVER_CONTAINER_NAME: charthub-prod-server
-        run: |
-          printenv CHARTHUB_SERVER_IMAGE        | xargs -I{} printf 'CHARTHUB_SERVER_IMAGE=%s\n' "{}" > .env.deploy
-          printenv Auth__JwtSigningKey          | xargs -I{} printf 'Auth__JwtSigningKey=%s\n' "{}" >> .env.deploy
-          printenv Auth__Issuer                 | xargs -I{} printf 'Auth__Issuer=%s\n' "{}" >> .env.deploy
-          printenv Auth__Audience               | xargs -I{} printf 'Auth__Audience=%s\n' "{}" >> .env.deploy
-          printenv Auth__AllowedEmails__0       | xargs -I{} printf 'Auth__AllowedEmails__0=%s\n' "{}" >> .env.deploy
-          printenv Auth__AccessTokenMinutes     | xargs -I{} printf 'Auth__AccessTokenMinutes=%s\n' "{}" >> .env.deploy
-          printenv GoogleAuth__AllowedAudiences__0 | xargs -I{} printf 'GoogleAuth__AllowedAudiences__0=%s\n' "{}" >> .env.deploy
-          printenv GoogleDrive__ApiKey          | xargs -I{} printf 'GoogleDrive__ApiKey=%s\n' "{}" >> .env.deploy
-          printenv ServerPaths__ConfigRoot      | xargs -I{} printf 'ServerPaths__ConfigRoot=%s\n' "{}" >> .env.deploy
-          printenv ServerPaths__ChartHubRoot    | xargs -I{} printf 'ServerPaths__ChartHubRoot=%s\n' "{}" >> .env.deploy
-          printenv ServerPaths__CloneHeroRoot   | xargs -I{} printf 'ServerPaths__CloneHeroRoot=%s\n' "{}" >> .env.deploy
-          printenv CHARTHUB_SERVER_PORT         | xargs -I{} printf 'CHARTHUB_SERVER_PORT=%s\n' "{}" >> .env.deploy
-          printenv CHARTHUB_SERVER_CONTAINER_NAME | xargs -I{} printf 'CHARTHUB_SERVER_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
-
-      - name: Pull and deploy
-        env:
+          AUTH_JWT_SIGNING_KEY: ${{ secrets.CHARTHUB_SERVER_JWT_SIGNING_KEY }}
+          AUTH_ISSUER: ${{ secrets.CHARTHUB_SERVER_JWT_ISSUER }}
+          AUTH_AUDIENCE: ${{ secrets.CHARTHUB_SERVER_JWT_AUDIENCE }}
+          AUTH_ALLOWED_EMAIL: ${{ secrets.CHARTHUB_SERVER_JWT_ALLOWED_EMAILS }}
+          GOOGLE_ALLOWED_AUDIENCE: ${{ secrets.CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES }}
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY }}
           CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
         run: |
           EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
-          docker compose --project-name charthub-prod --env-file .env.deploy -f docker-compose.server.yml pull charthub-server
-          docker compose --project-name charthub-prod --env-file .env.deploy -f docker-compose.server.yml up -d --no-build
+          sudo install -m 600 /dev/null /srv/appdata/charthub/config/charthub-server.env
+          {
+            echo "ASPNETCORE_URLS=http://+:5001"
+            echo "Auth__JwtSigningKey=${AUTH_JWT_SIGNING_KEY}"
+            echo "Auth__Issuer=${AUTH_ISSUER}"
+            echo "Auth__Audience=${AUTH_AUDIENCE}"
+            echo "Auth__AllowedEmails__0=${AUTH_ALLOWED_EMAIL}"
+            echo "Auth__AccessTokenMinutes=60"
+            echo "GoogleAuth__AllowedAudiences__0=${GOOGLE_ALLOWED_AUDIENCE}"
+            echo "GoogleDrive__ApiKey=${GOOGLE_DRIVE_API_KEY}"
+            echo "ServerPaths__ConfigRoot=/srv/appdata/charthub/config"
+            echo "ServerPaths__ChartHubRoot=/srv/appdata/charthub/data"
+            echo "ServerPaths__DownloadsDir=/srv/appdata/charthub/data/downloads"
+            echo "ServerPaths__StagingDir=/srv/appdata/charthub/data/staging"
+            echo "ServerPaths__CloneHeroRoot=/srv/appdata/charthub/music"
+            echo "ServerPaths__SqliteDbPath=/srv/appdata/charthub/db/charthub.db"
+            echo "ServerLogging__LogDirectory=/srv/appdata/charthub/logs"
+            echo "ServerLogging__FileName=charthub-server.log"
+            echo "CHARTHUB_SERVER_PORT=${EFFECTIVE_PORT}"
+          } | sudo tee /srv/appdata/charthub/config/charthub-server.env > /dev/null
+          sudo chmod 600 /srv/appdata/charthub/config/charthub-server.env
+
+      - name: Install release bundle
+        env:
+          VERSION: ${{ needs.classify.outputs.version }}
+        run: |
+          ARTIFACT="./.server-release/charthub-server-${VERSION}-linux-x64.zip"
+          RELEASE_DIR="/srv/appdata/charthub/releases/${VERSION}"
+          sudo rm -rf "$RELEASE_DIR"
+          sudo mkdir -p "$RELEASE_DIR"
+          sudo unzip -q "$ARTIFACT" -d "$RELEASE_DIR"
+          sudo ln -sfn "$RELEASE_DIR/server-linux-x64" /srv/appdata/charthub/current
+          sudo chmod +x /srv/appdata/charthub/current/ChartHub.Server || true
+          sudo chmod +x /srv/appdata/charthub/current/tools/onyx || true
+
+      - name: Install or update systemd unit
+        run: |
+          sudo install -m 644 .github/systemd/charthub-server.service /etc/systemd/system/charthub-server.service
+          sudo systemctl daemon-reload
+          sudo systemctl enable charthub-server.service
+
+      - name: Restart server service
+        run: |
+          sudo systemctl restart charthub-server.service
+          sudo systemctl --no-pager --full status charthub-server.service || true
 
       - name: Verify health
         env:
@@ -954,39 +759,20 @@ jobs:
             fi
             if [[ "$i" == "12" ]]; then
               echo "Production /health check failed on port ${EFFECTIVE_PORT}"
+              sudo journalctl -u charthub-server.service --no-pager -n 200 || true
               exit 1
             fi
             sleep 5
           done
 
-      - name: Verify production image digest
-        env:
-          EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-server@${{ needs.build-server-image.outputs.image_digest }}
-        run: |
-          EXPECTED_IMAGE_ID=$(docker image inspect "$EXPECTED_IMAGE_REF" --format '{{ .Id }}')
-          ACTUAL_IMAGE_ID=$(docker inspect charthub-prod-server --format '{{ .Image }}')
-          ACTUAL_IMAGE_REF=$(docker inspect charthub-prod-server --format '{{ .Config.Image }}')
-          if [[ "$ACTUAL_IMAGE_ID" != "$EXPECTED_IMAGE_ID" ]]; then
-            echo "Production deployed unexpected image"
-            echo "Expected: $EXPECTED_IMAGE_REF"
-            echo "Expected image ID: $EXPECTED_IMAGE_ID"
-            echo "Actual image ID:   $ACTUAL_IMAGE_ID"
-            echo "Container image:   $ACTUAL_IMAGE_REF"
-            exit 1
-          fi
-
       - name: Write deployment summary
         env:
           VERSION: ${{ needs.classify.outputs.version }}
-          DIGEST: ${{ needs.build-server-image.outputs.image_digest }}
         run: |
           {
-            echo "## Production deployment complete (ChartHub Server)"
+            echo "## Production deployment complete (ChartHub Server bundle)"
             echo "- Version: ${VERSION}"
-            echo "- Image digest: ${DIGEST}"
+            echo "- Install root: /srv/appdata/charthub"
+            echo "- Active release: /srv/appdata/charthub/current"
             echo "- Time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Clean up env file
-        if: always()
-        run: rm -f .env.deploy
