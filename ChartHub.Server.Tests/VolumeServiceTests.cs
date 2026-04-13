@@ -35,8 +35,9 @@ public sealed class VolumeServiceTests
     public async Task GetStateAsyncWithoutPactlFallsBackToAmixer()
     {
         FakeProcessRunner runner = new();
-        runner.AddResult("pactl", ["info"], new VolumeService.ProcessExecutionResult(127, string.Empty, "pactl not found"));
+        runner.AddResult("pactl", ["get-sink-volume", "@DEFAULT_SINK@"], new VolumeService.ProcessExecutionResult(127, string.Empty, "pactl not found"));
         runner.AddResult("amixer", ["get", "Master"], new VolumeService.ProcessExecutionResult(0, "Mono: Playback 43691 [67%] [-21.00dB] [on]\n", string.Empty));
+        runner.AddResult("pactl", ["list", "sink-inputs"], new VolumeService.ProcessExecutionResult(127, string.Empty, "pactl not found"));
 
         VolumeService sut = new(NullLogger<VolumeService>.Instance, runner);
 
@@ -84,7 +85,7 @@ public sealed class VolumeServiceTests
     public async Task SetMasterVolumeAsyncWhenAmixerUnavailableThrowsNotImplemented()
     {
         FakeProcessRunner runner = new();
-        runner.AddResult("pactl", ["info"], new VolumeService.ProcessExecutionResult(127, string.Empty, "pactl not found"));
+        runner.AddResult("pactl", ["set-sink-volume", "@DEFAULT_SINK@", "50%"], new VolumeService.ProcessExecutionResult(127, string.Empty, "pactl not found"));
         runner.AddResult("amixer", ["set", "Master", "50%"], new VolumeService.ProcessExecutionResult(1, string.Empty, "Unable to find simple control 'Master'"));
 
         VolumeService sut = new(NullLogger<VolumeService>.Instance, runner);
@@ -94,6 +95,24 @@ public sealed class VolumeServiceTests
 
         Assert.Equal(StatusCodes.Status501NotImplemented, ex.StatusCode);
         Assert.Equal("master_volume_unavailable", ex.ErrorCode);
+    }
+
+    [Fact]
+    public async Task GetStateAsyncWhenMasterAndSessionsUnavailableReturnsDefaultState()
+    {
+        FakeProcessRunner runner = new();
+        runner.AddResult("pactl", ["get-sink-volume", "@DEFAULT_SINK@"], new VolumeService.ProcessExecutionResult(127, string.Empty, "Connection failure"));
+        runner.AddResult("amixer", ["get", "Master"], new VolumeService.ProcessExecutionResult(1, string.Empty, "Unable to find simple control 'Master'"));
+        runner.AddResult("pactl", ["list", "sink-inputs"], new VolumeService.ProcessExecutionResult(127, string.Empty, "Connection failure"));
+
+        VolumeService sut = new(NullLogger<VolumeService>.Instance, runner);
+
+        VolumeStateResponse state = await sut.GetStateAsync(CancellationToken.None);
+
+        Assert.Equal(0, state.Master.ValuePercent);
+        Assert.False(state.SupportsPerApplicationSessions);
+        Assert.Empty(state.Sessions);
+        Assert.NotNull(state.SessionSupportMessage);
     }
 
     private sealed class FakeProcessRunner : VolumeService.IVolumeProcessRunner

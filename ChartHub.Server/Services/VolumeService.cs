@@ -31,24 +31,22 @@ public sealed partial class VolumeService(ILogger<VolumeService> logger) : IVolu
     {
         EnsureLinux();
 
-        bool pactlAvailable = await IsPactlAvailableAsync(cancellationToken).ConfigureAwait(false);
-
-        VolumeMasterStateResponse master = pactlAvailable
-            ? await GetMasterVolumeViaPactlAsync(cancellationToken).ConfigureAwait(false)
-            : await GetMasterVolumeViaAmixerAsync(cancellationToken).ConfigureAwait(false);
+        (VolumeMasterStateResponse master, string? masterSupportMessage) = await GetMasterVolumeBestEffortAsync(cancellationToken).ConfigureAwait(false);
 
         IReadOnlyList<VolumeSessionResponse> sessions = [];
         bool supportsPerApplicationSessions = false;
-        string? sessionSupportMessage = null;
+        string? sessionSupportMessage = masterSupportMessage;
 
-        if (pactlAvailable)
+        try
         {
-            supportsPerApplicationSessions = true;
             sessions = await ListSessionsAsync(cancellationToken).ConfigureAwait(false);
+            supportsPerApplicationSessions = true;
         }
-        else
+        catch (VolumeServiceException)
         {
-            sessionSupportMessage = "Per-application volume requires pactl on the server host.";
+            sessionSupportMessage = CombineSupportMessages(
+                masterSupportMessage,
+                "Per-application volume requires pactl on the server host.");
         }
 
         return new VolumeStateResponse
@@ -68,21 +66,12 @@ public sealed partial class VolumeService(ILogger<VolumeService> logger) : IVolu
 
         VolumeMasterStateResponse master;
 
-        if (await IsPactlAvailableAsync(cancellationToken).ConfigureAwait(false))
+        ProcessExecutionResult pactlResult = await _processRunner
+            .RunAsync("pactl", ["set-sink-volume", "@DEFAULT_SINK@", $"{valuePercent}%"], cancellationToken)
+            .ConfigureAwait(false);
+
+        if (pactlResult.ExitCode == 0)
         {
-            ProcessExecutionResult result = await _processRunner
-                .RunAsync("pactl", ["set-sink-volume", "@DEFAULT_SINK@", $"{valuePercent}%"], cancellationToken)
-                .ConfigureAwait(false);
-
-            if (result.ExitCode != 0)
-            {
-                LogMasterVolumeUpdateFailed(_logger, result.StandardError);
-                throw new VolumeServiceException(
-                    StatusCodes.Status501NotImplemented,
-                    "master_volume_unavailable",
-                    "Master volume control is unavailable on this server host.");
-            }
-
             master = await GetMasterVolumeViaPactlAsync(cancellationToken).ConfigureAwait(false);
         }
         else
@@ -246,6 +235,33 @@ public sealed partial class VolumeService(ILogger<VolumeService> logger) : IVolu
         };
     }
 
+    private async Task<(VolumeMasterStateResponse Master, string? SupportMessage)> GetMasterVolumeBestEffortAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            VolumeMasterStateResponse masterViaPactl = await GetMasterVolumeViaPactlAsync(cancellationToken).ConfigureAwait(false);
+            return (masterViaPactl, null);
+        }
+        catch (VolumeServiceException)
+        {
+            try
+            {
+                VolumeMasterStateResponse masterViaAmixer = await GetMasterVolumeViaAmixerAsync(cancellationToken).ConfigureAwait(false);
+                return (masterViaAmixer, null);
+            }
+            catch (VolumeServiceException)
+            {
+                return (
+                    new VolumeMasterStateResponse
+                    {
+                        ValuePercent = 0,
+                        IsMuted = false,
+                    },
+                    "Master volume control is unavailable on this server host.");
+            }
+        }
+    }
+
     private async Task<IReadOnlyList<VolumeSessionResponse>> ListSessionsAsync(CancellationToken cancellationToken)
     {
         ProcessExecutionResult result = await _processRunner
@@ -404,6 +420,21 @@ public sealed partial class VolumeService(ILogger<VolumeService> logger) : IVolu
         return result.StandardError.Contains("No such entity", StringComparison.OrdinalIgnoreCase)
                || result.StandardError.Contains("No such file", StringComparison.OrdinalIgnoreCase)
                || result.StandardOutput.Contains("No such entity", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? CombineSupportMessages(string? primary, string secondary)
+    {
+        if (string.IsNullOrWhiteSpace(primary))
+        {
+            return secondary;
+        }
+
+        if (primary.Contains(secondary, StringComparison.Ordinal))
+        {
+            return primary;
+        }
+
+        return $"{primary} {secondary}";
     }
 
     private static void EnsureValidVolume(int valuePercent)
