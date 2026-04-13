@@ -552,7 +552,7 @@ jobs:
     if: needs.classify.outputs.release_channel == 'stable'
     runs-on: [self-hosted, linux, charthub-host]
     needs: [classify, build-api-image, deploy-staging]
-    environment: productions
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
