@@ -107,7 +107,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore
-        run: dotnet restore ChartHub.sln -r ${{ matrix.rid }}
+        run: dotnet restore ChartHub/ChartHub.csproj -r ${{ matrix.rid }} /p:TargetFramework=net10.0
 
       - name: Publish
         run: >-
@@ -116,6 +116,7 @@ jobs:
           --no-restore
           -r ${{ matrix.rid }}
           --self-contained true
+          -p:TargetFramework=net10.0
           -p:Version=${{ needs.classify.outputs.version }}
           -o ./publish/${{ matrix.rid }}
 
@@ -683,12 +684,12 @@ jobs:
 
       - name: Prepare install directories
         run: |
-          sudo mkdir -p /srv/appdata/charthub/releases
-          sudo mkdir -p /srv/appdata/charthub/config
-          sudo mkdir -p /srv/appdata/charthub/db
-          sudo mkdir -p /srv/appdata/charthub/logs
-          sudo mkdir -p /srv/appdata/charthub/data
-          sudo mkdir -p /srv/appdata/charthub/music
+          mkdir -p /srv/appdata/charthub/releases
+          mkdir -p /srv/appdata/charthub/config
+          mkdir -p /srv/appdata/charthub/db
+          mkdir -p /srv/appdata/charthub/logs
+          mkdir -p /srv/appdata/charthub/data
+          mkdir -p /srv/appdata/charthub/music
 
       - name: Write runtime environment file
         env:
@@ -701,7 +702,7 @@ jobs:
           CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
         run: |
           EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
-          sudo install -m 600 /dev/null /srv/appdata/charthub/config/charthub-server.env
+          install -m 600 /dev/null /srv/appdata/charthub/config/charthub-server.env
           {
             echo "ASPNETCORE_URLS=http://+:5001"
             echo "Auth__JwtSigningKey=${AUTH_JWT_SIGNING_KEY}"
@@ -720,8 +721,8 @@ jobs:
             echo "ServerLogging__LogDirectory=/srv/appdata/charthub/logs"
             echo "ServerLogging__FileName=charthub-server.log"
             echo "CHARTHUB_SERVER_PORT=${EFFECTIVE_PORT}"
-          } | sudo tee /srv/appdata/charthub/config/charthub-server.env > /dev/null
-          sudo chmod 600 /srv/appdata/charthub/config/charthub-server.env
+          } > /srv/appdata/charthub/config/charthub-server.env
+          chmod 600 /srv/appdata/charthub/config/charthub-server.env
 
       - name: Install release bundle
         env:
@@ -729,12 +730,12 @@ jobs:
         run: |
           ARTIFACT="./.server-release/charthub-server-${VERSION}-linux-x64.zip"
           RELEASE_DIR="/srv/appdata/charthub/releases/${VERSION}"
-          sudo rm -rf "$RELEASE_DIR"
-          sudo mkdir -p "$RELEASE_DIR"
-          sudo unzip -q "$ARTIFACT" -d "$RELEASE_DIR"
-          sudo ln -sfn "$RELEASE_DIR/server-linux-x64" /srv/appdata/charthub/current
-          sudo chmod +x /srv/appdata/charthub/current/ChartHub.Server || true
-          sudo chmod +x /srv/appdata/charthub/current/tools/onyx || true
+          rm -rf "$RELEASE_DIR"
+          mkdir -p "$RELEASE_DIR"
+          unzip -q "$ARTIFACT" -d "$RELEASE_DIR"
+          ln -sfn "$RELEASE_DIR/server-linux-x64" /srv/appdata/charthub/current
+          chmod +x /srv/appdata/charthub/current/ChartHub.Server || true
+          chmod +x /srv/appdata/charthub/current/tools/onyx || true
 
       - name: Install or update systemd unit
         run: |
