@@ -153,6 +153,10 @@ public static class AppBootstrapper
             new CloneHeroViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
                 serviceProvider.GetRequiredService<IChartHubServerApiClient>()));
+        services.AddSingleton<DesktopEntryViewModel>(serviceProvider =>
+            new DesktopEntryViewModel(
+                serviceProvider.GetRequiredService<AppGlobalSettings>(),
+                serviceProvider.GetRequiredService<IChartHubServerApiClient>()));
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<RhythmVerseViewModel>(serviceProvider =>
             new RhythmVerseViewModel(
@@ -169,6 +173,7 @@ public static class AppBootstrapper
                 serviceProvider.GetRequiredService<SharedDownloadQueue>(),
                 serviceProvider.GetRequiredService<DownloadViewModel>(),
                 serviceProvider.GetRequiredService<CloneHeroViewModel>(),
+                serviceProvider.GetRequiredService<DesktopEntryViewModel>(),
                 serviceProvider.GetRequiredService<SettingsViewModel>()
             )
         );

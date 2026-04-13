@@ -56,6 +56,48 @@ public interface IChartHubServerApiClient
     {
         throw new NotSupportedException("Clone Hero restore is not supported by this API client implementation.");
     }
+
+    Task<IReadOnlyList<ChartHubServerDesktopEntryResponse>> ListDesktopEntriesAsync(
+        string baseUrl,
+        string bearerToken,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult<IReadOnlyList<ChartHubServerDesktopEntryResponse>>([]);
+    }
+
+    Task<ChartHubServerDesktopEntryActionResponse> ExecuteDesktopEntryAsync(
+        string baseUrl,
+        string bearerToken,
+        string entryId,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("DesktopEntry execute is not supported by this API client implementation.");
+    }
+
+    Task<ChartHubServerDesktopEntryActionResponse> KillDesktopEntryAsync(
+        string baseUrl,
+        string bearerToken,
+        string entryId,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("DesktopEntry kill is not supported by this API client implementation.");
+    }
+
+    Task RefreshDesktopEntryCatalogAsync(
+        string baseUrl,
+        string bearerToken,
+        CancellationToken cancellationToken = default)
+    {
+        return Task.CompletedTask;
+    }
+
+    IAsyncEnumerable<IReadOnlyList<ChartHubServerDesktopEntryResponse>> StreamDesktopEntriesAsync(
+        string baseUrl,
+        string bearerToken,
+        CancellationToken cancellationToken = default)
+    {
+        return AsyncEnumerable.Empty<IReadOnlyList<ChartHubServerDesktopEntryResponse>>();
+    }
 }
 
 public sealed record ChartHubServerAuthExchangeResponse(string AccessToken, DateTimeOffset ExpiresAtUtc);
@@ -106,6 +148,19 @@ public sealed record ChartHubServerDownloadProgressEvent(
     string Stage,
     double ProgressPercent,
     DateTimeOffset UpdatedAtUtc);
+
+public sealed record ChartHubServerDesktopEntryResponse(
+    string EntryId,
+    string Name,
+    string Status,
+    int? ProcessId,
+    string? IconUrl);
+
+public sealed record ChartHubServerDesktopEntryActionResponse(
+    string EntryId,
+    string Status,
+    int? ProcessId,
+    string Message);
 
 public sealed class ChartHubServerApiException : InvalidOperationException
 {
@@ -373,6 +428,143 @@ public sealed class ChartHubServerApiClient : IChartHubServerApiClient
         return await ReadJsonAsync<ChartHubServerCloneHeroSongResponse>(response, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<ChartHubServerDesktopEntryResponse>> ListDesktopEntriesAsync(
+        string baseUrl,
+        string bearerToken,
+        CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Get, baseUrl, "/api/v1/desktopentries", bearerToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+        List<ChartHubServerDesktopEntryResponse>? payload = await ReadJsonAsync<List<ChartHubServerDesktopEntryResponse>>(response, cancellationToken).ConfigureAwait(false);
+        return payload ?? [];
+    }
+
+    public async Task<ChartHubServerDesktopEntryActionResponse> ExecuteDesktopEntryAsync(
+        string baseUrl,
+        string bearerToken,
+        string entryId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(entryId))
+        {
+            throw new InvalidOperationException("entryId is required.");
+        }
+
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, $"/api/v1/desktopentries/{Uri.EscapeDataString(entryId)}/execute", bearerToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        return await ReadJsonAsync<ChartHubServerDesktopEntryActionResponse>(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<ChartHubServerDesktopEntryActionResponse> KillDesktopEntryAsync(
+        string baseUrl,
+        string bearerToken,
+        string entryId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(entryId))
+        {
+            throw new InvalidOperationException("entryId is required.");
+        }
+
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, $"/api/v1/desktopentries/{Uri.EscapeDataString(entryId)}/kill", bearerToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        return await ReadJsonAsync<ChartHubServerDesktopEntryActionResponse>(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task RefreshDesktopEntryCatalogAsync(
+        string baseUrl,
+        string bearerToken,
+        CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, "/api/v1/desktopentries/refresh", bearerToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw CreateRequestFailedException(response.StatusCode, response.ReasonPhrase, responseBody);
+        }
+    }
+
+    public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDesktopEntryResponse>> StreamDesktopEntriesAsync(
+        string baseUrl,
+        string bearerToken,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Get, baseUrl, "/api/v1/desktopentries/stream", bearerToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+
+        using HttpClient client = _createClient();
+        client.Timeout = Timeout.InfiniteTimeSpan;
+
+        using HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw CreateRequestFailedException(response.StatusCode, response.ReasonPhrase, responseBody);
+        }
+
+        await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using var reader = new StreamReader(stream);
+
+        string eventName = string.Empty;
+        string? line;
+        var dataBuilder = new StringBuilder();
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            line = await reader.ReadLineAsync().ConfigureAwait(false);
+            if (line is null)
+            {
+                yield break;
+            }
+
+            if (line.Length == 0)
+            {
+                if (!string.Equals(eventName, "desktopentries", StringComparison.OrdinalIgnoreCase)
+                    || dataBuilder.Length == 0)
+                {
+                    eventName = string.Empty;
+                    dataBuilder.Clear();
+                    continue;
+                }
+
+                string payloadJson = dataBuilder.ToString();
+                dataBuilder.Clear();
+                eventName = string.Empty;
+
+                DesktopEntrySnapshotEnvelope? payload;
+                try
+                {
+                    payload = JsonSerializer.Deserialize<DesktopEntrySnapshotEnvelope>(payloadJson, JsonOptions);
+                }
+                catch (JsonException ex)
+                {
+                    throw new InvalidOperationException("ChartHub.Server stream returned invalid desktop entry payload.", ex);
+                }
+
+                yield return payload?.Items ?? [];
+                continue;
+            }
+
+            if (line.StartsWith("event:", StringComparison.OrdinalIgnoreCase))
+            {
+                eventName = line["event:".Length..].Trim();
+                continue;
+            }
+
+            if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                if (dataBuilder.Length > 0)
+                {
+                    dataBuilder.Append('\n');
+                }
+
+                dataBuilder.Append(line["data:".Length..].TrimStart());
+            }
+        }
+    }
+
     private static HttpRequestMessage BuildRequest(HttpMethod method, string baseUrl, string relativePath, string? token)
     {
         if (string.IsNullOrWhiteSpace(baseUrl))
@@ -454,5 +646,12 @@ public sealed class ChartHubServerApiClient : IChartHubServerApiClient
         public string? AccessToken { get; init; }
 
         public DateTimeOffset ExpiresAtUtc { get; init; }
+    }
+
+    private sealed class DesktopEntrySnapshotEnvelope
+    {
+        public DateTimeOffset UpdatedAtUtc { get; init; }
+
+        public List<ChartHubServerDesktopEntryResponse>? Items { get; init; }
     }
 }

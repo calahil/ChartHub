@@ -25,6 +25,7 @@ public class MainViewModel : INotifyPropertyChanged
     private DownloadViewModel _downloadViewModel = null!;
     private readonly SharedDownloadQueue _sharedDownloadQueue = new();
     private CloneHeroViewModel _cloneHeroViewModel = null!;
+    private DesktopEntryViewModel _desktopEntryViewModel = null!;
     private SettingsViewModel _settingsViewModel = null!;
     private MainViewPageStrings _pageStrings = new MainViewPageStrings();
     private bool _isAndroidNavPaneOpen;
@@ -86,6 +87,16 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    public DesktopEntryViewModel DesktopEntryViewModel
+    {
+        get => _desktopEntryViewModel;
+        set
+        {
+            _desktopEntryViewModel = value;
+            OnPropertyChanged();
+        }
+    }
+
     private bool _isDownloadTabVisible;
     public bool IsDownloadTabVisible
     {
@@ -104,6 +115,17 @@ public class MainViewModel : INotifyPropertyChanged
         set
         {
             _isCloneHeroTabVisible = value;
+            OnPropertyChanged();
+        }
+    }
+
+    private bool _isDesktopEntryTabVisible;
+    public bool IsDesktopEntryTabVisible
+    {
+        get => _isDesktopEntryTabVisible;
+        set
+        {
+            _isDesktopEntryTabVisible = value;
             OnPropertyChanged();
         }
     }
@@ -220,7 +242,8 @@ public class MainViewModel : INotifyPropertyChanged
         1 => EncoreViewModel,
         2 => DownloadViewModel,
         3 when IsCloneHeroTabVisible => CloneHeroViewModel,
-        4 => SettingsViewModel,
+        4 => DesktopEntryViewModel,
+        5 => SettingsViewModel,
         _ => RhythmVerseViewModel,
     };
 
@@ -230,7 +253,8 @@ public class MainViewModel : INotifyPropertyChanged
         1 => PageStrings.Encore,
         2 => PageStrings.Downloads,
         3 when IsCloneHeroTabVisible => PageStrings.CloneHero,
-        4 => PageStrings.Settings,
+        4 => PageStrings.DesktopEntry,
+        5 => PageStrings.Settings,
         _ => PageStrings.RhythmVerse,
     };
 
@@ -242,6 +266,7 @@ public class MainViewModel : INotifyPropertyChanged
     public IRelayCommand GoEncoreCommand { get; }
     public IRelayCommand GoDownloadsCommand { get; }
     public IRelayCommand GoCloneHeroCommand { get; }
+    public IRelayCommand GoDesktopEntryCommand { get; }
     public IRelayCommand GoSettingsCommand { get; }
 
     public IRelayCommand<DownloadFile?> CancelSharedDownloadCommand { get; }
@@ -268,7 +293,8 @@ public class MainViewModel : INotifyPropertyChanged
         GoEncoreCommand = new RelayCommand(() => NavigateToTab(1));
         GoDownloadsCommand = new RelayCommand(() => NavigateToTab(2));
         GoCloneHeroCommand = new RelayCommand(() => NavigateToTab(3));
-        GoSettingsCommand = new RelayCommand(() => NavigateToTab(4));
+        GoDesktopEntryCommand = new RelayCommand(() => NavigateToTab(4));
+        GoSettingsCommand = new RelayCommand(() => NavigateToTab(5));
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
     }
@@ -279,6 +305,7 @@ public class MainViewModel : INotifyPropertyChanged
         SharedDownloadQueue sharedDownloadQueue,
         DownloadViewModel downloadViewModel,
         CloneHeroViewModel cloneHeroViewModel,
+        DesktopEntryViewModel desktopEntryViewModel,
         SettingsViewModel settingsViewModel)
         : this(
             rhythmVerseViewModel,
@@ -286,6 +313,7 @@ public class MainViewModel : INotifyPropertyChanged
             sharedDownloadQueue,
             downloadViewModel,
             cloneHeroViewModel,
+            desktopEntryViewModel,
             settingsViewModel,
             action => Dispatcher.UIThread.Post(action),
             OperatingSystem.IsAndroid())
@@ -298,6 +326,7 @@ public class MainViewModel : INotifyPropertyChanged
         SharedDownloadQueue sharedDownloadQueue,
         DownloadViewModel downloadViewModel,
         CloneHeroViewModel cloneHeroViewModel,
+        DesktopEntryViewModel desktopEntryViewModel,
         SettingsViewModel settingsViewModel,
         Action<Action> postToUi,
         bool isAndroid)
@@ -313,6 +342,7 @@ public class MainViewModel : INotifyPropertyChanged
         }
         _downloadViewModel = downloadViewModel;
         _cloneHeroViewModel = cloneHeroViewModel;
+        _desktopEntryViewModel = desktopEntryViewModel;
         _settingsViewModel = settingsViewModel;
         ShowFiltersPaneCommand = new RelayCommand(ToggleDesktopFiltersPane);
         ToggleAndroidNavPaneCommand = new RelayCommand(ToggleAndroidNavPane);
@@ -322,11 +352,13 @@ public class MainViewModel : INotifyPropertyChanged
         GoEncoreCommand = new RelayCommand(() => NavigateToTab(1));
         GoDownloadsCommand = new RelayCommand(() => NavigateToTab(2));
         GoCloneHeroCommand = new RelayCommand(() => NavigateToTab(3));
-        GoSettingsCommand = new RelayCommand(() => NavigateToTab(4));
+        GoDesktopEntryCommand = new RelayCommand(() => NavigateToTab(4));
+        GoSettingsCommand = new RelayCommand(() => NavigateToTab(5));
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
 
         _isCloneHeroTabVisible = true;
+        _isDesktopEntryTabVisible = true;
         _isDownloadTabVisible = false;
         _isSettingsTabVisible = true;
 
@@ -400,6 +432,11 @@ public class MainViewModel : INotifyPropertyChanged
     private void NavigateToTab(int tabIndex)
     {
         if (tabIndex == 3 && !IsCloneHeroTabVisible)
+        {
+            return;
+        }
+
+        if (tabIndex == 4 && !IsDesktopEntryTabVisible)
         {
             return;
         }

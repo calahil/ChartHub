@@ -17,6 +17,7 @@ builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(G
 builder.Services.Configure<GoogleDriveOptions>(builder.Configuration.GetSection(GoogleDriveOptions.SectionName));
 builder.Services.Configure<ServerPathOptions>(builder.Configuration.GetSection(ServerPathOptions.SectionName));
 builder.Services.Configure<DownloadsOptions>(builder.Configuration.GetSection(DownloadsOptions.SectionName));
+builder.Services.Configure<DesktopEntryOptions>(builder.Configuration.GetSection(DesktopEntryOptions.SectionName));
 builder.Services.Configure<ServerLoggingOptions>(builder.Configuration.GetSection(ServerLoggingOptions.SectionName));
 
 ServerLoggingOptions serverLoggingOptions = builder.Configuration
@@ -67,8 +68,10 @@ builder.Services.AddSingleton<IServerCloneHeroDirectorySchemaService, ServerClon
 builder.Services.AddSingleton<IServerOnyxInstallService, ServerOnyxInstallService>();
 builder.Services.AddSingleton<IDownloadJobInstallService, DownloadJobInstallService>();
 builder.Services.AddSingleton<ICloneHeroLibraryService, CloneHeroLibraryService>();
+builder.Services.AddSingleton<IDesktopEntryService, DesktopEntryService>();
 builder.Services.AddHostedService<ServerPathValidatorHostedService>();
 builder.Services.AddHostedService<DownloadPipelineHostedService>();
+builder.Services.AddHostedService<DesktopEntryStartupHostedService>();
 
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
@@ -108,6 +111,7 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
 app.MapAuthEndpoints();
 app.MapDownloadEndpoints();
 app.MapCloneHeroEndpoints();
+app.MapDesktopEntryEndpoints();
 
 app.Run();
 

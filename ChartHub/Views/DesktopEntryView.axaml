@@ -1,0 +1,115 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:asyncImage="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
+             xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
+             xmlns:utilities="clr-namespace:ChartHub.Utilities"
+             mc:Ignorable="d"
+             x:Class="ChartHub.Views.DesktopEntryView"
+             x:Name="Root"
+             x:DataType="viewmodels:DesktopEntryViewModel"
+             d:DesignWidth="1000"
+             d:DesignHeight="700">
+
+    <UserControl.Resources>
+        <utilities:SafeImageUrlConverter x:Key="SafeImageUrlConverter"/>
+    </UserControl.Resources>
+
+    <Grid Margin="10" RowDefinitions="Auto,Auto,*">
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+            <TextBlock Text="Desktop Entries"
+                       FontSize="18"
+                       FontWeight="Bold" />
+            <Button Grid.Column="1"
+                    Content="Refresh"
+                    Command="{Binding RefreshCommand}"
+                    IsEnabled="{Binding !IsBusy}" />
+        </Grid>
+
+        <Border Grid.Row="1"
+                Margin="0,0,0,8"
+                Padding="8"
+                BorderThickness="1"
+                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                Background="{StaticResource ThemeControlLowBrush}">
+            <TextBlock Text="{Binding StatusMessage}"
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
+        </Border>
+
+        <Grid Grid.Row="2" RowDefinitions="Auto,*">
+            <TextBlock Grid.Row="0"
+                       Text="No desktop entries found."
+                       IsVisible="{Binding !HasEntries}"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Margin="0,12,0,12"
+                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
+
+            <ScrollViewer Grid.Row="1"
+                          IsVisible="{Binding HasEntries}">
+                <ItemsControl ItemsSource="{Binding Entries}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="viewmodels:DesktopEntryCardItem">
+                            <Border Margin="0,0,0,8"
+                                    Padding="10"
+                                    BorderThickness="1"
+                                    BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                    Background="{StaticResource ThemeControlLowBrush}"
+                                    CornerRadius="8">
+                                <Grid ColumnDefinitions="Auto,*,Auto"
+                                      RowDefinitions="Auto,Auto"
+                                      ColumnSpacing="10"
+                                      RowSpacing="6">
+                                    <Border Grid.RowSpan="2"
+                                            Width="48"
+                                            Height="48"
+                                            CornerRadius="6"
+                                            Background="{StaticResource ThemeBackgroundBrush}"
+                                            BorderThickness="1"
+                                            BorderBrush="{StaticResource ThemeBorderMidBrush}">
+                                        <Image asyncImage:ImageLoader.Source="{Binding IconUrl, Converter={StaticResource SafeImageUrlConverter}, ConverterParameter=avatar}"
+                                               Stretch="UniformToFill"
+                                               Width="48"
+                                               Height="48" />
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" Grid.Row="0" Spacing="2">
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Status}"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                    </StackPanel>
+
+                                    <TextBlock Grid.Column="1"
+                                               Grid.Row="1"
+                                               Text="{Binding PidLabel}"
+                                               FontSize="11"
+                                               Foreground="{StaticResource ThemeForegroundLowBrush}" />
+
+                                    <StackPanel Grid.Column="2"
+                                                Grid.RowSpan="2"
+                                                Orientation="Horizontal"
+                                                Spacing="8"
+                                                VerticalAlignment="Center">
+                                        <Button Content="Execute"
+                                            Command="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).ExecuteCommand}"
+                                                CommandParameter="{Binding}"
+                                                IsEnabled="{Binding CanExecute}" />
+                                        <Button Content="Kill"
+                                            Command="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).KillCommand}"
+                                                CommandParameter="{Binding}"
+                                                IsEnabled="{Binding CanKill}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -20,6 +20,7 @@ public class MainViewModelTests
         Assert.True(sut.IsDesktopMode);
         Assert.False(sut.IsCompanionMode);
         Assert.True(sut.IsCloneHeroTabVisible);
+        Assert.True(sut.IsDesktopEntryTabVisible);
         Assert.True(sut.IsSettingsTabVisible);
         Assert.True(sut.IsDownloadTabVisible);
     }
@@ -32,6 +33,7 @@ public class MainViewModelTests
         Assert.True(sut.IsCompanionMode);
         Assert.False(sut.IsDesktopMode);
         Assert.True(sut.IsCloneHeroTabVisible);
+        Assert.True(sut.IsDesktopEntryTabVisible);
         Assert.True(sut.IsSettingsTabVisible);
         Assert.True(sut.IsDownloadTabVisible);
     }
@@ -52,6 +54,16 @@ public class MainViewModelTests
         MainViewModel sut = CreateMainViewModel(isAndroid: true);
 
         sut.GoSettingsCommand.Execute(null);
+
+        Assert.Equal(5, sut.SelectedMainTabIndex);
+    }
+
+    [Fact]
+    public void GoDesktopEntryCommand_SelectsDesktopEntryTab()
+    {
+        MainViewModel sut = CreateMainViewModel(isAndroid: true);
+
+        sut.GoDesktopEntryCommand.Execute(null);
 
         Assert.Equal(4, sut.SelectedMainTabIndex);
     }
@@ -96,6 +108,7 @@ public class MainViewModelTests
                 typeof(SharedDownloadQueue),
                 typeof(DownloadViewModel),
                 typeof(CloneHeroViewModel),
+                typeof(DesktopEntryViewModel),
                 typeof(SettingsViewModel),
                 typeof(Action<Action>),
                 typeof(bool),
@@ -112,6 +125,7 @@ public class MainViewModelTests
             queue,
             CreateUninitialized<DownloadViewModel>(),
             CreateUninitialized<CloneHeroViewModel>(),
+            CreateUninitialized<DesktopEntryViewModel>(),
             CreateUninitialized<SettingsViewModel>(),
             (Action<Action>)(action => action()),
             isAndroid,
