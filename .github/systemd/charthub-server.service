@@ -8,6 +8,8 @@ Type=simple
 WorkingDirectory=/srv/appdata/charthub/current
 EnvironmentFile=/srv/appdata/charthub/config/charthub-server.env
 Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
 Environment=PULSE_SERVER=unix:/run/user/1000/pulse/native
 ExecStart=/srv/appdata/charthub/current/ChartHub.Server
 Restart=always
