@@ -5,7 +5,7 @@ namespace ChartHub.Server.Services;
 public sealed class ServerFileLoggerProvider : ILoggerProvider
 {
     private readonly object _sync = new();
-    private readonly StreamWriter _writer;
+    private readonly TextWriter _writer;
 
     public ServerFileLoggerProvider(string logDirectory, string fileName)
     {
@@ -20,10 +20,42 @@ public sealed class ServerFileLoggerProvider : ILoggerProvider
 
         Directory.CreateDirectory(logDirectory);
         string filePath = Path.Combine(logDirectory, resolvedFileName);
-        _writer = new StreamWriter(new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+        _writer = TryOpenLogFile(filePath);
+    }
+
+    internal ServerFileLoggerProvider(TextWriter writer)
+    {
+        _writer = writer;
+    }
+
+    private static StreamWriter TryOpenLogFile(string filePath)
+    {
+        try
         {
-            AutoFlush = true,
-        };
+            return new StreamWriter(new FileStream(filePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+            {
+                AutoFlush = true,
+            };
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The existing log file may be owned by a different process user (e.g., after a service user change).
+            // Attempt to remove the inaccessible file and start fresh.
+            try
+            {
+                File.Delete(filePath);
+                return new StreamWriter(new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                {
+                    AutoFlush = true,
+                };
+            }
+            catch (Exception)
+            {
+                // The log directory is not writable by this process.
+                // Degrade gracefully; logs remain available via the system journal.
+                return StreamWriter.Null;
+            }
+        }
     }
 
     public ILogger CreateLogger(string categoryName) => new ServerFileLogger(categoryName, this);

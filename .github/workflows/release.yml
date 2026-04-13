@@ -703,6 +703,11 @@ jobs:
           mkdir -p /srv/appdata/charthub/logs
           mkdir -p /srv/appdata/charthub/data
           mkdir -p /srv/appdata/charthub/music
+          # Ensure the service user (gamer) can write runtime files regardless of the runner user.
+          chmod 777 /srv/appdata/charthub/logs
+          chmod 777 /srv/appdata/charthub/data
+          chmod 777 /srv/appdata/charthub/db
+          chmod 777 /srv/appdata/charthub/music
 
       - name: Write runtime environment file
         env:
@@ -718,7 +723,7 @@ jobs:
           ENV_FILE="/srv/appdata/charthub/config/charthub-server.env"
           install -m 600 /dev/null "$ENV_FILE"
           {
-            echo "ASPNETCORE_URLS=http://+:5001"
+            echo "ASPNETCORE_URLS=http://+:${EFFECTIVE_PORT}"
             echo "Auth__JwtSigningKey=${AUTH_JWT_SIGNING_KEY}"
             echo "Auth__Issuer=${AUTH_ISSUER}"
             echo "Auth__Audience=${AUTH_AUDIENCE}"
