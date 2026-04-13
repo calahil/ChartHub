@@ -29,6 +29,10 @@
         "/^perl -0pi -e 's/\\^    services\\\\\\.AddSingleton<IVolumeHardwareButtonSource, AndroidVolumeHardwareButtonSource>\\\\\\(\\\\\\);\\$/        services\\.AddSingleton<IVolumeHardwareButtonSource, AndroidVolumeHardwareButtonSource>\\(\\);/m' ChartHub/Utilities/AppBootstrapper\\.cs$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^cd /srv/games/source/rhythmverse-client/rhythmverseclient && python3 - <<'PY'\nimport xml\\.etree\\.ElementTree as ET\np='ChartHub\\.Tests/TestResults/Coverage/coverage\\.cobertura\\.xml'\nroot=ET\\.parse\\(p\\)\\.getroot\\(\\)\nrows=\\[\\]\nfor c in root\\.findall\\('\\.//class'\\):\n    fn=c\\.attrib\\.get\\('filename',''\\)\n    lr=float\\(c\\.attrib\\.get\\('line-rate','0'\\)\\)\n    lines=c\\.findall\\('\\./lines/line'\\)\n    valid=len\\(lines\\)\n    covered=sum\\(1 for l in lines if int\\(l\\.attrib\\.get\\('hits','0'\\)\\)>0\\)\n    if valid>=8 and fn\\.startswith\\('ChartHub/'\\):\n        rows\\.append\\(\\(lr,covered,valid,fn\\)\\)\nrows\\.sort\\(key=lambda t:\\(t\\[0\\],t\\[2\\]\\), reverse=False\\)\nfor lr,cov,val,fn in rows\\[:40\\]:\n    print\\(f\"\\{lr\\*100:6\\.2f\\}% \\{cov:4d\\}/\\{val:<4d\\} \\{fn\\}\"\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }
