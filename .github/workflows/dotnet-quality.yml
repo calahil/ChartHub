@@ -36,7 +36,7 @@ jobs:
       - name: Restore service and test projects
         run: |
           dotnet restore ChartHub.Server/ChartHub.Server.csproj
-          dotnet restore ChartHub.Tests/ChartHub.Tests.csproj
+          dotnet restore ChartHub.Tests/ChartHub.Tests.csproj /p:TargetFramework=net10.0
 
       - name: Restore BackupApi test projects
         if: ${{ inputs.run_backupapi_tests }}
@@ -70,7 +70,7 @@ jobs:
       - name: Build
         run: |
           dotnet build ChartHub.Server/ChartHub.Server.csproj --configuration Release --no-restore
-          dotnet build ChartHub.Tests/ChartHub.Tests.csproj --configuration Release --no-restore
+          dotnet build ChartHub.Tests/ChartHub.Tests.csproj --configuration Release --no-restore /p:TargetFramework=net10.0
           if [ "${{ inputs.run_backupapi_tests }}" = "true" ]; then
             dotnet build ChartHub.BackupApi/ChartHub.BackupApi.csproj --configuration Release --no-restore
             dotnet build ChartHub.BackupApi.Tests/ChartHub.BackupApi.Tests.csproj --configuration Release --no-restore
@@ -81,6 +81,7 @@ jobs:
           dotnet test ChartHub.Tests/ChartHub.Tests.csproj
           --configuration Release
           --no-build
+          /p:TargetFramework=net10.0
           /p:CollectCoverage=true
           /p:CoverletOutput=./TestResults/Coverage/
           /p:CoverletOutputFormat=cobertura

@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ChartHub\ChartHub.csproj" />
+    <ProjectReference Include="..\ChartHub\ChartHub.csproj" SetTargetFramework="TargetFramework=net10.0" />
   </ItemGroup>
 
   <ItemGroup>
