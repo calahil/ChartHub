@@ -273,6 +273,28 @@ public sealed class DesktopEntryViewModelTests
     }
 
     [Fact]
+    public async Task ExecuteCommand_WithoutConnection_ShowsConfigureExecuteMessage()
+    {
+        using var temp = new TemporaryDirectoryFixture("desktop-entry-execute-no-connection");
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath, string.Empty, string.Empty);
+
+        var sut = new DesktopEntryViewModel(settings, new FakeChartHubServerApiClient(), uiInvoke: InvokeInline);
+        try
+        {
+            var entry = new DesktopEntryCardItem("entry-1", "App", "Stopped", null, null);
+
+            await sut.ExecuteCommand.ExecuteAsync(entry);
+
+            Assert.Equal(UiLocalization.Get("DesktopEntry.ConfigureExecute"), sut.StatusMessage);
+            Assert.False(sut.IsBusy);
+        }
+        finally
+        {
+            sut.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task KillCommand_WithNullEntry_DoesNothing()
     {
         using var temp = new TemporaryDirectoryFixture("desktop-entry-kill-null");
@@ -283,6 +305,56 @@ public sealed class DesktopEntryViewModelTests
         {
             await sut.KillCommand.ExecuteAsync(null);
             Assert.False(sut.IsBusy);
+        }
+        finally
+        {
+            sut.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task KillCommand_WithoutConnection_ShowsConfigureStopMessage()
+    {
+        using var temp = new TemporaryDirectoryFixture("desktop-entry-kill-no-connection");
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath, string.Empty, string.Empty);
+
+        var sut = new DesktopEntryViewModel(settings, new FakeChartHubServerApiClient(), uiInvoke: InvokeInline);
+        try
+        {
+            var entry = new DesktopEntryCardItem("entry-1", "App", "Running", 10, null);
+
+            await sut.KillCommand.ExecuteAsync(entry);
+
+            Assert.Equal(UiLocalization.Get("DesktopEntry.ConfigureStop"), sut.StatusMessage);
+            Assert.False(sut.IsBusy);
+        }
+        finally
+        {
+            sut.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task DesktopModeAndEntryFlags_AreReportedFromCurrentState()
+    {
+        using var temp = new TemporaryDirectoryFixture("desktop-entry-flag-read");
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath, "http://127.0.0.1:5001", "token");
+
+        var fakeClient = new FakeChartHubServerApiClient
+        {
+            Entries = [new ChartHubServerDesktopEntryResponse("entry-1", "App", "Stopped", null, null)],
+        };
+
+        var sut = new DesktopEntryViewModel(settings, fakeClient, uiInvoke: InvokeInline);
+        try
+        {
+            bool loaded = await WaitForConditionAsync(() => sut.Entries.Count == 1, TimeSpan.FromSeconds(2));
+            Assert.True(loaded);
+
+            Assert.True(sut.IsDesktopMode);
+            Assert.False(sut.IsCompanionMode);
+            Assert.True(sut.HasEntries);
+            Assert.NotNull(sut.RefreshCommand);
         }
         finally
         {
