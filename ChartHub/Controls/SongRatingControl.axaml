@@ -1,8 +1,13 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:asyncImage="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
              xmlns:controls="clr-namespace:ChartHub.Controls;assembly=ChartHub"
+             xmlns:utilities="clr-namespace:ChartHub.Utilities;assembly=ChartHub"
+             xmlns:strings="clr-namespace:ChartHub.Strings;assembly=ChartHub"
              x:Class="ChartHub.Controls.SongRatingControl">
+
+       <UserControl.Resources>
+              <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+       </UserControl.Resources>
 
        <StackPanel>
               <StackPanel x:Name="EncoreRatings">
@@ -18,7 +23,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     Background="{StaticResource ThemeControlMidBrush}">
-                                   <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/drums_small.png"
+                                   <Image Source="{Binding Source={x:Static strings:UiIcons.DrumsSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                           Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                             </Border>
                             <Border Padding="8,2"
@@ -40,7 +45,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     Background="{StaticResource ThemeControlMidBrush}">
-                                   <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/guitar_small.png"
+                                   <Image Source="{Binding Source={x:Static strings:UiIcons.GuitarSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                           Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                             </Border>
                             <Border Padding="8,2"
@@ -62,7 +67,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     Background="{StaticResource ThemeControlMidBrush}">
-                                   <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/keys_small.png"
+                                   <Image Source="{Binding Source={x:Static strings:UiIcons.KeysSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                           Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                             </Border>
                             <Border Padding="8,2"
@@ -84,7 +89,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     Background="{StaticResource ThemeControlMidBrush}">
-                                   <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/bass_small.png"
+                                   <Image Source="{Binding Source={x:Static strings:UiIcons.BassSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                           Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                             </Border>
                             <Border Padding="8,2"
@@ -106,7 +111,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     Background="{StaticResource ThemeControlMidBrush}">
-                                   <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/vocals_small.png"
+                                   <Image Source="{Binding Source={x:Static strings:UiIcons.VocalsSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                           Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                             </Border>
                             <Border Padding="8,2"
@@ -127,7 +132,7 @@
                            ColumnDefinitions="Auto,Auto,*,Auto"
                            RowDefinitions="*, *, *">
                             <!-- Drum Rating -->
-                            <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/drums_small.png"
+                            <Image Source="{Binding Source={x:Static strings:UiIcons.DrumsSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                    Grid.Row="0"
                                    Grid.Column="0"
                                    VerticalAlignment="Top"
@@ -140,7 +145,7 @@
                                                         FontWeight="Bold"
                                                         Foreground="{StaticResource ThemeAccentBrush}"/>
                             <!-- Guitar Rating -->
-                            <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/guitar_small.png"
+                            <Image Source="{Binding Source={x:Static strings:UiIcons.GuitarSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                    Grid.Row="0"
                                    Grid.Column="2"
                                    VerticalAlignment="Top"
@@ -154,7 +159,7 @@
                                                         FontWeight="Bold"
                                                         Foreground="{StaticResource ThemeAccentBrush}"/>
                             <!-- Keyboard Rating -->
-                            <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/keys_small.png"
+                            <Image Source="{Binding Source={x:Static strings:UiIcons.KeysSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                    Grid.Row="1"
                                    Grid.Column="0"
                                    VerticalAlignment="Top"
@@ -167,7 +172,7 @@
                                                         Grid.Column="1"
                                                         FontWeight="Bold" />
                             <!-- Bass Rating -->
-                            <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/bass_small.png"
+                            <Image Source="{Binding Source={x:Static strings:UiIcons.BassSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                    Grid.Row="1"
                                    Grid.Column="2"
                                    VerticalAlignment="Top"
@@ -181,7 +186,7 @@
                                                         FontWeight="Bold"
                                                         Foreground="{StaticResource ThemeAccentBrush}"/>
                             <!-- Vocals Rating -->
-                            <Image asyncImage:ImageLoader.Source="avares://ChartHub/Resources/Images/vocals_small.png"
+                            <Image Source="{Binding Source={x:Static strings:UiIcons.VocalsSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                    Grid.Row="2"
                                    Grid.Column="0"
                                    VerticalAlignment="Top"

@@ -4,10 +4,17 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:views="clr-namespace:ChartHub.Views"
              xmlns:services="clr-namespace:ChartHub.Services"
+             xmlns:utilities="clr-namespace:ChartHub.Utilities;assembly=ChartHub"
+             xmlns:strings="clr-namespace:ChartHub.Strings;assembly=ChartHub"
              mc:Ignorable="d"
              x:Class="ChartHub.Views.SharedDownloadCardsView"
              x:Name="Root"
              x:DataType="views:SharedDownloadCardsView">
+
+    <UserControl.Resources>
+        <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+        <utilities:DownloadFileTypeIconConverter x:Key="DownloadFileTypeIconConverter" />
+    </UserControl.Resources>
 
     <UserControl.Styles>
         <Style Selector="Border.download-card-root">
@@ -52,9 +59,16 @@
                                 BorderBrush="{StaticResource ThemeBorderMidBrush}"
                                 CornerRadius="8">
                             <Grid RowDefinitions="Auto,Auto,Auto"
-                                  ColumnDefinitions="*,Auto">
+                                  ColumnDefinitions="Auto,*,Auto">
+                                <Image Grid.Row="0"
+                                       Grid.Column="0"
+                                       Width="24"
+                                       Height="24"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"
+                                       Source="{Binding Url, Converter={StaticResource DownloadFileTypeIconConverter}}" />
                                 <StackPanel Grid.Row="0"
-                                            Grid.Column="0"
+                                            Grid.Column="1"
                                             Spacing="4">
                                     <TextBlock Text="{Binding DisplayName}"
                                                FontWeight="SemiBold"
@@ -65,43 +79,49 @@
                                 </StackPanel>
 
                                 <Panel Grid.Row="0"
-                                       Grid.Column="1">
-                                    <Button Width="24"
-                                            Height="24"
+                                       Grid.Column="2">
+                                    <Button Width="28"
+                                            Height="28"
+                                            Padding="0"
+                                            BorderThickness="0"
                                             CornerRadius="10"
                                             Command="{Binding CancelCommand, ElementName=Root}"
                                             CommandParameter="{Binding}"
                                             IsVisible="{Binding CanCancel}">
                                         <Button.Content>
-                                            <TextBlock Text="X"
-                                                       FontSize="11"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center" />
+                                            <Image Width="18"
+                                                   Height="18"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Source="{Binding Source={x:Static strings:UiIcons.XCancelButton}, Converter={StaticResource AssetPathToImageConverter}, ConverterParameter='#ED8796'}" />
                                         </Button.Content>
                                     </Button>
-                                    <Button Width="24"
-                                            Height="24"
+                                    <Button Width="28"
+                                            Height="28"
+                                            Padding="0"
+                                            BorderThickness="0"
                                             CornerRadius="10"
                                             Command="{Binding ClearCommand, ElementName=Root}"
                                             CommandParameter="{Binding}"
                                             IsVisible="{Binding CanClear}">
                                         <Button.Content>
-                                            <TextBlock Text="X"
-                                                       FontSize="11"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center" />
+                                            <Image Width="18"
+                                                   Height="18"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Source="{Binding Source={x:Static strings:UiIcons.XCancelButton}, Converter={StaticResource AssetPathToImageConverter}, ConverterParameter='#ED8796'}" />
                                         </Button.Content>
                                     </Button>
                                 </Panel>
 
                                 <ProgressBar Grid.Row="1"
-                                             Grid.ColumnSpan="2"
+                                             Grid.ColumnSpan="3"
                                              Classes="download-progress"
                                              Maximum="100"
                                              Value="{Binding DownloadProgress}" />
 
                                 <Grid Grid.Row="2"
-                                      Grid.ColumnSpan="2"
+                                      Grid.ColumnSpan="3"
                                       Margin="0,8,0,0"
                                       ColumnDefinitions="Auto,*">
                                     <TextBlock Grid.Column="0"

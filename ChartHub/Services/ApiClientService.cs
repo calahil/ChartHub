@@ -325,7 +325,7 @@ public class ApiClientService : INotifyPropertyChanged
                                 }
                                 else
                                 {
-                                    songView.AlbumArt = "avares://ChartHub/Resources/Images/noalbumart.png";
+                                    songView.AlbumArt = "avares://ChartHub/Resources/Images/noalbumart.svg";
                                 }
 
                                 songView.FormattedTime = Toolbox.ConvertSecondstoText(songView.SongLength);
@@ -344,7 +344,7 @@ public class ApiClientService : INotifyPropertyChanged
                                 }
                                 else
                                 {
-                                    author.AvatarPath = "avares://ChartHub/Resources/Images/blankprofile.png";
+                                    author.AvatarPath = "avares://ChartHub/Resources/Images/blankprofile.svg";
                                 }
 
                                 songView.Author = author;

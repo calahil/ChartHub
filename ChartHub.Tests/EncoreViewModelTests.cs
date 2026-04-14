@@ -235,7 +235,7 @@ public class EncoreViewModelTests
         await sut.RefreshAsync();
 
         EncoreSong song = Assert.Single(sut.DataItems);
-        Assert.Equal("avares://ChartHub/Resources/Images/noalbumart.png", song.AlbumArtUrl);
+        Assert.Equal("avares://ChartHub/Resources/Images/noalbumart.svg", song.AlbumArtUrl);
     }
 
     [Fact]
@@ -657,7 +657,7 @@ public class EncoreViewModelTests
         public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
 
-        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamDownloadJobsAsync(
             string baseUrl,
             string bearerToken,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -668,6 +668,9 @@ public class EncoreViewModelTests
 
         public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task<IReadOnlyList<ChartHubServerJobLogEntry>> GetJobLogsAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerJobLogEntry>>([]);
 
         public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(
             string baseUrl,
@@ -719,7 +722,7 @@ public class EncoreViewModelTests
         public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
 
-        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamDownloadJobsAsync(
             string baseUrl,
             string bearerToken,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -730,6 +733,9 @@ public class EncoreViewModelTests
 
         public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task<IReadOnlyList<ChartHubServerJobLogEntry>> GetJobLogsAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerJobLogEntry>>([]);
 
         public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(
             string baseUrl,

@@ -3,14 +3,22 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:viewmodels="using:ChartHub.ViewModels"
+             xmlns:models="using:ChartHub.Models"
+             xmlns:services="using:ChartHub.Services"
+             xmlns:utilities="using:ChartHub.Utilities"
+             xmlns:strings="using:ChartHub.Strings"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="ChartHub.Views.DownloadView"
              x:DataType="viewmodels:DownloadViewModel">
 
-    <Grid RowDefinitions="Auto,Auto,*" Margin="10">
-        <!-- Buttons -->
-        <StackPanel Grid.Row="0"
-                    Spacing="4">
+    <UserControl.Resources>
+        <utilities:DownloadFileTypeToIconConverter x:Key="DownloadFileTypeToIconConverter" />
+        <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+    </UserControl.Resources>
+
+    <Grid RowDefinitions="Auto,*" Margin="10">
+        <!-- Toolbar -->
+        <StackPanel Grid.Row="0" Spacing="4">
             <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
                 <Button Content="{Binding PageStrings.InstallSongs}"
                         HorizontalContentAlignment="Center"
@@ -19,128 +27,10 @@
                         Command="{Binding InstallSongs}"
                         VerticalAlignment="Stretch"
                         Width="140" />
-                    <Button Content="{Binding PageStrings.DeleteSelected}"
-                        HorizontalContentAlignment="Center"
-                        CornerRadius="10"
-                        IsEnabled="{Binding IsAnyChecked}"
-                        Command="{Binding DeleteSelectedDownloadsCommand}"
-                    VerticalAlignment="Stretch"
-                        Width="140" />
             </StackPanel>
         </StackPanel>
-        <Border Grid.Row="1"
-                Margin="0,10,0,10"
-                Padding="10"
-                BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                BorderThickness="1"
-            CornerRadius="8"
-                IsVisible="{Binding IsInstallPanelVisible}">
-                <Grid RowDefinitions="Auto,Auto,Auto,*">
-                <Grid Grid.Row="0"
-                        ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto">
-                    <TextBlock Grid.Column="0"
-                           Text="{Binding PageStrings.InstallProgressLabel}"
-                           FontWeight="Bold"
-                           VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="1"
-                           Text="{Binding InstallCurrentItemName}"
-                               Margin="10,0,0,0"
-                           VerticalAlignment="Center" />
-                    <Border Grid.Column="2"
-                            Margin="10,0,0,0"
-                        Background="{StaticResource ThemeControlLowBrush}"
-                        CornerRadius="10"
-                        Padding="8,2"
-                        IsVisible="{Binding HasInstallSummary}">
-                    <TextBlock Text="{Binding InstallSummaryText}"
-                           VerticalAlignment="Center"
-                           FontSize="12" />
-                    </Border>
-                    <Button Grid.Column="3"
-                            Margin="10,0,0,0"
-                        CornerRadius="10"
-                        Content="{Binding InstallLogToggleText}"
-                        Command="{Binding ToggleInstallLogCommand}" />
-                    <Button Grid.Column="4"
-                            Margin="10,0,0,0"
-                        CornerRadius="10"
-                        Content="{Binding PageStrings.ClearLog}"
-                        Command="{Binding ClearInstallLogCommand}" />
-                    <Button Grid.Column="5"
-                            Margin="10,0,0,0"
-                        CornerRadius="10"
-                        Content="{Binding PageStrings.Cancel}"
-                        Command="{Binding CancelInstallCommand}"
-                        IsEnabled="{Binding IsInstallActive}" />
-                    <Button Grid.Column="6"
-                            Margin="10,0,0,0"
-                        CornerRadius="10"
-                        Content="{Binding PageStrings.Dismiss}"
-                        Command="{Binding DismissInstallPanelCommand}"
-                        IsEnabled="{Binding IsInstallIdle}" />
-                </Grid>
 
-                <TextBlock Grid.Row="1"
-                   Margin="0,8,0,0"
-                           Text="{Binding InstallStageText}"
-                           Foreground="{StaticResource ThemeForegroundLowBrush}" />
-
-                <Grid Grid.Row="2"
-                Margin="0,8,0,0"
-                ColumnDefinitions="*,Auto">
-                    <ProgressBar Grid.Column="0"
-                                 Minimum="0"
-                                 Maximum="100"
-                                 Value="{Binding InstallProgressValue}"
-                                 IsIndeterminate="{Binding IsInstallProgressIndeterminate}" />
-                    <TextBlock Grid.Column="1"
-                     Margin="8,0,0,0"
-                               VerticalAlignment="Center"
-                               Text="{Binding InstallProgressValue, StringFormat={}{0:F0}%}" />
-                </Grid>
-
-                <Border Grid.Row="3"
-                        Margin="0,8,0,0"
-                        MinHeight="140"
-                        MaxHeight="260"
-                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                        BorderThickness="1"
-                    CornerRadius="8"
-                        IsVisible="{Binding IsInstallLogExpanded}">
-                    <ScrollViewer x:Name="InstallLogScrollViewer"
-                                  VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
-                        <ScrollViewer.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="{Binding #InstallLogScrollViewer.((viewmodels:DownloadViewModel)DataContext).PageStrings.CopyAllLogs}"
-                                          IsEnabled="{Binding CanCopyAllInstallLogs}"
-                                          Click="CopyAllLogs_Click" />
-                            </ContextMenu>
-                        </ScrollViewer.ContextMenu>
-                        <ItemsControl x:Name="InstallLogItemsControl"
-                                      ItemsSource="{Binding InstallLogItems}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Padding="8,4">
-                                        <TextBlock Text="{Binding .}"
-                                                   TextWrapping="Wrap">
-                                            <TextBlock.ContextMenu>
-                                                <ContextMenu>
-                                                    <MenuItem Header="{Binding #InstallLogItemsControl.((viewmodels:DownloadViewModel)DataContext).PageStrings.CopyLog}"
-                                                              Click="CopyLogItem_Click" />
-                                                </ContextMenu>
-                                            </TextBlock.ContextMenu>
-                                        </TextBlock>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </Border>
-            </Grid>
-        </Border>
-
-        <Grid Grid.Row="2"
+        <Grid Grid.Row="1"
               RowDefinitions="Auto,*">
             <StackPanel Grid.Row="0"
                         Orientation="Horizontal"
@@ -171,60 +61,131 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
                                   IsVisible="{Binding HasIngestionQueueItems}">
-                        <ItemsControl ItemsSource="{Binding IngestionQueue}">
+                        <ItemsControl x:Name="QueueItemsControl"
+                                      ItemsSource="{Binding IngestionQueue}">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="models:IngestionQueueItem">
                                     <Border Margin="0,0,0,6"
                                             Padding="10"
                                             CornerRadius="8"
                                             BorderBrush="{StaticResource ThemeBorderMidBrush}"
                                             BorderThickness="1"
                                             Background="{StaticResource ThemeControlLowBrush}">
-                                        <Grid ColumnDefinitions="Auto,*"
-                                              RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
-                                            <CheckBox Grid.RowSpan="7"
-                                                      IsChecked="{Binding Checked}"
-                                                      VerticalAlignment="Top"
-                                                      Margin="0,1,10,0" />
-                                            <TextBlock Grid.Column="1"
-                                                       Grid.Row="0"
-                                                       Text="{Binding DisplayName}"
-                                                       FontWeight="SemiBold"
-                                                       Margin="0,0,0,4"
-                                                       TextWrapping="Wrap" />
-                                            <TextBlock Grid.Column="1"
-                                                       Grid.Row="1"
-                                                       Text="{Binding Source, StringFormat=Source: {0}}"
-                                                       Margin="0,0,0,4"
-                                                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                            <TextBlock Grid.Column="1"
-                                                       Grid.Row="2"
-                                                       Text="{Binding CurrentState, StringFormat=State: {0}}"
-                                                       Margin="0,0,0,4"
-                                                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                            <TextBlock Grid.Column="1"
-                                                       Grid.Row="3"
-                                                       Text="{Binding UpdatedText, StringFormat=Updated: {0}}"
-                                                       Margin="0,0,0,4"
-                                                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                            <TextBlock Grid.Column="1"
-                                                       Grid.Row="4"
-                                                       Text="{Binding DownloadedLocation, StringFormat=Downloaded Asset: {0}}"
-                                                       Margin="0,0,0,4"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                            <TextBlock Grid.Column="1"
-                                                       Grid.Row="5"
-                                                       Text="{Binding InstalledLocation, StringFormat=Installed Dir: {0}}"
-                                                       Margin="0,0,0,4"
-                                                       TextWrapping="Wrap"
-                                                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
-                                            <TextBlock Grid.Column="1"
-                                                       Grid.Row="6"
-                                                       Text="{Binding ActionResultStatusBadge, StringFormat=Status: {0}}"
-                                                       IsVisible="{Binding HasPendingActionResult}"
-                                                       Foreground="{StaticResource ThemeAccentBrush}" />
-                                        </Grid>
+                                        <StackPanel Spacing="6">
+                                            <!-- Main card row -->
+                                            <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                                                <!-- Checkbox -->
+                                                <CheckBox Grid.Column="0"
+                                                          IsChecked="{Binding Checked}"
+                                                          VerticalAlignment="Top"
+                                                          Margin="0,2,8,0" />
+                                                <!-- Filetype icon -->
+                                                <Image Grid.Column="1"
+                                                       Width="28"
+                                                       Height="28"
+                                                       VerticalAlignment="Top"
+                                                       Margin="0,2,10,0"
+                                                       Source="{Binding FileType, Converter={StaticResource DownloadFileTypeToIconConverter}}" />
+                                                <!-- Info stack -->
+                                                <StackPanel Grid.Column="2"
+                                                            Spacing="3"
+                                                            VerticalAlignment="Top">
+                                                    <TextBlock Text="{Binding DisplayName}"
+                                                               FontWeight="SemiBold"
+                                                               TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding DownloadedFilename}"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource ThemeForegroundLowBrush}"
+                                                               IsVisible="{Binding DownloadedFilename, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                               TextWrapping="Wrap" />
+                                                    <StackPanel Orientation="Horizontal"
+                                                                Spacing="4"
+                                                                IsVisible="{Binding Artist, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                        <TextBlock FontSize="11"
+                                                                   Foreground="{StaticResource ThemeForegroundLowBrush}"
+                                                                   Text="{Binding #QueueItemsControl.((viewmodels:DownloadViewModel)DataContext).PageStrings.ArtistLabel}" />
+                                                        <TextBlock FontSize="11"
+                                                                   Foreground="{StaticResource ThemeForegroundLowBrush}"
+                                                                   Text="{Binding Artist}" />
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal"
+                                                                Spacing="4"
+                                                                IsVisible="{Binding Charter, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                                        <TextBlock FontSize="11"
+                                                                   Foreground="{StaticResource ThemeForegroundLowBrush}"
+                                                                   Text="{Binding #QueueItemsControl.((viewmodels:DownloadViewModel)DataContext).PageStrings.CharterLabel}" />
+                                                        <TextBlock FontSize="11"
+                                                                   Foreground="{StaticResource ThemeForegroundLowBrush}"
+                                                                   Text="{Binding Charter}" />
+                                                    </StackPanel>
+                                                    <ProgressBar Minimum="0"
+                                                                 Maximum="100"
+                                                                 Value="{Binding ProgressPercent}"
+                                                                 Height="6"
+                                                                 IsVisible="{Binding IsProgressVisible}"
+                                                                 Margin="0,2,0,0" />
+                                                    <TextBlock Text="{Binding CurrentState}"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                </StackPanel>
+                                                <!-- Inline delete button -->
+                                                <Button Grid.Column="3"
+                                                        VerticalAlignment="Top"
+                                                        Width="28"
+                                                        Height="28"
+                                                        CornerRadius="10"
+                                                        Padding="0"
+                                                        Margin="8,0,0,0"
+                                                        ToolTip.Tip="{Binding #QueueItemsControl.((viewmodels:DownloadViewModel)DataContext).PageStrings.DeleteJob}"
+                                                        Command="{Binding #QueueItemsControl.((viewmodels:DownloadViewModel)DataContext).DeleteJobCommand}"
+                                                        CommandParameter="{Binding}">
+                                                    <Image Width="18"
+                                                           Height="18"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Source="{Binding Source={x:Static strings:UiIcons.DeleteButton}, Converter={StaticResource AssetPathToImageConverter}, ConverterParameter='#ED8796'}" />
+                                                </Button>
+                                            </Grid>
+                                            <!-- Log toggle button -->
+                                            <Button HorizontalAlignment="Left"
+                                                    CornerRadius="6"
+                                                    Padding="8,3"
+                                                    FontSize="11"
+                                                    Content="{Binding JobLogToggleText}"
+                                                    Command="{Binding #QueueItemsControl.((viewmodels:DownloadViewModel)DataContext).ToggleJobLogCommand}"
+                                                    CommandParameter="{Binding}" />
+                                            <!-- Collapsible log panel -->
+                                            <Border IsVisible="{Binding IsJobLogExpanded}"
+                                                    BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="6"
+                                                    Padding="6">
+                                                <Grid RowDefinitions="Auto,*">
+                                                    <TextBlock Grid.Row="0"
+                                                               Text="Loading…"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource ThemeForegroundLowBrush}"
+                                                               IsVisible="{Binding IsLoadingLogs}"
+                                                               Margin="0,0,0,4" />
+                                                    <ScrollViewer Grid.Row="1"
+                                                                  MaxHeight="200"
+                                                                  VerticalScrollBarVisibility="Auto"
+                                                                  HorizontalScrollBarVisibility="Disabled">
+                                                        <ItemsControl ItemsSource="{Binding JobLogs}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="services:ChartHubServerJobLogEntry">
+                                                                    <TextBlock FontSize="10"
+                                                                               FontFamily="Monospace"
+                                                                               TextWrapping="Wrap"
+                                                                               Margin="0,1"
+                                                                               Text="{Binding Message}" />
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </ScrollViewer>
+                                                </Grid>
+                                            </Border>
+                                        </StackPanel>
                                     </Border>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>

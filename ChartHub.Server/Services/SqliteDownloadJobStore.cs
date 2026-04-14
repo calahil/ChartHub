@@ -27,6 +27,10 @@ public interface IDownloadJobStore
 
     void MarkDownloaded(Guid jobId, string downloadedPath);
 
+    void UpdateFileType(Guid jobId, string fileType);
+
+    IReadOnlyList<DownloadJobResponse> ListDownloadedWithoutFileType();
+
     void MarkStaged(Guid jobId, string stagedPath);
 
     void MarkInstalled(
@@ -42,6 +46,8 @@ public interface IDownloadJobStore
     void MarkCancelled(Guid jobId);
 
     void MarkFailed(Guid jobId, string errorMessage);
+
+    void DeleteJob(Guid jobId);
 
     int DeleteFinishedOlderThan(DateTimeOffset thresholdUtc);
 }
@@ -160,7 +166,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     source_chart_hash,
                     error,
                     created_at_utc,
-                    updated_at_utc
+                    updated_at_utc,
+                    file_type
                 FROM download_jobs
                 ORDER BY updated_at_utc DESC;
                 """;
@@ -202,7 +209,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     source_chart_hash,
                     error,
                     created_at_utc,
-                    updated_at_utc
+                    updated_at_utc,
+                    file_type
                 FROM download_jobs
                 WHERE job_id = $jobId
                 LIMIT 1;
@@ -295,7 +303,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     source_chart_hash,
                     error,
                     created_at_utc,
-                    updated_at_utc
+                    updated_at_utc,
+                    file_type
                 FROM download_jobs
                 WHERE stage = 'Queued'
                 ORDER BY created_at_utc ASC
@@ -357,6 +366,68 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             command.Parameters.AddWithValue("$downloadedPath", downloadedPath);
             command.Parameters.AddWithValue("$updatedAtUtc", DateTimeOffset.UtcNow.ToString("O"));
             command.ExecuteNonQuery();
+        }
+    }
+
+    public void UpdateFileType(Guid jobId, string fileType)
+    {
+        lock (_syncLock)
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE download_jobs
+                SET file_type = $fileType
+                WHERE job_id = $jobId;
+                """;
+            command.Parameters.AddWithValue("$jobId", jobId.ToString("D"));
+            command.Parameters.AddWithValue("$fileType", fileType);
+            command.ExecuteNonQuery();
+        }
+    }
+
+    public IReadOnlyList<DownloadJobResponse> ListDownloadedWithoutFileType()
+    {
+        lock (_syncLock)
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT
+                    job_id,
+                    source,
+                    source_id,
+                    display_name,
+                    source_url,
+                    stage,
+                    progress_percent,
+                    downloaded_path,
+                    staged_path,
+                    installed_path,
+                    installed_relative_path,
+                    artist,
+                    title,
+                    charter,
+                    source_md5,
+                    source_chart_hash,
+                    error,
+                    created_at_utc,
+                    updated_at_utc,
+                    file_type
+                FROM download_jobs
+                WHERE stage = 'Downloaded'
+                  AND (file_type IS NULL OR file_type = 'Unknown')
+                  AND downloaded_path IS NOT NULL;
+                """;
+
+            using SqliteDataReader reader = command.ExecuteReader();
+            List<DownloadJobResponse> jobs = [];
+            while (reader.Read())
+            {
+                jobs.Add(Map(reader));
+            }
+
+            return jobs;
         }
     }
 
@@ -475,6 +546,21 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
         }
     }
 
+    public void DeleteJob(Guid jobId)
+    {
+        lock (_syncLock)
+        {
+            using SqliteConnection connection = OpenConnection();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                DELETE FROM download_jobs
+                WHERE job_id = $jobId;
+                """;
+            command.Parameters.AddWithValue("$jobId", jobId.ToString("D"));
+            command.ExecuteNonQuery();
+        }
+    }
+
     public int DeleteFinishedOlderThan(DateTimeOffset thresholdUtc)
     {
         lock (_syncLock)
@@ -525,6 +611,28 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
 
                 CREATE INDEX IF NOT EXISTS idx_download_jobs_stage ON download_jobs(stage);
                 CREATE INDEX IF NOT EXISTS idx_download_jobs_updated ON download_jobs(updated_at_utc);
+
+                CREATE TABLE IF NOT EXISTS job_logs (
+                    log_entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id TEXT NOT NULL,
+                    log_level TEXT NOT NULL,
+                    event_id INTEGER NOT NULL DEFAULT 0,
+                    category TEXT NULL,
+                    message TEXT NOT NULL,
+                    exception TEXT NULL,
+                    timestamp_utc TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_job_logs_job_id ON job_logs(job_id);
+
+                CREATE TABLE IF NOT EXISTS server_events (
+                    event_pk INTEGER PRIMARY KEY AUTOINCREMENT,
+                    log_level TEXT NOT NULL,
+                    event_id INTEGER NOT NULL DEFAULT 0,
+                    category TEXT NULL,
+                    message TEXT NOT NULL,
+                    exception TEXT NULL,
+                    timestamp_utc TEXT NOT NULL
+                );
                 """;
             command.ExecuteNonQuery();
 
@@ -534,6 +642,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             EnsureColumnExists(connection, "charter", "TEXT NULL");
             EnsureColumnExists(connection, "source_md5", "TEXT NULL");
             EnsureColumnExists(connection, "source_chart_hash", "TEXT NULL");
+            EnsureColumnExists(connection, "file_type", "TEXT NULL");
 
             using SqliteCommand migrateLegacy = connection.CreateCommand();
             migrateLegacy.CommandText = """
@@ -640,6 +749,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             Error = reader.IsDBNull(16) ? null : reader.GetString(16),
             CreatedAtUtc = DateTimeOffset.Parse(reader.GetString(17)),
             UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(18)),
+            FileType = reader.FieldCount > 19 && !reader.IsDBNull(19) ? reader.GetString(19) : null,
         };
     }
 

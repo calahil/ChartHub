@@ -64,6 +64,11 @@
   <data name="Download.SortLabel" xml:space="preserve"><value>Sort</value></data>
   <data name="Download.Descending" xml:space="preserve"><value>Descending</value></data>
   <data name="Download.EmptyState" xml:space="preserve"><value>No downloads are available from ChartHub.Server with the current filters.</value></data>
+  <data name="Download.ExpandLog" xml:space="preserve"><value>Expand Log</value></data>
+  <data name="Download.CollapseLog" xml:space="preserve"><value>Collapse Log</value></data>
+  <data name="Download.DeleteJob" xml:space="preserve"><value>Delete</value></data>
+  <data name="Download.ArtistLabel" xml:space="preserve"><value>Artist:</value></data>
+  <data name="Download.CharterLabel" xml:space="preserve"><value>Charter:</value></data>
 
   <data name="CloneHero.Title" xml:space="preserve"><value>Clone Hero Song Library</value></data>
   <data name="CloneHero.PageHeader" xml:space="preserve"><value>Clone Hero Library</value></data>
@@ -251,4 +256,22 @@
   <data name="Settings.SecretSaveFailed" xml:space="preserve"><value>Failed to save secret: {0}</value></data>
   <data name="Settings.SecretCleared" xml:space="preserve"><value>Cleared secret: {0}</value></data>
   <data name="Settings.SecretClearFailed" xml:space="preserve"><value>Failed to clear secret: {0}</value></data>
+  <data name="Downloads.ActiveDownloads" xml:space="preserve"><value>Active Downloads</value></data>
+
+  <data name="Main.Input" xml:space="preserve"><value>Input</value></data>
+  <data name="Main.Controller" xml:space="preserve"><value>Controller</value></data>
+  <data name="Main.Mouse" xml:space="preserve"><value>Mouse</value></data>
+  <data name="Main.Keyboard" xml:space="preserve"><value>Keyboard</value></data>
+
+  <data name="Input.Controller.Status.Connected" xml:space="preserve"><value>Connected</value></data>
+  <data name="Input.Controller.Status.Disconnected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="Input.Touchpad.Status.Connected" xml:space="preserve"><value>Connected</value></data>
+  <data name="Input.Touchpad.Status.Disconnected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="Input.Keyboard.Status.Connected" xml:space="preserve"><value>Connected</value></data>
+  <data name="Input.Keyboard.Status.Disconnected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="Input.Keyboard.Key.Enter" xml:space="preserve"><value>Enter</value></data>
+  <data name="Input.Keyboard.Key.Backspace" xml:space="preserve"><value>⌫</value></data>
+  <data name="Input.Keyboard.Key.Escape" xml:space="preserve"><value>Esc</value></data>
+  <data name="Input.Keyboard.Key.Tab" xml:space="preserve"><value>Tab</value></data>
+  <data name="Input.Keyboard.Hint" xml:space="preserve"><value>Type here…</value></data>
 </root>

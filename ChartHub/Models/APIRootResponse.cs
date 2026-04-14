@@ -801,7 +801,7 @@ public partial class BassElement
     public object AuthorClass { get; set; }
 
     [JsonPropertyName("level")]
-    public bool? Level { get; set; }
+    public Level Level { get; set; }
 
     [JsonPropertyName("confirmed")]
     public long? Confirmed { get; set; }
@@ -857,7 +857,8 @@ public partial class Difficulties
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("guitar_coop")]
-    public List<object>? GuitarCoop { get; set; } = new();
+    [JsonConverter(typeof(DrumsClassOrListConverter))]
+    public object? GuitarCoop { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("bass")]
@@ -881,7 +882,8 @@ public partial class Difficulties
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonPropertyName("guitarghl")]
-    public List<object>? Guitarghl { get; set; } = new();
+    [JsonConverter(typeof(DrumsClassOrListConverter))]
+    public object? Guitarghl { get; set; }
 }
 
 public partial class DrumsClass

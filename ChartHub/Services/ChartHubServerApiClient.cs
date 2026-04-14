@@ -16,11 +16,18 @@ public interface IChartHubServerApiClient
 
     Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default);
 
-    IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default);
+    IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ChartHubServerJobLogEntry>> GetJobLogsAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default);
 
     Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default);
 
     Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default);
+
+    Task DeleteDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("DeleteDownloadJob is not supported by this API client implementation.");
+    }
 
     Task<IReadOnlyList<ChartHubServerCloneHeroSongResponse>> ListCloneHeroSongsAsync(
         string baseUrl,
@@ -162,7 +169,8 @@ public sealed record ChartHubServerDownloadJobResponse(
     string? Title = null,
     string? Charter = null,
     string? SourceMd5 = null,
-    string? SourceChartHash = null);
+    string? SourceChartHash = null,
+    string? FileType = null);
 
 public sealed record ChartHubServerCloneHeroSongResponse(
     string SongId,
@@ -183,6 +191,14 @@ public sealed record ChartHubServerDownloadProgressEvent(
     string Stage,
     double ProgressPercent,
     DateTimeOffset UpdatedAtUtc);
+
+public sealed record ChartHubServerJobLogEntry(
+    DateTimeOffset TimestampUtc,
+    string Level,
+    int EventId,
+    string? Category,
+    string Message,
+    string? Exception);
 
 public sealed record ChartHubServerDesktopEntryResponse(
     string EntryId,
@@ -321,7 +337,7 @@ public sealed class ChartHubServerApiClient : IChartHubServerApiClient
         return payload ?? [];
     }
 
-    public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+    public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamDownloadJobsAsync(
         string baseUrl,
         string bearerToken,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -368,10 +384,10 @@ public sealed class ChartHubServerApiClient : IChartHubServerApiClient
                 dataBuilder.Clear();
                 eventName = string.Empty;
 
-                List<ChartHubServerDownloadProgressEvent>? payload;
+                List<ChartHubServerDownloadJobResponse>? payload;
                 try
                 {
-                    payload = JsonSerializer.Deserialize<List<ChartHubServerDownloadProgressEvent>>(payloadJson, JsonOptions);
+                    payload = JsonSerializer.Deserialize<List<ChartHubServerDownloadJobResponse>>(payloadJson, JsonOptions);
                 }
                 catch (JsonException ex)
                 {
@@ -400,6 +416,19 @@ public sealed class ChartHubServerApiClient : IChartHubServerApiClient
         }
     }
 
+    public async Task<IReadOnlyList<ChartHubServerJobLogEntry>> GetJobLogsAsync(
+        string baseUrl,
+        string bearerToken,
+        Guid jobId,
+        CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Get, baseUrl, $"/api/v1/downloads/jobs/{jobId:D}/logs", bearerToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+        List<ChartHubServerJobLogEntry>? payload = await ReadJsonAsync<List<ChartHubServerJobLogEntry>>(response, cancellationToken).ConfigureAwait(false);
+        return payload ?? [];
+    }
+
     public async Task RequestCancelDownloadJobAsync(
         string baseUrl,
         string bearerToken,
@@ -407,6 +436,21 @@ public sealed class ChartHubServerApiClient : IChartHubServerApiClient
         CancellationToken cancellationToken = default)
     {
         using HttpRequestMessage request = BuildRequest(HttpMethod.Post, baseUrl, $"/api/v1/downloads/jobs/{jobId:D}/cancel", bearerToken);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw new InvalidOperationException($"ChartHub.Server request failed ({(int)response.StatusCode} {response.ReasonPhrase}): {responseBody}");
+        }
+    }
+
+    public async Task DeleteDownloadJobAsync(
+        string baseUrl,
+        string bearerToken,
+        Guid jobId,
+        CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Delete, baseUrl, $"/api/v1/downloads/jobs/{jobId:D}", bearerToken);
         using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {

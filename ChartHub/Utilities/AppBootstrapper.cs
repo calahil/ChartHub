@@ -139,10 +139,13 @@ public static class AppBootstrapper
 #if ANDROID
         services.AddSingleton<IQrCodeScannerService, AndroidQrCodeScannerService>();
         services.AddSingleton<IVolumeHardwareButtonSource, AndroidVolumeHardwareButtonSource>();
+        services.AddSingleton<IOrientationService, AndroidOrientationService>();
 #else
         services.AddSingleton<IQrCodeScannerService, NoOpQrCodeScannerService>();
         services.AddSingleton<IVolumeHardwareButtonSource, NoOpVolumeHardwareButtonSource>();
+        services.AddSingleton<IOrientationService, NullOrientationService>();
 #endif
+        services.AddTransient<IInputWebSocketService, InputWebSocketService>();
         services.AddSingleton<EncoreApiService>();
         services.AddSingleton<SharedDownloadQueue>();
         services.AddSingleton(_ => new LibraryCatalogService(Path.Combine(configDir, "library-catalog.db")));
@@ -175,6 +178,20 @@ public static class AppBootstrapper
                 serviceProvider.GetRequiredService<ISettingsOrchestrator>(),
                 serviceProvider.GetRequiredService<IChartHubServerApiClient>()));
         services.AddSingleton<EncoreViewModel>();
+        services.AddSingleton<VirtualControllerViewModel>(serviceProvider =>
+            new VirtualControllerViewModel(
+                serviceProvider.GetRequiredService<AppGlobalSettings>(),
+                serviceProvider.GetRequiredService<IInputWebSocketService>(),
+                serviceProvider.GetRequiredService<IOrientationService>()));
+        services.AddSingleton<VirtualTouchPadViewModel>(serviceProvider =>
+            new VirtualTouchPadViewModel(
+                serviceProvider.GetRequiredService<AppGlobalSettings>(),
+                serviceProvider.GetRequiredService<IInputWebSocketService>(),
+                serviceProvider.GetRequiredService<IOrientationService>()));
+        services.AddSingleton<VirtualKeyboardViewModel>(serviceProvider =>
+            new VirtualKeyboardViewModel(
+                serviceProvider.GetRequiredService<AppGlobalSettings>(),
+                serviceProvider.GetRequiredService<IInputWebSocketService>()));
         services.AddSingleton<MainViewModel>(serviceProvider =>
             new MainViewModel(
                 serviceProvider.GetRequiredService<RhythmVerseViewModel>(),
@@ -184,7 +201,10 @@ public static class AppBootstrapper
                 serviceProvider.GetRequiredService<CloneHeroViewModel>(),
                 serviceProvider.GetRequiredService<DesktopEntryViewModel>(),
                 serviceProvider.GetRequiredService<VolumeViewModel>(),
-                serviceProvider.GetRequiredService<SettingsViewModel>()
+                serviceProvider.GetRequiredService<SettingsViewModel>(),
+                serviceProvider.GetRequiredService<VirtualControllerViewModel>(),
+                serviceProvider.GetRequiredService<VirtualTouchPadViewModel>(),
+                serviceProvider.GetRequiredService<VirtualKeyboardViewModel>()
             )
         );
         services.AddSingleton<Initializer>();

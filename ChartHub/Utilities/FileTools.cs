@@ -1,9 +1,3 @@
-using System.Globalization;
-
-using Avalonia.Data.Converters;
-
-using ChartHub.Models;
-
 using SharpCompress.Archives;
 using SharpCompress.Archives.Rar;
 using SharpCompress.Archives.SevenZip;
@@ -13,45 +7,6 @@ namespace ChartHub.Utilities;
 
 public static class FileTools
 {
-    public static string ConvertFileSize(long sizeBytes)
-    {
-        string[] sizeSuffixes = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
-        if (sizeBytes == 0)
-        {
-            return "0B";
-        }
-
-        int order = (int)Math.Log(sizeBytes, 1024);
-        double adjustedSize = sizeBytes / Math.Pow(1024, order);
-        return $"{Math.Round(adjustedSize, 2)} {sizeSuffixes[order]}";
-    }
-
-    public class FileTypeComparer : IComparer<object>
-    {
-        public int Compare(object? x, object? y)
-        {
-            if (x is not WatcherFile fileDataX || y is not WatcherFile fileDataY)
-            {
-                return 0;
-            }
-
-            return fileDataX.FileType.CompareTo(fileDataY.FileType);
-        }
-    }
-
-    public class FileSizeComparer : IComparer<object>
-    {
-        public int Compare(object? x, object? y)
-        {
-            if (x is not WatcherFile fileDataX || y is not WatcherFile fileDataY)
-            {
-                return 0;
-            }
-
-            return fileDataX.SizeBytes.CompareTo(fileDataY.SizeBytes);
-        }
-    }
-
     public static long GetDirectorySize(string folderPath)
     {
         DirectoryInfo di = new(folderPath);

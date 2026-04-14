@@ -1,0 +1,189 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
+             xmlns:strings="clr-namespace:ChartHub.Strings"
+             xmlns:utilities="clr-namespace:ChartHub.Utilities"
+             mc:Ignorable="d"
+             x:Class="ChartHub.Views.VirtualControllerView"
+             x:Name="Root"
+             x:DataType="viewmodels:VirtualControllerViewModel"
+             d:DesignWidth="800"
+             d:DesignHeight="400">
+
+    <UserControl.Resources>
+        <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+    </UserControl.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Status bar -->
+        <Border Grid.Row="0"
+                Padding="10,6"
+                BorderThickness="0,0,0,1"
+                BorderBrush="{StaticResource ThemeBorderMidBrush}">
+            <TextBlock Text="{Binding StatusMessage}"
+                       VerticalAlignment="Center"
+                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
+        </Border>
+
+        <!-- Controller layout: D-pad left, face buttons right, center buttons in the middle bottom -->
+        <Grid Grid.Row="1"
+              ColumnDefinitions="*,Auto,*"
+              Margin="16">
+
+            <!-- Left: D-pad -->
+            <Grid Grid.Column="0"
+                  Width="180"
+                  Height="180"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  RowDefinitions="*,Auto,*"
+                  ColumnDefinitions="*,Auto,*">
+
+                <!-- Up -->
+                <Button Grid.Row="0" Grid.Column="1"
+                        Width="60" Height="60"
+                        CornerRadius="8"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Command="{Binding SetDPadCommand}"
+                        CommandParameter="0,-1"
+                        PointerReleased="OnDPadReleased">
+                    <Image Width="32" Height="32"
+                           Source="{Binding Source={x:Static strings:UiIcons.ArrowUp}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+
+                <!-- Left -->
+                <Button Grid.Row="1" Grid.Column="0"
+                        Width="60" Height="60"
+                        CornerRadius="8"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Command="{Binding SetDPadCommand}"
+                        CommandParameter="-1,0"
+                        PointerReleased="OnDPadReleased">
+                    <Image Width="32" Height="32"
+                           Source="{Binding Source={x:Static strings:UiIcons.ArrowLeft}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+
+                <!-- Right -->
+                <Button Grid.Row="1" Grid.Column="2"
+                        Width="60" Height="60"
+                        CornerRadius="8"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Command="{Binding SetDPadCommand}"
+                        CommandParameter="1,0"
+                        PointerReleased="OnDPadReleased">
+                    <Image Width="32" Height="32"
+                           Source="{Binding Source={x:Static strings:UiIcons.ArrowRight}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+
+                <!-- Down -->
+                <Button Grid.Row="2" Grid.Column="1"
+                        Width="60" Height="60"
+                        CornerRadius="8"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Command="{Binding SetDPadCommand}"
+                        CommandParameter="0,1"
+                        PointerReleased="OnDPadReleased">
+                    <Image Width="32" Height="32"
+                           Source="{Binding Source={x:Static strings:UiIcons.ArrowDown}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+            </Grid>
+
+            <!-- Center: Start/Select -->
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="12"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,0,16">
+                <Button Width="56" Height="40"
+                        CornerRadius="8"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        PointerPressed="OnControllerButtonPressed"
+                        PointerReleased="OnControllerButtonReleased"
+                        Tag="select">
+                    <Image Width="28" Height="28"
+                           Source="{Binding Source={x:Static strings:UiIcons.SelectButton}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+                <Button Width="56" Height="40"
+                        CornerRadius="8"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        PointerPressed="OnControllerButtonPressed"
+                        PointerReleased="OnControllerButtonReleased"
+                        Tag="start">
+                    <Image Width="28" Height="28"
+                           Source="{Binding Source={x:Static strings:UiIcons.StartButton}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+            </StackPanel>
+
+            <!-- Right: Face buttons (ABXY) -->
+            <Grid Grid.Column="2"
+                  Width="180"
+                  Height="180"
+                  HorizontalAlignment="Center"
+                  VerticalAlignment="Center"
+                  RowDefinitions="*,Auto,*"
+                  ColumnDefinitions="*,Auto,*">
+
+                <!-- Y (top) -->
+                <Button Grid.Row="0" Grid.Column="1"
+                        Width="60" Height="60"
+                        CornerRadius="30"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        PointerPressed="OnControllerButtonPressed"
+                        PointerReleased="OnControllerButtonReleased"
+                        Tag="y">
+                    <Image Width="36" Height="36"
+                           Source="{Binding Source={x:Static strings:UiIcons.YButton}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+
+                <!-- X (left) -->
+                <Button Grid.Row="1" Grid.Column="0"
+                        Width="60" Height="60"
+                        CornerRadius="30"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        PointerPressed="OnControllerButtonPressed"
+                        PointerReleased="OnControllerButtonReleased"
+                        Tag="x">
+                    <Image Width="36" Height="36"
+                           Source="{Binding Source={x:Static strings:UiIcons.XButton}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+
+                <!-- B (right) -->
+                <Button Grid.Row="1" Grid.Column="2"
+                        Width="60" Height="60"
+                        CornerRadius="30"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        PointerPressed="OnControllerButtonPressed"
+                        PointerReleased="OnControllerButtonReleased"
+                        Tag="b">
+                    <Image Width="36" Height="36"
+                           Source="{Binding Source={x:Static strings:UiIcons.BButton}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+
+                <!-- A (bottom) -->
+                <Button Grid.Row="2" Grid.Column="1"
+                        Width="60" Height="60"
+                        CornerRadius="30"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        PointerPressed="OnControllerButtonPressed"
+                        PointerReleased="OnControllerButtonReleased"
+                        Tag="a">
+                    <Image Width="36" Height="36"
+                           Source="{Binding Source={x:Static strings:UiIcons.AButton}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

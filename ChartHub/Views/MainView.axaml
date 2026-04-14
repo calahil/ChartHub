@@ -2,6 +2,7 @@
              xmlns:Views="using:ChartHub.Views"
              xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
              xmlns:utilities="clr-namespace:ChartHub.Utilities"
+             xmlns:strings="clr-namespace:ChartHub.Strings;assembly=ChartHub"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -339,6 +340,41 @@
                                 Height="44"
                                         Width="220"
                                         IsVisible="{Binding IsSettingsTabVisible}" />
+
+                                <!-- Input accordion header (companion mode only) -->
+                                <Button CornerRadius="10"
+                                        HorizontalContentAlignment="Left"
+                                        Height="44"
+                                        Width="220"
+                                        IsVisible="{Binding IsCompanionMode}"
+                                        Command="{Binding ToggleInputAccordionCommand}">
+                                    <TextBlock Text="{Binding PageStrings.Input}"
+                                               VerticalAlignment="Center" />
+                                </Button>
+
+                                <!-- Input sub-items -->
+                                <StackPanel Spacing="6"
+                                            IsVisible="{Binding IsInputAccordionExpanded}"
+                                            Margin="16,0,0,0">
+                                    <Button Content="{Binding PageStrings.Controller}"
+                                            Command="{Binding GoVirtualControllerCommand}"
+                                            CornerRadius="8"
+                                            HorizontalContentAlignment="Left"
+                                            Height="40"
+                                            Width="204" />
+                                    <Button Content="{Binding PageStrings.Mouse}"
+                                            Command="{Binding GoVirtualTouchPadCommand}"
+                                            CornerRadius="8"
+                                            HorizontalContentAlignment="Left"
+                                            Height="40"
+                                            Width="204" />
+                                    <Button Content="{Binding PageStrings.Keyboard}"
+                                            Command="{Binding GoVirtualKeyboardCommand}"
+                                            CornerRadius="8"
+                                            HorizontalContentAlignment="Left"
+                                            Height="40"
+                                            Width="204" />
+                                </StackPanel>
                             </StackPanel>
 
                             <StackPanel Classes="flyout-pane"
@@ -479,10 +515,19 @@
                         BorderThickness="0,0,0,1">
                     <Grid ColumnDefinitions="Auto,*">
                         <Button Grid.Column="0"
-                                Content="{Binding PageStrings.MenuButton}"
+                                Width="40"
                             CornerRadius="10"
                             Height="40"
-                                Command="{Binding ToggleAndroidNavPaneCommand}" />
+                                ToolTip.Tip="{Binding PageStrings.MenuButton}"
+                                Command="{Binding ToggleAndroidNavPaneCommand}">
+                            <Button.Content>
+                                <Image Width="20"
+                                       Height="20"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Source="{Binding Source={x:Static strings:UiIcons.MenuIcon}, Converter={StaticResource AssetPathToImageConverter}}" />
+                            </Button.Content>
+                        </Button>
                         <TextBlock Grid.Column="1"
                                    Margin="10,0,0,0"
                                    VerticalAlignment="Center"

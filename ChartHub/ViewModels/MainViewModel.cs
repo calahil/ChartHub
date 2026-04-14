@@ -28,6 +28,9 @@ public class MainViewModel : INotifyPropertyChanged
     private DesktopEntryViewModel _desktopEntryViewModel = null!;
     private VolumeViewModel _volumeViewModel = null!;
     private SettingsViewModel _settingsViewModel = null!;
+    private VirtualControllerViewModel _virtualControllerViewModel = null!;
+    private VirtualTouchPadViewModel _virtualTouchPadViewModel = null!;
+    private VirtualKeyboardViewModel _virtualKeyboardViewModel = null!;
     private MainViewPageStrings _pageStrings = new MainViewPageStrings();
     private bool _isAndroidNavPaneOpen;
     private bool _isAndroidFlyoutFiltersMode;
@@ -108,6 +111,36 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    public VirtualControllerViewModel VirtualControllerViewModel
+    {
+        get => _virtualControllerViewModel;
+        set
+        {
+            _virtualControllerViewModel = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public VirtualTouchPadViewModel VirtualTouchPadViewModel
+    {
+        get => _virtualTouchPadViewModel;
+        set
+        {
+            _virtualTouchPadViewModel = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public VirtualKeyboardViewModel VirtualKeyboardViewModel
+    {
+        get => _virtualKeyboardViewModel;
+        set
+        {
+            _virtualKeyboardViewModel = value;
+            OnPropertyChanged();
+        }
+    }
+
     private bool _isDownloadTabVisible;
     public bool IsDownloadTabVisible
     {
@@ -155,6 +188,7 @@ public class MainViewModel : INotifyPropertyChanged
     private bool _isSettingsTabVisible;
     private int _selectedMainTabIndex;
     private bool _isFilterPaneOpen;
+    private bool _isInputAccordionExpanded;
 
     public int SelectedMainTabIndex
     {
@@ -234,6 +268,21 @@ public class MainViewModel : INotifyPropertyChanged
 
     public bool IsAndroidNavListMode => !IsAndroidFlyoutFiltersMode;
 
+    public bool IsInputAccordionExpanded
+    {
+        get => _isInputAccordionExpanded;
+        set
+        {
+            if (_isInputAccordionExpanded == value)
+            {
+                return;
+            }
+
+            _isInputAccordionExpanded = value;
+            OnPropertyChanged();
+        }
+    }
+
     public bool IsRhythmVerseTabActive => SelectedMainTabIndex == 0;
 
     public bool IsEncoreTabActive => SelectedMainTabIndex == 1;
@@ -257,6 +306,9 @@ public class MainViewModel : INotifyPropertyChanged
         4 => DesktopEntryViewModel,
         5 => VolumeViewModel,
         6 => SettingsViewModel,
+        7 => VirtualControllerViewModel,
+        8 => VirtualTouchPadViewModel,
+        9 => VirtualKeyboardViewModel,
         _ => RhythmVerseViewModel,
     };
 
@@ -269,6 +321,9 @@ public class MainViewModel : INotifyPropertyChanged
         4 => PageStrings.DesktopEntry,
         5 => PageStrings.Volume,
         6 => PageStrings.Settings,
+        7 => PageStrings.Controller,
+        8 => PageStrings.Mouse,
+        9 => PageStrings.Keyboard,
         _ => PageStrings.RhythmVerse,
     };
 
@@ -283,6 +338,10 @@ public class MainViewModel : INotifyPropertyChanged
     public IRelayCommand GoDesktopEntryCommand { get; }
     public IRelayCommand GoVolumeCommand { get; }
     public IRelayCommand GoSettingsCommand { get; }
+    public IRelayCommand ToggleInputAccordionCommand { get; }
+    public IRelayCommand GoVirtualControllerCommand { get; }
+    public IRelayCommand GoVirtualTouchPadCommand { get; }
+    public IRelayCommand GoVirtualKeyboardCommand { get; }
 
     public IRelayCommand<DownloadFile?> CancelSharedDownloadCommand { get; }
 
@@ -321,6 +380,10 @@ public class MainViewModel : INotifyPropertyChanged
         GoDesktopEntryCommand = new RelayCommand(() => NavigateToTab(4));
         GoVolumeCommand = new RelayCommand(() => NavigateToTab(5));
         GoSettingsCommand = new RelayCommand(() => NavigateToTab(6));
+        ToggleInputAccordionCommand = new RelayCommand(() => IsInputAccordionExpanded = !IsInputAccordionExpanded);
+        GoVirtualControllerCommand = new RelayCommand(() => NavigateToTab(7));
+        GoVirtualTouchPadCommand = new RelayCommand(() => NavigateToTab(8));
+        GoVirtualKeyboardCommand = new RelayCommand(() => NavigateToTab(9));
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
     }
@@ -343,6 +406,38 @@ public class MainViewModel : INotifyPropertyChanged
             desktopEntryViewModel,
             volumeViewModel,
             settingsViewModel,
+            virtualControllerViewModel: null,
+            virtualTouchPadViewModel: null,
+            virtualKeyboardViewModel: null,
+            action => Dispatcher.UIThread.Post(action),
+            OperatingSystem.IsAndroid())
+    {
+    }
+
+    public MainViewModel(
+        RhythmVerseViewModel rhythmVerseViewModel,
+        EncoreViewModel encoreViewModel,
+        SharedDownloadQueue sharedDownloadQueue,
+        DownloadViewModel downloadViewModel,
+        CloneHeroViewModel cloneHeroViewModel,
+        DesktopEntryViewModel desktopEntryViewModel,
+        VolumeViewModel volumeViewModel,
+        SettingsViewModel settingsViewModel,
+        VirtualControllerViewModel? virtualControllerViewModel,
+        VirtualTouchPadViewModel? virtualTouchPadViewModel,
+        VirtualKeyboardViewModel? virtualKeyboardViewModel)
+        : this(
+            rhythmVerseViewModel,
+            encoreViewModel,
+            sharedDownloadQueue,
+            downloadViewModel,
+            cloneHeroViewModel,
+            desktopEntryViewModel,
+            volumeViewModel,
+            settingsViewModel,
+            virtualControllerViewModel,
+            virtualTouchPadViewModel,
+            virtualKeyboardViewModel,
             action => Dispatcher.UIThread.Post(action),
             OperatingSystem.IsAndroid())
     {
@@ -357,6 +452,9 @@ public class MainViewModel : INotifyPropertyChanged
         DesktopEntryViewModel desktopEntryViewModel,
         VolumeViewModel volumeViewModel,
         SettingsViewModel settingsViewModel,
+        VirtualControllerViewModel? virtualControllerViewModel,
+        VirtualTouchPadViewModel? virtualTouchPadViewModel,
+        VirtualKeyboardViewModel? virtualKeyboardViewModel,
         Action<Action> postToUi,
         bool isAndroid)
     {
@@ -374,6 +472,9 @@ public class MainViewModel : INotifyPropertyChanged
         _desktopEntryViewModel = desktopEntryViewModel;
         _volumeViewModel = volumeViewModel;
         _settingsViewModel = settingsViewModel;
+        _virtualControllerViewModel = virtualControllerViewModel ?? new VirtualControllerViewModel();
+        _virtualTouchPadViewModel = virtualTouchPadViewModel ?? new VirtualTouchPadViewModel();
+        _virtualKeyboardViewModel = virtualKeyboardViewModel ?? new VirtualKeyboardViewModel();
         ShowFiltersPaneCommand = new RelayCommand(ToggleDesktopFiltersPane);
         ToggleAndroidNavPaneCommand = new RelayCommand(ToggleAndroidNavPane);
         ShowAndroidNavListCommand = new RelayCommand(ShowAndroidNavList);
@@ -385,6 +486,10 @@ public class MainViewModel : INotifyPropertyChanged
         GoDesktopEntryCommand = new RelayCommand(() => NavigateToTab(4));
         GoVolumeCommand = new RelayCommand(() => NavigateToTab(5));
         GoSettingsCommand = new RelayCommand(() => NavigateToTab(6));
+        ToggleInputAccordionCommand = new RelayCommand(() => IsInputAccordionExpanded = !IsInputAccordionExpanded);
+        GoVirtualControllerCommand = new RelayCommand(() => NavigateToTab(7));
+        GoVirtualTouchPadCommand = new RelayCommand(() => NavigateToTab(8));
+        GoVirtualKeyboardCommand = new RelayCommand(() => NavigateToTab(9));
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
 
@@ -474,6 +579,12 @@ public class MainViewModel : INotifyPropertyChanged
         }
 
         if (tabIndex == 5 && !IsVolumeTabVisible)
+        {
+            return;
+        }
+
+        // Input sub-pages (7, 8, 9) are Android-only.
+        if ((tabIndex == 7 || tabIndex == 8 || tabIndex == 9) && !IsCompanionMode)
         {
             return;
         }

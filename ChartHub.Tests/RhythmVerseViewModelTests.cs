@@ -344,7 +344,7 @@ public class RhythmVerseViewModelTests
         public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
 
-        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamDownloadJobsAsync(
             string baseUrl,
             string bearerToken,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -355,6 +355,9 @@ public class RhythmVerseViewModelTests
 
         public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task<IReadOnlyList<ChartHubServerJobLogEntry>> GetJobLogsAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerJobLogEntry>>([]);
 
         public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(
             string baseUrl,
@@ -406,7 +409,7 @@ public class RhythmVerseViewModelTests
         public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
 
-        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamDownloadJobsAsync(
             string baseUrl,
             string bearerToken,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -417,6 +420,9 @@ public class RhythmVerseViewModelTests
 
         public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task<IReadOnlyList<ChartHubServerJobLogEntry>> GetJobLogsAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerJobLogEntry>>([]);
 
         public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(
             string baseUrl,

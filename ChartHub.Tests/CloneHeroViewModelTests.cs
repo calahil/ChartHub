@@ -248,14 +248,17 @@ public class CloneHeroViewModelTests
         public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
 
-        public IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
-            => AsyncEnumerable.Empty<IReadOnlyList<ChartHubServerDownloadProgressEvent>>();
+        public IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => AsyncEnumerable.Empty<IReadOnlyList<ChartHubServerDownloadJobResponse>>();
 
         public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
         public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
+
+        public Task<IReadOnlyList<ChartHubServerJobLogEntry>> GetJobLogsAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerJobLogEntry>>([]);
 
         public Task<IReadOnlyList<ChartHubServerCloneHeroSongResponse>> ListCloneHeroSongsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
             => Task.FromResult(Songs);

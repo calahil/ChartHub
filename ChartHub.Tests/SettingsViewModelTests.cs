@@ -421,7 +421,7 @@ public class SettingsViewModelTests
             throw new NotSupportedException();
         }
 
-        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamDownloadJobsAsync(
             string baseUrl,
             string bearerToken,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -438,6 +438,9 @@ public class SettingsViewModelTests
         {
             throw new NotSupportedException();
         }
+
+        public Task<IReadOnlyList<ChartHubServerJobLogEntry>> GetJobLogsAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerJobLogEntry>>([]);
 
         public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(
             string baseUrl,

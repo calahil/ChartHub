@@ -37,6 +37,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
     private readonly IServerSongIniMetadataParser _songIniParser;
     private readonly IServerCloneHeroDirectorySchemaService _schemaService;
     private readonly ILogger<DownloadJobInstallService> _logger;
+    private readonly IJobLogSink _jobLogSink;
 
     public DownloadJobInstallService(
         IOptions<ServerPathOptions> pathOptions,
@@ -45,7 +46,8 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         IServerOnyxInstallService onyxInstallService,
         IServerSongIniMetadataParser songIniParser,
         IServerCloneHeroDirectorySchemaService schemaService,
-        ILogger<DownloadJobInstallService> logger)
+        ILogger<DownloadJobInstallService> logger,
+        IJobLogSink jobLogSink)
     {
         ServerPathOptions paths = pathOptions.Value;
         _contentRootPath = environment.ContentRootPath;
@@ -56,6 +58,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         _songIniParser = songIniParser;
         _schemaService = schemaService;
         _logger = logger;
+        _jobLogSink = jobLogSink;
     }
 
     public async Task<DownloadJobInstallResult> InstallJobAsync(DownloadJobResponse job, CancellationToken cancellationToken = default)
@@ -64,33 +67,46 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         {
             string artifactPath = ResolveDownloadedArtifactPath(job);
             InstallLog.ArtifactResolved(_logger, job.JobId, job.DownloadedPath, artifactPath);
+            _jobLogSink.Add(job.JobId, LogLevel.Information, new EventId(2101), nameof(DownloadJobInstallService),
+                $"Resolved downloaded path '{job.DownloadedPath}' to '{artifactPath}'.", null);
 
             if (!File.Exists(artifactPath))
             {
                 InstallLog.ArtifactMissing(_logger, job.JobId, artifactPath);
+                _jobLogSink.Add(job.JobId, LogLevel.Error, new EventId(2102), nameof(DownloadJobInstallService),
+                    $"Artifact missing at '{artifactPath}'.", null);
                 throw new InvalidOperationException("Downloaded artifact is missing.");
             }
 
             Directory.CreateDirectory(_cloneHeroRoot);
             InstallLog.CloneHeroRootReady(_logger, job.JobId, _cloneHeroRoot);
+            _jobLogSink.Add(job.JobId, LogLevel.Information, new EventId(2103), nameof(DownloadJobInstallService),
+                $"Clone Hero root ready at '{_cloneHeroRoot}'.", null);
 
             string stagedPath = MoveArtifactToStaging(job.JobId, artifactPath);
             InstallLog.ArtifactMovedToStaging(_logger, job.JobId, stagedPath);
+            _jobLogSink.Add(job.JobId, LogLevel.Information, new EventId(2104), nameof(DownloadJobInstallService),
+                $"Artifact moved to staging at '{stagedPath}'.", null);
 
             ServerInstallFileType type = await _fileTypeResolver.ResolveAsync(stagedPath, cancellationToken).ConfigureAwait(false);
             string source = _schemaService.NormalizeSource(job.Source);
             InstallLog.ArtifactTypeResolved(_logger, job.JobId, type, source);
+            _jobLogSink.Add(job.JobId, LogLevel.Information, new EventId(2105), nameof(DownloadJobInstallService),
+                $"Artifact type '{type}' detected for source '{source}'.", null);
 
             ServerRehomeInstallResult installedPath = type switch
             {
                 ServerInstallFileType.Zip or ServerInstallFileType.Rar or ServerInstallFileType.SevenZip
-                    => await InstallArchiveAsync(stagedPath, source, cancellationToken).ConfigureAwait(false),
+                    => await InstallArchiveAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
                 ServerInstallFileType.Con
-                    => await InstallOnyxAsync(stagedPath, source, cancellationToken).ConfigureAwait(false),
+                    => await InstallOnyxAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
                 _ => throw new InvalidOperationException("Unsupported install artifact format."),
             };
 
             InstallLog.InstallCompleted(_logger, job.JobId, installedPath.InstalledPath);
+            _jobLogSink.Add(job.JobId, LogLevel.Information, new EventId(2106), nameof(DownloadJobInstallService),
+                $"Install completed. Installed at '{installedPath.InstalledPath}'.", null);
+
             return new DownloadJobInstallResult(
                 stagedPath,
                 installedPath.InstalledPath,
@@ -100,11 +116,13 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         catch (Exception ex)
         {
             InstallLog.InstallFailed(_logger, job.JobId, job.Source, job.SourceId, job.DisplayName, job.DownloadedPath, ex);
+            _jobLogSink.Add(job.JobId, LogLevel.Error, new EventId(2107), nameof(DownloadJobInstallService),
+                $"Install failed: {ex.Message}", ex.ToString());
             throw;
         }
     }
 
-    private async Task<ServerRehomeInstallResult> InstallArchiveAsync(string artifactPath, string source, CancellationToken cancellationToken)
+    private async Task<ServerRehomeInstallResult> InstallArchiveAsync(Guid jobId, string artifactPath, string source, CancellationToken cancellationToken)
     {
         string installWorkspace = Path.Combine(_stagingDir, "install", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(installWorkspace);
@@ -129,7 +147,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
                 }), cancellationToken).ConfigureAwait(false);
             }
 
-            return await RehomeInstalledDirectoryAsync(installWorkspace, source, Path.GetFileNameWithoutExtension(artifactPath), cancellationToken).ConfigureAwait(false);
+            return await RehomeInstalledDirectoryAsync(jobId, installWorkspace, source, Path.GetFileNameWithoutExtension(artifactPath), cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -138,15 +156,23 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         }
     }
 
-    private async Task<ServerRehomeInstallResult> InstallOnyxAsync(string artifactPath, string source, CancellationToken cancellationToken)
+    private async Task<ServerRehomeInstallResult> InstallOnyxAsync(Guid jobId, string artifactPath, string source, CancellationToken cancellationToken)
     {
         InstallLog.OnyxInstallStarted(_logger, artifactPath, source);
+        _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2108), nameof(DownloadJobInstallService),
+            $"Onyx install started for '{artifactPath}', source '{source}'.", null);
+
         ServerOnyxInstallResult result = await _onyxInstallService.ConvertAsync(artifactPath, source, cancellationToken).ConfigureAwait(false);
+
         InstallLog.OnyxInstallCompleted(_logger, result.OutputDirectory, result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
-        return await RehomeInstalledDirectoryAsync(result.OutputDirectory, source, Path.GetFileNameWithoutExtension(artifactPath), cancellationToken, result.Metadata).ConfigureAwait(false);
+        _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2109), nameof(DownloadJobInstallService),
+            $"Onyx install finished. Output '{result.OutputDirectory}', artist='{result.Metadata.Artist}', title='{result.Metadata.Title}', charter='{result.Metadata.Charter}'.", null);
+
+        return await RehomeInstalledDirectoryAsync(jobId, result.OutputDirectory, source, Path.GetFileNameWithoutExtension(artifactPath), cancellationToken, result.Metadata).ConfigureAwait(false);
     }
 
     private Task<ServerRehomeInstallResult> RehomeInstalledDirectoryAsync(
+        Guid jobId,
         string currentDirectory,
         string source,
         string? fallbackTitle,
@@ -187,6 +213,9 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
 
         Directory.Move(currentDirectory, layout.FullPath);
         InstallLog.RehomedInstallDirectory(_logger, currentDirectory, layout.FullPath, layout.RelativePath);
+        _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2110), nameof(DownloadJobInstallService),
+            $"Rehomed from '{currentDirectory}' to '{layout.FullPath}' (relative '{layout.RelativePath}').", null);
+
         return Task.FromResult(new ServerRehomeInstallResult(layout.FullPath, layout.RelativePath, metadata));
     }
 

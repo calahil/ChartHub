@@ -103,12 +103,9 @@ public class DownloadViewModelTests
 
             sut.IngestionQueue[0].Checked = true;
 
-            await sut.InstallSongsCommand();
+            await sut.InstallSongs.ExecuteAsync(null);
 
             Assert.Single(fakeClient.InstallRequestedJobIds);
-            Assert.True(sut.IsInstallPanelVisible);
-            Assert.True(sut.IsInstallActive);
-            Assert.DoesNotContain("No selected downloads are installable", sut.InstallStageText, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
@@ -117,7 +114,7 @@ public class DownloadViewModelTests
     }
 
     [Fact]
-    public async Task DeleteSelectedDownloadsCommand_WhenServerConnected_CancelsSelectedJobs()
+    public async Task DeleteJobCommand_WhenServerConnected_DeletesJobAndRemovesFromQueue()
     {
         using var temp = new TemporaryDirectoryFixture("download-vm-delete");
         using AppGlobalSettings settings = CreateSettings(
@@ -163,10 +160,11 @@ public class DownloadViewModelTests
             Assert.True(queueLoaded);
 
             sut.IngestionQueue[0].Checked = true;
-            await sut.DeleteSelectedDownloadsCommand.ExecuteAsync(null);
+            await sut.DeleteJobCommand.ExecuteAsync(sut.IngestionQueue[0]);
 
-            Assert.Single(fakeClient.CancelledJobIds);
-            Assert.Equal(new Guid("11111111-1111-1111-1111-111111111111"), fakeClient.CancelledJobIds[0]);
+            Assert.Single(fakeClient.DeletedJobIds);
+            Assert.Equal(new Guid("11111111-1111-1111-1111-111111111111"), fakeClient.DeletedJobIds[0]);
+            Assert.Empty(sut.IngestionQueue);
         }
         finally
         {
@@ -294,33 +292,22 @@ public class DownloadViewModelTests
             StreamBatches =
             [
                 [
-                    new ChartHubServerDownloadProgressEvent(
+                    new ChartHubServerDownloadJobResponse(
                         jobId,
+                        LibrarySourceNames.RhythmVerse,
+                        "id-2",
+                        "Song B",
+                        "https://example.test/song-b",
                         "Installed",
                         100,
+                        "/tmp/song-b.zip",
+                        null,
+                        "/tmp/installed/song-b",
+                        null,
+                        DateTimeOffset.UtcNow,
                         DateTimeOffset.UtcNow),
                 ],
             ],
-        };
-        fakeClient.OnStreamBatch = _ =>
-        {
-            fakeClient.Jobs =
-            [
-                new ChartHubServerDownloadJobResponse(
-                    jobId,
-                    LibrarySourceNames.RhythmVerse,
-                    "id-2",
-                    "Song B",
-                    "https://example.test/song-b",
-                    "Installed",
-                    100,
-                    "/tmp/song-b.zip",
-                    null,
-                    "/tmp/installed/song-b",
-                    null,
-                    DateTimeOffset.UtcNow,
-                    DateTimeOffset.UtcNow),
-            ];
         };
 
         var sut = new ViewModels.DownloadViewModel(
@@ -341,6 +328,175 @@ public class DownloadViewModelTests
 
             Assert.True(cardUpdated);
             Assert.Equal(100, sharedQueue.Downloads[0].DownloadProgress);
+        }
+        finally
+        {
+            await sut.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task SseStreamJobsMergesStateInPlaceWithoutExtraListCall()
+    {
+        using var temp = new TemporaryDirectoryFixture("download-vm-sse-inplace");
+        using AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            serverApiBaseUrl: "http://127.0.0.1:5001",
+            serverApiAuthToken: "token");
+
+        var jobId = new Guid("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        var sharedQueue = new SharedDownloadQueue();
+
+        var fakeClient = new FakeChartHubServerApiClient
+        {
+            Jobs =
+            [
+                new ChartHubServerDownloadJobResponse(
+                    jobId,
+                    LibrarySourceNames.RhythmVerse,
+                    "id-cc",
+                    "Song CC",
+                    "https://example.test/song-cc",
+                    "Downloading",
+                    20,
+                    null,
+                    null,
+                    null,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+            ],
+            StreamBatches =
+            [
+                [
+                    new ChartHubServerDownloadJobResponse(
+                        jobId,
+                        LibrarySourceNames.RhythmVerse,
+                        "id-cc",
+                        "Song CC",
+                        "https://example.test/song-cc",
+                        "Installing",
+                        80,
+                        null,
+                        null,
+                        null,
+                        null,
+                        DateTimeOffset.UtcNow,
+                        DateTimeOffset.UtcNow,
+                        Charter: "Test Charter",
+                        FileType: "Zip"),
+                ],
+            ],
+        };
+
+        var sut = new ViewModels.DownloadViewModel(
+            settings,
+            fakeClient,
+            sharedQueue,
+            uiInvoke: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
+
+        try
+        {
+            bool stateApplied = await WaitForConditionAsync(
+                () => sut.IngestionQueue.Count > 0 && sut.IngestionQueue[0].ProgressPercent >= 80.0,
+                TimeSpan.FromSeconds(2));
+
+            Assert.True(stateApplied);
+            Assert.Equal(IngestionState.Installing, sut.IngestionQueue[0].CurrentState);
+            Assert.Equal("Test Charter", sut.IngestionQueue[0].Charter);
+            Assert.Equal("Zip", sut.IngestionQueue[0].FileType);
+            Assert.Equal(1, fakeClient.ListJobsCallCount);
+        }
+        finally
+        {
+            await sut.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task ToggleJobLogCommandLoadsLogsOnFirstExpandNotOnSecond()
+    {
+        using var temp = new TemporaryDirectoryFixture("download-vm-toggle-log");
+        using AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            serverApiBaseUrl: "http://127.0.0.1:5001",
+            serverApiAuthToken: "token");
+
+        var jobId = new Guid("dddddddd-dddd-dddd-dddd-dddddddddddd");
+        var sharedQueue = new SharedDownloadQueue();
+
+        var logEntry = new ChartHubServerJobLogEntry(
+            DateTimeOffset.UtcNow,
+            "Information",
+            0,
+            null,
+            "test log message",
+            null);
+
+        var fakeClient = new FakeChartHubServerApiClient
+        {
+            Jobs =
+            [
+                new ChartHubServerDownloadJobResponse(
+                    jobId,
+                    LibrarySourceNames.RhythmVerse,
+                    "id-dd",
+                    "Song DD",
+                    "https://example.test/song-dd",
+                    "Staged",
+                    100,
+                    "/tmp/song-dd.zip",
+                    null,
+                    null,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+            ],
+            JobLogsByJobId = new Dictionary<Guid, IReadOnlyList<ChartHubServerJobLogEntry>>
+            {
+                [jobId] = [logEntry],
+            },
+        };
+
+        var sut = new ViewModels.DownloadViewModel(
+            settings,
+            fakeClient,
+            sharedQueue,
+            uiInvoke: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
+
+        try
+        {
+            bool queued = await WaitForConditionAsync(
+                () => sut.IngestionQueue.Count > 0,
+                TimeSpan.FromSeconds(2));
+            Assert.True(queued);
+
+            IngestionQueueItem item = sut.IngestionQueue[0];
+
+            await sut.ToggleJobLogCommand.ExecuteAsync(item);
+
+            bool expanded = await WaitForConditionAsync(
+                () => item.IsJobLogExpanded && item.JobLogs.Count > 0,
+                TimeSpan.FromSeconds(2));
+            Assert.True(expanded);
+            Assert.Equal("test log message", item.JobLogs[0].Message);
+            Assert.Equal(1, fakeClient.GetJobLogsCallCount);
+
+            await sut.ToggleJobLogCommand.ExecuteAsync(item);
+
+            bool collapsed = await WaitForConditionAsync(
+                () => !item.IsJobLogExpanded,
+                TimeSpan.FromSeconds(2));
+            Assert.True(collapsed);
+            Assert.Equal(1, fakeClient.GetJobLogsCallCount);
         }
         finally
         {
@@ -420,9 +576,13 @@ public class DownloadViewModelTests
     {
         public IReadOnlyList<ChartHubServerDownloadJobResponse> Jobs { get; set; } = [];
         public List<Guid> CancelledJobIds { get; } = [];
+        public List<Guid> DeletedJobIds { get; } = [];
         public List<Guid> InstallRequestedJobIds { get; } = [];
-        public IReadOnlyList<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamBatches { get; set; } = [];
-        public Action<IReadOnlyList<ChartHubServerDownloadProgressEvent>>? OnStreamBatch { get; set; }
+        public IReadOnlyList<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamBatches { get; set; } = [];
+        public Action<IReadOnlyList<ChartHubServerDownloadJobResponse>>? OnStreamBatch { get; set; }
+        public int ListJobsCallCount { get; private set; }
+        public int GetJobLogsCallCount { get; private set; }
+        public Dictionary<Guid, IReadOnlyList<ChartHubServerJobLogEntry>> JobLogsByJobId { get; set; } = [];
 
         public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(string baseUrl, string googleIdToken, CancellationToken cancellationToken = default)
             => Task.FromResult(new ChartHubServerAuthExchangeResponse("token", DateTimeOffset.UtcNow.AddHours(1)));
@@ -444,14 +604,17 @@ public class DownloadViewModelTests
                 DateTimeOffset.UtcNow));
 
         public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
-            => Task.FromResult(Jobs);
+        {
+            ListJobsCallCount++;
+            return Task.FromResult(Jobs);
+        }
 
-        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadProgressEvent>> StreamDownloadJobsAsync(
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamDownloadJobsAsync(
             string baseUrl,
             string bearerToken,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            foreach (IReadOnlyList<ChartHubServerDownloadProgressEvent> batch in StreamBatches)
+            foreach (IReadOnlyList<ChartHubServerDownloadJobResponse> batch in StreamBatches)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 OnStreamBatch?.Invoke(batch);
@@ -462,9 +625,26 @@ public class DownloadViewModelTests
             await Task.Delay(Timeout.Infinite, cancellationToken);
         }
 
+        public Task<IReadOnlyList<ChartHubServerJobLogEntry>> GetJobLogsAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+        {
+            GetJobLogsCallCount++;
+            if (JobLogsByJobId.TryGetValue(jobId, out IReadOnlyList<ChartHubServerJobLogEntry>? logs))
+            {
+                return Task.FromResult(logs);
+            }
+
+            return Task.FromResult<IReadOnlyList<ChartHubServerJobLogEntry>>([]);
+        }
+
         public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
         {
             CancelledJobIds.Add(jobId);
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+        {
+            DeletedJobIds.Add(jobId);
             return Task.CompletedTask;
         }
 

@@ -47,6 +47,8 @@ public sealed class DownloadJobResponse
 
     public string? Error { get; init; }
 
+    public string? FileType { get; init; }
+
     public required DateTimeOffset CreatedAtUtc { get; init; }
 
     public required DateTimeOffset UpdatedAtUtc { get; init; }
@@ -61,4 +63,19 @@ public sealed class DownloadProgressEvent
     public required double ProgressPercent { get; init; }
 
     public required DateTimeOffset UpdatedAtUtc { get; init; }
+}
+
+public sealed class JobLogEntryResponse
+{
+    public required DateTimeOffset TimestampUtc { get; init; }
+
+    public required string Level { get; init; }
+
+    public required int EventId { get; init; }
+
+    public string? Category { get; init; }
+
+    public required string Message { get; init; }
+
+    public string? Exception { get; init; }
 }

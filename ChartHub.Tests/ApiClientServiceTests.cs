@@ -185,8 +185,8 @@ public class ApiClientServiceTests
         Assert.Equal(12, song.Downloads);
         Assert.Equal(2, song.Comments);
         Assert.Equal(180, song.SongLength);
-        Assert.Equal("avares://ChartHub/Resources/Images/noalbumart.png", song.AlbumArt);
-        Assert.Equal("avares://ChartHub/Resources/Images/blankprofile.png", song.Author?.AvatarPath);
+        Assert.Equal("avares://ChartHub/Resources/Images/noalbumart.svg", song.AlbumArt);
+        Assert.Equal("avares://ChartHub/Resources/Images/blankprofile.svg", song.Author?.AvatarPath);
         Assert.Equal("https://cdn.example/live-song.zip", song.DownloadLink);
         Assert.Equal("yarg.png", song.Gameformat);
         Assert.Equal(2, song.DrumString);
@@ -585,6 +585,70 @@ public class ApiClientServiceTests
         .Replace("__DOWNLOAD_URL__", downloadUrl, StringComparison.Ordinal)
         .Replace("__DOWNLOAD_PAGE_URL__", downloadPageUrl, StringComparison.Ordinal)
         .Replace("__DOWNLOAD_PAGE_URL_FULL__", downloadPageUrlFull, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetSongFilesAsync_WithDifficultiesAsObjects_ParsesWithoutException()
+    {
+        // Regression: guitarghl and guitar_coop inside difficulties can be DrumsClass objects,
+        // not just empty arrays. The model previously declared them as List<object> without
+        // DrumsClassOrListConverter, causing a JsonException on real RhythmVerse payloads.
+        using var httpClient = new HttpClient(new StubHttpMessageHandler((_, _) => throw new InvalidOperationException("HTTP fallback should not be used when mock payload is available.")))
+        {
+            BaseAddress = new Uri("https://rhythmverse.co"),
+        };
+
+        ApiClientService sut = CreateService(
+            configurationValues: new Dictionary<string, string?>
+            {
+                ["UseMockData"] = "True",
+                ["rhythmverseToken"] = "token-test",
+            },
+            httpClient,
+            loadEmbeddedMockData: () => BuildDifficultiesAsObjectsResponseJson(),
+            resolveMockDataPath: () => null);
+
+        IReadOnlyList<ViewSong> results = await sut.GetSongFilesAsync(
+            search: false,
+            searchString: string.Empty,
+            sort: "downloads",
+            order: "desc",
+            instrument: [],
+            authorText: string.Empty);
+
+        Assert.Single(results);
+        Assert.Equal("GHL Artist", results[0].Artist);
+    }
+
+    private static string BuildDifficultiesAsObjectsResponseJson()
+    {
+        return """
+        {
+          "status": "ok",
+          "data": {
+            "records": { "total_available": 1, "total_filtered": 1, "returned": 1 },
+            "pagination": { "start": 0, "records": "25", "page": "1" },
+            "songs": [
+              {
+                "data": false,
+                "file": {
+                  "file_id": "ghl-file-1",
+                  "file_name": "ghl-song.zip",
+                  "file_artist": "GHL Artist",
+                  "file_title": "GHL Title",
+                  "download_url": "https://example.com/ghl-song.zip",
+                  "gameformat": "ch",
+                  "author": { "name": "Charter" },
+                  "difficulties": {
+                    "guitarghl": { "e": 1, "m": 2, "h": 3, "x": 4, "all": 4 },
+                    "guitar_coop": { "e": 0, "m": 0, "h": 1, "x": 2, "all": 2 }
+                  }
+                }
+              }
+            ]
+          }
+        }
+        """;
     }
 
     private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> sendAsync) : HttpMessageHandler

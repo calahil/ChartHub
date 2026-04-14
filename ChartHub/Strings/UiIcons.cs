@@ -19,4 +19,28 @@ public static class UiIcons
     public const string SortBy = "avares://ChartHub/Resources/Svg/sort_by_alpha_24dp.svg";
     public const string Order = "avares://ChartHub/Resources/Svg/sort_24dp.svg";
     public const string Instrument = "avares://ChartHub/Resources/Svg/joystick_24dp.svg";
+
+    public const string DrumsSmall = "avares://ChartHub/Resources/Images/drums_small.svg";
+    public const string GuitarSmall = "avares://ChartHub/Resources/Images/guitar_small.svg";
+    public const string KeysSmall = "avares://ChartHub/Resources/Images/keys_small.svg";
+    public const string BassSmall = "avares://ChartHub/Resources/Images/bass_small.svg";
+    public const string VocalsSmall = "avares://ChartHub/Resources/Images/vocals_small.svg";
+
+    public const string MenuIcon = "avares://ChartHub/Resources/Images/menu.svg";
+    public const string XCancelButton = "avares://ChartHub/Resources/Images/x_cancel_button.svg";
+    public const string DeleteButton = "avares://ChartHub/Resources/Images/delete24dp.svg";
+
+    public const string JoystickIcon = "avares://ChartHub/Resources/Images/joystick24dp.svg";
+    public const string ArrowUp = "avares://ChartHub/Resources/Images/arrow_up.svg";
+    public const string ArrowDown = "avares://ChartHub/Resources/Images/arrow_down.svg";
+    public const string ArrowLeft = "avares://ChartHub/Resources/Images/arrow_left.svg";
+    public const string ArrowRight = "avares://ChartHub/Resources/Images/arrow_right.svg";
+    public const string AButton = "avares://ChartHub/Resources/Images/a_button.svg";
+    public const string BButton = "avares://ChartHub/Resources/Images/b_button.svg";
+    public const string XButton = "avares://ChartHub/Resources/Images/x_cancel_button.svg";
+    public const string YButton = "avares://ChartHub/Resources/Images/y_button.svg";
+    public const string StartButton = "avares://ChartHub/Resources/Images/start_button.svg";
+    public const string SelectButton = "avares://ChartHub/Resources/Images/select_button.svg";
+    public const string MouseLeftButton = "avares://ChartHub/Resources/Images/mouse_left_button.svg";
+    public const string MouseRightButton = "avares://ChartHub/Resources/Images/mouse_right_button.svg";
 }

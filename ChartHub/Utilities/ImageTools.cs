@@ -26,9 +26,9 @@ namespace ChartHub.Utilities;
 /// </summary>
 public class SafeImageUrlConverter : IValueConverter
 {
-    private const string FallbackAlbumArt = "avares://ChartHub/Resources/Images/noalbumart.png";
-    private const string FallbackGeneric = "avares://ChartHub/Resources/Images/blank.png";
-    private const string FallbackAvatar = "avares://ChartHub/Resources/Images/blankprofile.png";
+    private const string FallbackAlbumArt = "avares://ChartHub/Resources/Images/noalbumart.svg";
+    private const string FallbackGeneric = "avares://ChartHub/Resources/Images/blank.svg";
+    private const string FallbackAvatar = "avares://ChartHub/Resources/Images/blankprofile.svg";
 
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
@@ -94,8 +94,8 @@ public class SafeImageUrlConverter : IValueConverter
 /// </summary>
 public class AssetPathToImageConverter : IValueConverter
 {
-    // Default icon color — matches MacchiatoYellow (BrushYellow) from the Catppuccin Macchiato palette.
-    internal const string DefaultSvgColor = "#EED49F";
+    // Default icon color — matches MacchiatoMauve from the Catppuccin Macchiato palette.
+    internal const string DefaultSvgColor = "#C6A0F6";
 
     // Cache keyed by "uri|color" so each tinted variant is stored independently.
     internal static readonly ConcurrentDictionary<string, IImage> Cache = new();
@@ -128,7 +128,7 @@ public class AssetPathToImageConverter : IValueConverter
         {
             if (uri.Scheme.Equals("avares", StringComparison.OrdinalIgnoreCase) && !AssetLoader.Exists(uri))
             {
-                return LoadBitmap(new Uri("avares://ChartHub/Resources/Images/blank.png"));
+                return LoadSvgBitmap(new Uri("avares://ChartHub/Resources/Images/blank.svg"), color);
             }
 
             if (uri.AbsolutePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
@@ -140,7 +140,7 @@ public class AssetPathToImageConverter : IValueConverter
         }
         catch (FileNotFoundException)
         {
-            return LoadBitmap(new Uri("avares://ChartHub/Resources/Images/blank.png"));
+            return LoadSvgBitmap(new Uri("avares://ChartHub/Resources/Images/blank.svg"), color);
         }
     }
 
@@ -227,9 +227,9 @@ public class FallbackAsyncImageLoader : IAsyncImageLoader, IDisposable
     private static readonly HttpClient ProbeClient = new();
     private static readonly HttpClient NetworkImageClient = CreateNetworkImageClient();
     private readonly IAsyncImageLoader _innerLoader;
-    private readonly string _avatarFallback = "avares://ChartHub/Resources/Images/blankprofile.png";
-    private readonly string _albumFallback = "avares://ChartHub/Resources/Images/noalbumart.png";
-    private readonly string _genericFallback = "avares://ChartHub/Resources/Images/blank.png";
+    private readonly string _avatarFallback = "avares://ChartHub/Resources/Images/blankprofile.svg";
+    private readonly string _albumFallback = "avares://ChartHub/Resources/Images/noalbumart.svg";
+    private readonly string _genericFallback = "avares://ChartHub/Resources/Images/blank.svg";
 
     public FallbackAsyncImageLoader(IAsyncImageLoader? innerLoader = null)
     {
@@ -410,6 +410,11 @@ public class FallbackAsyncImageLoader : IAsyncImageLoader, IDisposable
         {
             if (Uri.TryCreate(url, UriKind.Absolute, out Uri? uri) && AssetLoader.Exists(uri))
             {
+                if (url.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                {
+                    return AssetPathToImageConverter.Load(url, AssetPathToImageConverter.DefaultSvgColor) as Bitmap;
+                }
+
                 using Stream stream = AssetLoader.Open(uri);
                 return new Bitmap(stream);
             }

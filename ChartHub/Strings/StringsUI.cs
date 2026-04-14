@@ -36,6 +36,10 @@ public class MainViewPageStrings : StringsUI
     public string BackToNavigation => UiLocalization.Get("Main.BackToNavigation");
     public string FiltersButton => UiLocalization.Get("Main.FiltersButton");
     public string MenuButton => UiLocalization.Get("Main.MenuButton");
+    public string Input => UiLocalization.Get("Main.Input");
+    public string Controller => UiLocalization.Get("Main.Controller");
+    public string Mouse => UiLocalization.Get("Main.Mouse");
+    public string Keyboard => UiLocalization.Get("Main.Keyboard");
 }
 
 public class InstallPageStrings : StringsUI
@@ -75,6 +79,11 @@ public class DownloadPageStrings : StringsUI
     public string SortLabel => UiLocalization.Get("Download.SortLabel");
     public string Descending => UiLocalization.Get("Download.Descending");
     public string EmptyState => UiLocalization.Get("Download.EmptyState");
+    public string ExpandLog => UiLocalization.Get("Download.ExpandLog");
+    public string CollapseLog => UiLocalization.Get("Download.CollapseLog");
+    public string DeleteJob => UiLocalization.Get("Download.DeleteJob");
+    public string ArtistLabel => UiLocalization.Get("Download.ArtistLabel");
+    public string CharterLabel => UiLocalization.Get("Download.CharterLabel");
 
 }
 
@@ -238,4 +247,22 @@ public class VolumePageStrings : StringsUI
     public string NoActiveSessions => UiLocalization.Get("Volume.NoActiveSessions");
     public string ApplySession => UiLocalization.Get("Volume.ApplySession");
     public string FormatPendingPercent(double value) => UiLocalization.Format("Volume.PendingPercent", Math.Round(value));
+}
+
+public class InputPageStrings : StringsUI
+{
+    public string ControllerStatusConnected => UiLocalization.Get("Input.Controller.Status.Connected");
+    public string ControllerStatusDisconnected => UiLocalization.Get("Input.Controller.Status.Disconnected");
+    public string TouchpadStatusConnected => UiLocalization.Get("Input.Touchpad.Status.Connected");
+    public string TouchpadStatusDisconnected => UiLocalization.Get("Input.Touchpad.Status.Disconnected");
+    public string KeyboardStatusConnected => UiLocalization.Get("Input.Keyboard.Status.Connected");
+    public string KeyboardStatusDisconnected => UiLocalization.Get("Input.Keyboard.Status.Disconnected");
+    public string KeyEnter => UiLocalization.Get("Input.Keyboard.Key.Enter");
+    public string KeyBackspace => UiLocalization.Get("Input.Keyboard.Key.Backspace");
+    public string KeyEscape => UiLocalization.Get("Input.Keyboard.Key.Escape");
+    public string KeyTab => UiLocalization.Get("Input.Keyboard.Key.Tab");
+    public string KeyboardHint => UiLocalization.Get("Input.Keyboard.Hint");
+    public string Controller => UiLocalization.Get("Main.Controller");
+    public string Mouse => UiLocalization.Get("Main.Mouse");
+    public string Keyboard => UiLocalization.Get("Main.Keyboard");
 }

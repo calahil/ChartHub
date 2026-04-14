@@ -4,6 +4,7 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 
+using ChartHub.Localization;
 using ChartHub.Services;
 
 namespace ChartHub.Views;
@@ -26,7 +27,7 @@ public partial class SharedDownloadCardsView : UserControl
         AvaloniaProperty.Register<SharedDownloadCardsView, bool>(nameof(IsCompact));
 
     public static readonly StyledProperty<string> TitleProperty =
-        AvaloniaProperty.Register<SharedDownloadCardsView, string>(nameof(Title), "Active Downloads");
+        AvaloniaProperty.Register<SharedDownloadCardsView, string>(nameof(Title), UiLocalization.Get("Downloads.ActiveDownloads"));
 
     static SharedDownloadCardsView()
     {

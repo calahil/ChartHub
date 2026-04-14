@@ -1,8 +1,6 @@
-﻿using System.Collections.ObjectModel;
-using System.Collections.Specialized;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Net;
-using System.Windows.Input;
 
 using Avalonia.Threading;
 
@@ -25,159 +23,10 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     public bool IsCompanionMode => OperatingSystem.IsAndroid();
     public bool IsDesktopMode => !OperatingSystem.IsAndroid();
 
-    public ICommand CheckAllCommand { get; }
+    public System.Windows.Input.ICommand CheckAllCommand { get; }
     public IAsyncRelayCommand InstallSongs { get; }
-    public IAsyncRelayCommand DeleteSelectedDownloadsCommand { get; }
-    public ICommand CancelInstallCommand { get; }
-    public ICommand ClearInstallLogCommand { get; }
-    public ICommand ToggleInstallLogCommand { get; }
-    public ICommand DismissInstallPanelCommand { get; }
-
-    private bool _isInstallPanelVisible;
-    public bool IsInstallPanelVisible
-    {
-        get => _isInstallPanelVisible;
-        private set
-        {
-            if (_isInstallPanelVisible == value)
-            {
-                return;
-            }
-
-            _isInstallPanelVisible = value;
-            OnPropertyChanged(nameof(IsInstallPanelVisible));
-        }
-    }
-
-    public bool IsInstallIdle => !IsInstallActive;
-
-    private bool _isInstallActive;
-    public bool IsInstallActive
-    {
-        get => _isInstallActive;
-        private set
-        {
-            if (_isInstallActive == value)
-            {
-                return;
-            }
-
-            _isInstallActive = value;
-            OnPropertyChanged(nameof(IsInstallActive));
-            OnPropertyChanged(nameof(IsInstallIdle));
-            _dismissInstallPanelCommand?.NotifyCanExecuteChanged();
-            UpdateInstallPanelVisibility();
-        }
-    }
-
-    private bool _isInstallProgressIndeterminate;
-    public bool IsInstallProgressIndeterminate
-    {
-        get => _isInstallProgressIndeterminate;
-        private set
-        {
-            if (_isInstallProgressIndeterminate == value)
-            {
-                return;
-            }
-
-            _isInstallProgressIndeterminate = value;
-            OnPropertyChanged(nameof(IsInstallProgressIndeterminate));
-        }
-    }
-
-    private double _installProgressValue;
-    public double InstallProgressValue
-    {
-        get => _installProgressValue;
-        private set
-        {
-            if (Math.Abs(_installProgressValue - value) < 0.001)
-            {
-                return;
-            }
-
-            _installProgressValue = value;
-            OnPropertyChanged(nameof(InstallProgressValue));
-        }
-    }
-
-    private string _installStageText = string.Empty;
-    public string InstallStageText
-    {
-        get => _installStageText;
-        private set
-        {
-            if (_installStageText == value)
-            {
-                return;
-            }
-
-            _installStageText = value;
-            OnPropertyChanged(nameof(InstallStageText));
-        }
-    }
-
-    private string _installCurrentItemName = string.Empty;
-    public string InstallCurrentItemName
-    {
-        get => _installCurrentItemName;
-        private set
-        {
-            if (_installCurrentItemName == value)
-            {
-                return;
-            }
-
-            _installCurrentItemName = value;
-            OnPropertyChanged(nameof(InstallCurrentItemName));
-        }
-    }
-
-    public ObservableCollection<string> InstallLogItems { get; } = [];
-
-    public bool CanCopyAllInstallLogs => InstallLogItems.Count > 0;
-
-    private string _installSummaryText = string.Empty;
-    public string InstallSummaryText
-    {
-        get => _installSummaryText;
-        private set
-        {
-            if (_installSummaryText == value)
-            {
-                return;
-            }
-
-            _installSummaryText = value;
-            OnPropertyChanged(nameof(InstallSummaryText));
-            OnPropertyChanged(nameof(HasInstallSummary));
-            _dismissInstallPanelCommand?.NotifyCanExecuteChanged();
-            UpdateInstallPanelVisibility();
-        }
-    }
-
-    public bool HasInstallSummary => !string.IsNullOrWhiteSpace(InstallSummaryText);
-
-    private bool _isInstallLogExpanded = true;
-    public bool IsInstallLogExpanded
-    {
-        get => _isInstallLogExpanded;
-        private set
-        {
-            if (_isInstallLogExpanded == value)
-            {
-                return;
-            }
-
-            _isInstallLogExpanded = value;
-            _globalSettings.InstallLogExpanded = value;
-            OnPropertyChanged(nameof(IsInstallLogExpanded));
-            OnPropertyChanged(nameof(InstallLogToggleText));
-        }
-    }
-
-    public string InstallLogToggleText => IsInstallLogExpanded ? "Collapse Log" : "Expand Log";
+    public IAsyncRelayCommand<IngestionQueueItem> DeleteJobCommand { get; }
+    public IAsyncRelayCommand<IngestionQueueItem> ToggleJobLogCommand { get; }
 
     private bool _isAnyChecked;
     public bool IsAnyChecked
@@ -192,6 +41,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             }
         }
     }
+
     private bool _isAllChecked;
     public bool IsAllChecked
     {
@@ -297,16 +147,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     private readonly CancellationTokenSource _queueRefreshCts = new();
     private readonly Task? _queueRefreshTask;
     private readonly Dictionary<long, Guid> _serverQueueJobIds = [];
-    private readonly HashSet<Guid> _trackedInstallJobIds = [];
-    private readonly Dictionary<Guid, string> _trackedInstallStages = [];
-    private bool _isServerQueueActive;
-    private CancellationTokenSource? _installCts;
-    private const int MaxInstallLogItems = 500;
-    private readonly RelayCommand _cancelInstallCommand;
-    private readonly RelayCommand _clearInstallLogCommand;
-    private readonly RelayCommand _toggleInstallLogCommand;
-    private readonly RelayCommand _dismissInstallPanelCommand;
-    private readonly AsyncRelayCommand _deleteSelectedDownloadsCommand;
 
     public DownloadViewModel(
         AppGlobalSettings settings,
@@ -321,20 +161,11 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         _cloneHeroViewModel = cloneHeroViewModel;
         _uiInvoke = uiInvoke ?? (async action => await Dispatcher.UIThread.InvokeAsync(action));
         CheckAllCommand = new RelayCommand(CheckAllItemsCommand);
-        InstallSongs = new AsyncRelayCommand(InstallSongsCommand);
-        _deleteSelectedDownloadsCommand = new AsyncRelayCommand(DeleteSelectedDownloadsAsync, CanDeleteSelectedDownloads);
-        DeleteSelectedDownloadsCommand = _deleteSelectedDownloadsCommand;
-        _cancelInstallCommand = new RelayCommand(CancelInstall, CanCancelInstall);
-        CancelInstallCommand = _cancelInstallCommand;
-        _clearInstallLogCommand = new RelayCommand(ClearInstallLog, CanClearInstallLog);
-        ClearInstallLogCommand = _clearInstallLogCommand;
-        _toggleInstallLogCommand = new RelayCommand(ToggleInstallLog);
-        ToggleInstallLogCommand = _toggleInstallLogCommand;
-        _dismissInstallPanelCommand = new RelayCommand(DismissInstallPanel, CanDismissInstallPanel);
-        DismissInstallPanelCommand = _dismissInstallPanelCommand;
+        InstallSongs = new AsyncRelayCommand(InstallSongsCommandAsync);
+        DeleteJobCommand = new AsyncRelayCommand<IngestionQueueItem>(DeleteJobAsync);
+        ToggleJobLogCommand = new AsyncRelayCommand<IngestionQueueItem>(ToggleJobLogAsync);
         IngestionQueue = [];
         _pageStrings = new DownloadPageStrings();
-        _isInstallLogExpanded = _globalSettings.InstallLogExpanded;
 
         IngestionQueue.CollectionChanged += IngestionQueue_CollectionChanged;
         ObserveBackgroundTask(RefreshIngestionQueueAsync(), "Initial ingestion queue load");
@@ -346,7 +177,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         if (sender is IngestionQueueItem && e.PropertyName == nameof(IngestionQueueItem.Checked))
         {
             IsAnyChecked = AnyItemChecked();
-            _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -368,7 +198,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             }
         }
 
-        _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(HasIngestionQueueItems));
         OnPropertyChanged(nameof(ShowQueueEmptyState));
     }
@@ -378,44 +207,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         IsAllChecked = !IsAllChecked;
     }
 
-    private bool CanCancelInstall() => IsInstallActive;
-
-    private void CancelInstall()
-    {
-        _installCts?.Cancel();
-    }
-
-    private bool CanClearInstallLog() => InstallLogItems.Count > 0;
-
-    private void ClearInstallLog()
-    {
-        InstallLogItems.Clear();
-        _clearInstallLogCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(CanCopyAllInstallLogs));
-        UpdateInstallPanelVisibility();
-    }
-
-    private void ToggleInstallLog()
-    {
-        IsInstallLogExpanded = !IsInstallLogExpanded;
-    }
-
-    private bool CanDismissInstallPanel() => !IsInstallActive && (HasInstallSummary || InstallLogItems.Count > 0);
-
-    private void DismissInstallPanel()
-    {
-        InstallLogItems.Clear();
-        InstallSummaryText = string.Empty;
-        InstallCurrentItemName = string.Empty;
-        InstallStageText = string.Empty;
-        InstallProgressValue = 0;
-        IsInstallProgressIndeterminate = false;
-        _clearInstallLogCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(CanCopyAllInstallLogs));
-        UpdateInstallPanelVisibility();
-    }
-
-    public async Task InstallSongsCommand()
+    public async Task InstallSongsCommandAsync()
     {
         var selectedInstallItems = IngestionQueue
             .Where(item => item.Checked && item.CanInstall && _serverQueueJobIds.ContainsKey(item.IngestionId))
@@ -423,217 +215,140 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
 
         if (selectedInstallItems.Count == 0)
         {
-            ResetInstallPanel();
-            InstallStageText = "No selected downloads are installable. Select Downloaded items.";
-            AppendInstallLog(InstallStage.Preparing, "Warning", InstallStageText);
-            Logger.LogWarning("Install", "Install request ignored because no selected queue items are installable.");
             return;
         }
 
         if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
         {
-            ResetInstallPanel();
-            InstallStageText = "Install requires a configured ChartHub.Server endpoint and token.";
-            AppendInstallLog(InstallStage.Failed, "Error", InstallStageText);
             Logger.LogWarning("Install", "Install request ignored because ChartHub.Server connection is not configured.");
             return;
         }
 
-        _installCts?.Dispose();
-        _installCts = new CancellationTokenSource();
-        ResetInstallPanel();
-        IsInstallActive = true;
-        IsInstallProgressIndeterminate = true;
-        InstallStageText = selectedInstallItems.Count == 1 ? "Starting install" : $"Starting install for {selectedInstallItems.Count} items";
-        InstallCurrentItemName = selectedInstallItems.Count == 1 ? selectedInstallItems[0].DisplayName : $"{selectedInstallItems.Count} selected items";
-        _cancelInstallCommand.NotifyCanExecuteChanged();
+        foreach (IngestionQueueItem item in selectedInstallItems)
+        {
+            if (!_serverQueueJobIds.TryGetValue(item.IngestionId, out Guid jobId))
+            {
+                continue;
+            }
 
-        _trackedInstallJobIds.Clear();
-        _trackedInstallStages.Clear();
+            try
+            {
+                await _serverApiClient.RequestInstallDownloadJobAsync(baseUrl, bearerToken, jobId);
+                item.Checked = false;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Install", "Failed to submit install request", ex, new Dictionary<string, object?>
+                {
+                    ["jobId"] = jobId,
+                    ["displayName"] = item.DisplayName,
+                });
+            }
+        }
+
+        if (_cloneHeroViewModel is not null)
+        {
+            await _cloneHeroViewModel.RefreshAsync();
+        }
+    }
+
+    private async Task DeleteJobAsync(IngestionQueueItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        if (!_serverQueueJobIds.TryGetValue(item.IngestionId, out Guid jobId))
+        {
+            Logger.LogWarning("Download", "Cannot delete queue item: no server job ID found.", new Dictionary<string, object?>
+            {
+                ["ingestionId"] = item.IngestionId,
+            });
+            return;
+        }
+
+        if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
+        {
+            return;
+        }
 
         try
         {
-            int submittedCount = 0;
-            for (int index = 0; index < selectedInstallItems.Count; index++)
-            {
-                _installCts.Token.ThrowIfCancellationRequested();
-                IngestionQueueItem item = selectedInstallItems[index];
-
-                if (!_serverQueueJobIds.TryGetValue(item.IngestionId, out Guid jobId))
-                {
-                    continue;
-                }
-
-                InstallCurrentItemName = item.DisplayName;
-                InstallStageText = $"Requesting install for {item.DisplayName}";
-                InstallProgressValue = Math.Clamp((double)index / selectedInstallItems.Count * 100, 0, 100);
-                AppendInstallLog(InstallStage.MovingToCloneHero, "Request", $"Install requested for job {jobId:D} ({item.DisplayName}).");
-                Logger.LogInfo("Install", "Submitting install request to ChartHub.Server", new Dictionary<string, object?>
-                {
-                    ["jobId"] = jobId,
-                    ["ingestionId"] = item.IngestionId,
-                    ["displayName"] = item.DisplayName,
-                    ["source"] = item.Source,
-                    ["sourceId"] = item.SourceId,
-                    ["baseUrl"] = baseUrl,
-                });
-
-                ChartHubServerDownloadJobResponse response = await _serverApiClient
-                    .RequestInstallDownloadJobAsync(baseUrl, bearerToken, jobId, _installCts.Token)
-                    ;
-
-                item.Checked = false;
-                submittedCount++;
-                _trackedInstallJobIds.Add(response.JobId);
-                _trackedInstallStages[response.JobId] = response.Stage;
-                AppendInstallLog(InstallStage.MovingToCloneHero, "Accepted", $"Server accepted install for job {response.JobId:D} ({response.Stage}).");
-                Logger.LogInfo("Install", "ChartHub.Server accepted install request", new Dictionary<string, object?>
-                {
-                    ["jobId"] = response.JobId,
-                    ["displayName"] = item.DisplayName,
-                    ["serverStage"] = response.Stage,
-                    ["serverProgress"] = response.ProgressPercent,
-                    ["serverDownloadedPath"] = response.DownloadedPath,
-                    ["serverStagedPath"] = response.StagedPath,
-                    ["serverInstalledPath"] = response.InstalledPath,
-                });
-            }
-
-            InstallSummaryText = submittedCount == 1
-                ? "Submitted 1 install request successfully."
-                : $"Submitted {submittedCount} install requests successfully.";
-            if (_trackedInstallJobIds.Count > 0)
-            {
-                IsInstallProgressIndeterminate = false;
-                InstallProgressValue = 0;
-                InstallStageText = "Install requests submitted. Waiting for server stage updates...";
-            }
-            else
-            {
-                IsInstallActive = false;
-                InstallStageText = "No install jobs were submitted.";
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            _trackedInstallJobIds.Clear();
-            _trackedInstallStages.Clear();
-            ApplyInstallProgress(new InstallProgressUpdate(
-                InstallStage.Cancelled,
-                "Install cancelled",
-                InstallProgressValue,
-                InstallCurrentItemName,
-                "Install cancelled by user."));
-            InstallSummaryText = "Install cancelled.";
+            await _serverApiClient.DeleteDownloadJobAsync(baseUrl, bearerToken, jobId).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _trackedInstallJobIds.Clear();
-            _trackedInstallStages.Clear();
-            string errorDetail = BuildInstallFailureDetail(ex);
-            Logger.LogError("Install", "Install songs command failed", ex, new Dictionary<string, object?>
+            Logger.LogError("Download", "Failed to delete server download job", ex, new Dictionary<string, object?>
             {
-                ["currentItem"] = InstallCurrentItemName,
-                ["detail"] = errorDetail,
+                ["jobId"] = jobId,
             });
-            ApplyInstallProgress(new InstallProgressUpdate(
-                InstallStage.Failed,
-                "Install failed",
-                InstallProgressValue,
-                InstallCurrentItemName,
-                errorDetail));
-            InstallSummaryText = "Install failed. Check the log for details.";
+            return;
+        }
+
+        await _uiInvoke(() =>
+        {
+            _serverQueueJobIds.Remove(item.IngestionId);
+            IngestionQueue.Remove(item);
+        }).ConfigureAwait(false);
+    }
+
+    private async Task ToggleJobLogAsync(IngestionQueueItem? item)
+    {
+        if (item is null)
+        {
+            return;
+        }
+
+        item.IsJobLogExpanded = !item.IsJobLogExpanded;
+
+        if (!item.IsJobLogExpanded)
+        {
+            return;
+        }
+
+        if (item.JobLogs.Count > 0)
+        {
+            return;
+        }
+
+        if (!_serverQueueJobIds.TryGetValue(item.IngestionId, out Guid jobId))
+        {
+            return;
+        }
+
+        if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
+        {
+            return;
+        }
+
+        item.IsLoadingLogs = true;
+        try
+        {
+            IReadOnlyList<ChartHubServerJobLogEntry> logs = await _serverApiClient
+                .GetJobLogsAsync(baseUrl, bearerToken, jobId)
+                .ConfigureAwait(false);
+
+            await _uiInvoke(() =>
+            {
+                item.JobLogs.Clear();
+                foreach (ChartHubServerJobLogEntry entry in logs)
+                {
+                    item.JobLogs.Add(entry);
+                }
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Download", "Failed to fetch job logs", ex, new Dictionary<string, object?>
+            {
+                ["jobId"] = jobId,
+            });
         }
         finally
         {
-            if (_trackedInstallJobIds.Count == 0)
-            {
-                IsInstallActive = false;
-            }
-
-            _cancelInstallCommand.NotifyCanExecuteChanged();
-            _dismissInstallPanelCommand.NotifyCanExecuteChanged();
-            _installCts.Dispose();
-            _installCts = null;
-
-            await RefreshIngestionQueueAsync();
-
-            if (_cloneHeroViewModel is not null)
-            {
-                await _cloneHeroViewModel.RefreshAsync();
-            }
+            item.IsLoadingLogs = false;
         }
-    }
-
-    private void ResetInstallPanel()
-    {
-        InstallLogItems.Clear();
-        InstallSummaryText = string.Empty;
-        InstallProgressValue = 0;
-        InstallStageText = string.Empty;
-        InstallCurrentItemName = string.Empty;
-        IsInstallProgressIndeterminate = false;
-        _clearInstallLogCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(CanCopyAllInstallLogs));
-        UpdateInstallPanelVisibility();
-    }
-
-    private void UpdateInstallPanelVisibility()
-    {
-        IsInstallPanelVisible = IsInstallActive || HasInstallSummary || InstallLogItems.Count > 0;
-    }
-
-    private void ApplyInstallProgress(InstallProgressUpdate update)
-    {
-        InstallStageText = update.Message;
-        if (!string.IsNullOrWhiteSpace(update.CurrentItemName))
-        {
-            InstallCurrentItemName = update.CurrentItemName;
-        }
-
-        if (update.ProgressPercent.HasValue)
-        {
-            InstallProgressValue = Math.Clamp(update.ProgressPercent.Value, 0, 100);
-        }
-
-        IsInstallProgressIndeterminate = update.IsIndeterminate;
-
-        if (!string.IsNullOrWhiteSpace(update.Message))
-        {
-            AppendInstallLog(update.Stage, "Status", update.Message);
-        }
-
-        if (!string.IsNullOrWhiteSpace(update.LogLine))
-        {
-            AppendInstallLog(update.Stage, "Detail", update.LogLine);
-        }
-    }
-
-    private void AppendInstallLog(InstallStage stage, string category, string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return;
-        }
-
-        string normalizedText = text.ReplaceLineEndings(" ").Trim();
-        if (string.IsNullOrWhiteSpace(normalizedText))
-        {
-            return;
-        }
-
-        string normalizedCategory = string.IsNullOrWhiteSpace(category) ? "Info" : category.Trim();
-        string item = $"{stage} | {normalizedCategory} | {normalizedText}";
-
-        InstallLogItems.Add(item);
-        while (InstallLogItems.Count > MaxInstallLogItems)
-        {
-            InstallLogItems.RemoveAt(0);
-        }
-
-        _clearInstallLogCommand.NotifyCanExecuteChanged();
-        OnPropertyChanged(nameof(CanCopyAllInstallLogs));
-        UpdateInstallPanelVisibility();
     }
 
     public void CheckAllItems(bool isChecked)
@@ -650,71 +365,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         return IngestionQueue.Any(item => item.Checked);
     }
 
-    private bool CanDeleteSelectedDownloads()
-    {
-        return IngestionQueue.Any(item => item.Checked);
-    }
-
-    private async Task DeleteSelectedDownloadsAsync()
-    {
-        var selectedQueueItems = IngestionQueue
-            .Where(item => item.Checked)
-            .ToList();
-
-        if (selectedQueueItems.Count == 0)
-        {
-            return;
-        }
-
-        foreach (IngestionQueueItem item in selectedQueueItems)
-        {
-            await DeleteQueueItemAsync(item);
-        }
-
-        await RefreshIngestionQueueAsync();
-        await _uiInvoke(() =>
-        {
-            IsAnyChecked = AnyItemChecked();
-            _deleteSelectedDownloadsCommand.NotifyCanExecuteChanged();
-        });
-    }
-
-    private async Task DeleteQueueItemAsync(IngestionQueueItem item)
-    {
-        if (_isServerQueueActive && _serverQueueJobIds.TryGetValue(item.IngestionId, out Guid jobId))
-        {
-            await RequestCancelServerJobAsync(jobId);
-            return;
-        }
-
-        Logger.LogWarning("Download", "Cannot cancel queue item because no active ChartHub.Server connection is configured.", new Dictionary<string, object?>
-        {
-            ["ingestionId"] = item.IngestionId,
-            ["source"] = item.Source,
-            ["sourceId"] = item.SourceId,
-        });
-    }
-
-    private async Task RequestCancelServerJobAsync(Guid jobId)
-    {
-        if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
-        {
-            return;
-        }
-
-        try
-        {
-            await _serverApiClient.RequestCancelDownloadJobAsync(baseUrl, bearerToken, jobId);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError("Download", "Failed to cancel server download job", ex, new Dictionary<string, object?>
-            {
-                ["jobId"] = jobId,
-            });
-        }
-    }
-
     public event PropertyChangedEventHandler? PropertyChanged;
 
     protected void OnPropertyChanged(string propertyName)
@@ -724,8 +374,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        _installCts?.Cancel();
-        _installCts?.Dispose();
         IngestionQueue.CollectionChanged -= IngestionQueue_CollectionChanged;
 
         foreach (IngestionQueueItem item in IngestionQueue)
@@ -752,55 +400,25 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         await _refreshGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            IReadOnlyList<IngestionQueueItem> items;
-            IReadOnlyList<ChartHubServerDownloadJobResponse> allJobs = [];
-            if (TryGetServerConnection(out string baseUrl, out string bearerToken))
+            if (!TryGetServerConnection(out string baseUrl, out string bearerToken))
             {
-                try
-                {
-                    ServerQueueSnapshot snapshot = await QueryServerQueueAsync(baseUrl, bearerToken, cancellationToken).ConfigureAwait(false);
-                    items = snapshot.VisibleItems;
-                    allJobs = snapshot.AllJobs;
-                    _isServerQueueActive = true;
-                }
-                catch (Exception ex) when (IsUnauthorizedServerError(ex))
-                {
-                    HandleUnauthorizedServerError("Download", "ChartHub.Server token rejected during queue refresh; clearing local token.", baseUrl);
-                    items = [];
-                    allJobs = [];
-                }
-            }
-            else
-            {
-                items = [];
-                allJobs = [];
-                _isServerQueueActive = false;
                 _serverQueueJobIds.Clear();
+                await _uiInvoke(() => IngestionQueue.Clear()).ConfigureAwait(false);
+                return;
             }
 
-            HashSet<long> selectedIds = [];
-            await _uiInvoke(() =>
+            try
             {
-                selectedIds = IngestionQueue
-                    .Where(item => item.Checked)
-                    .Select(item => item.IngestionId)
-                    .ToHashSet();
-            }).ConfigureAwait(false);
+                IReadOnlyList<ChartHubServerDownloadJobResponse> jobs = await _serverApiClient
+                    .ListDownloadJobsAsync(baseUrl, bearerToken, cancellationToken)
+                    .ConfigureAwait(false);
 
-            await _uiInvoke(() =>
+                await MergeServerJobsAsync(jobs, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (IsUnauthorizedServerError(ex))
             {
-                ApplySharedDownloadJobs(allJobs);
-                UpdateInstallProgressFromServerJobs(allJobs);
-
-                IngestionQueue.Clear();
-                foreach (IngestionQueueItem item in items)
-                {
-                    item.Checked = selectedIds.Contains(item.IngestionId);
-                    IngestionQueue.Add(item);
-                }
-
-                IsAnyChecked = AnyItemChecked();
-            }).ConfigureAwait(false);
+                HandleUnauthorizedServerError("Download", "ChartHub.Server token rejected during queue refresh; clearing local token.", baseUrl);
+            }
         }
         finally
         {
@@ -808,98 +426,12 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         }
     }
 
-    private void UpdateInstallProgressFromServerJobs(IReadOnlyList<ChartHubServerDownloadJobResponse> jobs)
+    private async Task MergeServerJobsAsync(IReadOnlyList<ChartHubServerDownloadJobResponse> allJobs, CancellationToken cancellationToken)
     {
-        if (_trackedInstallJobIds.Count == 0)
-        {
-            return;
-        }
-
-        var jobsById = jobs.ToDictionary(job => job.JobId);
-        int terminalCount = 0;
-        int failedCount = 0;
-        double totalProgress = 0;
-        string? currentItemName = null;
-
-        foreach (Guid jobId in _trackedInstallJobIds)
-        {
-            if (!jobsById.TryGetValue(jobId, out ChartHubServerDownloadJobResponse? job))
-            {
-                continue;
-            }
-
-            string currentStage = job.Stage;
-            if (!_trackedInstallStages.TryGetValue(jobId, out string? previousStage)
-                || !string.Equals(previousStage, currentStage, StringComparison.OrdinalIgnoreCase))
-            {
-                _trackedInstallStages[jobId] = currentStage;
-                AppendInstallLog(InstallStage.MovingToCloneHero, "Stage", $"Job {job.JobId:D} ({job.DisplayName}) -> {currentStage} ({Math.Clamp(job.ProgressPercent, 0, 100):0.#}%).");
-
-                if (string.Equals(currentStage, "Failed", StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(job.Error))
-                {
-                    AppendInstallLog(InstallStage.Failed, "Error", $"Job {job.JobId:D} failed: {job.Error}");
-                }
-            }
-
-            totalProgress += Math.Clamp(job.ProgressPercent, 0, 100);
-
-            if (!IsTerminalServerStage(currentStage) && string.IsNullOrWhiteSpace(currentItemName))
-            {
-                currentItemName = job.DisplayName;
-            }
-
-            if (IsTerminalServerStage(currentStage))
-            {
-                terminalCount++;
-                if (string.Equals(currentStage, "Failed", StringComparison.OrdinalIgnoreCase))
-                {
-                    failedCount++;
-                }
-            }
-        }
-
-        int trackedCount = _trackedInstallJobIds.Count;
-        if (trackedCount > 0)
-        {
-            IsInstallProgressIndeterminate = false;
-            InstallProgressValue = Math.Clamp(totalProgress / trackedCount, 0, 100);
-        }
-
-        if (!string.IsNullOrWhiteSpace(currentItemName))
-        {
-            InstallCurrentItemName = currentItemName;
-        }
-
-        if (terminalCount >= trackedCount)
-        {
-            IsInstallActive = false;
-            int successCount = trackedCount - failedCount;
-            InstallStageText = failedCount > 0
-                ? $"Install processing finished with failures ({successCount} succeeded, {failedCount} failed)."
-                : "Install processing finished successfully.";
-            InstallSummaryText = failedCount > 0
-                ? $"Install completed with failures ({successCount} succeeded, {failedCount} failed)."
-                : $"Installed {successCount} item{(successCount == 1 ? string.Empty : "s")} successfully.";
-
-            _trackedInstallJobIds.Clear();
-            _trackedInstallStages.Clear();
-        }
-        else
-        {
-            InstallStageText = $"Install processing... {terminalCount}/{trackedCount} complete.";
-        }
-    }
-
-    private async Task<ServerQueueSnapshot> QueryServerQueueAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken)
-    {
-        IReadOnlyList<ChartHubServerDownloadJobResponse> jobs = await _serverApiClient
-            .ListDownloadJobsAsync(baseUrl, bearerToken, cancellationToken)
-            .ConfigureAwait(false);
-
-        IEnumerable<ChartHubServerDownloadJobResponse> filtered = jobs.Where(job =>
+        IEnumerable<ChartHubServerDownloadJobResponse> filtered = allJobs.Where(job =>
             !string.Equals(job.Stage, "Installed", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(job.Stage, "Completed", StringComparison.OrdinalIgnoreCase));
+
         if (!string.Equals(SelectedQueueStateFilter, "All", StringComparison.OrdinalIgnoreCase))
         {
             filtered = filtered.Where(job => string.Equals(job.Stage, SelectedQueueStateFilter, StringComparison.OrdinalIgnoreCase));
@@ -921,29 +453,94 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
                 : filtered.OrderBy(item => item.UpdatedAtUtc),
         };
 
-        _serverQueueJobIds.Clear();
-        List<IngestionQueueItem> queue = [];
-        foreach (ChartHubServerDownloadJobResponse job in filtered)
+        var sortedJobs = filtered.ToList();
+
+        var existingByIngestionId = new Dictionary<long, IngestionQueueItem>();
+        foreach (IngestionQueueItem item in IngestionQueue)
         {
-            long ingestionId = BitConverter.ToInt64(job.JobId.ToByteArray(), 0);
-            _serverQueueJobIds[ingestionId] = job.JobId;
-            queue.Add(new IngestionQueueItem
-            {
-                IngestionId = ingestionId,
-                Source = job.Source,
-                SourceId = job.SourceId,
-                SourceLink = job.SourceUrl,
-                DisplayName = job.DisplayName,
-                CurrentState = MapServerStage(job.Stage),
-                DownloadedLocation = job.DownloadedPath,
-                InstalledLocation = job.InstalledPath,
-                DesktopState = ResolveDesktopState(job),
-                UpdatedAtUtc = job.UpdatedAtUtc,
-                LibrarySource = job.Source,
-            });
+            existingByIngestionId[item.IngestionId] = item;
         }
 
-        return new ServerQueueSnapshot(jobs, queue);
+        var newQueue = new List<IngestionQueueItem>(sortedJobs.Count);
+        var newServerQueueJobIds = new Dictionary<long, Guid>(sortedJobs.Count);
+
+        foreach (ChartHubServerDownloadJobResponse job in sortedJobs)
+        {
+            long ingestionId = BitConverter.ToInt64(job.JobId.ToByteArray(), 0);
+            newServerQueueJobIds[ingestionId] = job.JobId;
+
+            if (existingByIngestionId.TryGetValue(ingestionId, out IngestionQueueItem? existing))
+            {
+                UpdateItemFromServerJob(existing, job);
+                newQueue.Add(existing);
+            }
+            else
+            {
+                var item = new IngestionQueueItem
+                {
+                    IngestionId = ingestionId,
+                    Source = job.Source,
+                    SourceId = job.SourceId,
+                    SourceLink = job.SourceUrl,
+                    DisplayName = job.DisplayName,
+                    LibrarySource = job.Source,
+                };
+                UpdateItemFromServerJob(item, job);
+                newQueue.Add(item);
+            }
+        }
+
+        await _uiInvoke(() =>
+        {
+            _serverQueueJobIds.Clear();
+            foreach (KeyValuePair<long, Guid> kv in newServerQueueJobIds)
+            {
+                _serverQueueJobIds[kv.Key] = kv.Value;
+            }
+
+            ApplySharedDownloadJobs(allJobs);
+
+            var newIds = newQueue.Select(x => x.IngestionId).ToHashSet();
+            for (int i = IngestionQueue.Count - 1; i >= 0; i--)
+            {
+                if (!newIds.Contains(IngestionQueue[i].IngestionId))
+                {
+                    IngestionQueue.RemoveAt(i);
+                }
+            }
+
+            for (int i = 0; i < newQueue.Count; i++)
+            {
+                if (i < IngestionQueue.Count)
+                {
+                    if (IngestionQueue[i].IngestionId != newQueue[i].IngestionId)
+                    {
+                        IngestionQueue.RemoveAt(i);
+                        IngestionQueue.Insert(i, newQueue[i]);
+                    }
+                }
+                else
+                {
+                    IngestionQueue.Add(newQueue[i]);
+                }
+            }
+
+            IsAnyChecked = AnyItemChecked();
+        }).ConfigureAwait(false);
+    }
+
+    private static void UpdateItemFromServerJob(IngestionQueueItem item, ChartHubServerDownloadJobResponse job)
+    {
+        item.CurrentState = MapServerStage(job.Stage);
+        item.ProgressPercent = Math.Clamp(job.ProgressPercent, 0, 100);
+        item.DownloadedLocation = job.DownloadedPath;
+        item.InstalledLocation = job.InstalledPath;
+        item.DesktopState = ResolveDesktopState(job);
+        item.UpdatedAtUtc = job.UpdatedAtUtc;
+        item.Charter = job.Charter;
+        item.Artist = job.Artist;
+        item.Title = job.Title;
+        item.FileType = job.FileType;
     }
 
     private void ApplySharedDownloadJobs(IReadOnlyList<ChartHubServerDownloadJobResponse> jobs)
@@ -1045,22 +642,8 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         return ex.Message.Contains("401 Unauthorized", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string BuildInstallFailureDetail(Exception ex)
-    {
-        if (ex is ChartHubServerApiException apiException)
-        {
-            string response = string.IsNullOrWhiteSpace(apiException.ResponseBody)
-                ? "(empty response body)"
-                : apiException.ResponseBody;
-            return $"Server install request failed ({(int)apiException.StatusCode} {apiException.ReasonPhrase}). ErrorCode={apiException.ErrorCode ?? "none"}. Response={response}";
-        }
-
-        return ex.Message;
-    }
-
     private void HandleUnauthorizedServerError(string logCategory, string message, string? baseUrl = null)
     {
-        _isServerQueueActive = false;
         _serverQueueJobIds.Clear();
 
         if (string.IsNullOrWhiteSpace(_globalSettings.ServerApiAuthToken))
@@ -1119,12 +702,12 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
                     ["baseUrl"] = baseUrl,
                 });
 
-                await foreach (IReadOnlyList<ChartHubServerDownloadProgressEvent> _ in _serverApiClient
+                await foreach (IReadOnlyList<ChartHubServerDownloadJobResponse> jobs in _serverApiClient
                                    .StreamDownloadJobsAsync(baseUrl, bearerToken, cancellationToken)
                                    .WithCancellation(cancellationToken)
                                    .ConfigureAwait(false))
                 {
-                    await RefreshIngestionQueueAsync(cancellationToken).ConfigureAwait(false);
+                    await MergeServerJobsAsync(jobs, cancellationToken).ConfigureAwait(false);
                 }
 
                 Logger.LogWarning("ServerDownload", "ChartHub.Server job stream disconnected; reconnecting.", new Dictionary<string, object?>
@@ -1147,9 +730,4 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             }
         }
     }
-
-    private sealed record ServerQueueSnapshot(
-        IReadOnlyList<ChartHubServerDownloadJobResponse> AllJobs,
-        IReadOnlyList<IngestionQueueItem> VisibleItems);
-
 }

@@ -146,11 +146,11 @@ public sealed class EncoreSong : INotifyPropertyChanged
             {
                 Name = normalizedAuthorName,
                 Shortname = ApplicationUsername,
-                AvatarPath = "avares://ChartHub/Resources/Images/blankprofile.png",
+                AvatarPath = "avares://ChartHub/Resources/Images/blankprofile.svg",
             },
-            Avatar = "avares://ChartHub/Resources/Images/blankprofile.png",
+            Avatar = "avares://ChartHub/Resources/Images/blankprofile.svg",
             AlbumArt = string.IsNullOrWhiteSpace(AlbumArtUrl)
-                ? "avares://ChartHub/Resources/Images/noalbumart.png"
+                ? "avares://ChartHub/Resources/Images/noalbumart.svg"
                 : AlbumArtUrl,
             SongLength = normalizedSongLengthSeconds,
             DownloadLink = DownloadUrl,

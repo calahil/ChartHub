@@ -383,6 +383,8 @@ public sealed class CloneHeroEndpointsIntegrationTests
             builder.Services.AddAuthorization();
             builder.Services.AddSingleton<IDownloadJobStore>(store);
             builder.Services.AddSingleton<IDownloadJobInstallService>(installService);
+            builder.Services.AddSingleton<IInstallConcurrencyLimiter, SemaphoreInstallConcurrencyLimiter>();
+            builder.Services.AddSingleton<IJobLogSink, NullJobLogSink>();
             builder.Services.AddSingleton<ICloneHeroLibraryService>(_ =>
                 new CloneHeroLibraryService(Microsoft.Extensions.Options.Options.Create(new ServerPathOptions
                 {
@@ -545,6 +547,39 @@ public sealed class CloneHeroEndpointsIntegrationTests
             }
         }
 
+        public void UpdateFileType(Guid jobId, string fileType)
+        {
+            if (_jobs.TryGetValue(jobId, out DownloadJobResponse? existing))
+            {
+                _jobs[jobId] = new DownloadJobResponse
+                {
+                    JobId = existing.JobId,
+                    Source = existing.Source,
+                    SourceId = existing.SourceId,
+                    DisplayName = existing.DisplayName,
+                    SourceUrl = existing.SourceUrl,
+                    Stage = existing.Stage,
+                    ProgressPercent = existing.ProgressPercent,
+                    DownloadedPath = existing.DownloadedPath,
+                    StagedPath = existing.StagedPath,
+                    InstalledPath = existing.InstalledPath,
+                    InstalledRelativePath = existing.InstalledRelativePath,
+                    Artist = existing.Artist,
+                    Title = existing.Title,
+                    Charter = existing.Charter,
+                    SourceMd5 = existing.SourceMd5,
+                    SourceChartHash = existing.SourceChartHash,
+                    Error = existing.Error,
+                    FileType = fileType,
+                    CreatedAtUtc = existing.CreatedAtUtc,
+                    UpdatedAtUtc = existing.UpdatedAtUtc,
+                };
+            }
+        }
+
+        public IReadOnlyList<DownloadJobResponse> ListDownloadedWithoutFileType()
+            => [];
+
         public void MarkStaged(Guid jobId, string stagedPath)
         {
             if (_jobs.TryGetValue(jobId, out DownloadJobResponse? existing))
@@ -633,6 +668,8 @@ public sealed class CloneHeroEndpointsIntegrationTests
         }
 
         public int DeleteFinishedOlderThan(DateTimeOffset thresholdUtc) => 0;
+
+        public void DeleteJob(Guid jobId) => _jobs.Remove(jobId);
     }
 
     private sealed class FakeDownloadJobInstallService : IDownloadJobInstallService
@@ -671,5 +708,12 @@ public sealed class CloneHeroEndpointsIntegrationTests
         public string ContentRootPath { get; set; } = contentRootPath;
 
         public IFileProvider ContentRootFileProvider { get; set; } = new PhysicalFileProvider(contentRootPath);
+    }
+
+    private sealed class NullJobLogSink : IJobLogSink
+    {
+        public void Add(Guid jobId, LogLevel level, EventId eventId, string? category, string message, string? exception) { }
+
+        public IReadOnlyList<JobLogEntry> GetLogs(Guid jobId) => [];
     }
 }

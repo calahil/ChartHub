@@ -20,6 +20,13 @@ namespace ChartHub;
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.UiMode)]
 public class MainActivity : AvaloniaMainActivity
 {
+    /// <summary>
+    /// The currently resumed <see cref="MainActivity"/> instance.
+    /// Set on <see cref="OnResume"/> and cleared on <see cref="OnDestroy"/>.
+    /// Used by services that need to interact with the Android UI (e.g. orientation lock).
+    /// </summary>
+    public static MainActivity? Current { get; private set; }
+
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
@@ -28,6 +35,21 @@ public class MainActivity : AvaloniaMainActivity
         if (OperatingSystem.IsAndroidVersionAtLeast(30) && !OperatingSystem.IsAndroidVersionAtLeast(35))
         {
             Window?.SetDecorFitsSystemWindows(true);
+        }
+    }
+
+    protected override void OnResume()
+    {
+        base.OnResume();
+        Current = this;
+    }
+
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();
+        if (Current == this)
+        {
+            Current = null;
         }
     }
 

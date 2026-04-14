@@ -19,6 +19,7 @@ builder.Services.Configure<ServerPathOptions>(builder.Configuration.GetSection(S
 builder.Services.Configure<DownloadsOptions>(builder.Configuration.GetSection(DownloadsOptions.SectionName));
 builder.Services.Configure<DesktopEntryOptions>(builder.Configuration.GetSection(DesktopEntryOptions.SectionName));
 builder.Services.Configure<ServerLoggingOptions>(builder.Configuration.GetSection(ServerLoggingOptions.SectionName));
+builder.Services.Configure<InputOptions>(builder.Configuration.GetSection(InputOptions.SectionName));
 
 ServerLoggingOptions serverLoggingOptions = builder.Configuration
     .GetSection(ServerLoggingOptions.SectionName)
@@ -26,6 +27,18 @@ ServerLoggingOptions serverLoggingOptions = builder.Configuration
 
 string serverLogDirectory = ServerContentPathResolver.Resolve(serverLoggingOptions.LogDirectory, builder.Environment.ContentRootPath);
 builder.Logging.AddProvider(new ServerFileLoggerProvider(serverLogDirectory, serverLoggingOptions.FileName));
+
+ServerPathOptions serverPathOptions = builder.Configuration
+    .GetSection(ServerPathOptions.SectionName)
+    .Get<ServerPathOptions>() ?? new ServerPathOptions();
+
+string sqliteDbPath = serverPathOptions.SqliteDbPath;
+if (!Path.IsPathRooted(sqliteDbPath))
+{
+    sqliteDbPath = Path.Combine(builder.Environment.ContentRootPath, sqliteDbPath);
+}
+
+builder.Logging.AddProvider(new SqliteServerEventLoggerProvider(sqliteDbPath));
 
 AuthOptions authOptions = builder.Configuration
     .GetSection(AuthOptions.SectionName)
@@ -62,6 +75,8 @@ builder.Services.AddHttpClient("downloads");
 builder.Services.AddSingleton<ISourceUrlResolver, SourceUrlResolver>();
 builder.Services.AddSingleton<IGoogleDriveFolderArchiveService, GoogleDriveFolderArchiveService>();
 builder.Services.AddSingleton<IDownloadJobStore, SqliteDownloadJobStore>();
+builder.Services.AddSingleton<IJobLogSink, SqliteJobLogSink>();
+builder.Services.AddSingleton<IInstallConcurrencyLimiter, SemaphoreInstallConcurrencyLimiter>();
 builder.Services.AddSingleton<IServerInstallFileTypeResolver, ServerInstallFileTypeResolver>();
 builder.Services.AddSingleton<IServerSongIniMetadataParser, ServerSongIniMetadataParser>();
 builder.Services.AddSingleton<IServerCloneHeroDirectorySchemaService, ServerCloneHeroDirectorySchemaService>();
@@ -73,6 +88,9 @@ builder.Services.AddSingleton<IVolumeService, VolumeService>();
 builder.Services.AddHostedService<ServerPathValidatorHostedService>();
 builder.Services.AddHostedService<DownloadPipelineHostedService>();
 builder.Services.AddHostedService<DesktopEntryStartupHostedService>();
+builder.Services.AddSingleton<IUinputGamepadService, UinputGamepadService>();
+builder.Services.AddSingleton<IUinputMouseService, UinputMouseService>();
+builder.Services.AddSingleton<IUinputKeyboardService, UinputKeyboardService>();
 
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
@@ -102,6 +120,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
+app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -114,6 +133,7 @@ app.MapDownloadEndpoints();
 app.MapCloneHeroEndpoints();
 app.MapDesktopEntryEndpoints();
 app.MapVolumeEndpoints();
+app.MapInputEndpoints();
 
 app.Run();
 

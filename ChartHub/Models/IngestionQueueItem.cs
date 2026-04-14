@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
@@ -9,24 +10,229 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
 {
     private bool _checked;
     private ActionResult? _lastActionResult;
+    private IngestionState _currentState;
+    private string? _downloadedLocation;
+    private string? _installedLocation;
+    private DesktopState _desktopState = DesktopState.Cloud;
+    private DateTimeOffset _updatedAtUtc;
+    private string? _charter;
+    private string? _artist;
+    private string? _title;
+    private double _progressPercent;
+    private bool _isJobLogExpanded;
+    private bool _isLoadingLogs;
+    private string? _fileType;
 
     public long IngestionId { get; init; }
     public string Source { get; init; } = string.Empty;
     public string? SourceId { get; init; }
     public string SourceLink { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
-    public string? Artist { get; init; }
-    public string? Title { get; init; }
-    public string? Charter { get; init; }
-    public IngestionState CurrentState { get; init; }
-    public string? DownloadedLocation { get; init; }
-    public string? InstalledLocation { get; init; }
-    public DesktopState DesktopState { get; init; } = DesktopState.Cloud;
-    public string? DesktopLibraryPath { get; init; }
-    public DateTimeOffset UpdatedAtUtc { get; init; }
     public string? LibrarySource { get; init; }
+    public string? DesktopLibraryPath { get; init; }
+
+    public ObservableCollection<ChartHubServerJobLogEntry> JobLogs { get; } = [];
+
+    public string? FileType
+    {
+        get => _fileType;
+        set
+        {
+            if (_fileType == value)
+            {
+                return;
+            }
+
+            _fileType = value;
+            OnPropertyChanged();
+        }
+    }
 
     public bool IsInDesktopLibrary => !string.IsNullOrEmpty(InstalledLocation) || DesktopState == DesktopState.Installed;
+
+    public string? Artist
+    {
+        get => _artist;
+        set
+        {
+            if (_artist == value)
+            {
+                return;
+            }
+
+            _artist = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string? Title
+    {
+        get => _title;
+        set
+        {
+            if (_title == value)
+            {
+                return;
+            }
+
+            _title = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string? Charter
+    {
+        get => _charter;
+        set
+        {
+            if (_charter == value)
+            {
+                return;
+            }
+
+            _charter = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public IngestionState CurrentState
+    {
+        get => _currentState;
+        set
+        {
+            if (_currentState == value)
+            {
+                return;
+            }
+
+            _currentState = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(CanInstall));
+            OnPropertyChanged(nameof(IsProgressVisible));
+        }
+    }
+
+    public string? DownloadedLocation
+    {
+        get => _downloadedLocation;
+        set
+        {
+            if (_downloadedLocation == value)
+            {
+                return;
+            }
+
+            _downloadedLocation = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(DownloadedFilename));
+        }
+    }
+
+    public string? DownloadedFilename => string.IsNullOrWhiteSpace(_downloadedLocation)
+        ? null
+        : Path.GetFileName(_downloadedLocation);
+
+    public string? InstalledLocation
+    {
+        get => _installedLocation;
+        set
+        {
+            if (_installedLocation == value)
+            {
+                return;
+            }
+
+            _installedLocation = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsInDesktopLibrary));
+        }
+    }
+
+    public DesktopState DesktopState
+    {
+        get => _desktopState;
+        set
+        {
+            if (_desktopState == value)
+            {
+                return;
+            }
+
+            _desktopState = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsInDesktopLibrary));
+        }
+    }
+
+    public DateTimeOffset UpdatedAtUtc
+    {
+        get => _updatedAtUtc;
+        set
+        {
+            if (_updatedAtUtc == value)
+            {
+                return;
+            }
+
+            _updatedAtUtc = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(UpdatedText));
+        }
+    }
+
+    public double ProgressPercent
+    {
+        get => _progressPercent;
+        set
+        {
+            if (Math.Abs(_progressPercent - value) < 0.001)
+            {
+                return;
+            }
+
+            _progressPercent = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool IsJobLogExpanded
+    {
+        get => _isJobLogExpanded;
+        set
+        {
+            if (_isJobLogExpanded == value)
+            {
+                return;
+            }
+
+            _isJobLogExpanded = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(JobLogToggleText));
+        }
+    }
+
+    public bool IsLoadingLogs
+    {
+        get => _isLoadingLogs;
+        set
+        {
+            if (_isLoadingLogs == value)
+            {
+                return;
+            }
+
+            _isLoadingLogs = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string JobLogToggleText => IsJobLogExpanded ? "Collapse Log" : "Expand Log";
+
+    public bool IsProgressVisible => CurrentState is
+        IngestionState.Downloading or
+        IngestionState.Installing or
+        IngestionState.Staged or
+        IngestionState.Converting;
 
     public bool Checked
     {
@@ -43,9 +249,6 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
         }
     }
 
-    /// <summary>
-    /// The most recent action result (Retry, Install, OpenFolder) for this item. Null if no action has been attempted.
-    /// </summary>
     public ActionResult? LastActionResult
     {
         get => _lastActionResult;
@@ -65,24 +268,9 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
         }
     }
 
-    /// <summary>
-    /// True if an action result exists (successful or failed).
-    /// </summary>
     public bool HasActionResult => LastActionResult is not null;
-
-    /// <summary>
-    /// True if the most recent action is still pending.
-    /// </summary>
     public bool HasPendingActionResult => LastActionResult?.Status == ActionResultStatus.Pending;
-
-    /// <summary>
-    /// Badge icon/text for action status.
-    /// </summary>
     public string ActionResultStatusBadge => LastActionResult?.StatusBadge ?? string.Empty;
-
-    /// <summary>
-    /// Display text for the UI showing action status and message.
-    /// </summary>
     public string ActionResultDisplay => LastActionResult?.DisplayText ?? string.Empty;
 
     public string UpdatedText => UpdatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");

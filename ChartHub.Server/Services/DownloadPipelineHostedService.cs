@@ -13,6 +13,7 @@ public sealed class DownloadPipelineHostedService(
     IHttpClientFactory httpClientFactory,
     ISourceUrlResolver sourceUrlResolver,
     IGoogleDriveFolderArchiveService googleDriveFolderArchiveService,
+    IServerInstallFileTypeResolver fileTypeResolver,
     IWebHostEnvironment environment,
     IOptions<ServerPathOptions> pathOptions,
     IOptions<DownloadsOptions> downloadOptions) : BackgroundService
@@ -21,11 +22,14 @@ public sealed class DownloadPipelineHostedService(
     private readonly HttpClient _httpClient = httpClientFactory.CreateClient("downloads");
     private readonly ISourceUrlResolver _sourceUrlResolver = sourceUrlResolver;
     private readonly IGoogleDriveFolderArchiveService _googleDriveFolderArchiveService = googleDriveFolderArchiveService;
+    private readonly IServerInstallFileTypeResolver _fileTypeResolver = fileTypeResolver;
     private readonly DownloadsOptions _downloadsOptions = downloadOptions.Value;
     private readonly string _downloadsDir = ServerContentPathResolver.Resolve(pathOptions.Value.DownloadsDir, environment.ContentRootPath);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        await BackfillFileTypesAsync(stoppingToken).ConfigureAwait(false);
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -66,6 +70,9 @@ public sealed class DownloadPipelineHostedService(
                 ? await DownloadGoogleDriveFolderAsync(job, resolvedSource, cancellationToken).ConfigureAwait(false)
                 : await DownloadFileAsync(job, resolvedSource, cancellationToken).ConfigureAwait(false);
             _jobStore.MarkDownloaded(job.JobId, downloadedPath);
+
+            ServerInstallFileType fileType = await _fileTypeResolver.ResolveAsync(downloadedPath, cancellationToken).ConfigureAwait(false);
+            _jobStore.UpdateFileType(job.JobId, fileType.ToString());
         }
         catch (OperationCanceledException)
         {
@@ -172,6 +179,34 @@ public sealed class DownloadPipelineHostedService(
         char[] invalid = Path.GetInvalidFileNameChars();
         string cleaned = new string(value.Select(ch => invalid.Contains(ch) ? '-' : ch).ToArray()).Trim();
         return string.IsNullOrWhiteSpace(cleaned) ? "download" : cleaned;
+    }
+
+    private async Task BackfillFileTypesAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<DownloadJobResponse> jobs = _jobStore.ListDownloadedWithoutFileType();
+        foreach (DownloadJobResponse job in jobs)
+        {
+            if (cancellationToken.IsCancellationRequested || job.DownloadedPath is null)
+            {
+                break;
+            }
+
+            try
+            {
+                ServerInstallFileType fileType = await _fileTypeResolver
+                    .ResolveAsync(job.DownloadedPath, cancellationToken)
+                    .ConfigureAwait(false);
+                _jobStore.UpdateFileType(job.JobId, fileType.ToString());
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception)
+            {
+                // Best-effort: skip jobs whose artifact is no longer on disk
+            }
+        }
     }
 
     private static string ResolveDownloadExtension(Uri sourceUri, string? suggestedName, HttpContentHeaders contentHeaders)

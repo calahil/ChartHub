@@ -75,7 +75,7 @@ public sealed class ChartHubServerApiClientTests
     {
         HttpRequestMessage? captured = null;
         string ssePayload = "event: jobs\n"
-            + "data: [{\"jobId\":\"33333333-3333-3333-3333-333333333333\",\"stage\":\"Downloading\",\"progressPercent\":42.5,\"updatedAtUtc\":\"2026-04-10T00:00:00Z\"}]\n\n";
+            + "data: [{\"jobId\":\"33333333-3333-3333-3333-333333333333\",\"source\":\"rhythmverse\",\"sourceId\":\"abc\",\"displayName\":\"Test Song\",\"sourceUrl\":\"https://example.test\",\"stage\":\"Downloading\",\"progressPercent\":42.5,\"downloadedPath\":null,\"stagedPath\":null,\"installedPath\":null,\"error\":null,\"createdAtUtc\":\"2026-04-10T00:00:00Z\",\"updatedAtUtc\":\"2026-04-10T00:00:00Z\"}]\n\n";
 
         ChartHubServerApiClient sut = new(() =>
             new HttpClient(new StubHttpMessageHandler((request, _) =>
@@ -87,8 +87,8 @@ public sealed class ChartHubServerApiClientTests
                 });
             })));
 
-        IReadOnlyList<ChartHubServerDownloadProgressEvent>? batch = null;
-        await foreach (IReadOnlyList<ChartHubServerDownloadProgressEvent> item in sut.StreamDownloadJobsAsync("http://127.0.0.1:5001", "jwt-token"))
+        IReadOnlyList<ChartHubServerDownloadJobResponse>? batch = null;
+        await foreach (IReadOnlyList<ChartHubServerDownloadJobResponse> item in sut.StreamDownloadJobsAsync("http://127.0.0.1:5001", "jwt-token"))
         {
             batch = item;
             break;
@@ -100,7 +100,7 @@ public sealed class ChartHubServerApiClientTests
         Assert.Equal("Bearer", captured.Headers.Authorization?.Scheme);
         Assert.Equal("jwt-token", captured.Headers.Authorization?.Parameter);
         Assert.NotNull(batch);
-        ChartHubServerDownloadProgressEvent evt = Assert.Single(batch!);
+        ChartHubServerDownloadJobResponse evt = Assert.Single(batch!);
         Assert.Equal(Guid.Parse("33333333-3333-3333-3333-333333333333"), evt.JobId);
         Assert.Equal("Downloading", evt.Stage);
         Assert.Equal(42.5, evt.ProgressPercent);
@@ -135,7 +135,7 @@ public sealed class ChartHubServerApiClientTests
 
         ChartHubServerApiException ex = await Assert.ThrowsAsync<ChartHubServerApiException>(async () =>
         {
-            await foreach (IReadOnlyList<ChartHubServerDownloadProgressEvent> _ in sut.StreamDownloadJobsAsync("http://127.0.0.1:5001", "bad-token"))
+            await foreach (IReadOnlyList<ChartHubServerDownloadJobResponse> _ in sut.StreamDownloadJobsAsync("http://127.0.0.1:5001", "bad-token"))
             {
             }
         });

@@ -1,0 +1,86 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
+             xmlns:strings="clr-namespace:ChartHub.Strings"
+             xmlns:utilities="clr-namespace:ChartHub.Utilities"
+             mc:Ignorable="d"
+             x:Class="ChartHub.Views.VirtualTouchPadView"
+             x:Name="Root"
+             x:DataType="viewmodels:VirtualTouchPadViewModel"
+             d:DesignWidth="800"
+             d:DesignHeight="400">
+
+    <UserControl.Resources>
+        <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+    </UserControl.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Status bar -->
+        <Border Grid.Row="0"
+                Padding="10,6"
+                BorderThickness="0,0,0,1"
+                BorderBrush="{StaticResource ThemeBorderMidBrush}">
+            <TextBlock Text="{Binding StatusMessage}"
+                       VerticalAlignment="Center"
+                       Foreground="{StaticResource ThemeForegroundLowBrush}" />
+        </Border>
+
+        <!-- Touchpad layout: tracking surface left, mouse buttons right -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
+
+            <!-- Touch tracking surface -->
+            <Border x:Name="TouchSurface"
+                    Grid.Column="0"
+                    Margin="12"
+                    CornerRadius="12"
+                    BorderThickness="2"
+                    BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                    Background="{StaticResource ThemeControlLowBrush}"
+                    PointerPressed="OnTouchSurfacePointerPressed"
+                    PointerMoved="OnTouchSurfacePointerMoved"
+                    PointerReleased="OnTouchSurfacePointerReleased"
+                    PointerCaptureLost="OnTouchSurfaceCaptureLost">
+                <TextBlock Text="{Binding PageStrings.TouchpadStatusDisconnected}"
+                           IsVisible="{Binding !IsConnected}"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource ThemeForegroundLowBrush}" />
+            </Border>
+
+            <!-- Mouse buttons -->
+            <StackPanel Grid.Column="1"
+                        Orientation="Vertical"
+                        Spacing="8"
+                        Margin="0,12,12,12"
+                        Width="80"
+                        VerticalAlignment="Stretch">
+                <Button HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        VerticalContentAlignment="Center"
+                        HorizontalContentAlignment="Center"
+                        CornerRadius="8"
+                        Tag="left"
+                        Height="120"
+                        PointerPressed="OnMouseButtonPressed"
+                        PointerReleased="OnMouseButtonReleased">
+                    <Image Width="40" Height="40"
+                           Source="{Binding Source={x:Static strings:UiIcons.MouseLeftButton}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+                <Button HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        VerticalContentAlignment="Center"
+                        HorizontalContentAlignment="Center"
+                        CornerRadius="8"
+                        Tag="right"
+                        Height="120"
+                        PointerPressed="OnMouseButtonPressed"
+                        PointerReleased="OnMouseButtonReleased">
+                    <Image Width="40" Height="40"
+                           Source="{Binding Source={x:Static strings:UiIcons.MouseRightButton}, Converter={StaticResource AssetPathToImageConverter}}" />
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

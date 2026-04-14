@@ -60,11 +60,25 @@ public static partial class DownloadEndpoints
             .WithName("CancelDownloadJob")
             .WithSummary("Cancel an active job");
 
+        group.MapDelete("/jobs/{jobId:guid}", (Guid jobId, IDownloadJobStore store) =>
+            {
+                if (!store.TryGet(jobId, out _))
+                {
+                    return Results.NotFound();
+                }
+
+                store.DeleteJob(jobId);
+                return Results.NoContent();
+            })
+            .WithName("DeleteDownloadJob")
+            .WithSummary("Delete a download job");
+
         group.MapPost("/jobs/{jobId:guid}/install", (
                 Guid jobId,
                 IDownloadJobStore store,
                 IDownloadJobInstallService installService,
                 ICloneHeroLibraryService cloneHeroLibraryService,
+                IInstallConcurrencyLimiter concurrencyLimiter,
                 ILogger<DownloadInstallEndpointLogCategory> logger) =>
             {
                 if (!store.TryGet(jobId, out DownloadJobResponse? job) || job is null)
@@ -92,7 +106,7 @@ public static partial class DownloadEndpoints
                 DownloadEndpointLog.InstallRequestStarted(logger, job.JobId, job.Source, job.SourceId, job.DisplayName, job.DownloadedPath);
                 store.UpdateProgress(jobId, "InstallQueued", 88);
 
-                _ = Task.Run(() => ProcessInstallInBackgroundAsync(job.JobId, store, installService, cloneHeroLibraryService, logger));
+                _ = Task.Run(() => ProcessInstallInBackgroundAsync(job.JobId, store, installService, cloneHeroLibraryService, concurrencyLimiter, logger));
 
                 if (!store.TryGet(jobId, out DownloadJobResponse? queuedJob) || queuedJob is null)
                 {
@@ -162,16 +176,9 @@ public static partial class DownloadEndpoints
                     while (!cancellationToken.IsCancellationRequested)
                     {
                         IReadOnlyList<DownloadJobResponse> jobs = store.List();
-                        IEnumerable<DownloadProgressEvent> eventsPayload = jobs.Select(job => new DownloadProgressEvent
-                        {
-                            JobId = job.JobId,
-                            Stage = job.Stage,
-                            ProgressPercent = job.ProgressPercent,
-                            UpdatedAtUtc = job.UpdatedAtUtc,
-                        });
 
                         await context.Response.WriteAsync($"event: jobs\n", cancellationToken).ConfigureAwait(false);
-                        await context.Response.WriteAsync($"data: {JsonSerializer.Serialize(eventsPayload)}\n\n", cancellationToken)
+                        await context.Response.WriteAsync($"data: {JsonSerializer.Serialize(jobs)}\n\n", cancellationToken)
                             .ConfigureAwait(false);
                         await context.Response.Body.FlushAsync(cancellationToken).ConfigureAwait(false);
 
@@ -184,7 +191,29 @@ public static partial class DownloadEndpoints
                 }
             })
             .WithName("StreamDownloadJobs")
-            .WithSummary("Stream download progress events over SSE");
+            .WithSummary("Stream full download job state over SSE");
+
+        group.MapGet("/jobs/{jobId:guid}/logs", (Guid jobId, IDownloadJobStore store, IJobLogSink jobLogSink) =>
+            {
+                if (!store.TryGet(jobId, out _))
+                {
+                    return Results.NotFound();
+                }
+
+                IReadOnlyList<JobLogEntry> logs = jobLogSink.GetLogs(jobId);
+                IEnumerable<JobLogEntryResponse> response = logs.Select(l => new JobLogEntryResponse
+                {
+                    TimestampUtc = l.TimestampUtc,
+                    Level = l.Level,
+                    EventId = l.EventId,
+                    Category = l.Category,
+                    Message = l.Message,
+                    Exception = l.Exception,
+                });
+                return Results.Ok(response);
+            })
+            .WithName("GetDownloadJobLogs")
+            .WithSummary("Get structured install logs for a specific download job");
 
         return group;
     }
@@ -194,6 +223,7 @@ public static partial class DownloadEndpoints
         IDownloadJobStore store,
         IDownloadJobInstallService installService,
         ICloneHeroLibraryService cloneHeroLibraryService,
+        IInstallConcurrencyLimiter concurrencyLimiter,
         ILogger logger)
     {
         if (!store.TryGet(jobId, out DownloadJobResponse? job) || job is null)
@@ -202,6 +232,7 @@ public static partial class DownloadEndpoints
             return;
         }
 
+        await concurrencyLimiter.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
             store.UpdateProgress(jobId, "Staging", 90);
@@ -237,6 +268,10 @@ public static partial class DownloadEndpoints
         {
             DownloadEndpointLog.InstallRequestFailed(logger, job.JobId, job.Source, job.SourceId, job.DisplayName, job.DownloadedPath, ex);
             store.MarkFailed(jobId, ex.Message);
+        }
+        finally
+        {
+            concurrencyLimiter.Release();
         }
     }
 
