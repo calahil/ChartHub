@@ -110,6 +110,7 @@
   <data name="RhythmVerse.FilterDownloads" xml:space="preserve"><value>Downloads</value></data>
   <data name="RhythmVerse.FilterSongLength" xml:space="preserve"><value>Song Length</value></data>
   <data name="RhythmVerse.FilterTitleText" xml:space="preserve"><value>Title</value></data>
+  <data name="RhythmVerse.FilterUpdated" xml:space="preserve"><value>Updated</value></data>
   <data name="RhythmVerse.OrderAscending" xml:space="preserve"><value>Ascending</value></data>
   <data name="RhythmVerse.OrderDescending" xml:space="preserve"><value>Descending</value></data>
   <data name="RhythmVerse.Difficulty" xml:space="preserve"><value>Difficulty:</value></data>

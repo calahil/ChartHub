@@ -139,6 +139,7 @@ public class RhythmVersePageStrings : SongSourcePageStrings
         UiLocalization.Get("RhythmVerse.FilterDownloads"),
         UiLocalization.Get("RhythmVerse.FilterSongLength"),
         UiLocalization.Get("RhythmVerse.FilterTitleText"),
+        UiLocalization.Get("RhythmVerse.FilterUpdated"),
     ];
     public List<string> Orders { get; } = [UiLocalization.Get("RhythmVerse.OrderAscending"), UiLocalization.Get("RhythmVerse.OrderDescending")];
     public string Difficulty => UiLocalization.Get("RhythmVerse.Difficulty");

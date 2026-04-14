@@ -542,7 +542,7 @@ public sealed partial class RhythmVerseRepository(
             "song_id" or "id" => ascending
                 ? query.OrderBy(x => x.SongId)
                 : query.OrderByDescending(x => x.SongId),
-            "record_updated" or "release_date" or "downloads" or "song_length" or "length" => ascending
+            "record_updated" or "release_date" or "downloads" or "song_length" or "length" or "updated" => ascending
                 ? query.OrderBy(x => x.RecordUpdatedUnix).ThenBy(x => x.SongId)
                 : query.OrderByDescending(x => x.RecordUpdatedUnix).ThenBy(x => x.SongId),
             _ => query.OrderByDescending(x => x.RecordUpdatedUnix).ThenBy(x => x.SongId),
