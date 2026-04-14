@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -10,8 +11,12 @@ namespace ChartHub.Views;
 
 public partial class EncoreView : UserControl
 {
+    private const int LoadMoreDebounceMs = 120;
+
     private ScrollViewer? _desktopScrollViewer;
     private ScrollViewer? _mobileScrollViewer;
+    private CancellationTokenSource? _loadMoreDebounceCts;
+    private int _loadMoreInFlight;
 
     public EncoreView()
     {
@@ -22,6 +27,15 @@ public partial class EncoreView : UserControl
     {
         base.OnAttachedToVisualTree(e);
         ScheduleAttachScrollHandlers();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+
+        _loadMoreDebounceCts?.Cancel();
+        _loadMoreDebounceCts?.Dispose();
+        _loadMoreDebounceCts = null;
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -74,7 +88,43 @@ public partial class EncoreView : UserControl
             return;
         }
 
-        await viewModel.LoadMoreAsync();
+        if (Interlocked.CompareExchange(ref _loadMoreInFlight, 1, 0) != 0)
+        {
+            return;
+        }
+
+        _loadMoreDebounceCts?.Cancel();
+        _loadMoreDebounceCts?.Dispose();
+        _loadMoreDebounceCts = new CancellationTokenSource();
+        CancellationToken cancellationToken = _loadMoreDebounceCts.Token;
+
+        try
+        {
+            // Debounce and yield once so pagination does not execute inside the active offset-change callback.
+            await Task.Delay(LoadMoreDebounceMs, cancellationToken);
+            await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Fill the viewport: keep loading pages until there is enough content to scroll or records are exhausted.
+            while (viewModel.HasMoreRecords)
+            {
+                await viewModel.LoadMoreAsync();
+                await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+                double postRemaining = scrollViewer.Extent.Height - scrollViewer.Viewport.Height - scrollViewer.Offset.Y;
+                if (postRemaining > 200)
+                {
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer scroll event superseded this scheduled pagination attempt.
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _loadMoreInFlight, 0);
+        }
     }
 
     private async void SearchTextBox_KeyDown(object? sender, KeyEventArgs e)

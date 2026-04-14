@@ -28,6 +28,7 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     private readonly object _autoClearSync = new();
     private readonly Dictionary<DownloadFile, CancellationTokenSource> _autoClearTokens = [];
     private static readonly TimeSpan SuccessfulDownloadAutoClearDelay = TimeSpan.FromSeconds(3);
+    private int _loadMoreGate;
 
     private string _searchText = string.Empty;
     private bool _isLoading;
@@ -91,6 +92,8 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             OnPropertyChanged();
         }
     }
+
+    public bool HasMoreRecords => _apiService.HasMoreRecords;
 
     public bool NoResults
     {
@@ -390,7 +393,8 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
         IChartHubServerApiClient serverApiClient,
         ISettingsOrchestrator settingsOrchestrator,
         SharedDownloadQueue sharedDownloadQueue,
-        Func<Action, Task>? uiInvoke = null)
+        Func<Action, Task>? uiInvoke = null,
+        bool loadInitialData = true)
     {
         _apiService = apiService;
         _serverApiClient = serverApiClient;
@@ -413,7 +417,10 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             item.PropertyChanged += DownloadItem_PropertyChanged;
         }
 
-        ObserveBackgroundTask(RefreshAsync(), "Encore initial load");
+        if (loadInitialData)
+        {
+            ObserveBackgroundTask(RefreshAsync(), "Encore initial load");
+        }
     }
 
     private void Downloads_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -666,8 +673,20 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             return;
         }
 
-        _apiService.CurrentPage += 1;
-        await ExecuteSearchAsync(reset: false);
+        if (Interlocked.CompareExchange(ref _loadMoreGate, 1, 0) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            _apiService.CurrentPage += 1;
+            await ExecuteSearchAsync(reset: false);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _loadMoreGate, 0);
+        }
     }
 
     public async Task DownloadSongAsync(EncoreSong? song)

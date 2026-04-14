@@ -761,7 +761,14 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         {
             ApiClient.CurrentPage = (ApiClient.CurrentPage ?? 1) + 1;
             OnPropertyChanged(nameof(CurrentPage));
-            await LoadDataAsync(false);
+            bool loaded = await LoadDataAsync(false);
+            if (!loaded)
+            {
+                // Gate was busy (concurrent initial load). Restore the page counter so the
+                // next retry requests the correct page rather than skipping ahead.
+                ApiClient.CurrentPage = (ApiClient.CurrentPage ?? 2) - 1;
+                OnPropertyChanged(nameof(CurrentPage));
+            }
         }
         finally
         {
@@ -769,11 +776,11 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         }
     }
 
-    public async Task LoadDataAsync(bool search)
+    public async Task<bool> LoadDataAsync(bool search)
     {
         if (!await _loadDataGate.WaitAsync(0).ConfigureAwait(false))
         {
-            return;
+            return false;
         }
 
         try
@@ -790,7 +797,7 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             if (!search && !ApiClient.HasMoreRecords)
             {
                 NoResults = DataItems == null || DataItems.Count < 1;
-                return;
+                return true;
             }
 
             if (string.IsNullOrEmpty(SelectedFilter) || string.IsNullOrEmpty(SelectedOrder))
@@ -835,6 +842,7 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             });
             _loadDataGate.Release();
         }
+        return true;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -147,7 +147,18 @@ public partial class RhythmVerseView : UserControl
             await Task.Delay(LoadMoreDebounceMs, cancellationToken);
             await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
             cancellationToken.ThrowIfCancellationRequested();
-            await viewModel.LoadMoreAsync();
+
+            // Fill the viewport: keep loading pages until there is enough content to scroll or records are exhausted.
+            while (viewModel.HasMoreRecords)
+            {
+                await viewModel.LoadMoreAsync();
+                await Dispatcher.UIThread.InvokeAsync(static () => { }, DispatcherPriority.Background);
+                double postRemaining = scrollViewer.Extent.Height - scrollViewer.Viewport.Height - scrollViewer.Offset.Y;
+                if (postRemaining > 200)
+                {
+                    break;
+                }
+            }
         }
         catch (OperationCanceledException)
         {

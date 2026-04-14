@@ -379,14 +379,17 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
                 .RequestDeleteCloneHeroSongAsync(baseUrl, bearerToken, deletedSongId, CancellationToken.None)
                 .ConfigureAwait(false);
 
-            _lastDeletedSongId = deletedSongId;
-            _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
+            await _uiInvoke(() =>
+            {
+                _lastDeletedSongId = deletedSongId;
+                _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
+            });
             await RefreshArtistsAsync(CancellationToken.None).ConfigureAwait(false);
-            ReconciliationStatusMessage = UiLocalization.Get("CloneHero.Deleted");
+            await _uiInvoke(() => ReconciliationStatusMessage = UiLocalization.Get("CloneHero.Deleted"));
         }
         catch (Exception ex)
         {
-            ReconciliationStatusMessage = UiLocalization.Format("CloneHero.DeleteFailed", ex.Message);
+            await _uiInvoke(() => ReconciliationStatusMessage = UiLocalization.Format("CloneHero.DeleteFailed", ex.Message));
             Logger.LogError("CloneHero", "Delete selected song from server failed", ex, new Dictionary<string, object?>
             {
                 ["songId"] = deletedSongId,
@@ -394,7 +397,7 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
         }
         finally
         {
-            IsReconciling = false;
+            await _uiInvoke(() => IsReconciling = false);
         }
     }
 
@@ -426,14 +429,17 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
                 .RequestRestoreCloneHeroSongAsync(baseUrl, bearerToken, deletedSongId, CancellationToken.None)
                 .ConfigureAwait(false);
 
-            _lastDeletedSongId = null;
-            _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
+            await _uiInvoke(() =>
+            {
+                _lastDeletedSongId = null;
+                _restoreLastDeletedSongCommand.NotifyCanExecuteChanged();
+            });
             await RefreshArtistsAsync(CancellationToken.None).ConfigureAwait(false);
-            ReconciliationStatusMessage = UiLocalization.Get("CloneHero.Restored");
+            await _uiInvoke(() => ReconciliationStatusMessage = UiLocalization.Get("CloneHero.Restored"));
         }
         catch (Exception ex)
         {
-            ReconciliationStatusMessage = UiLocalization.Format("CloneHero.RestoreFailed", ex.Message);
+            await _uiInvoke(() => ReconciliationStatusMessage = UiLocalization.Format("CloneHero.RestoreFailed", ex.Message));
             Logger.LogError("CloneHero", "Restore deleted song failed", ex, new Dictionary<string, object?>
             {
                 ["songId"] = deletedSongId,
@@ -441,7 +447,7 @@ public class CloneHeroViewModel : INotifyPropertyChanged, IDisposable
         }
         finally
         {
-            IsReconciling = false;
+            await _uiInvoke(() => IsReconciling = false);
         }
     }
 

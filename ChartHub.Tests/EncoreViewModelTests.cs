@@ -379,6 +379,56 @@ public class EncoreViewModelTests
         Assert.Empty(sharedQueue.Downloads);
     }
 
+    [Fact]
+    public async Task LoadMoreAsync_ThenLoadMoreAsync_AppendsPageResults()
+    {
+        using var temp = new TemporaryDirectoryFixture("encore-vm-pagination-append");
+        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        EncoreApiService apiService = CreateApiServiceWithPagedHandler();
+        var sut = new EncoreViewModel(
+            apiService,
+            new NoOpChartHubServerApiClient(),
+            new NoOpSettingsOrchestrator(),
+            new SharedDownloadQueue(),
+            uiInvoke: action => { action(); return Task.CompletedTask; },
+            loadInitialData: false);
+
+        await sut.RefreshAsync();
+        Assert.Single(sut.DataItems);
+
+        await sut.LoadMoreAsync();
+
+        Assert.NotNull(sut.DataItems);
+        Assert.Equal(2, sut.DataItems!.Count);
+        Assert.Equal(2, apiService.CurrentPage);
+        Assert.False(apiService.HasMoreRecords);
+    }
+
+    [Fact]
+    public async Task LoadMoreAsync_WhenTriggeredConcurrently_DeduplicatesPageAdvance()
+    {
+        using var temp = new TemporaryDirectoryFixture("encore-vm-pagination-dedup");
+        var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        EncoreApiService apiService = CreateApiServiceWithPagedHandler(delayMs: 40);
+        var sut = new EncoreViewModel(
+            apiService,
+            new NoOpChartHubServerApiClient(),
+            new NoOpSettingsOrchestrator(),
+            new SharedDownloadQueue(),
+            uiInvoke: action => { action(); return Task.CompletedTask; },
+            loadInitialData: false);
+
+        await sut.RefreshAsync();
+
+        await Task.WhenAll(sut.LoadMoreAsync(), sut.LoadMoreAsync());
+
+        Assert.NotNull(sut.DataItems);
+        Assert.Equal(2, sut.DataItems!.Count);
+        Assert.Equal(2, apiService.CurrentPage);
+    }
+
     private sealed class RecordingHttpHandler : HttpMessageHandler
     {
         private static readonly string EmptyResponseJson = """
@@ -477,6 +527,110 @@ public class EncoreViewModelTests
 
         Assert.NotNull(constructor);
         return (EncoreApiService)constructor!.Invoke([catalog, httpClient]);
+    }
+
+    private static EncoreApiService CreateApiServiceWithPagedHandler(int delayMs = 0)
+    {
+        using var tempDir = new TemporaryDirectoryFixture("encore-paged-catalog");
+        var catalog = new LibraryCatalogService(Path.Combine(tempDir.RootPath, "library-catalog.db"));
+
+        var httpClient = new HttpClient(new StubEncoreHttpHandler(async (request, cancellationToken) =>
+        {
+            if (delayMs > 0)
+            {
+                await Task.Delay(delayMs, cancellationToken);
+            }
+
+            string body = request.Content is null
+                ? string.Empty
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+            int page = ParseEncorePage(body);
+            string json = BuildPagedEncoreResponseJson(page);
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(json),
+            };
+        }))
+        {
+            BaseAddress = new Uri("https://api.enchor.us"),
+        };
+
+        return CreateApiService(catalog, httpClient);
+    }
+
+    private static int ParseEncorePage(string requestBody)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(
+            string.IsNullOrWhiteSpace(requestBody) ? "{}" : requestBody);
+        if (doc.RootElement.TryGetProperty("page", out System.Text.Json.JsonElement pageElement)
+            && pageElement.TryGetInt32(out int page))
+        {
+            return page;
+        }
+
+        return 1;
+    }
+
+    private static string BuildPagedEncoreResponseJson(int page)
+    {
+        const int totalSongs = 2;
+        bool hasItem = page >= 1 && page <= totalSongs;
+        int chartId = page;
+        string md5 = $"{page:D32}";
+
+        string dataSection = hasItem
+            ? $$"""
+                [
+                    {
+                        "name": "Title {{page}}",
+                        "artist": "Artist {{page}}",
+                        "album": "Album {{page}}",
+                        "genre": "Rock",
+                        "year": "2024",
+                        "charter": "Charter {{page}}",
+                        "applicationUsername": "user{{page}}",
+                        "albumArtMd5": null,
+                        "song_length": 180000,
+                        "chartId": {{chartId}},
+                        "songId": {{page}},
+                        "groupId": {{page}},
+                        "md5": "{{md5}}",
+                        "chartHash": "hash-{{page}}",
+                        "versionGroupId": {{page}},
+                        "preview_start_time": 0,
+                        "diff_band": null,
+                        "diff_guitar": null,
+                        "diff_bass": null,
+                        "diff_drums": null,
+                        "diff_vocals": null,
+                        "diff_keys": null,
+                        "diff_guitar_coop": null,
+                        "diff_rhythm": null,
+                        "diff_drums_real": null,
+                        "diff_guitarghl": null,
+                        "diff_bassghl": null,
+                        "hasVideoBackground": false,
+                        "modchart": false
+                    }
+                ]
+                """
+            : "[]";
+
+        return $$"""
+            {
+                "found": {{totalSongs}},
+                "out_of": {{totalSongs}},
+                "page": {{page}},
+                "search_time_ms": 0,
+                "data": {{dataSection}}
+            }
+            """;
+    }
+
+    private sealed class StubEncoreHttpHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> sendAsync) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => sendAsync(request, cancellationToken);
     }
 
     private sealed class NoOpChartHubServerApiClient : IChartHubServerApiClient
