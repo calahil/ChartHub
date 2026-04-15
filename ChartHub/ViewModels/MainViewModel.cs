@@ -16,9 +16,24 @@ namespace ChartHub.ViewModels;
 public class MainViewModel : INotifyPropertyChanged
 {
     private readonly bool _isAndroidMode;
+    private readonly IStatusBarService _statusBarService = new StatusBarService();
+    private string _statusBarMessage = string.Empty;
 
     public bool IsCompanionMode => _isAndroidMode;
     public bool IsDesktopMode => !_isAndroidMode;
+
+    public string StatusBarMessage
+    {
+        get => _statusBarMessage;
+        private set
+        {
+            _statusBarMessage = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasStatusBarMessage));
+        }
+    }
+
+    public bool HasStatusBarMessage => !string.IsNullOrEmpty(StatusBarMessage);
 
     private RhythmVerseViewModel _rhythmVerseViewModel = null!;
     private EncoreViewModel _encoreViewModel = null!;
@@ -410,7 +425,8 @@ public class MainViewModel : INotifyPropertyChanged
             virtualTouchPadViewModel: null,
             virtualKeyboardViewModel: null,
             action => Dispatcher.UIThread.Post(action),
-            OperatingSystem.IsAndroid())
+            OperatingSystem.IsAndroid(),
+            App.ServiceProvider?.GetService(typeof(IStatusBarService)) as IStatusBarService)
     {
     }
 
@@ -439,7 +455,8 @@ public class MainViewModel : INotifyPropertyChanged
             virtualTouchPadViewModel,
             virtualKeyboardViewModel,
             action => Dispatcher.UIThread.Post(action),
-            OperatingSystem.IsAndroid())
+            OperatingSystem.IsAndroid(),
+            App.ServiceProvider?.GetService(typeof(IStatusBarService)) as IStatusBarService)
     {
     }
 
@@ -456,7 +473,8 @@ public class MainViewModel : INotifyPropertyChanged
         VirtualTouchPadViewModel? virtualTouchPadViewModel,
         VirtualKeyboardViewModel? virtualKeyboardViewModel,
         Action<Action> postToUi,
-        bool isAndroid)
+        bool isAndroid,
+        IStatusBarService? statusBarService = null)
     {
         _rhythmVerseViewModel = rhythmVerseViewModel;
         _encoreViewModel = encoreViewModel;
@@ -475,6 +493,12 @@ public class MainViewModel : INotifyPropertyChanged
         _virtualControllerViewModel = virtualControllerViewModel ?? new VirtualControllerViewModel();
         _virtualTouchPadViewModel = virtualTouchPadViewModel ?? new VirtualTouchPadViewModel();
         _virtualKeyboardViewModel = virtualKeyboardViewModel ?? new VirtualKeyboardViewModel();
+
+        if (statusBarService is not null)
+        {
+            _statusBarService = statusBarService;
+            _statusBarService.MessageChanged += (_, _) => postToUi(() => StatusBarMessage = _statusBarService.CurrentMessage);
+        }
         ShowFiltersPaneCommand = new RelayCommand(ToggleDesktopFiltersPane);
         ToggleAndroidNavPaneCommand = new RelayCommand(ToggleAndroidNavPane);
         ShowAndroidNavListCommand = new RelayCommand(ShowAndroidNavList);

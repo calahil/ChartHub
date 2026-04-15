@@ -142,7 +142,78 @@ public sealed partial class RhythmVerseRepository(
             }
         }
 
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException ex)
+        {
+            Log.UpsertBatchFailed(logger, bufferedSongs.Count, ex);
+            dbContext.ChangeTracker.Clear();
+            int savedCount = 0;
+            int failedCount = 0;
+            foreach (SyncedSong song in bufferedSongs)
+            {
+                try
+                {
+                    await UpsertSingleSongAsync(song, reconciliationRunId, syncedUtc, cancellationToken).ConfigureAwait(false);
+                    savedCount++;
+                }
+                catch (DbUpdateException songEx)
+                {
+                    Log.UpsertSongFailed(logger, song.SongId, song.RecordId, songEx);
+                    dbContext.ChangeTracker.Clear();
+                    failedCount++;
+                }
+            }
+
+            Log.UpsertFallbackComplete(logger, savedCount, failedCount);
+        }
+    }
+
+    private async Task UpsertSingleSongAsync(
+        SyncedSong song,
+        string? reconciliationRunId,
+        DateTimeOffset syncedUtc,
+        CancellationToken cancellationToken)
+    {
+        SongSnapshotEntity? existing = await dbContext.SongSnapshots
+            .FirstOrDefaultAsync(x => x.SongId == song.SongId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (existing is null)
+        {
+            existing = new SongSnapshotEntity { SongId = song.SongId };
+            dbContext.SongSnapshots.Add(existing);
+        }
+
+        existing.RecordId = song.RecordId;
+        existing.Artist = song.Artist;
+        existing.Title = song.Title;
+        existing.Album = song.Album;
+        existing.Genre = song.Genre;
+        existing.Year = song.Year;
+        existing.RecordUpdatedUnix = song.RecordUpdatedUnix;
+        existing.FileId = song.FileId;
+        existing.DownloadUrl = song.DownloadUrl;
+        existing.DiffGuitar = song.DiffGuitar;
+        existing.DiffBass = song.DiffBass;
+        existing.DiffDrums = song.DiffDrums;
+        existing.DiffVocals = song.DiffVocals;
+        existing.DiffKeys = song.DiffKeys;
+        existing.DiffBand = song.DiffBand;
+        existing.AuthorId = song.AuthorId;
+        existing.GroupId = song.GroupId;
+        existing.GameFormat = song.GameFormat;
+        existing.SongJson = song.SongJson;
+        existing.DataJson = song.DataJson;
+        existing.FileJson = song.FileJson;
+        existing.IsDeleted = false;
+        existing.LastReconciledRunId = reconciliationRunId;
+        existing.LastSyncedUtc = syncedUtc;
+
         await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        dbContext.ChangeTracker.Clear();
     }
 
     public async Task FinalizeReconciliationRunAsync(string reconciliationRunId, CancellationToken cancellationToken)
@@ -556,5 +627,14 @@ public sealed partial class RhythmVerseRepository(
 
         [LoggerMessage(EventId = 1102, Level = LogLevel.Warning, Message = "Skipping RhythmVerse song with RecordId {RecordId} because it conflicts with existing SongId {ExistingSongId}; incoming SongId was {IncomingSongId}.")]
         public static partial void RecordIdConflictIgnored(ILogger logger, string recordId, long incomingSongId, long existingSongId);
+
+        [LoggerMessage(EventId = 1103, Level = LogLevel.Warning, Message = "Batch save failed for {Count} songs; falling back to per-song saves to isolate the problem.")]
+        public static partial void UpsertBatchFailed(ILogger logger, int count, Exception exception);
+
+        [LoggerMessage(EventId = 1104, Level = LogLevel.Warning, Message = "Per-song save failed for SongId {SongId} (RecordId: {RecordId}); song will be skipped.")]
+        public static partial void UpsertSongFailed(ILogger logger, long songId, string? recordId, Exception exception);
+
+        [LoggerMessage(EventId = 1105, Level = LogLevel.Information, Message = "Per-song fallback complete: {SavedCount} saved, {FailedCount} skipped.")]
+        public static partial void UpsertFallbackComplete(ILogger logger, int savedCount, int failedCount);
     }
 }

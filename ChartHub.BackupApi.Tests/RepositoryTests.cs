@@ -5,7 +5,9 @@ using ChartHub.BackupApi.Persistence;
 using ChartHub.BackupApi.Services;
 using ChartHub.BackupApi.Tests.TestInfrastructure;
 
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ChartHub.BackupApi.Tests;
@@ -549,6 +551,96 @@ public class RepositoryTests : IDisposable
         string? value = await _sut.GetSyncStateAsync("test.key", CancellationToken.None);
 
         Assert.Equal("value2", value);
+    }
+
+    [Fact]
+    public async Task UpsertSongsAsync_WhenBatchSaveFails_FallsBackAndSavesAllSongsIndividually()
+    {
+        using SqliteConnection connection = new("Data Source=:memory:");
+        connection.Open();
+        DbContextOptions<BackupDbContext> options = new DbContextOptionsBuilder<BackupDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        using FailFirstBatchContext ctx = new(options);
+        ctx.Database.EnsureCreated();
+        RhythmVerseRepository sut = new(ctx, NullLogger<RhythmVerseRepository>.Instance);
+
+        await sut.UpsertSongsAsync(
+            [Song(1, "Artist A"), Song(2, "Artist B")],
+            CancellationToken.None);
+
+        int savedCount = await ctx.SongSnapshots.CountAsync(CancellationToken.None);
+        Assert.Equal(2, savedCount);
+    }
+
+    [Fact]
+    public async Task UpsertSongsAsync_WhenBatchAndOneSongFail_SkipsFailingSongAndSavesRest()
+    {
+        using SqliteConnection connection = new("Data Source=:memory:");
+        connection.Open();
+        DbContextOptions<BackupDbContext> options = new DbContextOptionsBuilder<BackupDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        using FailBatchAndSong99Context ctx = new(options);
+        ctx.Database.EnsureCreated();
+        RhythmVerseRepository sut = new(ctx, NullLogger<RhythmVerseRepository>.Instance);
+
+        await sut.UpsertSongsAsync(
+            [Song(1, "Artist A"), Song(99, "Bad Artist"), Song(2, "Artist B")],
+            CancellationToken.None);
+
+        int savedCount = await ctx.SongSnapshots.CountAsync(CancellationToken.None);
+        Assert.Equal(2, savedCount);
+        Assert.False(await ctx.SongSnapshots.AnyAsync(x => x.SongId == 99, CancellationToken.None));
+        Assert.True(await ctx.SongSnapshots.AnyAsync(x => x.SongId == 1, CancellationToken.None));
+        Assert.True(await ctx.SongSnapshots.AnyAsync(x => x.SongId == 2, CancellationToken.None));
+    }
+
+    private sealed class FailFirstBatchContext(DbContextOptions<BackupDbContext> options) : BackupDbContext(options)
+    {
+        private bool _batchFailed;
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            if (!_batchFailed)
+            {
+                int pending = ChangeTracker.Entries()
+                    .Count(e => e.State is EntityState.Added or EntityState.Modified);
+                if (pending > 1)
+                {
+                    _batchFailed = true;
+                    throw new DbUpdateException("Simulated batch failure", new Exception("inner"));
+                }
+            }
+
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private sealed class FailBatchAndSong99Context(DbContextOptions<BackupDbContext> options) : BackupDbContext(options)
+    {
+        private bool _batchFailed;
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            var pending = ChangeTracker.Entries<SongSnapshotEntity>()
+                .Where(e => e.State is EntityState.Added or EntityState.Modified)
+                .Select(e => e.Entity)
+                .ToList();
+
+            if (!_batchFailed && pending.Count > 1)
+            {
+                _batchFailed = true;
+                throw new DbUpdateException("Simulated batch failure", new Exception("inner"));
+            }
+
+            if (pending.Any(s => s.SongId == 99))
+            {
+                throw new DbUpdateException("Simulated single-song failure", new Exception("inner"));
+            }
+
+            return await base.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static SyncedSong Song(

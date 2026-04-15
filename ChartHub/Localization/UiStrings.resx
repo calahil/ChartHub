@@ -274,4 +274,5 @@
   <data name="Input.Keyboard.Key.Escape" xml:space="preserve"><value>Esc</value></data>
   <data name="Input.Keyboard.Key.Tab" xml:space="preserve"><value>Tab</value></data>
   <data name="Input.Keyboard.Hint" xml:space="preserve"><value>Type here…</value></data>
+  <data name="StatusBar.ServerUnavailable" xml:space="preserve"><value>Server unavailable — retrying connection…</value></data>
 </root>

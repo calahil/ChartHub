@@ -172,6 +172,7 @@ public class MainViewModelTests
                 typeof(VirtualKeyboardViewModel),
                 typeof(Action<Action>),
                 typeof(bool),
+                typeof(IStatusBarService),
             ],
             modifiers: null);
 
@@ -193,6 +194,7 @@ public class MainViewModelTests
             null,
             (Action<Action>)(action => action()),
             isAndroid,
+            null,
         ]);
     }
 

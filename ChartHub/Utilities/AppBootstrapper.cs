@@ -150,12 +150,14 @@ public static class AppBootstrapper
         services.AddSingleton<SharedDownloadQueue>();
         services.AddSingleton(_ => new LibraryCatalogService(Path.Combine(configDir, "library-catalog.db")));
         services.AddSingleton<IChartHubServerApiClient, ChartHubServerApiClient>();
+        services.AddSingleton<IStatusBarService, StatusBarService>();
         services.AddSingleton<DownloadViewModel>(serviceProvider =>
             new DownloadViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
                 serviceProvider.GetRequiredService<IChartHubServerApiClient>(),
                 serviceProvider.GetRequiredService<SharedDownloadQueue>(),
-                serviceProvider.GetService<CloneHeroViewModel>()));
+                serviceProvider.GetService<CloneHeroViewModel>(),
+                statusBarService: serviceProvider.GetRequiredService<IStatusBarService>()));
         services.AddSingleton<CloneHeroViewModel>(serviceProvider =>
             new CloneHeroViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),

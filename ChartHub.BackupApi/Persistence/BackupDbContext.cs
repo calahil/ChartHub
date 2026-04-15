@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ChartHub.BackupApi.Persistence;
 
-public sealed class BackupDbContext(DbContextOptions<BackupDbContext> options) : DbContext(options)
+public class BackupDbContext(DbContextOptions<BackupDbContext> options) : DbContext(options)
 {
     public DbSet<SongSnapshotEntity> SongSnapshots => Set<SongSnapshotEntity>();
 

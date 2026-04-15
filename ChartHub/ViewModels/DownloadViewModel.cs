@@ -4,6 +4,7 @@ using System.Net;
 
 using Avalonia.Threading;
 
+using ChartHub.Localization;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Strings;
@@ -144,6 +145,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     }
 
     private readonly CloneHeroViewModel? _cloneHeroViewModel;
+    private readonly IStatusBarService _statusBarService;
     private readonly CancellationTokenSource _queueRefreshCts = new();
     private readonly Task? _queueRefreshTask;
     private readonly Dictionary<long, Guid> _serverQueueJobIds = [];
@@ -153,12 +155,14 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         IChartHubServerApiClient serverApiClient,
         SharedDownloadQueue sharedDownloadQueue,
         CloneHeroViewModel? cloneHeroViewModel = null,
-        Func<Action, Task>? uiInvoke = null)
+        Func<Action, Task>? uiInvoke = null,
+        IStatusBarService? statusBarService = null)
     {
         _globalSettings = settings;
         _serverApiClient = serverApiClient;
         _sharedDownloadQueue = sharedDownloadQueue;
         _cloneHeroViewModel = cloneHeroViewModel;
+        _statusBarService = statusBarService ?? new StatusBarService();
         _uiInvoke = uiInvoke ?? (async action => await Dispatcher.UIThread.InvokeAsync(action));
         CheckAllCommand = new RelayCommand(CheckAllItemsCommand);
         InstallSongs = new AsyncRelayCommand(InstallSongsCommandAsync);
@@ -702,6 +706,8 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
                     ["baseUrl"] = baseUrl,
                 });
 
+                _statusBarService.Clear();
+
                 await foreach (IReadOnlyList<ChartHubServerDownloadJobResponse> jobs in _serverApiClient
                                    .StreamDownloadJobsAsync(baseUrl, bearerToken, cancellationToken)
                                    .WithCancellation(cancellationToken)
@@ -726,6 +732,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             catch (Exception ex)
             {
                 Logger.LogError("ServerDownload", "ChartHub.Server job stream failed", ex);
+                _statusBarService.Post(UiLocalization.Get("StatusBar.ServerUnavailable"));
                 await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
             }
         }

@@ -31,8 +31,9 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid>
-        <SplitView IsVisible="{Binding IsDesktopMode}"
+    <Grid RowDefinitions="*,Auto">
+        <SplitView Grid.Row="0"
+                   IsVisible="{Binding IsDesktopMode}"
                    IsPaneOpen="{Binding IsFilterPaneOpen}"
                    OpenPaneLength="380"
                    CompactPaneLength="48"
@@ -286,7 +287,8 @@
             </TabControl>
         </SplitView>
 
-        <SplitView IsVisible="{Binding IsCompanionMode}"
+        <SplitView Grid.Row="0"
+                   IsVisible="{Binding IsCompanionMode}"
                    IsPaneOpen="{Binding IsAndroidNavPaneOpen}"
                    OpenPaneLength="320"
                    PanePlacement="Left"
@@ -557,5 +559,15 @@
                                 Content="{Binding SelectedMainContentViewModel}" />
             </Grid>
         </SplitView>
+        <Border Grid.Row="1"
+                IsVisible="{Binding HasStatusBarMessage}"
+                BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                BorderThickness="0,1,0,0"
+                Background="{StaticResource ThemeBackgroundBrush}"
+                Padding="8,4">
+            <TextBlock Text="{Binding StatusBarMessage}"
+                       Foreground="{StaticResource ThemeForegroundLowBrush}"
+                       FontSize="12" />
+        </Border>
     </Grid>
 </UserControl>
