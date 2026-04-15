@@ -12,7 +12,7 @@ public static class RhythmVerseSourceUrls
     {
         return source switch
         {
-            RhythmVerseSource.ChartHubMirror => new Uri("http://backupapi.protail"),
+            RhythmVerseSource.ChartHubMirror => new Uri("https://rhythmverse.calahilstudios.com"),
             _ => new Uri("https://rhythmverse.co"),
         };
     }

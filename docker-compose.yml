@@ -49,11 +49,9 @@ services:
       - ImageCache__CacheDirectory=/cache/images
     labels:
       traefik.enable: 'true'
-      traefik.http.routers.backupapi.rule: 'Host(`backupapi.protail`)'
+      traefik.http.routers.backupapi.rule: 'Host(`prodesk.tail5f77c7.ts.net`)'
       traefik.http.services.backupapi.loadbalancer.server.port: '5000'
       traefik.http.routers.backupapi.entrypoints: 'http'
-      traefik.http.routers.backupapi.tls: 'false'
-      traefik.http.routers.backupapi.middlewares: ''
       traefik.docker.network: ${NETWORK}
     ports:
       - "${API_PORT:-5147}:5000"
