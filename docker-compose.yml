@@ -49,7 +49,7 @@ services:
       - ImageCache__CacheDirectory=/cache/images
     labels:
       traefik.enable: 'true'
-      traefik.http.routers.backupapi.rule: 'Host(`protail`)'
+      traefik.http.routers.backupapi.rule: 'Host(`backupapi.protail`)'
       traefik.http.services.backupapi.loadbalancer.server.port: '5000'
       traefik.http.routers.backupapi.entrypoints: 'http'
       traefik.http.routers.backupapi.tls: 'false'
