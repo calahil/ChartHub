@@ -49,12 +49,10 @@ services:
       - ImageCache__CacheDirectory=/cache/images
     labels:
       traefik.enable: 'true'
-      traefik.http.routers.backupapi.rule: 'Host(`backupapi.protail`)'
+      traefik.http.routers.backupapi.rule: 'Host(`protail`)'
       traefik.http.services.backupapi.loadbalancer.server.port: '5000'
       traefik.http.routers.backupapi.entrypoints: 'http'
       traefik.docker.network: ${NETWORK}
-    ports:
-      - "${API_PORT:-5147}:5000"
     volumes:
       - ${BACKUP_DOWNLOADS_HOST_PATH:-./ChartHub.BackupApi/cache/downloads}:/cache/downloads
       - ${BACKUP_IMAGES_HOST_PATH:-./ChartHub.BackupApi/cache/images}:/cache/images

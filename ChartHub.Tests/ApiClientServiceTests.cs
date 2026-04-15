@@ -94,9 +94,9 @@ public class ApiClientServiceTests
           authorText: string.Empty);
 
         ViewSong song = Assert.Single(results);
-        Assert.Equal("http://backupapi.protail/assets/album_art/data-art.png", song.AlbumArt);
-        Assert.Equal("http://backupapi.protail/downloads/data-song.zip", song.DownloadLink);
-        Assert.Equal("http://backupapi.protail/avatars/author.png", song.Author?.AvatarPath);
+        Assert.Equal("http://protail/assets/album_art/data-art.png", song.AlbumArt);
+        Assert.Equal("http://protail/downloads/data-song.zip", song.DownloadLink);
+        Assert.Equal("http://protail/avatars/author.png", song.Author?.AvatarPath);
     }
 
     [Fact]
