@@ -94,9 +94,9 @@ public class ApiClientServiceTests
           authorText: string.Empty);
 
         ViewSong song = Assert.Single(results);
-        Assert.Equal("http://127.0.0.1:5147/assets/album_art/data-art.png", song.AlbumArt);
-        Assert.Equal("http://127.0.0.1:5147/downloads/data-song.zip", song.DownloadLink);
-        Assert.Equal("http://127.0.0.1:5147/avatars/author.png", song.Author?.AvatarPath);
+        Assert.Equal("http://backupapi.protail/assets/album_art/data-art.png", song.AlbumArt);
+        Assert.Equal("http://backupapi.protail/downloads/data-song.zip", song.DownloadLink);
+        Assert.Equal("http://backupapi.protail/avatars/author.png", song.Author?.AvatarPath);
     }
 
     [Fact]
@@ -223,7 +223,7 @@ public class ApiClientServiceTests
             authorText: string.Empty);
 
         ViewSong song = Assert.Single(results);
-        Assert.Equal("http://127.0.0.1:5147/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip", song.DownloadLink);
+        Assert.Equal("http://backupapi.protail/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip", song.DownloadLink);
     }
 
     [Fact]
@@ -299,7 +299,7 @@ public class ApiClientServiceTests
     [Fact]
     public async Task GetSongFilesAsync_WithMirrorSource_WhenDownloadUrlIsMalformedExternalProxy_UsesDownloadPageUrlFull()
     {
-        const string malformedProxyUrl = "http://127.0.0.1:5147/downloads/external";
+        const string malformedProxyUrl = "http://backupapi.protail/downloads/external";
         const string mediaFireUrl = "https://www.mediafire.com/file/abc123/sample/file";
 
         using var httpClient = new HttpClient(new StubHttpMessageHandler(async (_, _) => new HttpResponseMessage(HttpStatusCode.OK)

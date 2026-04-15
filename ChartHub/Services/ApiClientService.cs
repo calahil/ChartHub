@@ -441,8 +441,8 @@ public class ApiClientService : INotifyPropertyChanged
             return downloadUrl;
         }
 
-        if (!string.Equals(baseUri.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
-            || baseUri.Port != 5147)
+        Uri mirrorBaseUri = RhythmVerseSourceUrls.GetBaseUri(RhythmVerseSource.ChartHubMirror);
+        if (!string.Equals(baseUri.Host, mirrorBaseUri.Host, StringComparison.OrdinalIgnoreCase))
         {
             return downloadUrl;
         }
@@ -451,7 +451,8 @@ public class ApiClientService : INotifyPropertyChanged
             || downloadUri.Host.Contains("mediafire.com", StringComparison.OrdinalIgnoreCase)
             || downloadUri.Host.Contains("marketplace.xbox.com", StringComparison.OrdinalIgnoreCase)
             || downloadUri.Host.Contains("store.xbox.com", StringComparison.OrdinalIgnoreCase)
-            || downloadUri.IsLoopback)
+            || downloadUri.IsLoopback
+            || string.Equals(downloadUri.Host, mirrorBaseUri.Host, StringComparison.OrdinalIgnoreCase))
         {
             return downloadUrl;
         }
@@ -502,7 +503,10 @@ public class ApiClientService : INotifyPropertyChanged
             return false;
         }
 
-        if (!uri.IsLoopback || !string.Equals(uri.AbsolutePath, "/downloads/external", StringComparison.OrdinalIgnoreCase))
+        Uri mirrorBaseUri = RhythmVerseSourceUrls.GetBaseUri(RhythmVerseSource.ChartHubMirror);
+        bool isMirrorHost = uri.IsLoopback
+            || string.Equals(uri.Host, mirrorBaseUri.Host, StringComparison.OrdinalIgnoreCase);
+        if (!isMirrorHost || !string.Equals(uri.AbsolutePath, "/downloads/external", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
