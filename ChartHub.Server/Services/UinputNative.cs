@@ -12,7 +12,7 @@ internal static class UinputNative
     // ── libc syscalls ────────────────────────────────────────────────────────
 
     // open() accepts a null-terminated byte string. Encode to UTF-8 before calling.
-    [DllImport("libc", SetLastError = true)]
+    [DllImport("libc", EntryPoint = "open", SetLastError = true)]
     private static extern int open_native(byte[] pathname, int flags);
 
     /// <summary>Opens a file path on Linux via libc open(2).</summary>
@@ -36,6 +36,9 @@ internal static class UinputNative
     [DllImport("libc", SetLastError = true)]
     internal static extern int ioctl(int fd, ulong request, ref UinputSetup arg);
 
+    [DllImport("libc", SetLastError = true)]
+    internal static extern int ioctl(int fd, ulong request, ref UinputAbsSetup arg);
+
     // ── open flags ───────────────────────────────────────────────────────────
 
     internal const int O_WRONLY = 1;
@@ -49,6 +52,8 @@ internal static class UinputNative
     internal const ulong UI_SET_ABSBIT = 0x40045567;
     internal const ulong UI_SET_MSCBIT = 0x40045568;
     internal const ulong UI_DEV_SETUP = 0x405c5503;
+    // UI_ABS_SETUP = _IOWR('U', 4, struct uinput_abs_setup); size=28=0x1C
+    internal const ulong UI_ABS_SETUP = 0xC01C5504;
     internal const ulong UI_DEV_CREATE = 0x5501;
     internal const ulong UI_DEV_DESTROY = 0x5502;
 
@@ -69,8 +74,14 @@ internal static class UinputNative
     internal const int REL_X = 0x00;
     internal const int REL_Y = 0x01;
 
-    // ── absolute axes (gamepad D-pad) ────────────────────────────────────────
+    // ── absolute axes (analog sticks, triggers, D-pad) ────────────────────────
 
+    internal const int ABS_X = 0x00;
+    internal const int ABS_Y = 0x01;
+    internal const int ABS_Z = 0x02;
+    internal const int ABS_RX = 0x03;
+    internal const int ABS_RY = 0x04;
+    internal const int ABS_RZ = 0x05;
     internal const int ABS_HAT0X = 0x10;
     internal const int ABS_HAT0Y = 0x11;
 
@@ -85,8 +96,14 @@ internal static class UinputNative
     internal const int BTN_B = 0x131;
     internal const int BTN_X = 0x133;
     internal const int BTN_Y = 0x134;
+    // Xbox 360 shoulder and thumb buttons — registered for correct SDL2 button indices.
+    internal const int BTN_TL = 0x136;
+    internal const int BTN_TR = 0x137;
     internal const int BTN_SELECT = 0x13a;
     internal const int BTN_START = 0x13b;
+    internal const int BTN_MODE = 0x13c;
+    internal const int BTN_THUMBL = 0x13d;
+    internal const int BTN_THUMBR = 0x13e;
 
     // ── mappings: button-id strings to Linux key codes ───────────────────────
 
@@ -198,6 +215,26 @@ internal static class UinputNative
         public string Name;
 
         public uint FfEffectsMax;
+    }
+
+    /// <summary>Maps to Linux struct input_absinfo.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct InputAbsinfo
+    {
+        public int Value;
+        public int Minimum;
+        public int Maximum;
+        public int Fuzz;
+        public int Flat;
+        public int Resolution;
+    }
+
+    /// <summary>Maps to Linux struct uinput_abs_setup (used with UI_ABS_SETUP).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct UinputAbsSetup
+    {
+        public uint Code;
+        public InputAbsinfo Absinfo;
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

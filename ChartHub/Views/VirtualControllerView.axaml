@@ -42,56 +42,68 @@
                   ColumnDefinitions="*,Auto,*">
 
                 <!-- Up -->
-                <Button Grid.Row="0" Grid.Column="1"
+                <Border Grid.Row="0" Grid.Column="1"
                         Width="60" Height="60"
                         CornerRadius="8"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        Command="{Binding SetDPadCommand}"
-                        CommandParameter="0,-1"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
+                        Tag="0,-1"
+                        PointerPressed="OnDPadPressed"
                         PointerReleased="OnDPadReleased">
                     <Image Width="32" Height="32"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
                            Source="{Binding Source={x:Static strings:UiIcons.ArrowUp}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
+                </Border>
 
                 <!-- Left -->
-                <Button Grid.Row="1" Grid.Column="0"
+                <Border Grid.Row="1" Grid.Column="0"
                         Width="60" Height="60"
                         CornerRadius="8"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        Command="{Binding SetDPadCommand}"
-                        CommandParameter="-1,0"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
+                        Tag="-1,0"
+                        PointerPressed="OnDPadPressed"
                         PointerReleased="OnDPadReleased">
                     <Image Width="32" Height="32"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
                            Source="{Binding Source={x:Static strings:UiIcons.ArrowLeft}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
+                </Border>
 
                 <!-- Right -->
-                <Button Grid.Row="1" Grid.Column="2"
+                <Border Grid.Row="1" Grid.Column="2"
                         Width="60" Height="60"
                         CornerRadius="8"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        Command="{Binding SetDPadCommand}"
-                        CommandParameter="1,0"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
+                        Tag="1,0"
+                        PointerPressed="OnDPadPressed"
                         PointerReleased="OnDPadReleased">
                     <Image Width="32" Height="32"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
                            Source="{Binding Source={x:Static strings:UiIcons.ArrowRight}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
+                </Border>
 
                 <!-- Down -->
-                <Button Grid.Row="2" Grid.Column="1"
+                <Border Grid.Row="2" Grid.Column="1"
                         Width="60" Height="60"
                         CornerRadius="8"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
-                        Command="{Binding SetDPadCommand}"
-                        CommandParameter="0,1"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
+                        Tag="0,1"
+                        PointerPressed="OnDPadPressed"
                         PointerReleased="OnDPadReleased">
                     <Image Width="32" Height="32"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
                            Source="{Binding Source={x:Static strings:UiIcons.ArrowDown}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
+                </Border>
             </Grid>
 
             <!-- Center: Start/Select -->
@@ -101,26 +113,32 @@
                         HorizontalAlignment="Center"
                         VerticalAlignment="Bottom"
                         Margin="0,0,0,16">
-                <Button Width="56" Height="40"
+                <Border Width="56" Height="40"
                         CornerRadius="8"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
+                        Tag="select"
                         PointerPressed="OnControllerButtonPressed"
-                        PointerReleased="OnControllerButtonReleased"
-                        Tag="select">
+                        PointerReleased="OnControllerButtonReleased">
                     <Image Width="28" Height="28"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
                            Source="{Binding Source={x:Static strings:UiIcons.SelectButton}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
-                <Button Width="56" Height="40"
+                </Border>
+                <Border Width="56" Height="40"
                         CornerRadius="8"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
+                        Tag="start"
                         PointerPressed="OnControllerButtonPressed"
-                        PointerReleased="OnControllerButtonReleased"
-                        Tag="start">
+                        PointerReleased="OnControllerButtonReleased">
                     <Image Width="28" Height="28"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
                            Source="{Binding Source={x:Static strings:UiIcons.StartButton}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
+                </Border>
             </StackPanel>
 
             <!-- Right: Face buttons (ABXY) -->
@@ -133,56 +151,68 @@
                   ColumnDefinitions="*,Auto,*">
 
                 <!-- Y (top) -->
-                <Button Grid.Row="0" Grid.Column="1"
+                <Border Grid.Row="0" Grid.Column="1"
                         Width="60" Height="60"
                         CornerRadius="30"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
+                        Tag="y"
                         PointerPressed="OnControllerButtonPressed"
-                        PointerReleased="OnControllerButtonReleased"
-                        Tag="y">
+                        PointerReleased="OnControllerButtonReleased">
                     <Image Width="36" Height="36"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
                            Source="{Binding Source={x:Static strings:UiIcons.YButton}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
+                </Border>
 
                 <!-- X (left) -->
-                <Button Grid.Row="1" Grid.Column="0"
+                <Border Grid.Row="1" Grid.Column="0"
                         Width="60" Height="60"
                         CornerRadius="30"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
+                        Tag="x"
                         PointerPressed="OnControllerButtonPressed"
-                        PointerReleased="OnControllerButtonReleased"
-                        Tag="x">
+                        PointerReleased="OnControllerButtonReleased">
                     <Image Width="36" Height="36"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
                            Source="{Binding Source={x:Static strings:UiIcons.XButton}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
+                </Border>
 
                 <!-- B (right) -->
-                <Button Grid.Row="1" Grid.Column="2"
+                <Border Grid.Row="1" Grid.Column="2"
                         Width="60" Height="60"
                         CornerRadius="30"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
+                        Tag="b"
                         PointerPressed="OnControllerButtonPressed"
-                        PointerReleased="OnControllerButtonReleased"
-                        Tag="b">
+                        PointerReleased="OnControllerButtonReleased">
                     <Image Width="36" Height="36"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
                            Source="{Binding Source={x:Static strings:UiIcons.BButton}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
+                </Border>
 
                 <!-- A (bottom) -->
-                <Button Grid.Row="2" Grid.Column="1"
+                <Border Grid.Row="2" Grid.Column="1"
                         Width="60" Height="60"
                         CornerRadius="30"
-                        HorizontalContentAlignment="Center"
-                        VerticalContentAlignment="Center"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
+                        Tag="a"
                         PointerPressed="OnControllerButtonPressed"
-                        PointerReleased="OnControllerButtonReleased"
-                        Tag="a">
+                        PointerReleased="OnControllerButtonReleased">
                     <Image Width="36" Height="36"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
                            Source="{Binding Source={x:Static strings:UiIcons.AButton}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
+                </Border>
             </Grid>
         </Grid>
     </Grid>

@@ -41,17 +41,36 @@ public sealed partial class UinputGamepadService : IUinputGamepadService, IDispo
         _ = UinputNative.ioctl(fd, UinputNative.UI_SET_EVBIT, UinputNative.EV_ABS);
         _ = UinputNative.ioctl(fd, UinputNative.UI_SET_EVBIT, UinputNative.EV_SYN);
 
+        // Register the complete Xbox 360 button set so SDL2 assigns correct button
+        // indices: A=b0, B=b1, X=b2, Y=b3, LB=b4, RB=b5, Back=b6, Start=b7,
+        // Guide=b8, LS=b9, RS=b10. Missing entries would shift SELECT/START indices.
         foreach (int code in UinputNative.GamepadButtonCodes.Values)
         {
             _ = UinputNative.ioctl(fd, UinputNative.UI_SET_KEYBIT, code);
         }
 
-        _ = UinputNative.ioctl(fd, UinputNative.UI_SET_ABSBIT, UinputNative.ABS_HAT0X);
-        _ = UinputNative.ioctl(fd, UinputNative.UI_SET_ABSBIT, UinputNative.ABS_HAT0Y);
+        _ = UinputNative.ioctl(fd, UinputNative.UI_SET_KEYBIT, UinputNative.BTN_TL);
+        _ = UinputNative.ioctl(fd, UinputNative.UI_SET_KEYBIT, UinputNative.BTN_TR);
+        _ = UinputNative.ioctl(fd, UinputNative.UI_SET_KEYBIT, UinputNative.BTN_MODE);
+        _ = UinputNative.ioctl(fd, UinputNative.UI_SET_KEYBIT, UinputNative.BTN_THUMBL);
+        _ = UinputNative.ioctl(fd, UinputNative.UI_SET_KEYBIT, UinputNative.BTN_THUMBR);
+
+        // Analog sticks and triggers — registered with proper ranges so SDL2 includes
+        // them in axis enumeration (a0–a5 matching the Xbox 360 gamecontrollerdb entry).
+        SetupAbsAxis(fd, UinputNative.ABS_X, -32767, 32767, 16, 128);
+        SetupAbsAxis(fd, UinputNative.ABS_Y, -32767, 32767, 16, 128);
+        SetupAbsAxis(fd, UinputNative.ABS_Z, 0, 255, 0, 0);
+        SetupAbsAxis(fd, UinputNative.ABS_RX, -32767, 32767, 16, 128);
+        SetupAbsAxis(fd, UinputNative.ABS_RY, -32767, 32767, 16, 128);
+        SetupAbsAxis(fd, UinputNative.ABS_RZ, 0, 255, 0, 0);
+
+        // D-pad.
+        SetupAbsAxis(fd, UinputNative.ABS_HAT0X, -1, 1, 0, 0);
+        SetupAbsAxis(fd, UinputNative.ABS_HAT0Y, -1, 1, 0, 0);
 
         UinputNative.UinputSetup setup = new()
         {
-            Id = new UinputNative.UinputId { BusType = 0x03, Vendor = 0x045e, Product = 0x028e, Version = 1 },
+            Id = new UinputNative.UinputId { BusType = 0x03, Vendor = 0x045e, Product = 0x028e, Version = 0x0110 },
             Name = name,
             FfEffectsMax = 0,
         };
@@ -114,6 +133,23 @@ public sealed partial class UinputGamepadService : IUinputGamepadService, IDispo
             _ = UinputNative.close(_fd);
             LogGamepadDestroyed(_logger);
         }
+    }
+
+    private static void SetupAbsAxis(int fd, int code, int min, int max, int fuzz, int flat)
+    {
+        _ = UinputNative.ioctl(fd, UinputNative.UI_SET_ABSBIT, code);
+        UinputNative.UinputAbsSetup absSetup = new()
+        {
+            Code = (uint)code,
+            Absinfo = new UinputNative.InputAbsinfo
+            {
+                Minimum = min,
+                Maximum = max,
+                Fuzz = fuzz,
+                Flat = flat,
+            },
+        };
+        _ = UinputNative.ioctl(fd, UinputNative.UI_ABS_SETUP, ref absSetup);
     }
 
     [LoggerMessage(EventId = 8001, Level = LogLevel.Warning, Message = "UinputGamepadService: uinput is Linux-only; gamepad input will be unavailable.")]

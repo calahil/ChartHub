@@ -69,6 +69,9 @@ public class ViewLocator : IDataTemplate
             or VolumeViewModel
             or SettingsViewModel
             or AppShellViewModel
-            or SplashViewModel;
+            or SplashViewModel
+            or VirtualControllerViewModel
+            or VirtualTouchPadViewModel
+            or VirtualKeyboardViewModel;
     }
 }

@@ -47,4 +47,11 @@ public sealed class RuntimeAppConfig
     [SettingEditor(SettingEditorKind.Toggle)]
     [SettingHotReloadable(true)]
     public bool AndroidVolumeButtonsControlServerVolume { get; set; }
+
+    [SettingGroup("Input")]
+    [SettingDisplay("Mouse Speed Multiplier")]
+    [SettingDescription("Scales touchpad pointer deltas before sending to the server. Increase if the cursor moves too slowly.")]
+    [SettingEditor(SettingEditorKind.Number)]
+    [SettingHotReloadable(true)]
+    public double MouseSpeedMultiplier { get; set; } = 4.0;
 }

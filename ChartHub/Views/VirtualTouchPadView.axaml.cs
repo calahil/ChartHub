@@ -85,17 +85,21 @@ public partial class VirtualTouchPadView : UserControl
 
     private void OnMouseButtonPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is global::Avalonia.Controls.Button { Tag: string side } && DataContext is VirtualTouchPadViewModel vm)
+        if (sender is Border { Tag: string side } && DataContext is VirtualTouchPadViewModel vm)
         {
+            e.Pointer.Capture((Border)sender);
             vm.PressMouseButtonCommand.Execute(side);
+            e.Handled = true;
         }
     }
 
     private void OnMouseButtonReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (sender is global::Avalonia.Controls.Button { Tag: string side } && DataContext is VirtualTouchPadViewModel vm)
+        if (sender is Border { Tag: string side } && DataContext is VirtualTouchPadViewModel vm)
         {
+            e.Pointer.Capture(null);
             vm.ReleaseMouseButtonCommand.Execute(side);
+            e.Handled = true;
         }
     }
 }

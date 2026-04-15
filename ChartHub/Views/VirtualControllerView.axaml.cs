@@ -38,25 +38,39 @@ public partial class VirtualControllerView : UserControl
 
     private void OnControllerButtonPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is global::Avalonia.Controls.Button { Tag: string buttonId } && DataContext is VirtualControllerViewModel vm)
+        if (sender is Border { Tag: string buttonId } && DataContext is VirtualControllerViewModel vm)
         {
+            e.Pointer.Capture((Border)sender);
             vm.PressButtonCommand.Execute(buttonId);
+            e.Handled = true;
             PerformHaptic();
         }
     }
 
     private void OnControllerButtonReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (sender is global::Avalonia.Controls.Button { Tag: string buttonId } && DataContext is VirtualControllerViewModel vm)
+        if (sender is Border { Tag: string buttonId } && DataContext is VirtualControllerViewModel vm)
         {
+            e.Pointer.Capture(null);
             vm.ReleaseButtonCommand.Execute(buttonId);
+        }
+    }
+
+    private void OnDPadPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is Border { Tag: string direction } && DataContext is VirtualControllerViewModel vm)
+        {
+            e.Pointer.Capture((Border)sender);
+            vm.SetDPadCommand.Execute(direction);
+            e.Handled = true;
         }
     }
 
     private void OnDPadReleased(object? sender, PointerReleasedEventArgs e)
     {
-        if (DataContext is VirtualControllerViewModel vm)
+        if (sender is Border && DataContext is VirtualControllerViewModel vm)
         {
+            e.Pointer.Capture(null);
             vm.SetDPadCommand.Execute("0,0");
         }
     }

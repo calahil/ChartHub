@@ -94,7 +94,16 @@ public sealed class VirtualTouchPadViewModel : INotifyPropertyChanged, IDisposab
             return;
         }
 
-        ObserveBackgroundTask(SendMoveAsync(dx, dy), "Touchpad move");
+        double multiplier = _globalSettings?.MouseSpeedMultiplier ?? 4.0;
+        int scaledDx = (int)Math.Round(dx * multiplier);
+        int scaledDy = (int)Math.Round(dy * multiplier);
+
+        if (scaledDx == 0 && scaledDy == 0)
+        {
+            return;
+        }
+
+        ObserveBackgroundTask(SendMoveAsync(scaledDx, scaledDy), "Touchpad move");
     }
 
     private async Task ConnectAsync()

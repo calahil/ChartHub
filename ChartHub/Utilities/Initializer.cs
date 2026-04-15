@@ -69,6 +69,12 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         set => QueueConfigUpdate(config => config.Runtime.AndroidVolumeButtonsControlServerVolume = value);
     }
 
+    public double MouseSpeedMultiplier
+    {
+        get => Runtime.MouseSpeedMultiplier;
+        set => QueueConfigUpdate(config => config.Runtime.MouseSpeedMultiplier = Math.Max(0.1, value));
+    }
+
     public AppGlobalSettings(ISettingsOrchestrator settingsOrchestrator)
     {
         _settingsOrchestrator = settingsOrchestrator;
@@ -147,6 +153,7 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(InstallLogExpanded));
         OnPropertyChanged(nameof(UiCulture));
         OnPropertyChanged(nameof(AndroidVolumeButtonsControlServerVolume));
+        OnPropertyChanged(nameof(MouseSpeedMultiplier));
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

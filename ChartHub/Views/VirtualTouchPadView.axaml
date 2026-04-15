@@ -56,30 +56,30 @@
                         Margin="0,12,12,12"
                         Width="80"
                         VerticalAlignment="Stretch">
-                <Button HorizontalAlignment="Stretch"
-                        VerticalAlignment="Stretch"
-                        VerticalContentAlignment="Center"
-                        HorizontalContentAlignment="Center"
+                <Border HorizontalAlignment="Stretch"
                         CornerRadius="8"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
                         Tag="left"
                         Height="120"
                         PointerPressed="OnMouseButtonPressed"
                         PointerReleased="OnMouseButtonReleased">
                     <Image Width="40" Height="40"
                            Source="{Binding Source={x:Static strings:UiIcons.MouseLeftButton}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
-                <Button HorizontalAlignment="Stretch"
-                        VerticalAlignment="Stretch"
-                        VerticalContentAlignment="Center"
-                        HorizontalContentAlignment="Center"
+                </Border>
+                <Border HorizontalAlignment="Stretch"
                         CornerRadius="8"
+                        BorderThickness="2"
+                        BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                        Background="{StaticResource ThemeControlLowBrush}"
                         Tag="right"
                         Height="120"
                         PointerPressed="OnMouseButtonPressed"
                         PointerReleased="OnMouseButtonReleased">
                     <Image Width="40" Height="40"
                            Source="{Binding Source={x:Static strings:UiIcons.MouseRightButton}, Converter={StaticResource AssetPathToImageConverter}}" />
-                </Button>
+                </Border>
             </StackPanel>
         </Grid>
     </Grid>
