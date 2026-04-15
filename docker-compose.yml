@@ -47,6 +47,12 @@ services:
       - Downloads__CacheDirectory=/cache/downloads
       - Downloads__ExternalRedirectCacheHours=${BACKUP_DOWNLOADS_EXTERNAL_REDIRECT_CACHE_HOURS:-48}
       - ImageCache__CacheDirectory=/cache/images
+    labels:
+      traefik.enable: 'true'
+      traefik.http.routers.backupapi.rule: 'Host(`backupapi.protail`)'
+      traefik.http.services.backupapi.loadbalancer.server.port: '5000'
+      traefik.http.routers.backupapi.entrypoints: 'http'
+      traefik.docker.network: ${NETWORK}
     ports:
       - "${API_PORT:-5147}:5000"
     volumes:
@@ -63,11 +69,15 @@ services:
     restart: always
     networks:
       - internal_env
+      - external_env
 
 networks:
   internal_env:
     external: true
     name: ${INTERNAL}
+  external_env:
+    external: true
+    name: ${EXTERNAL:-proxy_network}
 
 volumes:
   db_data:
