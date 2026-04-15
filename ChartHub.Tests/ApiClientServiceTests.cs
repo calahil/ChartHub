@@ -94,9 +94,9 @@ public class ApiClientServiceTests
           authorText: string.Empty);
 
         ViewSong song = Assert.Single(results);
-        Assert.Equal("http://protail/assets/album_art/data-art.png", song.AlbumArt);
-        Assert.Equal("http://protail/downloads/data-song.zip", song.DownloadLink);
-        Assert.Equal("http://protail/avatars/author.png", song.Author?.AvatarPath);
+        Assert.Equal($"{MirrorBaseUrl}/assets/album_art/data-art.png", song.AlbumArt);
+        Assert.Equal($"{MirrorBaseUrl}/downloads/data-song.zip", song.DownloadLink);
+        Assert.Equal($"{MirrorBaseUrl}/avatars/author.png", song.Author?.AvatarPath);
     }
 
     [Fact]
@@ -223,7 +223,7 @@ public class ApiClientServiceTests
             authorText: string.Empty);
 
         ViewSong song = Assert.Single(results);
-        Assert.Equal("http://backupapi.protail/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip", song.DownloadLink);
+        Assert.Equal($"{MirrorBaseUrl}/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip", song.DownloadLink);
     }
 
     [Fact]
@@ -299,7 +299,7 @@ public class ApiClientServiceTests
     [Fact]
     public async Task GetSongFilesAsync_WithMirrorSource_WhenDownloadUrlIsMalformedExternalProxy_UsesDownloadPageUrlFull()
     {
-        const string malformedProxyUrl = "http://backupapi.protail/downloads/external";
+        string malformedProxyUrl = $"{MirrorBaseUrl}/downloads/external";
         const string mediaFireUrl = "https://www.mediafire.com/file/abc123/sample/file";
 
         using var httpClient = new HttpClient(new StubHttpMessageHandler(async (_, _) => new HttpResponseMessage(HttpStatusCode.OK)
@@ -452,6 +452,11 @@ public class ApiClientServiceTests
             resolveMockDataPath,
         ]);
     }
+
+    // Derives the mirror base URL from the canonical source so test assertions
+    // automatically track changes to RhythmVerseSourceUrls without manual updates.
+    private static string MirrorBaseUrl { get; } =
+        RhythmVerseSourceUrls.GetBaseUri(RhythmVerseSource.ChartHubMirror).AbsoluteUri.TrimEnd('/');
 
     private static string BuildMappedSongResponseJson()
     {
