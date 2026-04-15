@@ -109,6 +109,50 @@ public class MainViewModelTests
         Assert.False(sut.NoSharedDownloads);
     }
 
+    [Fact]
+    public void GoVirtualControllerCommand_SelectsControllerTab()
+    {
+        MainViewModel sut = CreateMainViewModel(isAndroid: true);
+
+        sut.GoVirtualControllerCommand.Execute(null);
+
+        Assert.Equal(7, sut.SelectedMainTabIndex);
+    }
+
+    [Fact]
+    public void GoVirtualTouchPadCommand_SelectsTouchPadTab()
+    {
+        MainViewModel sut = CreateMainViewModel(isAndroid: true);
+
+        sut.GoVirtualTouchPadCommand.Execute(null);
+
+        Assert.Equal(8, sut.SelectedMainTabIndex);
+    }
+
+    [Fact]
+    public void GoVirtualKeyboardCommand_SelectsKeyboardTab()
+    {
+        MainViewModel sut = CreateMainViewModel(isAndroid: true);
+
+        sut.GoVirtualKeyboardCommand.Execute(null);
+
+        Assert.Equal(9, sut.SelectedMainTabIndex);
+    }
+
+    [Fact]
+    public void ToggleInputAccordionCommand_TogglesIsInputAccordionExpanded()
+    {
+        MainViewModel sut = CreateMainViewModel(isAndroid: true);
+
+        Assert.False(sut.IsInputAccordionExpanded);
+
+        sut.ToggleInputAccordionCommand.Execute(null);
+        Assert.True(sut.IsInputAccordionExpanded);
+
+        sut.ToggleInputAccordionCommand.Execute(null);
+        Assert.False(sut.IsInputAccordionExpanded);
+    }
+
     private static MainViewModel CreateMainViewModel(bool isAndroid, SharedDownloadQueue? sharedDownloadQueue = null)
     {
         ConstructorInfo? constructor = typeof(MainViewModel).GetConstructor(
