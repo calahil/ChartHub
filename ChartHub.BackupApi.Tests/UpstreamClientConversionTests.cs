@@ -212,8 +212,42 @@ public class UpstreamClientConversionTests
         RhythmVerseUpstreamClient sut = BuildClient("{}");
         IReadOnlyList<SyncedSong> songs = sut.ConvertToSyncedSongs(envelope);
 
+        // data=false → still skipped (data is required to be an object)
+        // file=false → now produces a partial record (no file data, but song is archived)
+        // third entry → full record
+        Assert.Equal(2, songs.Count);
+        Assert.Contains(songs, s => s.SongId == 2L && s.FileId == string.Empty && s.FileJson == "{}");
+        Assert.Contains(songs, s => s.SongId == 654L && s.FileId == "f-654");
+    }
+
+    [Fact]
+    public void ConvertToSyncedSongs_WithMissingFileObject_ReturnsPartialRecord()
+    {
+        var envelope = new RhythmVersePageEnvelope
+        {
+            TotalAvailable = 1,
+            TotalFiltered = 1,
+            Returned = 1,
+            Start = 0,
+            Records = 25,
+            Page = 1,
+            Songs = [JsonNode.Parse("""{"data":{"song_id":777,"artist":"Test Artist","title":"Test Title"}}""")],
+        };
+
+        RhythmVerseUpstreamClient sut = BuildClient("{}");
+        IReadOnlyList<SyncedSong> songs = sut.ConvertToSyncedSongs(envelope);
+
         Assert.Single(songs);
-        Assert.Equal(654L, songs[0].SongId);
+        SyncedSong song = songs[0];
+        Assert.Equal(777L, song.SongId);
+        Assert.Equal("Test Artist", song.Artist);
+        Assert.Equal("Test Title", song.Title);
+        Assert.Equal(string.Empty, song.FileId);
+        Assert.Equal(string.Empty, song.DownloadUrl);
+        Assert.Equal(string.Empty, song.AuthorId);
+        Assert.Equal(string.Empty, song.GroupId);
+        Assert.Equal(string.Empty, song.GameFormat);
+        Assert.Equal("{}", song.FileJson);
     }
 
     private static RhythmVerseUpstreamClient BuildClient(string responseJson)

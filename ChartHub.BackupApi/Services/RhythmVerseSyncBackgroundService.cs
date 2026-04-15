@@ -116,7 +116,7 @@ public sealed partial class RhythmVerseSyncBackgroundService(
 
             IReadOnlyList<Models.SyncedSong> songs = upstreamClient.ConvertToSyncedSongs(envelope);
 
-            if (songs.Count == 0)
+            if (envelope.Songs.Count == 0)
             {
                 reachedTerminalPage = true;
                 break;
@@ -140,7 +140,7 @@ public sealed partial class RhythmVerseSyncBackgroundService(
             await SaveCursorAsync(repository, reconciliationRunId, page, records, cursorStartedUtc, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (songs.Count < records)
+            if (envelope.Songs.Count < records)
             {
                 reachedTerminalPage = true;
                 break;

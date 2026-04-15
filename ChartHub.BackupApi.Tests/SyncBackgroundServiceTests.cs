@@ -348,6 +348,63 @@ public class SyncBackgroundServiceTests
         Assert.Equal("completed", repo.StateValues["sync.status"]); // Cursor status set to completed after finalize
     }
 
+    [Fact]
+    public async Task ExecuteAsync_WithFullRawPageButAllSongsLackFile_ContinuesPaging()
+    {
+        // Page 1: envelope.Songs.Count == RecordsPerPage (2), but FakeUpstreamClient.ConvertToSyncedSongs
+        // returns [] because all nodes parse to null (SongJson = "null"). This simulates the real-world
+        // case where old RhythmVerse records lack a `file` object and are skipped during conversion.
+        // Before the fix: songs.Count == 0 triggered a false terminal at page 1.
+        // After the fix: envelope.Songs.Count == 2 → not terminal; page 2 is empty → genuine terminal.
+        SyncedSong filelessSong1 = FilelessSong(1);
+        SyncedSong filelessSong2 = FilelessSong(2);
+
+        FakeUpstreamClient upstream = new([[filelessSong1, filelessSong2]]);
+        FakeRepository repo = new();
+        RhythmVerseSyncBackgroundService sut = BuildService(
+            new SyncOptions { Enabled = true, RecordsPerPage = 2, MaxPagesPerRun = 10 },
+            upstream, repo);
+        sut.RetryDelays = [];
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+        await sut.StartAsync(cts.Token);
+        await repo.SuccessWrittenTask.WaitAsync(cts.Token);
+        await cts.CancelAsync();
+
+        // Must have fetched page 1 (full raw) AND page 2 (empty raw → true terminal)
+        Assert.Equal(2, upstream.FetchCallCount);
+        Assert.Empty(repo.UpsertedSongs);
+        Assert.NotNull(repo.LastSuccessUtc);
+        Assert.Single(repo.FinalizedRunIds);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithPartialRawPageRegardlessOfConversion_FinalizesReconciliation()
+    {
+        // 40 raw songs on a page configured for 100 records.
+        // envelope.Songs.Count (40) < records (100) → genuine terminal, finalize.
+        IReadOnlyList<SyncedSong> partialPage = Enumerable.Range(1, 40)
+            .Select(i => TestSong(i, (long)i * 10))
+            .ToList();
+
+        FakeUpstreamClient upstream = new([partialPage]);
+        FakeRepository repo = new();
+        RhythmVerseSyncBackgroundService sut = BuildService(
+            new SyncOptions { Enabled = true, RecordsPerPage = 100, MaxPagesPerRun = 10 },
+            upstream, repo);
+        sut.RetryDelays = [];
+
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+        await sut.StartAsync(cts.Token);
+        await repo.SuccessWrittenTask.WaitAsync(cts.Token);
+        await cts.CancelAsync();
+
+        Assert.Equal(1, upstream.FetchCallCount);
+        Assert.Equal(40, repo.UpsertedSongs.Count);
+        Assert.NotNull(repo.LastSuccessUtc);
+        Assert.Single(repo.FinalizedRunIds);
+    }
+
     private static RhythmVerseSyncBackgroundService BuildService(
         SyncOptions options,
         IRhythmVerseUpstreamClient upstream,
@@ -412,6 +469,21 @@ public class SyncBackgroundServiceTests
             FileJson = "{}",
         };
     }
+
+    /// <summary>
+    /// Returns a song whose SongJson parses to a null JsonNode, causing
+    /// FakeUpstreamClient.ConvertToSyncedSongs to skip it while still contributing
+    /// to envelope.Songs.Count. This simulates old RhythmVerse records that have
+    /// no file object and are filtered out during real conversion.
+    /// </summary>
+    private static SyncedSong FilelessSong(long id) => new SyncedSong
+    {
+        SongId = id,
+        RecordId = null,
+        SongJson = "null",
+        DataJson = "{}",
+        FileJson = "{}",
+    };
 
     private sealed class FakeUpstreamClient(
         IReadOnlyList<IReadOnlyList<SyncedSong>> pages,

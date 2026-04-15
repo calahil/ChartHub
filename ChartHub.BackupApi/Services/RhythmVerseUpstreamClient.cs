@@ -99,11 +99,8 @@ public sealed class RhythmVerseUpstreamClient(
                 continue;
             }
 
-            if (!songElement.TryGetProperty("file", out JsonElement file)
-                || file.ValueKind != JsonValueKind.Object)
-            {
-                continue;
-            }
+            bool hasFile = songElement.TryGetProperty("file", out JsonElement file)
+                && file.ValueKind == JsonValueKind.Object;
 
             songs.Add(new SyncedSong
             {
@@ -115,20 +112,20 @@ public sealed class RhythmVerseUpstreamClient(
                 Genre = ReadString(data, "genre"),
                 Year = ReadNullableInt(data, "year"),
                 RecordUpdatedUnix = ReadNullableLong(data, "record_updated"),
-                FileId = ReadString(file, "file_id"),
-                DownloadUrl = ResolveDownloadUrl(file),
+                FileId = hasFile ? ReadString(file, "file_id") : string.Empty,
+                DownloadUrl = hasFile ? ResolveDownloadUrl(file) : string.Empty,
                 DiffGuitar = ReadNullableInt(data, "diff_guitar"),
                 DiffBass = ReadNullableInt(data, "diff_bass"),
                 DiffDrums = ReadNullableInt(data, "diff_drums"),
                 DiffVocals = ReadNullableInt(data, "diff_vocals"),
                 DiffKeys = ReadNullableInt(data, "diff_keys"),
                 DiffBand = ReadNullableInt(data, "diff_band"),
-                AuthorId = ReadString(file, "author_id"),
-                GroupId = ReadString(file, "group_id"),
-                GameFormat = ReadString(file, "gameformat"),
+                AuthorId = hasFile ? ReadString(file, "author_id") : string.Empty,
+                GroupId = hasFile ? ReadString(file, "group_id") : string.Empty,
+                GameFormat = hasFile ? ReadString(file, "gameformat") : string.Empty,
                 SongJson = songNode.ToJsonString(),
                 DataJson = data.GetRawText(),
-                FileJson = file.GetRawText(),
+                FileJson = hasFile ? file.GetRawText() : "{}",
             });
         }
 
