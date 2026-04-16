@@ -7,6 +7,12 @@ using ChartHub.BackupApi.Services;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 
+using NpgsqlTypes;
+
+using Serilog;
+using Serilog.Events;
+using Serilog.Sinks.PostgreSQL.ColumnWriters;
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.SectionName));
@@ -14,6 +20,56 @@ builder.Services.Configure<RhythmVerseSourceOptions>(builder.Configuration.GetSe
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection(SyncOptions.SectionName));
 builder.Services.Configure<DownloadOptions>(builder.Configuration.GetSection(DownloadOptions.SectionName));
 builder.Services.Configure<ImageCacheOptions>(builder.Configuration.GetSection(ImageCacheOptions.SectionName));
+builder.Services.Configure<LoggingOptions>(builder.Configuration.GetSection(LoggingOptions.SectionName));
+
+// Read DB provider and logging options early for Serilog sink configuration.
+string dbProvider = builder.Configuration[$"{DatabaseOptions.SectionName}:{nameof(DatabaseOptions.Provider)}"]
+    ?? new DatabaseOptions().Provider;
+string pgConnectionString = builder.Configuration[$"{DatabaseOptions.SectionName}:{nameof(DatabaseOptions.PostgreSqlConnectionString)}"]
+    ?? new DatabaseOptions().PostgreSqlConnectionString;
+LoggingOptions loggingOptions = builder.Configuration
+    .GetSection(LoggingOptions.SectionName)
+    .Get<LoggingOptions>() ?? new LoggingOptions();
+
+builder.Host.UseSerilog((ctx, services, config) =>
+{
+    // Minimum levels and category overrides are driven by the Serilog section in appsettings.
+    // Enrichers and sinks are declared here to remain explicit.
+    config
+        .ReadFrom.Configuration(ctx.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithMachineName()
+        .Enrich.WithProperty("EnvironmentName", ctx.HostingEnvironment.EnvironmentName)
+        .Enrich.WithProperty("Application", "BackupApi")
+        .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Information);
+
+    // PostgreSQL sink is conditioned on provider and environment to prevent the sink
+    // from attempting a connection in test runs (which use SQLite).
+    if (string.Equals(dbProvider, "postgresql", StringComparison.OrdinalIgnoreCase)
+        && !ctx.HostingEnvironment.IsEnvironment("Testing"))
+    {
+        IDictionary<string, ColumnWriterBase> columnOptions = new Dictionary<string, ColumnWriterBase>
+        {
+            { "message", new RenderedMessageColumnWriter(NpgsqlDbType.Text) },
+            { "message_template", new MessageTemplateColumnWriter(NpgsqlDbType.Text) },
+            { "level", new LevelColumnWriter(true, NpgsqlDbType.Varchar) },
+            { "raise_date", new TimestampColumnWriter(NpgsqlDbType.TimestampTz) },
+            { "exception", new ExceptionColumnWriter(NpgsqlDbType.Text) },
+            { "properties", new LogEventSerializedColumnWriter(NpgsqlDbType.Jsonb) },
+        };
+
+        config.WriteTo.PostgreSQL(
+            connectionString: pgConnectionString,
+            tableName: loggingOptions.SinkTableName,
+            columnOptions: columnOptions,
+            restrictedToMinimumLevel: LogEventLevel.Warning,
+            needAutoCreateTable: true,
+            batchSizeLimit: loggingOptions.BatchSizeLimit,
+            period: TimeSpan.FromSeconds(loggingOptions.PeriodSeconds),
+            retentionTime: TimeSpan.FromDays(loggingOptions.RetentionDays));
+    }
+});
 
 builder.Services.AddDbContext<BackupDbContext>((serviceProvider, options) =>
 {
@@ -82,6 +138,18 @@ app.UseExceptionHandler(errorApp =>
 
         await result.ExecuteAsync(context);
     });
+});
+
+// Request logging sits after UseExceptionHandler so the final status code (including
+// 500s rewritten by exception handling) is captured in the structured log entry.
+app.UseSerilogRequestLogging(options =>
+{
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        diagnosticContext.Set("TraceId", httpContext.TraceIdentifier);
+        diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? string.Empty);
+        diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
+    };
 });
 
 app.UseSwagger();
