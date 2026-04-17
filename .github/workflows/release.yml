@@ -678,12 +678,12 @@ jobs:
         if: always()
         run: rm -f .env.deploy
 
-  deploy-server-production:
-    name: Deploy ChartHub Server bundle to production
-    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
-    runs-on: [self-hosted, linux, charthub-server-host]
+  deploy-server-dev:
+    name: Deploy ChartHub Server bundle to dev
+    if: needs.classify.outputs.release_channel == 'dev'
+    runs-on: [self-hosted, linux, charthub-build]
     needs: [classify, build-server-bundle]
-    environment: server-production
+    environment: server-dev
     steps:
       - uses: actions/checkout@v4
 
@@ -693,33 +693,54 @@ jobs:
           name: server-linux-x64
           path: ./.server-release
 
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p "$EFFECTIVE_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Prepare install directories
         env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
           CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
           DATA_PATH: ${{ secrets.CHARTHUB_SERVER_DATA_PATH }}
           DB_PATH: ${{ secrets.CHARTHUB_SERVER_DB_PATH }}
           LOGS_PATH: ${{ secrets.CHARTHUB_SERVER_LOGS_PATH }}
           MUSIC_PATH: ${{ secrets.CHARTHUB_SERVER_CLONEHERO_PATH }}
         run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
           EFFECTIVE_CONFIG="${CONFIG_PATH:-/srv/appdata/charthub/config}"
           EFFECTIVE_DATA="${DATA_PATH:-/srv/appdata/charthub/data}"
           EFFECTIVE_DB="$(dirname "${DB_PATH:-/srv/appdata/charthub/db/charthub.db}")"
           EFFECTIVE_LOGS="${LOGS_PATH:-/srv/appdata/charthub/logs}"
           EFFECTIVE_MUSIC="${MUSIC_PATH:-/srv/appdata/charthub/music}"
-          mkdir -p "$(dirname "$EFFECTIVE_CONFIG")/releases"
-          mkdir -p "$EFFECTIVE_CONFIG"
-          mkdir -p "$EFFECTIVE_DB"
-          mkdir -p "$EFFECTIVE_LOGS"
-          mkdir -p "$EFFECTIVE_DATA"
-          mkdir -p "$EFFECTIVE_MUSIC"
-          # Ensure the service user (gamer) can write runtime files regardless of the runner user.
-          chmod 777 "$EFFECTIVE_LOGS"
-          chmod 777 "$EFFECTIVE_DATA"
-          chmod 777 "$EFFECTIVE_DB"
-          chmod 777 "$EFFECTIVE_MUSIC"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            mkdir -p \"$(dirname "$EFFECTIVE_CONFIG")/releases\"
+            mkdir -p \"$EFFECTIVE_CONFIG\"
+            mkdir -p \"$EFFECTIVE_DB\"
+            mkdir -p \"$EFFECTIVE_LOGS\"
+            mkdir -p \"$EFFECTIVE_DATA\"
+            mkdir -p \"$EFFECTIVE_MUSIC\"
+            chmod 777 \"$EFFECTIVE_LOGS\"
+            chmod 777 \"$EFFECTIVE_DATA\"
+            chmod 777 \"$EFFECTIVE_DB\"
+            chmod 777 \"$EFFECTIVE_MUSIC\"
+          "
 
       - name: Write runtime environment file
         env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
           AUTH_JWT_SIGNING_KEY: ${{ secrets.CHARTHUB_SERVER_JWT_SIGNING_KEY }}
           AUTH_ISSUER: ${{ secrets.CHARTHUB_SERVER_JWT_ISSUER }}
           AUTH_AUDIENCE: ${{ secrets.CHARTHUB_SERVER_JWT_AUDIENCE }}
@@ -736,6 +757,7 @@ jobs:
           SERVER_LOGS_PATH: ${{ secrets.CHARTHUB_SERVER_LOGS_PATH }}
         run: |
           EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
           EFFECTIVE_CONFIG="${SERVER_CONFIG_PATH:-/srv/appdata/charthub/config}"
           EFFECTIVE_DATA="${SERVER_DATA_PATH:-/srv/appdata/charthub/data}"
           EFFECTIVE_DOWNLOADS="${SERVER_DOWNLOADS_PATH:-/srv/appdata/charthub/data/downloads}"
@@ -743,8 +765,7 @@ jobs:
           EFFECTIVE_CLONEHERO="${SERVER_CLONEHERO_PATH:-/srv/appdata/charthub/music}"
           EFFECTIVE_DB="${SERVER_DB_PATH:-/srv/appdata/charthub/db/charthub.db}"
           EFFECTIVE_LOGS="${SERVER_LOGS_PATH:-/srv/appdata/charthub/logs}"
-          ENV_FILE="${EFFECTIVE_CONFIG}/charthub-server.env"
-          install -m 600 /dev/null "$ENV_FILE"
+          LOCAL_ENV_FILE="$(mktemp)"
           {
             echo "ASPNETCORE_URLS=http://+:${EFFECTIVE_PORT}"
             echo "Auth__JwtSigningKey=${AUTH_JWT_SIGNING_KEY}"
@@ -761,65 +782,548 @@ jobs:
             echo "ServerLogging__LogDirectory=${EFFECTIVE_LOGS}"
             echo "ServerLogging__FileName=charthub-server.log"
             echo "CHARTHUB_SERVER_PORT=${EFFECTIVE_PORT}"
-          } > "$ENV_FILE"
+          } > "$LOCAL_ENV_FILE"
 
           # Parse JSON array secrets (e.g. ["email@domain.com","other@domain.com"])
           auth_allowed_index=0
           while IFS= read -r item; do
             [[ -n "$item" ]] || continue
-            printf 'Auth__AllowedEmails__%d=%s\n' "$auth_allowed_index" "$item" >> "$ENV_FILE"
+            printf 'Auth__AllowedEmails__%d=%s\n' "$auth_allowed_index" "$item" >> "$LOCAL_ENV_FILE"
             auth_allowed_index=$((auth_allowed_index + 1))
           done < <(python3 -c "import json,sys; [print(x) for x in json.loads(sys.argv[1])]" "${AUTH_ALLOWED_EMAIL:-[]}" 2>/dev/null)
 
           google_audience_index=0
           while IFS= read -r item; do
             [[ -n "$item" ]] || continue
-            printf 'GoogleAuth__AllowedAudiences__%d=%s\n' "$google_audience_index" "$item" >> "$ENV_FILE"
+            printf 'GoogleAuth__AllowedAudiences__%d=%s\n' "$google_audience_index" "$item" >> "$LOCAL_ENV_FILE"
             google_audience_index=$((google_audience_index + 1))
           done < <(python3 -c "import json,sys; [print(x) for x in json.loads(sys.argv[1])]" "${GOOGLE_ALLOWED_AUDIENCE:-[]}" 2>/dev/null)
 
-          chmod 600 "$ENV_FILE"
+          chmod 600 "$LOCAL_ENV_FILE"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
+            "$LOCAL_ENV_FILE" "${SSH_USER}@${SSH_HOST}:${EFFECTIVE_CONFIG}/charthub-server.env"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "chmod 600 \"${EFFECTIVE_CONFIG}/charthub-server.env\""
+          rm -f "$LOCAL_ENV_FILE"
 
       - name: Install release bundle
         env:
           VERSION: ${{ needs.classify.outputs.version }}
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
           SERVER_CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
         run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
           EFFECTIVE_CONFIG="${SERVER_CONFIG_PATH:-/srv/appdata/charthub/config}"
           RELEASES_DIR="$(dirname "$EFFECTIVE_CONFIG")/releases"
+          INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
           ARTIFACT="./.server-release/charthub-server-${VERSION}-linux-x64.zip"
-          RELEASE_DIR="${RELEASES_DIR}/${VERSION}"
-          rm -rf "$RELEASE_DIR"
-          mkdir -p "$RELEASE_DIR"
-          unzip -q "$ARTIFACT" -d "$RELEASE_DIR"
-          ln -sfn "$RELEASE_DIR/server-linux-x64" "$(dirname "$EFFECTIVE_CONFIG")/current"
-          chmod +x "$(dirname "$EFFECTIVE_CONFIG")/current/ChartHub.Server" || true
-          chmod +x "$(dirname "$EFFECTIVE_CONFIG")/current/tools/onyx" || true
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
+            "$ARTIFACT" "${SSH_USER}@${SSH_HOST}:/tmp/charthub-server-${VERSION}-linux-x64.zip"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            set -e
+            RELEASE_DIR=\"${RELEASES_DIR}/${VERSION}\"
+            rm -rf \"\$RELEASE_DIR\"
+            mkdir -p \"\$RELEASE_DIR\"
+            unzip -q \"/tmp/charthub-server-${VERSION}-linux-x64.zip\" -d \"\$RELEASE_DIR\"
+            ln -sfn \"\$RELEASE_DIR/server-linux-x64\" \"${INSTALL_ROOT}/current\"
+            chmod +x \"${INSTALL_ROOT}/current/ChartHub.Server\" || true
+            chmod +x \"${INSTALL_ROOT}/current/tools/onyx\" || true
+            rm -f \"/tmp/charthub-server-${VERSION}-linux-x64.zip\"
+          "
 
       - name: Install or update systemd unit
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
         run: |
-          sudo install -m 644 .github/systemd/charthub-server.service /etc/systemd/system/charthub-server.service
-          sudo systemctl daemon-reload
-          sudo systemctl enable charthub-server.service
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
+            .github/systemd/charthub-server.service "${SSH_USER}@${SSH_HOST}:/tmp/charthub-server.service"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service
+            sudo systemctl daemon-reload
+            sudo systemctl enable charthub-server.service
+            rm -f /tmp/charthub-server.service
+          "
 
       - name: Restart server service
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
         run: |
-          sudo systemctl restart charthub-server.service
-          sudo systemctl --no-pager --full status charthub-server.service || true
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            sudo systemctl restart charthub-server.service
+            sudo systemctl --no-pager --full status charthub-server.service || true
+          "
 
       - name: Verify health
         env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
           CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
         run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
           EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
           for i in $(seq 1 12); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${EFFECTIVE_PORT}/health" 2>/dev/null || echo "000")
+            STATUS=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_PORT}/health 2>/dev/null || echo 000")
+            if [[ "$STATUS" == "200" ]]; then
+              break
+            fi
+            if [[ "$i" == "12" ]]; then
+              echo "Dev /health check failed on port ${EFFECTIVE_PORT}"
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "sudo journalctl -u charthub-server.service --no-pager -n 200 || true"
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Write deployment summary
+        env:
+          VERSION: ${{ needs.classify.outputs.version }}
+        run: |
+          {
+            echo "## Dev deployment complete (ChartHub Server bundle)"
+            echo "- Version: ${VERSION}"
+            echo "- Install root: /srv/appdata/charthub"
+            echo "- Active release: /srv/appdata/charthub/current"
+            echo "- Time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  deploy-server-staging:
+    name: Deploy ChartHub Server bundle to staging
+    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
+    runs-on: [self-hosted, linux, charthub-build]
+    needs: [classify, build-server-bundle, deploy-server-dev]
+    environment: server-staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Server Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: server-linux-x64
+          path: ./.server-release
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p "$EFFECTIVE_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Prepare install directories
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
+          DATA_PATH: ${{ secrets.CHARTHUB_SERVER_DATA_PATH }}
+          DB_PATH: ${{ secrets.CHARTHUB_SERVER_DB_PATH }}
+          LOGS_PATH: ${{ secrets.CHARTHUB_SERVER_LOGS_PATH }}
+          MUSIC_PATH: ${{ secrets.CHARTHUB_SERVER_CLONEHERO_PATH }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONFIG="${CONFIG_PATH:-/srv/appdata/charthub/config}"
+          EFFECTIVE_DATA="${DATA_PATH:-/srv/appdata/charthub/data}"
+          EFFECTIVE_DB="$(dirname "${DB_PATH:-/srv/appdata/charthub/db/charthub.db}")"
+          EFFECTIVE_LOGS="${LOGS_PATH:-/srv/appdata/charthub/logs}"
+          EFFECTIVE_MUSIC="${MUSIC_PATH:-/srv/appdata/charthub/music}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            mkdir -p \"$(dirname "$EFFECTIVE_CONFIG")/releases\"
+            mkdir -p \"$EFFECTIVE_CONFIG\"
+            mkdir -p \"$EFFECTIVE_DB\"
+            mkdir -p \"$EFFECTIVE_LOGS\"
+            mkdir -p \"$EFFECTIVE_DATA\"
+            mkdir -p \"$EFFECTIVE_MUSIC\"
+            chmod 777 \"$EFFECTIVE_LOGS\"
+            chmod 777 \"$EFFECTIVE_DATA\"
+            chmod 777 \"$EFFECTIVE_DB\"
+            chmod 777 \"$EFFECTIVE_MUSIC\"
+          "
+
+      - name: Write runtime environment file
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          AUTH_JWT_SIGNING_KEY: ${{ secrets.CHARTHUB_SERVER_JWT_SIGNING_KEY }}
+          AUTH_ISSUER: ${{ secrets.CHARTHUB_SERVER_JWT_ISSUER }}
+          AUTH_AUDIENCE: ${{ secrets.CHARTHUB_SERVER_JWT_AUDIENCE }}
+          AUTH_ALLOWED_EMAIL: ${{ secrets.CHARTHUB_SERVER_JWT_ALLOWED_EMAILS }}
+          GOOGLE_ALLOWED_AUDIENCE: ${{ secrets.CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES }}
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY }}
+          CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
+          SERVER_CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
+          SERVER_DATA_PATH: ${{ secrets.CHARTHUB_SERVER_DATA_PATH }}
+          SERVER_DOWNLOADS_PATH: ${{ secrets.CHARTHUB_SERVER_DOWNLOADS_PATH }}
+          SERVER_STAGING_PATH: ${{ secrets.CHARTHUB_SERVER_STAGING_PATH }}
+          SERVER_CLONEHERO_PATH: ${{ secrets.CHARTHUB_SERVER_CLONEHERO_PATH }}
+          SERVER_DB_PATH: ${{ secrets.CHARTHUB_SERVER_DB_PATH }}
+          SERVER_LOGS_PATH: ${{ secrets.CHARTHUB_SERVER_LOGS_PATH }}
+        run: |
+          EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONFIG="${SERVER_CONFIG_PATH:-/srv/appdata/charthub/config}"
+          EFFECTIVE_DATA="${SERVER_DATA_PATH:-/srv/appdata/charthub/data}"
+          EFFECTIVE_DOWNLOADS="${SERVER_DOWNLOADS_PATH:-/srv/appdata/charthub/data/downloads}"
+          EFFECTIVE_STAGING="${SERVER_STAGING_PATH:-/srv/appdata/charthub/data/staging}"
+          EFFECTIVE_CLONEHERO="${SERVER_CLONEHERO_PATH:-/srv/appdata/charthub/music}"
+          EFFECTIVE_DB="${SERVER_DB_PATH:-/srv/appdata/charthub/db/charthub.db}"
+          EFFECTIVE_LOGS="${SERVER_LOGS_PATH:-/srv/appdata/charthub/logs}"
+          LOCAL_ENV_FILE="$(mktemp)"
+          {
+            echo "ASPNETCORE_URLS=http://+:${EFFECTIVE_PORT}"
+            echo "Auth__JwtSigningKey=${AUTH_JWT_SIGNING_KEY}"
+            echo "Auth__Issuer=${AUTH_ISSUER}"
+            echo "Auth__Audience=${AUTH_AUDIENCE}"
+            echo "Auth__AccessTokenMinutes=60"
+            echo "GoogleDrive__ApiKey=${GOOGLE_DRIVE_API_KEY}"
+            echo "ServerPaths__ConfigRoot=${EFFECTIVE_CONFIG}"
+            echo "ServerPaths__ChartHubRoot=${EFFECTIVE_DATA}"
+            echo "ServerPaths__DownloadsDir=${EFFECTIVE_DOWNLOADS}"
+            echo "ServerPaths__StagingDir=${EFFECTIVE_STAGING}"
+            echo "ServerPaths__CloneHeroRoot=${EFFECTIVE_CLONEHERO}"
+            echo "ServerPaths__SqliteDbPath=${EFFECTIVE_DB}"
+            echo "ServerLogging__LogDirectory=${EFFECTIVE_LOGS}"
+            echo "ServerLogging__FileName=charthub-server.log"
+            echo "CHARTHUB_SERVER_PORT=${EFFECTIVE_PORT}"
+          } > "$LOCAL_ENV_FILE"
+
+          auth_allowed_index=0
+          while IFS= read -r item; do
+            [[ -n "$item" ]] || continue
+            printf 'Auth__AllowedEmails__%d=%s\n' "$auth_allowed_index" "$item" >> "$LOCAL_ENV_FILE"
+            auth_allowed_index=$((auth_allowed_index + 1))
+          done < <(python3 -c "import json,sys; [print(x) for x in json.loads(sys.argv[1])]" "${AUTH_ALLOWED_EMAIL:-[]}" 2>/dev/null)
+
+          google_audience_index=0
+          while IFS= read -r item; do
+            [[ -n "$item" ]] || continue
+            printf 'GoogleAuth__AllowedAudiences__%d=%s\n' "$google_audience_index" "$item" >> "$LOCAL_ENV_FILE"
+            google_audience_index=$((google_audience_index + 1))
+          done < <(python3 -c "import json,sys; [print(x) for x in json.loads(sys.argv[1])]" "${GOOGLE_ALLOWED_AUDIENCE:-[]}" 2>/dev/null)
+
+          chmod 600 "$LOCAL_ENV_FILE"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
+            "$LOCAL_ENV_FILE" "${SSH_USER}@${SSH_HOST}:${EFFECTIVE_CONFIG}/charthub-server.env"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "chmod 600 \"${EFFECTIVE_CONFIG}/charthub-server.env\""
+          rm -f "$LOCAL_ENV_FILE"
+
+      - name: Install release bundle
+        env:
+          VERSION: ${{ needs.classify.outputs.version }}
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          SERVER_CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
+        run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONFIG="${SERVER_CONFIG_PATH:-/srv/appdata/charthub/config}"
+          RELEASES_DIR="$(dirname "$EFFECTIVE_CONFIG")/releases"
+          INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
+          ARTIFACT="./.server-release/charthub-server-${VERSION}-linux-x64.zip"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
+            "$ARTIFACT" "${SSH_USER}@${SSH_HOST}:/tmp/charthub-server-${VERSION}-linux-x64.zip"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            set -e
+            RELEASE_DIR=\"${RELEASES_DIR}/${VERSION}\"
+            rm -rf \"\$RELEASE_DIR\"
+            mkdir -p \"\$RELEASE_DIR\"
+            unzip -q \"/tmp/charthub-server-${VERSION}-linux-x64.zip\" -d \"\$RELEASE_DIR\"
+            ln -sfn \"\$RELEASE_DIR/server-linux-x64\" \"${INSTALL_ROOT}/current\"
+            chmod +x \"${INSTALL_ROOT}/current/ChartHub.Server\" || true
+            chmod +x \"${INSTALL_ROOT}/current/tools/onyx\" || true
+            rm -f \"/tmp/charthub-server-${VERSION}-linux-x64.zip\"
+          "
+
+      - name: Install or update systemd unit
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
+            .github/systemd/charthub-server.service "${SSH_USER}@${SSH_HOST}:/tmp/charthub-server.service"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service
+            sudo systemctl daemon-reload
+            sudo systemctl enable charthub-server.service
+            rm -f /tmp/charthub-server.service
+          "
+
+      - name: Restart server service
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            sudo systemctl restart charthub-server.service
+            sudo systemctl --no-pager --full status charthub-server.service || true
+          "
+
+      - name: Verify health
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
+        run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
+          for i in $(seq 1 12); do
+            STATUS=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_PORT}/health 2>/dev/null || echo 000")
+            if [[ "$STATUS" == "200" ]]; then
+              break
+            fi
+            if [[ "$i" == "12" ]]; then
+              echo "Staging /health check failed on port ${EFFECTIVE_PORT}"
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "sudo journalctl -u charthub-server.service --no-pager -n 200 || true"
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Write deployment summary
+        env:
+          VERSION: ${{ needs.classify.outputs.version }}
+        run: |
+          {
+            echo "## Staging deployment complete (ChartHub Server bundle)"
+            echo "- Version: ${VERSION}"
+            echo "- Install root: /srv/appdata/charthub"
+            echo "- Active release: /srv/appdata/charthub/current"
+            echo "- Time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  deploy-server-production:
+    name: Deploy ChartHub Server bundle to production
+    if: needs.classify.outputs.release_channel == 'stable'
+    runs-on: [self-hosted, linux, charthub-build]
+    needs: [classify, build-server-bundle, deploy-server-staging]
+    environment: server-production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Server Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: server-linux-x64
+          path: ./.server-release
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_DEPLOY_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p "$EFFECTIVE_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Prepare install directories
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
+          DATA_PATH: ${{ secrets.CHARTHUB_SERVER_DATA_PATH }}
+          DB_PATH: ${{ secrets.CHARTHUB_SERVER_DB_PATH }}
+          LOGS_PATH: ${{ secrets.CHARTHUB_SERVER_LOGS_PATH }}
+          MUSIC_PATH: ${{ secrets.CHARTHUB_SERVER_CLONEHERO_PATH }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONFIG="${CONFIG_PATH:-/srv/appdata/charthub/config}"
+          EFFECTIVE_DATA="${DATA_PATH:-/srv/appdata/charthub/data}"
+          EFFECTIVE_DB="$(dirname "${DB_PATH:-/srv/appdata/charthub/db/charthub.db}")"
+          EFFECTIVE_LOGS="${LOGS_PATH:-/srv/appdata/charthub/logs}"
+          EFFECTIVE_MUSIC="${MUSIC_PATH:-/srv/appdata/charthub/music}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            mkdir -p \"$(dirname "$EFFECTIVE_CONFIG")/releases\"
+            mkdir -p \"$EFFECTIVE_CONFIG\"
+            mkdir -p \"$EFFECTIVE_DB\"
+            mkdir -p \"$EFFECTIVE_LOGS\"
+            mkdir -p \"$EFFECTIVE_DATA\"
+            mkdir -p \"$EFFECTIVE_MUSIC\"
+            chmod 777 \"$EFFECTIVE_LOGS\"
+            chmod 777 \"$EFFECTIVE_DATA\"
+            chmod 777 \"$EFFECTIVE_DB\"
+            chmod 777 \"$EFFECTIVE_MUSIC\"
+          "
+
+      - name: Write runtime environment file
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          AUTH_JWT_SIGNING_KEY: ${{ secrets.CHARTHUB_SERVER_JWT_SIGNING_KEY }}
+          AUTH_ISSUER: ${{ secrets.CHARTHUB_SERVER_JWT_ISSUER }}
+          AUTH_AUDIENCE: ${{ secrets.CHARTHUB_SERVER_JWT_AUDIENCE }}
+          AUTH_ALLOWED_EMAIL: ${{ secrets.CHARTHUB_SERVER_JWT_ALLOWED_EMAILS }}
+          GOOGLE_ALLOWED_AUDIENCE: ${{ secrets.CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES }}
+          GOOGLE_DRIVE_API_KEY: ${{ secrets.CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY }}
+          CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
+          SERVER_CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
+          SERVER_DATA_PATH: ${{ secrets.CHARTHUB_SERVER_DATA_PATH }}
+          SERVER_DOWNLOADS_PATH: ${{ secrets.CHARTHUB_SERVER_DOWNLOADS_PATH }}
+          SERVER_STAGING_PATH: ${{ secrets.CHARTHUB_SERVER_STAGING_PATH }}
+          SERVER_CLONEHERO_PATH: ${{ secrets.CHARTHUB_SERVER_CLONEHERO_PATH }}
+          SERVER_DB_PATH: ${{ secrets.CHARTHUB_SERVER_DB_PATH }}
+          SERVER_LOGS_PATH: ${{ secrets.CHARTHUB_SERVER_LOGS_PATH }}
+        run: |
+          EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONFIG="${SERVER_CONFIG_PATH:-/srv/appdata/charthub/config}"
+          EFFECTIVE_DATA="${SERVER_DATA_PATH:-/srv/appdata/charthub/data}"
+          EFFECTIVE_DOWNLOADS="${SERVER_DOWNLOADS_PATH:-/srv/appdata/charthub/data/downloads}"
+          EFFECTIVE_STAGING="${SERVER_STAGING_PATH:-/srv/appdata/charthub/data/staging}"
+          EFFECTIVE_CLONEHERO="${SERVER_CLONEHERO_PATH:-/srv/appdata/charthub/music}"
+          EFFECTIVE_DB="${SERVER_DB_PATH:-/srv/appdata/charthub/db/charthub.db}"
+          EFFECTIVE_LOGS="${SERVER_LOGS_PATH:-/srv/appdata/charthub/logs}"
+          LOCAL_ENV_FILE="$(mktemp)"
+          {
+            echo "ASPNETCORE_URLS=http://+:${EFFECTIVE_PORT}"
+            echo "Auth__JwtSigningKey=${AUTH_JWT_SIGNING_KEY}"
+            echo "Auth__Issuer=${AUTH_ISSUER}"
+            echo "Auth__Audience=${AUTH_AUDIENCE}"
+            echo "Auth__AccessTokenMinutes=60"
+            echo "GoogleDrive__ApiKey=${GOOGLE_DRIVE_API_KEY}"
+            echo "ServerPaths__ConfigRoot=${EFFECTIVE_CONFIG}"
+            echo "ServerPaths__ChartHubRoot=${EFFECTIVE_DATA}"
+            echo "ServerPaths__DownloadsDir=${EFFECTIVE_DOWNLOADS}"
+            echo "ServerPaths__StagingDir=${EFFECTIVE_STAGING}"
+            echo "ServerPaths__CloneHeroRoot=${EFFECTIVE_CLONEHERO}"
+            echo "ServerPaths__SqliteDbPath=${EFFECTIVE_DB}"
+            echo "ServerLogging__LogDirectory=${EFFECTIVE_LOGS}"
+            echo "ServerLogging__FileName=charthub-server.log"
+            echo "CHARTHUB_SERVER_PORT=${EFFECTIVE_PORT}"
+          } > "$LOCAL_ENV_FILE"
+
+          auth_allowed_index=0
+          while IFS= read -r item; do
+            [[ -n "$item" ]] || continue
+            printf 'Auth__AllowedEmails__%d=%s\n' "$auth_allowed_index" "$item" >> "$LOCAL_ENV_FILE"
+            auth_allowed_index=$((auth_allowed_index + 1))
+          done < <(python3 -c "import json,sys; [print(x) for x in json.loads(sys.argv[1])]" "${AUTH_ALLOWED_EMAIL:-[]}" 2>/dev/null)
+
+          google_audience_index=0
+          while IFS= read -r item; do
+            [[ -n "$item" ]] || continue
+            printf 'GoogleAuth__AllowedAudiences__%d=%s\n' "$google_audience_index" "$item" >> "$LOCAL_ENV_FILE"
+            google_audience_index=$((google_audience_index + 1))
+          done < <(python3 -c "import json,sys; [print(x) for x in json.loads(sys.argv[1])]" "${GOOGLE_ALLOWED_AUDIENCE:-[]}" 2>/dev/null)
+
+          chmod 600 "$LOCAL_ENV_FILE"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
+            "$LOCAL_ENV_FILE" "${SSH_USER}@${SSH_HOST}:${EFFECTIVE_CONFIG}/charthub-server.env"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "chmod 600 \"${EFFECTIVE_CONFIG}/charthub-server.env\""
+          rm -f "$LOCAL_ENV_FILE"
+
+      - name: Install release bundle
+        env:
+          VERSION: ${{ needs.classify.outputs.version }}
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          SERVER_CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
+        run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONFIG="${SERVER_CONFIG_PATH:-/srv/appdata/charthub/config}"
+          RELEASES_DIR="$(dirname "$EFFECTIVE_CONFIG")/releases"
+          INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
+          ARTIFACT="./.server-release/charthub-server-${VERSION}-linux-x64.zip"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
+            "$ARTIFACT" "${SSH_USER}@${SSH_HOST}:/tmp/charthub-server-${VERSION}-linux-x64.zip"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            set -e
+            RELEASE_DIR=\"${RELEASES_DIR}/${VERSION}\"
+            rm -rf \"\$RELEASE_DIR\"
+            mkdir -p \"\$RELEASE_DIR\"
+            unzip -q \"/tmp/charthub-server-${VERSION}-linux-x64.zip\" -d \"\$RELEASE_DIR\"
+            ln -sfn \"\$RELEASE_DIR/server-linux-x64\" \"${INSTALL_ROOT}/current\"
+            chmod +x \"${INSTALL_ROOT}/current/ChartHub.Server\" || true
+            chmod +x \"${INSTALL_ROOT}/current/tools/onyx\" || true
+            rm -f \"/tmp/charthub-server-${VERSION}-linux-x64.zip\"
+          "
+
+      - name: Install or update systemd unit
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
+            .github/systemd/charthub-server.service "${SSH_USER}@${SSH_HOST}:/tmp/charthub-server.service"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service
+            sudo systemctl daemon-reload
+            sudo systemctl enable charthub-server.service
+            rm -f /tmp/charthub-server.service
+          "
+
+      - name: Restart server service
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            sudo systemctl restart charthub-server.service
+            sudo systemctl --no-pager --full status charthub-server.service || true
+          "
+
+      - name: Verify health
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
+        run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
+          for i in $(seq 1 12); do
+            STATUS=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_PORT}/health 2>/dev/null || echo 000")
             if [[ "$STATUS" == "200" ]]; then
               break
             fi
             if [[ "$i" == "12" ]]; then
               echo "Production /health check failed on port ${EFFECTIVE_PORT}"
-              sudo journalctl -u charthub-server.service --no-pager -n 200 || true
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "sudo journalctl -u charthub-server.service --no-pager -n 200 || true"
               exit 1
             fi
             sleep 5
@@ -836,3 +1340,7 @@ jobs:
             echo "- Active release: /srv/appdata/charthub/current"
             echo "- Time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

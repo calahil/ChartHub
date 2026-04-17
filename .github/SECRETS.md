@@ -41,9 +41,25 @@ Formatting note:
 - Do not add quotes around entries.
 - Example: `client-id-desktop.apps.googleusercontent.com,client-id-android.apps.googleusercontent.com`
 
-### Environment-level secrets (`server-production`)
+### SSH deployment secrets
 
-Server deploy is stable-only and targets the `server-production` environment.
+Required for all three server environments (`server-dev`, `server-staging`, `server-production`).
+These should be set as environment-level secrets on each GitHub Environment.
+
+- `SERVER_DEPLOY_SSH_HOST` — hostname or IP of the server machine
+- `SERVER_DEPLOY_SSH_USER` — SSH user (must have `sudo` rights for `systemctl` and `install` into `/etc/systemd/system/`)
+- `SERVER_DEPLOY_SSH_PRIVATE_KEY` — PEM-encoded private key (ed25519 or RSA); the corresponding public key must be in `~/.ssh/authorized_keys` on the server
+- `SERVER_DEPLOY_SSH_PORT` — optional; SSH port, defaults to `22`
+
+### Environment-level secrets
+
+| Environment | Triggered on |
+|---|---|
+| `server-dev` | `dev` channel |
+| `server-staging` | `rc` or `stable` channel |
+| `server-production` | `stable` channel only |
+
+Each environment requires the SSH secrets above plus:
 
 - `CHARTHUB_SERVER_CHARTHUB_PORT` (optional, defaults to `5180`)
 
@@ -74,6 +90,8 @@ These paths are now fixed in workflow/systemd configuration:
 
 - BackupApi secrets exist in repository settings.
 - Server repository secrets exist in repository settings.
-- `server-production` environment exists.
-- `CHARTHUB_SERVER_CHARTHUB_PORT` is set in `server-production` if not using default 5180.
+- `server-dev`, `server-staging`, and `server-production` GitHub Environments exist.
+- SSH secrets (`SERVER_DEPLOY_SSH_HOST`, `SERVER_DEPLOY_SSH_USER`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`) are set in each server environment.
+- The SSH public key is present in `authorized_keys` on the server for the deploy user.
+- `CHARTHUB_SERVER_CHARTHUB_PORT` is set in each environment if not using default 5180.
 
