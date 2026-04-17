@@ -253,6 +253,7 @@ public sealed class InputEndpointsIntegrationTests
             builder.Services.AddSingleton<IUinputGamepadService>(gamepad ?? new FakeGamepadService());
             builder.Services.AddSingleton<IUinputMouseService>(mouse ?? new FakeMouseService());
             builder.Services.AddSingleton<IUinputKeyboardService>(keyboard ?? new FakeKeyboardService());
+            builder.Services.AddSingleton<IInputConnectionTracker, InputConnectionTracker>();
 
             WebApplication app = builder.Build();
             app.UseWebSockets();
