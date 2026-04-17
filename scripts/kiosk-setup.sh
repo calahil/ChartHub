@@ -1,0 +1,339 @@
+#!/usr/bin/env bash
+# kiosk-setup.sh
+# Configures a minimal Lubuntu 24.04 machine to run ChartHub.Server as a kiosk:
+#   - Replaces XFCE4 with bare Openbox (Unity/SDL2 games require a WM for window mapping)
+#   - Removes confirmed-installed bloat: CUPS/printers, Bluetooth UI, XFCE4, NFS,
+#     snapd, build tools, .NET SDK, crash reporters, cloud-init, spell checkers
+#   - Downgrades from dotnet-sdk to dotnet-runtime only
+#   - Disables LightDM screen lock and screensaver
+#   - Installs the charthub-kiosk X session
+#
+# Based on package inventory from installed.txt (Lubuntu 24.04.3 on emubox).
+# Packages confirmed present before removing; uses --auto-remove throughout.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SESSION_SCRIPT="/usr/local/bin/start-charthub-kiosk"
+SESSION_DESKTOP="/usr/share/xsessions/charthub-kiosk.desktop"
+LIGHTDM_CONF="/etc/lightdm/lightdm.conf.d/99-charthub-kiosk.conf"
+
+# ---------------------------------------------------------------------------
+# 1. Verify running as root
+# ---------------------------------------------------------------------------
+if [[ $EUID -ne 0 ]]; then
+    echo "ERROR: This script must be run as root (sudo)." >&2
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Install Openbox
+# ---------------------------------------------------------------------------
+echo "==> Installing Openbox..."
+apt-get install -y openbox
+
+# ---------------------------------------------------------------------------
+# 3. Remove XFCE4 desktop environment
+# ---------------------------------------------------------------------------
+echo "==> Removing XFCE4..."
+apt-get remove -y --auto-remove \
+    xfce4 \
+    xfce4-session \
+    xfce4-panel \
+    xfce4-terminal \
+    xfce4-appfinder \
+    xfce4-notifyd \
+    xfce4-power-manager \
+    xfce4-power-manager-plugins \
+    xfce4-screensaver \
+    xfce4-screenshooter \
+    xfce4-settings \
+    xfce4-whiskermenu-plugin \
+    xfce4-pulseaudio-plugin \
+    xfce4-indicator-plugin \
+    xfce4-helpers \
+    xfwm4 \
+    thunar \
+    thunar-volman \
+    exo-utils \
+    || true
+
+# ---------------------------------------------------------------------------
+# 4. Remove print stack (no printers on a gaming kiosk)
+# ---------------------------------------------------------------------------
+echo "==> Removing CUPS / printer stack..."
+apt-get remove -y --auto-remove \
+    cups \
+    cups-daemon \
+    cups-browsed \
+    cups-bsd \
+    cups-client \
+    cups-filters \
+    cups-filters-core-drivers \
+    cups-ipp-utils \
+    cups-ppdc \
+    cups-server-common \
+    foomatic-db-compressed-ppds \
+    openprinting-ppds \
+    ghostscript \
+    printer-driver-brlaser \
+    printer-driver-c2esp \
+    printer-driver-foo2zjs \
+    printer-driver-foo2zjs-common \
+    printer-driver-hpcups \
+    printer-driver-m2300w \
+    printer-driver-min12xxw \
+    printer-driver-pnm2ppa \
+    printer-driver-postscript-hp \
+    printer-driver-ptouch \
+    printer-driver-pxljr \
+    printer-driver-sag-gdi \
+    printer-driver-splix \
+    bluez-cups \
+    || true
+
+# ---------------------------------------------------------------------------
+# 5. Remove scanner stack (SANE)
+# ---------------------------------------------------------------------------
+echo "==> Removing SANE scanner stack..."
+apt-get remove -y --auto-remove \
+    sane-utils \
+    sane-airscan \
+    libsane1 \
+    libsane-hpaio \
+    || true
+
+# ---------------------------------------------------------------------------
+# 6. Remove Bluetooth UI (bluez itself retained — some game controllers use BT)
+#    Remove blueman (GUI), bluez-obexd (file transfer), and BT audio module.
+#    If no BT controllers are used at all, also remove bluez here.
+# ---------------------------------------------------------------------------
+echo "==> Removing Bluetooth GUI and unused BT services..."
+apt-get remove -y --auto-remove \
+    blueman \
+    bluez-obexd \
+    pulseaudio-module-bluetooth \
+    || true
+
+# ---------------------------------------------------------------------------
+# 7. Remove NFS / RPC (no network file shares on a kiosk)
+# ---------------------------------------------------------------------------
+echo "==> Removing NFS and RPC..."
+apt-get remove -y --auto-remove \
+    nfs-kernel-server \
+    nfs-common \
+    rpcbind \
+    || true
+
+# ---------------------------------------------------------------------------
+# 8. Remove snapd (no snap packages used; saves ~100–200 MB)
+# ---------------------------------------------------------------------------
+echo "==> Removing snapd..."
+apt-get remove -y --auto-remove snapd || true
+# Prevent snap from being re-installed as a dependency in future apt runs
+cat > /etc/apt/preferences.d/no-snap <<'EOF'
+Package: snapd
+Pin: release a=*
+Pin-Priority: -1
+EOF
+
+# ---------------------------------------------------------------------------
+# 9. Remove build toolchain (not needed at runtime)
+#    Keeps: make (used by dkms internally), gcc-13-base (shared lib base)
+# ---------------------------------------------------------------------------
+echo "==> Removing build toolchain..."
+apt-get remove -y --auto-remove \
+    build-essential \
+    gcc \
+    gcc-13 \
+    gcc-13-x86-64-linux-gnu \
+    gcc-x86-64-linux-gnu \
+    g++ \
+    g++-13 \
+    g++-13-x86-64-linux-gnu \
+    g++-x86-64-linux-gnu \
+    clang \
+    clang-18 \
+    binutils \
+    binutils-x86-64-linux-gnu \
+    cpp \
+    cpp-13 \
+    cpp-13-x86-64-linux-gnu \
+    cpp-x86-64-linux-gnu \
+    libgcc-13-dev \
+    libclang-common-18-dev \
+    libclang-cpp18 \
+    libclang-rt-18-dev \
+    libclang1-18 \
+    dpkg-dev \
+    pkg-config \
+    manpages-dev \
+    cargo \
+    rustc \
+    libstd-rust-1.75 \
+    libstd-rust-dev \
+    || true
+
+# ---------------------------------------------------------------------------
+# 10. Remove .NET SDK; keep only the runtime needed by ChartHub.Server
+#     dotnet-runtime-8.0 and aspnetcore-runtime-8.0 are retained.
+#     NOTE: if ChartHub.Server targets net10.0, adjust the version kept here.
+# ---------------------------------------------------------------------------
+echo "==> Removing .NET SDK (keeping runtime)..."
+apt-get remove -y --auto-remove \
+    dotnet-sdk-8.0 \
+    dotnet-templates-8.0 \
+    dotnet-apphost-pack-8.0 \
+    dotnet-targeting-pack-8.0 \
+    aspnetcore-targeting-pack-8.0 \
+    || true
+
+# ---------------------------------------------------------------------------
+# 11. Remove crash reporters and telemetry
+# ---------------------------------------------------------------------------
+echo "==> Removing apport crash reporter..."
+apt-get remove -y --auto-remove \
+    apport \
+    apport-symptoms \
+    apport-core-dump-handler \
+    python3-apport \
+    || true
+
+# ---------------------------------------------------------------------------
+# 12. Remove cloud-init (not a cloud VM; saves time on boot)
+# ---------------------------------------------------------------------------
+echo "==> Removing cloud-init..."
+apt-get remove -y --auto-remove cloud-init cloud-guest-utils || true
+# Prevent reinstall
+echo 'datasource_list: [ None ]' > /etc/cloud/cloud.cfg.d/99-disable.cfg 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# 13. Remove spell checkers (no text editor on the kiosk)
+# ---------------------------------------------------------------------------
+echo "==> Removing spell checkers..."
+apt-get remove -y --auto-remove \
+    aspell \
+    aspell-en \
+    enchant-2 \
+    dictionaries-common \
+    || true
+
+# ---------------------------------------------------------------------------
+# 14. Remove avahi mDNS (not needed; ChartHub uses direct IP)
+#     NOTE: avahi-daemon is pulled by some Bluetooth stack components.
+#     Only remove if you have no mDNS discovery need.
+# ---------------------------------------------------------------------------
+echo "==> Removing avahi-daemon..."
+apt-get remove -y --auto-remove avahi-daemon || true
+
+# ---------------------------------------------------------------------------
+# 15. Remove bpfcc / bpftrace tracing tools (developer tools, not runtime deps)
+# ---------------------------------------------------------------------------
+echo "==> Removing bpf tracing tools..."
+apt-get remove -y --auto-remove \
+    bpfcc-tools \
+    bpftrace \
+    python3-bpfcc \
+    || true
+
+# ---------------------------------------------------------------------------
+# 16. Remove synaptic package manager GUI (no GUI package mgmt on kiosk)
+# ---------------------------------------------------------------------------
+echo "==> Removing synaptic..."
+apt-get remove -y --auto-remove synaptic software-properties-gtk || true
+
+# ---------------------------------------------------------------------------
+# 17. Remove dkms and linux headers (no kernel modules to recompile)
+#     CAUTION: skip this if you have NVIDIA/AMD/WiFi drivers installed via dkms
+# ---------------------------------------------------------------------------
+echo "==> Checking for dkms modules before removing..."
+if dkms status 2>/dev/null | grep -q "^"; then
+    echo "    WARNING: dkms has active modules — skipping dkms/linux-headers removal."
+    echo "    Active modules:"
+    dkms status
+else
+    echo "    No dkms modules found. Removing dkms and old kernel headers..."
+    apt-get remove -y --auto-remove dkms || true
+    # Remove stale kernel headers (keep current running kernel's headers if any)
+    RUNNING_KERNEL="$(uname -r)"
+    dpkg -l 'linux-headers-*' 2>/dev/null | awk '/^ii/{print $2}' | grep -v "$RUNNING_KERNEL" | xargs -r apt-get remove -y --auto-remove || true
+fi
+
+# ---------------------------------------------------------------------------
+# 18. Final autoremove pass (catch any orphaned deps)
+# ---------------------------------------------------------------------------
+echo "==> Final autoremove..."
+apt-get autoremove -y --purge
+
+# ---------------------------------------------------------------------------
+# 19. Install the kiosk session script
+# ---------------------------------------------------------------------------
+echo "==> Installing kiosk session script to ${SESSION_SCRIPT}..."
+install -m 0755 "${SCRIPT_DIR}/start-kiosk-session.sh" "${SESSION_SCRIPT}"
+
+# ---------------------------------------------------------------------------
+# 20. Register the X session
+# ---------------------------------------------------------------------------
+echo "==> Registering charthub-kiosk X session at ${SESSION_DESKTOP}..."
+mkdir -p "$(dirname "${SESSION_DESKTOP}")"
+cat > "${SESSION_DESKTOP}" <<'EOF'
+[Desktop Entry]
+Name=ChartHub Kiosk
+Comment=Minimal kiosk session for ChartHub.Server
+Exec=/usr/local/bin/start-charthub-kiosk
+Type=Application
+EOF
+
+# ---------------------------------------------------------------------------
+# 21. LightDM: auto-login + disable greeter screen lock
+# ---------------------------------------------------------------------------
+AUTOLOGIN_USER="${KIOSK_USER:-${SUDO_USER:-$(logname 2>/dev/null || echo "")}}"
+if [[ -z "$AUTOLOGIN_USER" ]]; then
+    echo "WARNING: Could not determine the autologin user."
+    echo "         Set KIOSK_USER environment variable and re-run, or edit ${LIGHTDM_CONF} manually."
+    AUTOLOGIN_USER="<your-user>"
+fi
+
+echo "==> Writing LightDM config to ${LIGHTDM_CONF} (autologin user: ${AUTOLOGIN_USER})..."
+mkdir -p "$(dirname "${LIGHTDM_CONF}")"
+cat > "${LIGHTDM_CONF}" <<EOF
+[Seat:*]
+autologin-user=${AUTOLOGIN_USER}
+autologin-user-timeout=0
+user-session=charthub-kiosk
+greeter-session=lightdm-gtk-greeter
+
+[SeatDefaults]
+xserver-command=X -s 0 -dpms
+EOF
+
+# ---------------------------------------------------------------------------
+# 22. Disable lightdm-gtk-greeter screen locker (if present)
+# ---------------------------------------------------------------------------
+GREETER_CONF="/etc/lightdm/lightdm-gtk-greeter.conf"
+if [[ -f "$GREETER_CONF" ]]; then
+    echo "==> Disabling screensaver in lightdm-gtk-greeter.conf..."
+    if ! grep -q "^\[greeter\]" "$GREETER_CONF"; then
+        echo "" >> "$GREETER_CONF"
+        echo "[greeter]" >> "$GREETER_CONF"
+    fi
+    sed -i '/^screensaver-timeout/d' "$GREETER_CONF"
+    sed -i '/^\[greeter\]/a screensaver-timeout=0' "$GREETER_CONF"
+fi
+
+echo ""
+echo "========================================="
+echo " Kiosk setup complete."
+echo "========================================="
+echo " Next steps:"
+echo "   1. Verify autologin user in ${LIGHTDM_CONF}: ${AUTOLOGIN_USER}"
+echo "   2. Edit ${SESSION_SCRIPT} — set CHARTHUB_SERVER path"
+echo "   3. Reboot to activate the kiosk session"
+echo ""
+echo " Packages intentionally kept:"
+echo "   bluez        — Bluetooth game controllers"
+echo "   ffmpeg       — game audio/video codecs"
+echo "   dotnet-runtime-8.0 / aspnetcore-runtime-8.0"
+echo "   alsa-utils   — audio control (ChartHub.Server volume service)"
+echo "   openbox      — WM required by Unity/SDL2 games"
+echo "========================================="

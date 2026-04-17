@@ -22,6 +22,7 @@ builder.Services.Configure<DownloadsOptions>(builder.Configuration.GetSection(Do
 builder.Services.Configure<DesktopEntryOptions>(builder.Configuration.GetSection(DesktopEntryOptions.SectionName));
 builder.Services.Configure<ServerLoggingOptions>(builder.Configuration.GetSection(ServerLoggingOptions.SectionName));
 builder.Services.Configure<InputOptions>(builder.Configuration.GetSection(InputOptions.SectionName));
+builder.Services.Configure<HudOptions>(builder.Configuration.GetSection(HudOptions.SectionName));
 
 ServerLoggingOptions serverLoggingOptions = builder.Configuration
     .GetSection(ServerLoggingOptions.SectionName)
@@ -87,6 +88,10 @@ builder.Services.AddSingleton<IDownloadJobInstallService, DownloadJobInstallServ
 builder.Services.AddSingleton<ICloneHeroLibraryService, CloneHeroLibraryService>();
 builder.Services.AddSingleton<IDesktopEntryService, DesktopEntryService>();
 builder.Services.AddSingleton<IVolumeService, VolumeService>();
+builder.Services.AddSingleton<IInputConnectionTracker, InputConnectionTracker>();
+builder.Services.AddSingleton<HudLifecycleService>();
+builder.Services.AddSingleton<IHudLifecycleService>(sp => sp.GetRequiredService<HudLifecycleService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<HudLifecycleService>());
 builder.Services.AddHostedService<ServerPathValidatorHostedService>();
 builder.Services.AddHostedService<NestedInstallPathMigrationService>();
 builder.Services.AddHostedService<DownloadPipelineHostedService>();
@@ -168,6 +173,7 @@ app.MapCloneHeroEndpoints();
 app.MapDesktopEntryEndpoints();
 app.MapVolumeEndpoints();
 app.MapInputEndpoints();
+app.MapHudStatusEndpoints();
 
 app.Run();
 

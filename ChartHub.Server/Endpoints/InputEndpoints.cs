@@ -48,6 +48,7 @@ public static partial class InputEndpoints
     private static async Task HandleControllerAsync(
         HttpContext context,
         IUinputGamepadService gamepad,
+        IInputConnectionTracker connectionTracker,
         ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
@@ -58,29 +59,37 @@ public static partial class InputEndpoints
         }
 
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
+        connectionTracker.RegisterConnection();
         LogControllerConnected(logger);
 
-        await ReceiveLoopAsync(ws, logger, cancellationToken, message =>
+        try
         {
-            string type = message.GetProperty("type").GetString() ?? string.Empty;
+            await ReceiveLoopAsync(ws, logger, cancellationToken, message =>
+            {
+                string type = message.GetProperty("type").GetString() ?? string.Empty;
 
-            if (string.Equals(type, "btn", StringComparison.OrdinalIgnoreCase))
-            {
-                ControllerButtonMessage? msg = message.Deserialize<ControllerButtonMessage>(JsonOptions);
-                if (msg is not null)
+                if (string.Equals(type, "btn", StringComparison.OrdinalIgnoreCase))
                 {
-                    gamepad.PressButton(msg.ButtonId, msg.Pressed);
+                    ControllerButtonMessage? msg = message.Deserialize<ControllerButtonMessage>(JsonOptions);
+                    if (msg is not null)
+                    {
+                        gamepad.PressButton(msg.ButtonId, msg.Pressed);
+                    }
                 }
-            }
-            else if (string.Equals(type, "dpad", StringComparison.OrdinalIgnoreCase))
-            {
-                ControllerDPadMessage? msg = message.Deserialize<ControllerDPadMessage>(JsonOptions);
-                if (msg is not null)
+                else if (string.Equals(type, "dpad", StringComparison.OrdinalIgnoreCase))
                 {
-                    gamepad.SetDPad(msg.X, msg.Y);
+                    ControllerDPadMessage? msg = message.Deserialize<ControllerDPadMessage>(JsonOptions);
+                    if (msg is not null)
+                    {
+                        gamepad.SetDPad(msg.X, msg.Y);
+                    }
                 }
-            }
-        });
+            });
+        }
+        finally
+        {
+            connectionTracker.UnregisterConnection();
+        }
 
         LogControllerDisconnected(logger);
     }
@@ -88,6 +97,7 @@ public static partial class InputEndpoints
     private static async Task HandleTouchpadAsync(
         HttpContext context,
         IUinputMouseService mouse,
+        IInputConnectionTracker connectionTracker,
         ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
@@ -98,29 +108,37 @@ public static partial class InputEndpoints
         }
 
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
+        connectionTracker.RegisterConnection();
         LogTouchpadConnected(logger);
 
-        await ReceiveLoopAsync(ws, logger, cancellationToken, message =>
+        try
         {
-            string type = message.GetProperty("type").GetString() ?? string.Empty;
+            await ReceiveLoopAsync(ws, logger, cancellationToken, message =>
+            {
+                string type = message.GetProperty("type").GetString() ?? string.Empty;
 
-            if (string.Equals(type, "move", StringComparison.OrdinalIgnoreCase))
-            {
-                TouchpadMoveMessage? msg = message.Deserialize<TouchpadMoveMessage>(JsonOptions);
-                if (msg is not null)
+                if (string.Equals(type, "move", StringComparison.OrdinalIgnoreCase))
                 {
-                    mouse.MoveDelta(msg.Dx, msg.Dy);
+                    TouchpadMoveMessage? msg = message.Deserialize<TouchpadMoveMessage>(JsonOptions);
+                    if (msg is not null)
+                    {
+                        mouse.MoveDelta(msg.Dx, msg.Dy);
+                    }
                 }
-            }
-            else if (string.Equals(type, "mousebtn", StringComparison.OrdinalIgnoreCase))
-            {
-                TouchpadButtonMessage? msg = message.Deserialize<TouchpadButtonMessage>(JsonOptions);
-                if (msg is not null)
+                else if (string.Equals(type, "mousebtn", StringComparison.OrdinalIgnoreCase))
                 {
-                    mouse.PressButton(msg.Side, msg.Pressed);
+                    TouchpadButtonMessage? msg = message.Deserialize<TouchpadButtonMessage>(JsonOptions);
+                    if (msg is not null)
+                    {
+                        mouse.PressButton(msg.Side, msg.Pressed);
+                    }
                 }
-            }
-        });
+            });
+        }
+        finally
+        {
+            connectionTracker.UnregisterConnection();
+        }
 
         LogTouchpadDisconnected(logger);
     }
@@ -128,6 +146,7 @@ public static partial class InputEndpoints
     private static async Task HandleKeyboardAsync(
         HttpContext context,
         IUinputKeyboardService keyboard,
+        IInputConnectionTracker connectionTracker,
         ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
@@ -138,29 +157,37 @@ public static partial class InputEndpoints
         }
 
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
+        connectionTracker.RegisterConnection();
         LogKeyboardConnected(logger);
 
-        await ReceiveLoopAsync(ws, logger, cancellationToken, message =>
+        try
         {
-            string type = message.GetProperty("type").GetString() ?? string.Empty;
+            await ReceiveLoopAsync(ws, logger, cancellationToken, message =>
+            {
+                string type = message.GetProperty("type").GetString() ?? string.Empty;
 
-            if (string.Equals(type, "key", StringComparison.OrdinalIgnoreCase))
-            {
-                KeyboardKeyMessage? msg = message.Deserialize<KeyboardKeyMessage>(JsonOptions);
-                if (msg is not null)
+                if (string.Equals(type, "key", StringComparison.OrdinalIgnoreCase))
                 {
-                    keyboard.PressKey(msg.LinuxKeyCode, msg.Pressed);
+                    KeyboardKeyMessage? msg = message.Deserialize<KeyboardKeyMessage>(JsonOptions);
+                    if (msg is not null)
+                    {
+                        keyboard.PressKey(msg.LinuxKeyCode, msg.Pressed);
+                    }
                 }
-            }
-            else if (string.Equals(type, "char", StringComparison.OrdinalIgnoreCase))
-            {
-                KeyboardCharMessage? msg = message.Deserialize<KeyboardCharMessage>(JsonOptions);
-                if (msg?.Char is { Length: > 0 } charStr)
+                else if (string.Equals(type, "char", StringComparison.OrdinalIgnoreCase))
                 {
-                    keyboard.TypeChar(charStr[0]);
+                    KeyboardCharMessage? msg = message.Deserialize<KeyboardCharMessage>(JsonOptions);
+                    if (msg?.Char is { Length: > 0 } charStr)
+                    {
+                        keyboard.TypeChar(charStr[0]);
+                    }
                 }
-            }
-        });
+            });
+        }
+        finally
+        {
+            connectionTracker.UnregisterConnection();
+        }
 
         LogKeyboardDisconnected(logger);
     }

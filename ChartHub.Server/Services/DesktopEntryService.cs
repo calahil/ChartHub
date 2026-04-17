@@ -13,6 +13,7 @@ namespace ChartHub.Server.Services;
 public sealed partial class DesktopEntryService(
     IOptions<DesktopEntryOptions> options,
     IWebHostEnvironment environment,
+    IHudLifecycleService hudLifecycle,
     ILogger<DesktopEntryService> logger) : IDesktopEntryService
 {
     private static readonly string[] ExecFieldTokensToStrip =
@@ -45,6 +46,7 @@ public sealed partial class DesktopEntryService(
     };
 
     private readonly DesktopEntryOptions _options = options.Value;
+    private readonly IHudLifecycleService _hudLifecycle = hudLifecycle;
     private readonly ILogger<DesktopEntryService> _logger = logger;
     private readonly string _catalogDirectoryPath = ServerContentPathResolver.Resolve(options.Value.CatalogDirectory, environment.ContentRootPath);
     private readonly string _iconCacheDirectoryPath = ServerContentPathResolver.Resolve(options.Value.IconCacheDirectory, environment.ContentRootPath);
@@ -174,9 +176,11 @@ public sealed partial class DesktopEntryService(
             throw new DesktopEntryServiceException(StatusCodes.Status400BadRequest, "invalid_exec", "Desktop entry Exec field is missing or invalid.");
         }
 
+        await _hudLifecycle.SuspendAsync(cancellationToken).ConfigureAwait(false);
+
         try
         {
-            using Process process = new()
+            Process process = new()
             {
                 StartInfo = new ProcessStartInfo
                 {
@@ -187,6 +191,7 @@ public sealed partial class DesktopEntryService(
                     CreateNoWindow = true,
                     WorkingDirectory = Path.GetDirectoryName(entry.DesktopFilePath) ?? "/",
                 },
+                EnableRaisingEvents = true,
             };
 
             foreach (string argument in exec.Arguments)
@@ -194,8 +199,17 @@ public sealed partial class DesktopEntryService(
                 process.StartInfo.ArgumentList.Add(argument);
             }
 
+            string capturedEntryId = entry.EntryId;
+            process.Exited += (_, _) =>
+            {
+                _trackedProcesses.TryRemove(capturedEntryId, out _);
+                process.Dispose();
+                _ = _hudLifecycle.ResumeAsync(CancellationToken.None);
+            };
+
             if (!process.Start())
             {
+                process.Dispose();
                 throw new DesktopEntryServiceException(StatusCodes.Status500InternalServerError, "execution_failed", "Failed to start process.");
             }
 
@@ -212,10 +226,12 @@ public sealed partial class DesktopEntryService(
         }
         catch (DesktopEntryServiceException)
         {
+            await _hudLifecycle.ResumeAsync(CancellationToken.None).ConfigureAwait(false);
             throw;
         }
         catch (Exception ex)
         {
+            await _hudLifecycle.ResumeAsync(CancellationToken.None).ConfigureAwait(false);
             LogDesktopEntryExecuteFailed(_logger, entry.EntryId, ex);
             throw new DesktopEntryServiceException(StatusCodes.Status500InternalServerError, "execution_failed", "Failed to execute desktop entry.");
         }
@@ -266,6 +282,7 @@ public sealed partial class DesktopEntryService(
         }
 
         _trackedProcesses.TryRemove(entryId, out _);
+        await _hudLifecycle.ResumeAsync(cancellationToken).ConfigureAwait(false);
 
         return new DesktopEntryActionResponse
         {

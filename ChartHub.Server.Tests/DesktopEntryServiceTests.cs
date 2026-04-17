@@ -46,6 +46,7 @@ public sealed class DesktopEntryServiceTests
                     SseIntervalSeconds = 2,
                 }),
                 new TestHostEnvironment(root),
+                NullHudLifecycleService.Instance,
                 NullLogger<DesktopEntryService>.Instance);
 
             await sut.RefreshCatalogAsync(CancellationToken.None);
@@ -89,6 +90,7 @@ public sealed class DesktopEntryServiceTests
                     SseIntervalSeconds = 2,
                 }),
                 new TestHostEnvironment(root),
+                NullHudLifecycleService.Instance,
                 NullLogger<DesktopEntryService>.Instance);
 
             await sut.RefreshCatalogAsync(CancellationToken.None);
@@ -113,6 +115,15 @@ public sealed class DesktopEntryServiceTests
         string path = Path.Combine(Path.GetTempPath(), "charthub-desktopentry-service-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
         return path;
+    }
+
+    private sealed class NullHudLifecycleService : IHudLifecycleService
+    {
+        public static readonly NullHudLifecycleService Instance = new();
+
+        public Task SuspendAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task ResumeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class TestHostEnvironment(string contentRootPath) : IWebHostEnvironment
