@@ -34,6 +34,7 @@ public sealed partial class DownloadProxyService : IDownloadProxyService
     private readonly string _cacheRootPath;
     private readonly Uri _upstreamBaseUri;
     private readonly HttpClient _httpClient;
+    private readonly IDnsResolver _dnsResolver;
     private readonly ILogger<DownloadProxyService> _logger;
     private readonly int _externalRedirectCacheHours;
 
@@ -42,6 +43,7 @@ public sealed partial class DownloadProxyService : IDownloadProxyService
         IOptions<DownloadOptions> downloadOptions,
         IOptions<RhythmVerseSourceOptions> sourceOptions,
         IHostEnvironment hostEnvironment,
+        IDnsResolver dnsResolver,
         ILogger<DownloadProxyService> logger)
     {
         ArgumentNullException.ThrowIfNull(downloadOptions);
@@ -49,6 +51,7 @@ public sealed partial class DownloadProxyService : IDownloadProxyService
         ArgumentNullException.ThrowIfNull(hostEnvironment);
 
         _httpClient = httpClient;
+        _dnsResolver = dnsResolver;
         _logger = logger;
 
         string cacheDirectory = downloadOptions.Value.CacheDirectory;
@@ -119,6 +122,11 @@ public sealed partial class DownloadProxyService : IDownloadProxyService
     public async Task<DownloadProxyResult?> GetExternalDownloadAsync(string sourceUrl, CancellationToken cancellationToken)
     {
         if (!TryNormalizeExternalUrl(sourceUrl, out Uri? sourceUri) || sourceUri is null)
+        {
+            return null;
+        }
+
+        if (!await ValidateExternalUriAgainstSsrfAsync(sourceUri, cancellationToken).ConfigureAwait(false))
         {
             return null;
         }
@@ -283,6 +291,36 @@ public sealed partial class DownloadProxyService : IDownloadProxyService
             ? resolvedUri
             : new Uri(sourceUri, href);
     }
+
+    private async Task<bool> ValidateExternalUriAgainstSsrfAsync(Uri uri, CancellationToken cancellationToken)
+    {
+        try
+        {
+            System.Net.IPAddress[] addresses = await _dnsResolver.GetHostAddressesAsync(uri.Host, cancellationToken).ConfigureAwait(false);
+            if (addresses.Length == 0)
+            {
+                return false;
+            }
+
+            foreach (System.Net.IPAddress address in addresses)
+            {
+                if (PrivateIpBlocker.IsPrivateOrReserved(address))
+                {
+                    LogSsrfBlocked(_logger, uri.Host);
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is System.Net.Sockets.SocketException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "SSRF check blocked request to host {Host} resolving to a private/reserved IP")]
+    private static partial void LogSsrfBlocked(ILogger logger, string host);
 
     private static bool TryNormalizeExternalUrl(string sourceUrl, out Uri? normalizedUri)
     {

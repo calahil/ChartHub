@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 
 using ChartHub.Server.Endpoints;
 using ChartHub.Server.Options;
@@ -6,6 +7,7 @@ using ChartHub.Server.Services;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 
 using Scalar.AspNetCore;
@@ -86,6 +88,7 @@ builder.Services.AddSingleton<ICloneHeroLibraryService, CloneHeroLibraryService>
 builder.Services.AddSingleton<IDesktopEntryService, DesktopEntryService>();
 builder.Services.AddSingleton<IVolumeService, VolumeService>();
 builder.Services.AddHostedService<ServerPathValidatorHostedService>();
+builder.Services.AddHostedService<NestedInstallPathMigrationService>();
 builder.Services.AddHostedService<DownloadPipelineHostedService>();
 builder.Services.AddHostedService<DesktopEntryStartupHostedService>();
 builder.Services.AddSingleton<IUinputGamepadService, UinputGamepadService>();
@@ -95,6 +98,36 @@ builder.Services.AddSingleton<IUinputKeyboardService, UinputKeyboardService>();
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("auth", context =>
+        RateLimitPartition.GetTokenBucketLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = 10,
+                ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+                TokensPerPeriod = 10,
+                AutoReplenishment = true,
+            }));
+
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        string clientIp = context.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim()
+            ?? context.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+        return RateLimitPartition.GetTokenBucketLimiter(clientIp, _ => new TokenBucketRateLimiterOptions
+        {
+            TokenLimit = 120,
+            ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+            TokensPerPeriod = 120,
+            AutoReplenishment = true,
+        });
+    });
+});
 
 WebApplication app = builder.Build();
 
@@ -123,6 +156,7 @@ if (app.Environment.IsDevelopment())
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
     .WithName("GetChartHubServerHealth")

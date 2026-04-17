@@ -13,6 +13,11 @@ WORKDIR /app
 
 RUN mkdir -p /cache/downloads /cache/images
 
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup --no-create-home appuser \
+    && chown -R appuser:appgroup /cache /app
+
+USER appuser
+
 ENV ASPNETCORE_URLS=http://+:5000
 EXPOSE 5000
 

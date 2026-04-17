@@ -27,7 +27,7 @@ public sealed class SoftDeleteExclusionEndpointTests : IClassFixture<BackupApiWe
             Song(2, "Deleted Artist", isDeleted: true),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage httpResponse = await client.PostAsync(
             "/api/all/songfiles/list",
             new FormUrlEncodedContent([
@@ -55,7 +55,7 @@ public sealed class SoftDeleteExclusionEndpointTests : IClassFixture<BackupApiWe
             Song(99, "Deleted Artist", isDeleted: true),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.GetAsync("/api/rhythmverse/songs/99");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

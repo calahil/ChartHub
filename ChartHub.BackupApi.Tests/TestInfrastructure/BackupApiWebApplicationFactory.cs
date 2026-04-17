@@ -8,8 +8,20 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ChartHub.BackupApi.Tests.TestInfrastructure;
 
+public static class WebApplicationFactoryExtensions
+{
+    public static HttpClient CreateAuthenticatedClient(this Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory)
+    {
+        HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Api-Key", BackupApiWebApplicationFactory.TestApiKey);
+        return client;
+    }
+}
+
 public sealed class BackupApiWebApplicationFactory : WebApplicationFactory<Program>, IDisposable
 {
+    public const string TestApiKey = "test-api-key-for-integration-tests";
+
     private readonly string _databasePath = Path.Combine(
         Path.GetTempPath(),
         $"charthub-backupapi-tests-{Guid.NewGuid():N}.db");
@@ -26,6 +38,7 @@ public sealed class BackupApiWebApplicationFactory : WebApplicationFactory<Progr
                     new KeyValuePair<string, string?>("Database:Provider", "sqlite"),
                     new KeyValuePair<string, string?>("Database:SqliteConnectionString", $"Data Source={_databasePath}"),
                     new KeyValuePair<string, string?>("Sync:Enabled", "false"),
+                    new KeyValuePair<string, string?>("ApiKey:Key", TestApiKey),
                 ]);
             });
 

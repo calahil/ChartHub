@@ -24,7 +24,7 @@ public sealed class ImageProxyEndpointTests : IClassFixture<BackupApiWebApplicat
             {
                 services.AddSingleton<IImageProxyService>(new StubImageProxyService(new ImageProxyResult([4, 5, 6], "image/png")));
             }))
-            .CreateClient();
+            .CreateAuthenticatedClient();
 
         HttpResponseMessage response = await client.GetAsync("/assets/album_art/data-art.png");
 
@@ -41,7 +41,7 @@ public sealed class ImageProxyEndpointTests : IClassFixture<BackupApiWebApplicat
             {
                 services.AddSingleton<IImageProxyService>(new StubImageProxyService(null));
             }))
-            .CreateClient();
+            .CreateAuthenticatedClient();
 
         HttpResponseMessage response = await client.GetAsync("/avatars/author.png");
 

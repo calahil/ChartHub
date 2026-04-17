@@ -701,21 +701,21 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         Secrets.Clear();
         Secrets.Add(new SecretFieldViewModel
         {
-            Label = "Google Desktop Client Secret",
+            Label = UiLocalization.Get("Settings.Secret.GoogleDesktopClientSecretLabel"),
             Key = SecretKeys.GoogleDesktopClientSecret,
-            Description = "Sensitive OAuth client secret used for desktop auth flow.",
+            Description = UiLocalization.Get("Settings.Secret.GoogleDesktopClientSecretDescription"),
         });
         Secrets.Add(new SecretFieldViewModel
         {
-            Label = "Google Refresh Token",
+            Label = UiLocalization.Get("Settings.Secret.GoogleRefreshTokenLabel"),
             Key = SecretKeys.GoogleRefreshToken,
-            Description = "OAuth refresh token used to obtain new access tokens.",
+            Description = UiLocalization.Get("Settings.Secret.GoogleRefreshTokenDescription"),
         });
         Secrets.Add(new SecretFieldViewModel
         {
-            Label = "Google Access Token",
+            Label = UiLocalization.Get("Settings.Secret.GoogleAccessTokenLabel"),
             Key = SecretKeys.GoogleAccessToken,
-            Description = "Current short-lived access token. Usually set automatically.",
+            Description = UiLocalization.Get("Settings.Secret.GoogleAccessTokenDescription"),
         });
     }
 

@@ -93,7 +93,7 @@ jobs:
   build-desktop:
     name: Publish desktop (${{ matrix.rid }})
     if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, charthub-build]
     needs: [classify, validate]
     strategy:
       fail-fast: true
@@ -101,10 +101,6 @@ jobs:
         rid: [linux-x64, win-x64]
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
 
       - name: Restore
         run: dotnet restore ChartHub/ChartHub.csproj -r ${{ matrix.rid }} /p:TargetFramework=net10.0
@@ -176,7 +172,7 @@ jobs:
 
   build-api-image:
     name: Build and push Backup API image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, charthub-host]
     needs: [classify, validate]
     outputs:
       image_digest: ${{ steps.push.outputs.digest }}
@@ -243,20 +239,16 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ needs.classify.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/charthub-backup-api:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/charthub-backup-api:buildcache,mode=max
 
   build-server-bundle:
     name: Publish ChartHub.Server (linux-x64)
-    if: needs.classify.outputs.release_channel == 'stable'
-    runs-on: ubuntu-latest
+    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
+    runs-on: [self-hosted, linux, charthub-build]
     needs: [classify, validate]
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
 
       - name: Restore
         run: dotnet restore ChartHub.Server/ChartHub.Server.csproj -r linux-x64
@@ -305,7 +297,7 @@ jobs:
           path: ./release-assets
 
       - name: Download Server Linux artifact
-        if: needs.classify.outputs.release_channel == 'stable'
+        if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
         uses: actions/download-artifact@v4
         with:
           name: server-linux-x64
@@ -342,7 +334,7 @@ jobs:
             echo "### Backup API"
             echo "- Image: ghcr.io/${REPO_OWNER}/charthub-backup-api:${VERSION}"
             echo "- Digest: ${BACKUP_API_DIGEST}"
-            if [[ "$RELEASE_CHANNEL" == "stable" ]]; then
+            if [[ "$RELEASE_CHANNEL" == "rc" || "$RELEASE_CHANNEL" == "stable" ]]; then
               echo ""
               echo "### ChartHub Server"
               echo "- Linux bundle: charthub-server-${VERSION}-linux-x64.zip"
@@ -379,6 +371,7 @@ jobs:
           RHYTHMVERSE_TOKEN: ${{ secrets.RHYTHMVERSE_TOKEN }}
           BACKUP_SYNC_ENABLED: ${{ secrets.BACKUP_SYNC_ENABLED }}
           DB_VOLUME: ${{ secrets.DB_VOLUME }}
+          BACKUP_API_KEY: ${{ secrets.BACKUP_API_KEY }}
         run: |
           printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
           printenv PSQL_CONTAINER_NAME  | xargs -I{} printf 'PSQL_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
@@ -394,6 +387,7 @@ jobs:
           printenv RHYTHMVERSE_TOKEN    | xargs -I{} printf 'RHYTHMVERSE_TOKEN=%s\n' "{}" >> .env.deploy
           printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
           printenv DB_VOLUME            | xargs -I{} printf 'DB_VOLUME=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_API_KEY       | xargs -I{} printf 'BACKUP_API_KEY=%s\n' "{}" >> .env.deploy
 
       - name: Pull and deploy
         run: |
@@ -470,6 +464,7 @@ jobs:
           RHYTHMVERSE_TOKEN: ${{ secrets.RHYTHMVERSE_TOKEN }}
           BACKUP_SYNC_ENABLED: ${{ secrets.BACKUP_SYNC_ENABLED }}
           DB_VOLUME: ${{ secrets.DB_VOLUME }}
+          BACKUP_API_KEY: ${{ secrets.BACKUP_API_KEY }}
         run: |
           printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
           printenv PSQL_CONTAINER_NAME  | xargs -I{} printf 'PSQL_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
@@ -485,6 +480,7 @@ jobs:
           printenv RHYTHMVERSE_TOKEN    | xargs -I{} printf 'RHYTHMVERSE_TOKEN=%s\n' "{}" >> .env.deploy
           printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
           printenv DB_VOLUME            | xargs -I{} printf 'DB_VOLUME=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_API_KEY       | xargs -I{} printf 'BACKUP_API_KEY=%s\n' "{}" >> .env.deploy
 
       - name: Pull and deploy
         run: |
@@ -593,6 +589,7 @@ jobs:
           RHYTHMVERSE_TOKEN: ${{ secrets.RHYTHMVERSE_TOKEN }}
           BACKUP_SYNC_ENABLED: ${{ secrets.BACKUP_SYNC_ENABLED }}
           DB_VOLUME: ${{ secrets.DB_VOLUME }}
+          BACKUP_API_KEY: ${{ secrets.BACKUP_API_KEY }}
         run: |
           printenv BACKUP_API_IMAGE     | xargs -I{} printf 'BACKUP_API_IMAGE=%s\n' "{}" > .env.deploy
           printenv PSQL_CONTAINER_NAME  | xargs -I{} printf 'PSQL_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
@@ -608,6 +605,7 @@ jobs:
           printenv RHYTHMVERSE_TOKEN    | xargs -I{} printf 'RHYTHMVERSE_TOKEN=%s\n' "{}" >> .env.deploy
           printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
           printenv DB_VOLUME            | xargs -I{} printf 'DB_VOLUME=%s\n' "{}" >> .env.deploy
+          printenv BACKUP_API_KEY       | xargs -I{} printf 'BACKUP_API_KEY=%s\n' "{}" >> .env.deploy
 
       - name: Pull and deploy
         run: |
@@ -682,7 +680,7 @@ jobs:
 
   deploy-server-production:
     name: Deploy ChartHub Server bundle to production
-    if: needs.classify.outputs.release_channel == 'stable'
+    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
     runs-on: [self-hosted, linux, charthub-server-host]
     needs: [classify, build-server-bundle]
     environment: server-production
@@ -696,18 +694,29 @@ jobs:
           path: ./.server-release
 
       - name: Prepare install directories
+        env:
+          CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
+          DATA_PATH: ${{ secrets.CHARTHUB_SERVER_DATA_PATH }}
+          DB_PATH: ${{ secrets.CHARTHUB_SERVER_DB_PATH }}
+          LOGS_PATH: ${{ secrets.CHARTHUB_SERVER_LOGS_PATH }}
+          MUSIC_PATH: ${{ secrets.CHARTHUB_SERVER_CLONEHERO_PATH }}
         run: |
-          mkdir -p /srv/appdata/charthub/releases
-          mkdir -p /srv/appdata/charthub/config
-          mkdir -p /srv/appdata/charthub/db
-          mkdir -p /srv/appdata/charthub/logs
-          mkdir -p /srv/appdata/charthub/data
-          mkdir -p /srv/appdata/charthub/music
+          EFFECTIVE_CONFIG="${CONFIG_PATH:-/srv/appdata/charthub/config}"
+          EFFECTIVE_DATA="${DATA_PATH:-/srv/appdata/charthub/data}"
+          EFFECTIVE_DB="$(dirname "${DB_PATH:-/srv/appdata/charthub/db/charthub.db}")"
+          EFFECTIVE_LOGS="${LOGS_PATH:-/srv/appdata/charthub/logs}"
+          EFFECTIVE_MUSIC="${MUSIC_PATH:-/srv/appdata/charthub/music}"
+          mkdir -p "$(dirname "$EFFECTIVE_CONFIG")/releases"
+          mkdir -p "$EFFECTIVE_CONFIG"
+          mkdir -p "$EFFECTIVE_DB"
+          mkdir -p "$EFFECTIVE_LOGS"
+          mkdir -p "$EFFECTIVE_DATA"
+          mkdir -p "$EFFECTIVE_MUSIC"
           # Ensure the service user (gamer) can write runtime files regardless of the runner user.
-          chmod 777 /srv/appdata/charthub/logs
-          chmod 777 /srv/appdata/charthub/data
-          chmod 777 /srv/appdata/charthub/db
-          chmod 777 /srv/appdata/charthub/music
+          chmod 777 "$EFFECTIVE_LOGS"
+          chmod 777 "$EFFECTIVE_DATA"
+          chmod 777 "$EFFECTIVE_DB"
+          chmod 777 "$EFFECTIVE_MUSIC"
 
       - name: Write runtime environment file
         env:
@@ -718,9 +727,23 @@ jobs:
           GOOGLE_ALLOWED_AUDIENCE: ${{ secrets.CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES }}
           GOOGLE_DRIVE_API_KEY: ${{ secrets.CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY }}
           CHARTHUB_SERVER_PORT: ${{ secrets.CHARTHUB_SERVER_CHARTHUB_PORT }}
+          SERVER_CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
+          SERVER_DATA_PATH: ${{ secrets.CHARTHUB_SERVER_DATA_PATH }}
+          SERVER_DOWNLOADS_PATH: ${{ secrets.CHARTHUB_SERVER_DOWNLOADS_PATH }}
+          SERVER_STAGING_PATH: ${{ secrets.CHARTHUB_SERVER_STAGING_PATH }}
+          SERVER_CLONEHERO_PATH: ${{ secrets.CHARTHUB_SERVER_CLONEHERO_PATH }}
+          SERVER_DB_PATH: ${{ secrets.CHARTHUB_SERVER_DB_PATH }}
+          SERVER_LOGS_PATH: ${{ secrets.CHARTHUB_SERVER_LOGS_PATH }}
         run: |
           EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
-          ENV_FILE="/srv/appdata/charthub/config/charthub-server.env"
+          EFFECTIVE_CONFIG="${SERVER_CONFIG_PATH:-/srv/appdata/charthub/config}"
+          EFFECTIVE_DATA="${SERVER_DATA_PATH:-/srv/appdata/charthub/data}"
+          EFFECTIVE_DOWNLOADS="${SERVER_DOWNLOADS_PATH:-/srv/appdata/charthub/data/downloads}"
+          EFFECTIVE_STAGING="${SERVER_STAGING_PATH:-/srv/appdata/charthub/data/staging}"
+          EFFECTIVE_CLONEHERO="${SERVER_CLONEHERO_PATH:-/srv/appdata/charthub/music}"
+          EFFECTIVE_DB="${SERVER_DB_PATH:-/srv/appdata/charthub/db/charthub.db}"
+          EFFECTIVE_LOGS="${SERVER_LOGS_PATH:-/srv/appdata/charthub/logs}"
+          ENV_FILE="${EFFECTIVE_CONFIG}/charthub-server.env"
           install -m 600 /dev/null "$ENV_FILE"
           {
             echo "ASPNETCORE_URLS=http://+:${EFFECTIVE_PORT}"
@@ -729,52 +752,49 @@ jobs:
             echo "Auth__Audience=${AUTH_AUDIENCE}"
             echo "Auth__AccessTokenMinutes=60"
             echo "GoogleDrive__ApiKey=${GOOGLE_DRIVE_API_KEY}"
-            echo "ServerPaths__ConfigRoot=/srv/appdata/charthub/config"
-            echo "ServerPaths__ChartHubRoot=/srv/appdata/charthub/data"
-            echo "ServerPaths__DownloadsDir=/srv/appdata/charthub/data/downloads"
-            echo "ServerPaths__StagingDir=/srv/appdata/charthub/data/staging"
-            echo "ServerPaths__CloneHeroRoot=/srv/appdata/charthub/music"
-            echo "ServerPaths__SqliteDbPath=/srv/appdata/charthub/db/charthub.db"
-            echo "ServerLogging__LogDirectory=/srv/appdata/charthub/logs"
+            echo "ServerPaths__ConfigRoot=${EFFECTIVE_CONFIG}"
+            echo "ServerPaths__ChartHubRoot=${EFFECTIVE_DATA}"
+            echo "ServerPaths__DownloadsDir=${EFFECTIVE_DOWNLOADS}"
+            echo "ServerPaths__StagingDir=${EFFECTIVE_STAGING}"
+            echo "ServerPaths__CloneHeroRoot=${EFFECTIVE_CLONEHERO}"
+            echo "ServerPaths__SqliteDbPath=${EFFECTIVE_DB}"
+            echo "ServerLogging__LogDirectory=${EFFECTIVE_LOGS}"
             echo "ServerLogging__FileName=charthub-server.log"
             echo "CHARTHUB_SERVER_PORT=${EFFECTIVE_PORT}"
           } > "$ENV_FILE"
 
-          # Support single or comma-separated lists in secrets.
+          # Parse JSON array secrets (e.g. ["email@domain.com","other@domain.com"])
           auth_allowed_index=0
-          IFS=',' read -r -a auth_allowed_items <<< "${AUTH_ALLOWED_EMAIL:-}"
-          for item in "${auth_allowed_items[@]}"; do
-            trimmed=$(echo "$item" | xargs)
-            if [[ -n "$trimmed" ]]; then
-              printf 'Auth__AllowedEmails__%d=%s\n' "$auth_allowed_index" "$trimmed" >> "$ENV_FILE"
-              auth_allowed_index=$((auth_allowed_index + 1))
-            fi
-          done
+          while IFS= read -r item; do
+            [[ -n "$item" ]] || continue
+            printf 'Auth__AllowedEmails__%d=%s\n' "$auth_allowed_index" "$item" >> "$ENV_FILE"
+            auth_allowed_index=$((auth_allowed_index + 1))
+          done < <(python3 -c "import json,sys; [print(x) for x in json.loads(sys.argv[1])]" "${AUTH_ALLOWED_EMAIL:-[]}" 2>/dev/null)
 
           google_audience_index=0
-          IFS=',' read -r -a google_audience_items <<< "${GOOGLE_ALLOWED_AUDIENCE:-}"
-          for item in "${google_audience_items[@]}"; do
-            trimmed=$(echo "$item" | xargs)
-            if [[ -n "$trimmed" ]]; then
-              printf 'GoogleAuth__AllowedAudiences__%d=%s\n' "$google_audience_index" "$trimmed" >> "$ENV_FILE"
-              google_audience_index=$((google_audience_index + 1))
-            fi
-          done
+          while IFS= read -r item; do
+            [[ -n "$item" ]] || continue
+            printf 'GoogleAuth__AllowedAudiences__%d=%s\n' "$google_audience_index" "$item" >> "$ENV_FILE"
+            google_audience_index=$((google_audience_index + 1))
+          done < <(python3 -c "import json,sys; [print(x) for x in json.loads(sys.argv[1])]" "${GOOGLE_ALLOWED_AUDIENCE:-[]}" 2>/dev/null)
 
           chmod 600 "$ENV_FILE"
 
       - name: Install release bundle
         env:
           VERSION: ${{ needs.classify.outputs.version }}
+          SERVER_CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
         run: |
+          EFFECTIVE_CONFIG="${SERVER_CONFIG_PATH:-/srv/appdata/charthub/config}"
+          RELEASES_DIR="$(dirname "$EFFECTIVE_CONFIG")/releases"
           ARTIFACT="./.server-release/charthub-server-${VERSION}-linux-x64.zip"
-          RELEASE_DIR="/srv/appdata/charthub/releases/${VERSION}"
+          RELEASE_DIR="${RELEASES_DIR}/${VERSION}"
           rm -rf "$RELEASE_DIR"
           mkdir -p "$RELEASE_DIR"
           unzip -q "$ARTIFACT" -d "$RELEASE_DIR"
-          ln -sfn "$RELEASE_DIR/server-linux-x64" /srv/appdata/charthub/current
-          chmod +x /srv/appdata/charthub/current/ChartHub.Server || true
-          chmod +x /srv/appdata/charthub/current/tools/onyx || true
+          ln -sfn "$RELEASE_DIR/server-linux-x64" "$(dirname "$EFFECTIVE_CONFIG")/current"
+          chmod +x "$(dirname "$EFFECTIVE_CONFIG")/current/ChartHub.Server" || true
+          chmod +x "$(dirname "$EFFECTIVE_CONFIG")/current/tools/onyx" || true
 
       - name: Install or update systemd unit
         run: |

@@ -74,7 +74,8 @@ public static class AuthEndpoints
                 });
             })
             .WithName("ExchangeGoogleToken")
-            .WithSummary("Exchange Google ID token for ChartHub JWT");
+            .WithSummary("Exchange Google ID token for ChartHub JWT")
+            .RequireRateLimiting("auth");
 
         return group;
     }

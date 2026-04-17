@@ -267,4 +267,510 @@ public class SongIngestionCatalogServiceTests
 
         Assert.True(hasLibrarySource);
     }
+
+    [Fact]
+    public async Task GetOrCreateIngestionAsync_SetsMetadataFields_OnFirstCreate()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-metadata-create");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord record = await sut.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-meta-1",
+            sourceLink: "https://example.com/meta.zip?token=abc",
+            artist: "Test Artist",
+            title: "Test Title",
+            charter: "Test Charter");
+
+        Assert.Equal("Test Artist", record.Artist);
+        Assert.Equal("Test Title", record.Title);
+        Assert.Equal("Test Charter", record.Charter);
+        Assert.Equal(IngestionState.Queued, record.CurrentState);
+        Assert.Equal(DesktopState.Cloud, record.DesktopState);
+    }
+
+    [Fact]
+    public async Task GetOrCreateIngestionAsync_PreservesExistingMetadata_OnConflictWithNullValues()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-metadata-preserve");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        await sut.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-preserve-1",
+            sourceLink: "https://example.com/pres.zip?token=abc",
+            artist: "Original Artist",
+            title: "Original Title",
+            charter: "Original Charter");
+
+        SongIngestionRecord second = await sut.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-preserve-1",
+            sourceLink: "https://example.com/pres.zip?token=abc",
+            artist: null,
+            title: null,
+            charter: null);
+
+        Assert.Equal("Original Artist", second.Artist);
+        Assert.Equal("Original Title", second.Title);
+        Assert.Equal("Original Charter", second.Charter);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task GetOrCreateIngestionAsync_ThrowsOnBlankSource(string source)
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-blank-source");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => sut.GetOrCreateIngestionAsync(source: source, sourceId: "id1", sourceLink: "https://example.com/a.zip?token=x"));
+    }
+
+    [Fact]
+    public async Task GetIngestionByIdAsync_ReturnsNull_ForNonExistentId()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-notfound");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord? result = await sut.GetIngestionByIdAsync(99999);
+
+        Assert.Null(result);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task GetIngestionByIdAsync_ReturnsNull_ForNonPositiveId(long id)
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-nonpositive-id");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord? result = await sut.GetIngestionByIdAsync(id);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetLatestIngestionBySourceKeyAsync_ReturnsRecord_WhenExists()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-by-source-key");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord created = await sut.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-sourcekey-1",
+            sourceLink: "https://example.com/sourcekey.zip?token=abc");
+
+        SongIngestionRecord? found = await sut.GetLatestIngestionBySourceKeyAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-sourcekey-1");
+
+        Assert.NotNull(found);
+        Assert.Equal(created.Id, found!.Id);
+    }
+
+    [Fact]
+    public async Task GetLatestIngestionBySourceKeyAsync_ReturnsNull_WhenNotExists()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-by-source-key-miss");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord? found = await sut.GetLatestIngestionBySourceKeyAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-does-not-exist");
+
+        Assert.Null(found);
+    }
+
+    [Fact]
+    public async Task GetLatestIngestionByAssetLocationAsync_ReturnsRecord_WhenAssetExists()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-by-asset-location");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord ingestion = await sut.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-asset-1",
+            sourceLink: "https://example.com/asset.zip?token=abc");
+
+        SongIngestionAttemptRecord attempt = await sut.StartAttemptAsync(ingestion.Id);
+
+        await sut.UpsertAssetAsync(new SongIngestionAssetEntry(
+            IngestionId: ingestion.Id,
+            AttemptId: attempt.Id,
+            AssetRole: IngestionAssetRole.Downloaded,
+            Location: "/tmp/downloads/asset.zip",
+            SizeBytes: 512,
+            ContentHash: null,
+            RecordedAtUtc: DateTimeOffset.UtcNow));
+
+        SongIngestionRecord? found = await sut.GetLatestIngestionByAssetLocationAsync("/tmp/downloads/asset.zip");
+
+        Assert.NotNull(found);
+        Assert.Equal(ingestion.Id, found!.Id);
+    }
+
+    [Fact]
+    public async Task GetLatestIngestionByAssetLocationAsync_ReturnsNull_WhenNotExists()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-by-asset-location-miss");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord? found = await sut.GetLatestIngestionByAssetLocationAsync("/no/such/path.zip");
+
+        Assert.Null(found);
+    }
+
+    [Fact]
+    public async Task GetLatestAssetLocationAsync_ReturnsLocation_WhenAssetExists()
+    {
+        using var temp = new TemporaryDirectoryFixture("asset-location-roundtrip");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord ingestion = await sut.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-loc-1",
+            sourceLink: "https://example.com/loc.zip?token=abc");
+
+        await sut.UpsertAssetAsync(new SongIngestionAssetEntry(
+            IngestionId: ingestion.Id,
+            AttemptId: null,
+            AssetRole: IngestionAssetRole.InstalledDirectory,
+            Location: "/songs/Test Artist/Test Title/Test Charter__rhythmverse",
+            SizeBytes: null,
+            ContentHash: null,
+            RecordedAtUtc: DateTimeOffset.UtcNow));
+
+        string? location = await sut.GetLatestAssetLocationAsync(ingestion.Id, IngestionAssetRole.InstalledDirectory);
+
+        Assert.Equal("/songs/Test Artist/Test Title/Test Charter__rhythmverse", location);
+    }
+
+    [Fact]
+    public async Task GetLatestAssetLocationAsync_ReturnsNull_WhenNoAssetOfRole()
+    {
+        using var temp = new TemporaryDirectoryFixture("asset-location-miss");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord ingestion = await sut.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-loc-miss",
+            sourceLink: "https://example.com/locmiss.zip?token=abc");
+
+        string? location = await sut.GetLatestAssetLocationAsync(ingestion.Id, IngestionAssetRole.InstalledDirectory);
+
+        Assert.Null(location);
+    }
+
+    [Fact]
+    public async Task RemoveIngestionAsync_DeletesRecordAndCascades()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-remove-cascade");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord ingestion = await sut.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-remove-1",
+            sourceLink: "https://example.com/remove.zip?token=abc");
+
+        SongIngestionAttemptRecord attempt = await sut.StartAttemptAsync(ingestion.Id);
+
+        await sut.UpsertAssetAsync(new SongIngestionAssetEntry(
+            IngestionId: ingestion.Id,
+            AttemptId: attempt.Id,
+            AssetRole: IngestionAssetRole.Downloaded,
+            Location: "/tmp/remove.zip",
+            SizeBytes: null,
+            ContentHash: null,
+            RecordedAtUtc: DateTimeOffset.UtcNow));
+
+        await sut.RemoveIngestionAsync(ingestion.Id);
+
+        SongIngestionRecord? afterDelete = await sut.GetIngestionByIdAsync(ingestion.Id);
+        Assert.Null(afterDelete);
+
+        // Asset should also be deleted via cascade
+        string? assetLocation = await sut.GetLatestAssetLocationAsync(ingestion.Id, IngestionAssetRole.Downloaded);
+        Assert.Null(assetLocation);
+    }
+
+    [Fact]
+    public async Task RecordStateTransitionAsync_UpdatesDesktopState_ToDownloadedWhenDownloading()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-desktop-state-transition");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord ingestion = await sut.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-transition-1",
+            sourceLink: "https://example.com/trans.zip?token=abc");
+
+        Assert.Equal(DesktopState.Cloud, ingestion.DesktopState);
+
+        await sut.RecordStateTransitionAsync(
+            ingestionId: ingestion.Id,
+            attemptId: null,
+            fromState: IngestionState.Queued,
+            toState: IngestionState.Downloaded,
+            detailsJson: null);
+
+        SongIngestionRecord? updated = await sut.GetIngestionByIdAsync(ingestion.Id);
+        Assert.NotNull(updated);
+        Assert.Equal(IngestionState.Downloaded, updated!.CurrentState);
+        Assert.Equal(DesktopState.Downloaded, updated.DesktopState);
+    }
+
+    [Fact]
+    public async Task RecordStateTransitionAsync_UpdatesDesktopState_ToInstalledWhenInstalled()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-desktop-state-installed");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord ingestion = await sut.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-transition-installed",
+            sourceLink: "https://example.com/transi.zip?token=abc");
+
+        await sut.RecordStateTransitionAsync(
+            ingestionId: ingestion.Id,
+            attemptId: null,
+            fromState: IngestionState.Installing,
+            toState: IngestionState.Installed,
+            detailsJson: null);
+
+        SongIngestionRecord? updated = await sut.GetIngestionByIdAsync(ingestion.Id);
+        Assert.NotNull(updated);
+        Assert.Equal(DesktopState.Installed, updated!.DesktopState);
+    }
+
+    [Fact]
+    public async Task RecordStateTransitionAsync_UpdatesDesktopState_BackToCloudWhenFailed()
+    {
+        using var temp = new TemporaryDirectoryFixture("ingestion-desktop-state-failed");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord ingestion = await sut.GetOrCreateIngestionAsync(
+            source: LibrarySourceNames.RhythmVerse,
+            sourceId: "rv-transition-failed",
+            sourceLink: "https://example.com/transf.zip?token=abc");
+
+        await sut.RecordStateTransitionAsync(
+            ingestionId: ingestion.Id,
+            attemptId: null,
+            fromState: IngestionState.Downloading,
+            toState: IngestionState.Failed,
+            detailsJson: "{\"error\":\"timeout\"}");
+
+        SongIngestionRecord? updated = await sut.GetIngestionByIdAsync(ingestion.Id);
+        Assert.NotNull(updated);
+        Assert.Equal(IngestionState.Failed, updated!.CurrentState);
+        Assert.Equal(DesktopState.Cloud, updated.DesktopState);
+    }
+
+    [Fact]
+    public async Task QueryQueueAsync_ReturnsAll_WhenNoFilters()
+    {
+        using var temp = new TemporaryDirectoryFixture("queue-no-filters");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        await sut.GetOrCreateIngestionAsync(LibrarySourceNames.RhythmVerse, "rv-q1", "https://example.com/q1.zip?token=a");
+        await sut.GetOrCreateIngestionAsync(LibrarySourceNames.Encore, "e-q2", "https://example.com/q2.zip?token=b");
+
+        IReadOnlyList<IngestionQueueItem> items = await sut.QueryQueueAsync(
+            stateFilter: null,
+            sourceFilter: null,
+            sortBy: "date",
+            descending: true);
+
+        Assert.Equal(2, items.Count);
+    }
+
+    [Fact]
+    public async Task QueryQueueAsync_FiltersBy_State()
+    {
+        using var temp = new TemporaryDirectoryFixture("queue-state-filter");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        SongIngestionRecord ingestion = await sut.GetOrCreateIngestionAsync(
+            LibrarySourceNames.RhythmVerse, "rv-qsf1", "https://example.com/qsf1.zip?token=a");
+
+        await sut.GetOrCreateIngestionAsync(
+            LibrarySourceNames.RhythmVerse, "rv-qsf2", "https://example.com/qsf2.zip?token=b");
+
+        await sut.RecordStateTransitionAsync(
+            ingestionId: ingestion.Id,
+            attemptId: null,
+            fromState: IngestionState.Queued,
+            toState: IngestionState.Downloaded,
+            detailsJson: null);
+
+        IReadOnlyList<IngestionQueueItem> onlyDownloaded = await sut.QueryQueueAsync(
+            stateFilter: "Downloaded",
+            sourceFilter: null,
+            sortBy: "date",
+            descending: false);
+
+        Assert.Single(onlyDownloaded);
+        Assert.Equal(ingestion.Id, onlyDownloaded[0].IngestionId);
+    }
+
+    [Fact]
+    public async Task QueryQueueAsync_FiltersBy_Source()
+    {
+        using var temp = new TemporaryDirectoryFixture("queue-source-filter");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        await sut.GetOrCreateIngestionAsync(LibrarySourceNames.RhythmVerse, "rv-qsrc1", "https://example.com/qsrc1.zip?token=a");
+        await sut.GetOrCreateIngestionAsync(LibrarySourceNames.Encore, "e-qsrc2", "https://example.com/qsrc2.zip?token=b");
+
+        IReadOnlyList<IngestionQueueItem> rvOnly = await sut.QueryQueueAsync(
+            stateFilter: null,
+            sourceFilter: LibrarySourceNames.RhythmVerse,
+            sortBy: "date",
+            descending: false);
+
+        Assert.Single(rvOnly);
+        Assert.Equal(LibrarySourceNames.RhythmVerse, rvOnly[0].Source);
+    }
+
+    [Fact]
+    public async Task QueryQueueAsync_RespectsLimit()
+    {
+        using var temp = new TemporaryDirectoryFixture("queue-limit");
+        var sut = new SongIngestionCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
+
+        for (int i = 0; i < 5; i++)
+        {
+            await sut.GetOrCreateIngestionAsync(LibrarySourceNames.RhythmVerse, $"rv-ql{i}", $"https://example.com/ql{i}.zip?token={i}");
+        }
+
+        IReadOnlyList<IngestionQueueItem> limited = await sut.QueryQueueAsync(
+            stateFilter: null,
+            sourceFilter: null,
+            sortBy: "date",
+            descending: false,
+            limit: 3);
+
+        Assert.Equal(3, limited.Count);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void NormalizeSourceLink_ReturnsEmpty_ForBlankInput(string input)
+    {
+        string result = SongIngestionCatalogService.NormalizeSourceLink(input);
+
+        Assert.Equal(string.Empty, result);
+    }
+
+    [Fact]
+    public void NormalizeSourceLink_ReturnsInput_ForNonUrl()
+    {
+        const string nonUrl = "not-a-url";
+
+        string result = SongIngestionCatalogService.NormalizeSourceLink(nonUrl);
+
+        Assert.Equal(nonUrl, result);
+    }
+
+    [Fact]
+    public void NormalizeSourceLink_StripsFragment()
+    {
+        string result = SongIngestionCatalogService.NormalizeSourceLink("https://example.com/song.zip?token=abc#section");
+
+        Assert.Equal("https://example.com/song.zip?token=abc", result);
+    }
+
+    [Fact]
+    public void NormalizeSourceLink_StripsTrailingSlash_FromPath()
+    {
+        string result = SongIngestionCatalogService.NormalizeSourceLink("https://example.com/path/");
+
+        Assert.DoesNotContain("/path/", result);
+    }
+
+    [Theory]
+    [InlineData("http://example.com:80/a.zip?token=abc", "http://example.com/a.zip?token=abc")]
+    [InlineData("https://example.com:443/a.zip?token=abc", "https://example.com/a.zip?token=abc")]
+    public void NormalizeSourceLink_StripsDefaultPort(string input, string expected)
+    {
+        string result = SongIngestionCatalogService.NormalizeSourceLink(input);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void NormalizeSourceLink_NormalizesSchemeAndHostToLowercase()
+    {
+        string result = SongIngestionCatalogService.NormalizeSourceLink("HTTPS://Example.COM/song.zip?token=abc");
+
+        Assert.StartsWith("https://example.com/", result);
+    }
+
+    [Fact]
+    public void EnsureColumnExists_ThrowsArgumentException_ForInvalidTableName()
+    {
+        using var temp = new TemporaryDirectoryFixture("ensure-column-invalid-table");
+        string dbPath = Path.Combine(temp.RootPath, "test.db");
+
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        // Use reflection to make the private static method accessible
+        System.Reflection.MethodInfo? method = typeof(SongIngestionCatalogService).GetMethod(
+            "EnsureColumnExists",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+        Assert.NotNull(method);
+
+        System.Reflection.TargetInvocationException ex = Assert.Throws<System.Reflection.TargetInvocationException>(
+            () => method!.Invoke(null, [connection, "song_ingestions; DROP TABLE--", "some_col", "TEXT NULL"]));
+
+        Assert.IsType<ArgumentException>(ex.InnerException);
+    }
+
+    [Fact]
+    public void EnsureColumnExists_ThrowsArgumentException_ForInvalidColumnName()
+    {
+        using var temp = new TemporaryDirectoryFixture("ensure-column-invalid-col");
+        string dbPath = Path.Combine(temp.RootPath, "test.db");
+
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        System.Reflection.MethodInfo? method = typeof(SongIngestionCatalogService).GetMethod(
+            "EnsureColumnExists",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+        Assert.NotNull(method);
+
+        System.Reflection.TargetInvocationException ex = Assert.Throws<System.Reflection.TargetInvocationException>(
+            () => method!.Invoke(null, [connection, "song_ingestions", "col'; DROP TABLE song_ingestions;--", "TEXT NULL"]));
+
+        Assert.IsType<ArgumentException>(ex.InnerException);
+    }
+
+    [Fact]
+    public void EnsureColumnExists_ThrowsArgumentException_ForInvalidColumnDefinition()
+    {
+        using var temp = new TemporaryDirectoryFixture("ensure-column-invalid-def");
+        string dbPath = Path.Combine(temp.RootPath, "test.db");
+
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        System.Reflection.MethodInfo? method = typeof(SongIngestionCatalogService).GetMethod(
+            "EnsureColumnExists",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+
+        Assert.NotNull(method);
+
+        System.Reflection.TargetInvocationException ex = Assert.Throws<System.Reflection.TargetInvocationException>(
+            () => method!.Invoke(null, [connection, "song_ingestions", "some_col", "TEXT; DROP TABLE song_ingestions;--"]));
+
+        Assert.IsType<ArgumentException>(ex.InnerException);
+    }
 }

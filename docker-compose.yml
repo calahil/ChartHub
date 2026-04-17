@@ -47,6 +47,7 @@ services:
       - Downloads__CacheDirectory=/cache/downloads
       - Downloads__ExternalRedirectCacheHours=${BACKUP_DOWNLOADS_EXTERNAL_REDIRECT_CACHE_HOURS:-48}
       - ImageCache__CacheDirectory=/cache/images
+      - ApiKey__Key=${BACKUP_API_KEY}
     labels:
       traefik.enable: 'true'
       traefik.http.routers.backupapi.rule: 'Host(`rhythmverse.calahilstudios.com`)'
@@ -54,7 +55,7 @@ services:
       traefik.http.routers.backupapi.entrypoints: 'https'
       traefik.http.routers.backupapi.tls: 'true'
       traefik.http.routers.backupapi.tls.certresolver: 'letsencrypt'
-      traefik.docker.network: ${NETWORK}
+      traefik.docker.network: 'external_env'
     ports:
       - "${API_PORT:-5147}:5000"
     volumes:

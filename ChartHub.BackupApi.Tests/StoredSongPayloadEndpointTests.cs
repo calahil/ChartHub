@@ -22,7 +22,7 @@ public sealed class StoredSongPayloadEndpointTests : IClassFixture<BackupApiWebA
     {
         await _factory.SeedSongsAsync([MalformedSong(501)]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.GetAsync("/api/rhythmverse/songs/501");
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
@@ -36,7 +36,7 @@ public sealed class StoredSongPayloadEndpointTests : IClassFixture<BackupApiWebA
     {
         await _factory.SeedSongsAsync([MalformedSong(502)]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/list",
             new FormUrlEncodedContent([

@@ -53,6 +53,7 @@ public static class DesktopEntryEndpoints
             .WithName("GetDesktopEntryIcon")
             .WithTags("DesktopEntry")
             .WithSummary("Get cached desktop-entry icon")
+            .RequireAuthorization()
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 

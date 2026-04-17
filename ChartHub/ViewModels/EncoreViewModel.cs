@@ -7,6 +7,7 @@ using Avalonia.Threading;
 
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
+using ChartHub.Localization;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Strings;
@@ -953,8 +954,8 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
 
     private static string BuildEncoreFileName(EncoreSong song)
     {
-        string artist = string.IsNullOrWhiteSpace(song.Artist) ? "Unknown Artist" : song.Artist;
-        string title = string.IsNullOrWhiteSpace(song.Name) ? "Unknown Song" : song.Name;
+        string artist = string.IsNullOrWhiteSpace(song.Artist) ? UiLocalization.Get("Encore.UnknownArtist") : song.Artist;
+        string title = string.IsNullOrWhiteSpace(song.Name) ? UiLocalization.Get("Song.UnknownTitle") : song.Name;
         return SafePathHelper.SanitizeFileName($"{artist} - {title}.sng", "encore-chart.sng");
     }
 

@@ -79,6 +79,7 @@ public static partial class DownloadEndpoints
                 IDownloadJobInstallService installService,
                 ICloneHeroLibraryService cloneHeroLibraryService,
                 IInstallConcurrencyLimiter concurrencyLimiter,
+                IHostApplicationLifetime lifetime,
                 ILogger<DownloadInstallEndpointLogCategory> logger) =>
             {
                 if (!store.TryGet(jobId, out DownloadJobResponse? job) || job is null)
@@ -106,7 +107,7 @@ public static partial class DownloadEndpoints
                 DownloadEndpointLog.InstallRequestStarted(logger, job.JobId, job.Source, job.SourceId, job.DisplayName, job.DownloadedPath);
                 store.UpdateProgress(jobId, "InstallQueued", 88);
 
-                _ = Task.Run(() => ProcessInstallInBackgroundAsync(job.JobId, store, installService, cloneHeroLibraryService, concurrencyLimiter, logger));
+                _ = Task.Run(() => ProcessInstallInBackgroundAsync(job.JobId, store, installService, cloneHeroLibraryService, concurrencyLimiter, lifetime.ApplicationStopping, logger));
 
                 if (!store.TryGet(jobId, out DownloadJobResponse? queuedJob) || queuedJob is null)
                 {
@@ -224,6 +225,7 @@ public static partial class DownloadEndpoints
         IDownloadJobInstallService installService,
         ICloneHeroLibraryService cloneHeroLibraryService,
         IInstallConcurrencyLimiter concurrencyLimiter,
+        CancellationToken cancellationToken,
         ILogger logger)
     {
         if (!store.TryGet(jobId, out DownloadJobResponse? job) || job is null)
@@ -232,11 +234,11 @@ public static partial class DownloadEndpoints
             return;
         }
 
-        await concurrencyLimiter.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+        await concurrencyLimiter.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             store.UpdateProgress(jobId, "Staging", 90);
-            DownloadJobInstallResult installResult = await installService.InstallJobAsync(job, CancellationToken.None).ConfigureAwait(false);
+            DownloadJobInstallResult installResult = await installService.InstallJobAsync(job, cancellationToken).ConfigureAwait(false);
             store.MarkStaged(jobId, installResult.StagedPath);
             store.UpdateProgress(jobId, "Installing", 97);
             (string? sourceMd5, string? sourceChartHash) = ExtractSourceHashes(job.Source, job.SourceId);

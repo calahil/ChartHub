@@ -2,8 +2,15 @@ name: Validate OpenAPI
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
+    paths:
+      - 'openapi.yaml'
+  pull_request:
+    paths:
+      - 'openapi.yaml'
 
 jobs:
   lint-openapi:
@@ -12,13 +19,5 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Redocly CLI
-        run: npm install --global @redocly/cli
-
       - name: Lint OpenAPI document
-        run: redocly lint openapi.yaml
+        run: npx --yes @redocly/cli@latest lint openapi.yaml

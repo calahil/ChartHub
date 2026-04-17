@@ -194,15 +194,26 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
             ? _songIniParser.ParseFromSongIni(songIniPath)
             : fallbackMetadata ?? new ServerSongMetadata("Unknown Artist", fallbackTitle ?? "Unknown Song", "Unknown Charter");
 
+        // If the archive had a top-level subdirectory, song.ini will be found inside it rather than
+        // directly in the staging workspace root. Move only the song.ini's parent so that extra
+        // nesting is not carried into the final install location.
+        string sourceToMove = songIniPath is not null
+            ? Path.GetDirectoryName(songIniPath)!
+            : currentDirectory;
+        if (string.Equals(sourceToMove, currentDirectory, StringComparison.Ordinal))
+        {
+            sourceToMove = currentDirectory;
+        }
+
         ServerCloneHeroDirectoryLayout layout = _schemaService.ResolveUniqueLayout(
             _cloneHeroRoot,
             metadata,
             source,
-            exists: path => string.Equals(path, currentDirectory, StringComparison.Ordinal) || Directory.Exists(path));
+            exists: path => string.Equals(path, sourceToMove, StringComparison.Ordinal) || Directory.Exists(path));
 
-        if (string.Equals(layout.FullPath, currentDirectory, StringComparison.Ordinal))
+        if (string.Equals(layout.FullPath, sourceToMove, StringComparison.Ordinal))
         {
-            return Task.FromResult(new ServerRehomeInstallResult(currentDirectory, layout.RelativePath, metadata));
+            return Task.FromResult(new ServerRehomeInstallResult(sourceToMove, layout.RelativePath, metadata));
         }
 
         string? parent = Path.GetDirectoryName(layout.FullPath);
@@ -211,10 +222,17 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
             Directory.CreateDirectory(parent);
         }
 
-        Directory.Move(currentDirectory, layout.FullPath);
-        InstallLog.RehomedInstallDirectory(_logger, currentDirectory, layout.FullPath, layout.RelativePath);
+        Directory.Move(sourceToMove, layout.FullPath);
+        InstallLog.RehomedInstallDirectory(_logger, sourceToMove, layout.FullPath, layout.RelativePath);
         _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2110), nameof(DownloadJobInstallService),
-            $"Rehomed from '{currentDirectory}' to '{layout.FullPath}' (relative '{layout.RelativePath}').", null);
+            $"Rehomed from '{sourceToMove}' to '{layout.FullPath}' (relative '{layout.RelativePath}').", null);
+
+        // If the staging workspace contained a subdirectory that was moved individually, clean up
+        // the now-empty workspace root.
+        if (!string.Equals(sourceToMove, currentDirectory, StringComparison.Ordinal))
+        {
+            Cleanup(currentDirectory);
+        }
 
         return Task.FromResult(new ServerRehomeInstallResult(layout.FullPath, layout.RelativePath, metadata));
     }

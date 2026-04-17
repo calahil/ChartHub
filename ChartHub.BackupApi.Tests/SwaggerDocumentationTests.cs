@@ -18,7 +18,7 @@ public sealed class SwaggerDocumentationTests : IClassFixture<BackupApiWebApplic
     [Fact]
     public async Task SwaggerJson_AllMappedEndpoints_HaveSummaryAndDescription()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         JsonElement swagger = await client.GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json");
 
         JsonElement paths = swagger.GetProperty("paths");
@@ -38,7 +38,7 @@ public sealed class SwaggerDocumentationTests : IClassFixture<BackupApiWebApplic
     [Fact]
     public async Task SwaggerJson_CompatibilityEndpoints_DocumentFormDataKeys()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         JsonElement swagger = await client.GetFromJsonAsync<JsonElement>("/swagger/v1/swagger.json");
 
         JsonElement properties = GetFormSchemaProperties(swagger, "/api/all/songfiles/list");

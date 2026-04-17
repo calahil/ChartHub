@@ -2,8 +2,9 @@ name: Dotnet Guardrails
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+  pull_request:
 
 jobs:
   guardrails:

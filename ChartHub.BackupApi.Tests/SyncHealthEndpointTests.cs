@@ -32,7 +32,7 @@ public sealed class SyncHealthEndpointTests : IClassFixture<BackupApiWebApplicat
             new("reconciliation.completed_utc", completedUtc),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         JsonElement response = await client.GetFromJsonAsync<JsonElement>("/api/rhythmverse/health/sync");
 
         Assert.Equal("run-123", response.GetProperty("reconciliation_current_run_id").GetString());
@@ -56,7 +56,7 @@ public sealed class SyncHealthEndpointTests : IClassFixture<BackupApiWebApplicat
             new("reconciliation.started_utc", startedUtc),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         JsonElement response = await client.GetFromJsonAsync<JsonElement>("/api/rhythmverse/health/sync");
 
         Assert.Equal("run-incomplete", response.GetProperty("reconciliation_current_run_id").GetString());

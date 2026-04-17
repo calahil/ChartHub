@@ -1271,6 +1271,24 @@ public sealed class SongIngestionCatalogService
 
     private static void EnsureColumnExists(SqliteConnection connection, string tableName, string columnName, string columnDefinition)
     {
+        if (!System.Text.RegularExpressions.Regex.IsMatch(tableName, @"^[a-z_]+$"))
+        {
+            throw new ArgumentException($"Invalid table name: {tableName}", nameof(tableName));
+        }
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(columnName, @"^[a-z_]+$"))
+        {
+            throw new ArgumentException($"Invalid column name: {columnName}", nameof(columnName));
+        }
+
+        // columnDefinition is embedded in DDL and cannot be parameterized. Guard against injection by
+        // restricting to a safe subset: type keywords, NULL/NOT NULL, DEFAULT, and single-quoted literals
+        // containing only word characters and spaces. No semicolons, dashes, or comment sequences allowed.
+        if (!System.Text.RegularExpressions.Regex.IsMatch(columnDefinition, @"^[A-Z]+( NOT NULL| NULL)?( DEFAULT '[^']*')?$"))
+        {
+            throw new ArgumentException($"Invalid column definition: {columnDefinition}", nameof(columnDefinition));
+        }
+
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
 

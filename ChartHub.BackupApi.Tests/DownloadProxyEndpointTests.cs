@@ -30,7 +30,7 @@ public sealed class DownloadProxyEndpointTests : IClassFixture<BackupApiWebAppli
                 services.AddSingleton<IDownloadProxyService>(new StubDownloadProxyService(
                     new DownloadProxyResult(payloadPath, "application/vnd.rar")));
             }))
-            .CreateClient();
+            .CreateAuthenticatedClient();
 
         HttpResponseMessage response = await client.GetAsync("/download_file/stackoverflow/532e3cb651aa6/TrailerTrash_wii.rar");
 
@@ -47,7 +47,7 @@ public sealed class DownloadProxyEndpointTests : IClassFixture<BackupApiWebAppli
             {
                 services.AddSingleton<IDownloadProxyService>(new StubDownloadProxyService(null));
             }))
-            .CreateClient();
+            .CreateAuthenticatedClient();
 
         HttpResponseMessage response = await client.GetAsync("/download_file/stackoverflow/532e3cb651aa6/TrailerTrash_wii.rar");
 
@@ -66,7 +66,7 @@ public sealed class DownloadProxyEndpointTests : IClassFixture<BackupApiWebAppli
                 services.AddSingleton<IDownloadProxyService>(new StubDownloadProxyService(
                     new DownloadProxyResult(payloadPath, "application/vnd.rar")));
             }))
-            .CreateClient();
+            .CreateAuthenticatedClient();
 
         using HttpRequestMessage request = new(HttpMethod.Head, "/download_file/stackoverflow/532e3cb651aa6/head-download-file.rar");
         HttpResponseMessage response = await client.SendAsync(request);
@@ -83,7 +83,7 @@ public sealed class DownloadProxyEndpointTests : IClassFixture<BackupApiWebAppli
             {
                 services.AddSingleton<IDownloadProxyService>(new StubDownloadProxyService(null));
             }))
-            .CreateClient();
+            .CreateAuthenticatedClient();
 
         using HttpRequestMessage request = new(HttpMethod.Head, "/download_file/stackoverflow/532e3cb651aa6/head-miss.rar");
         HttpResponseMessage response = await client.SendAsync(request);
@@ -104,7 +104,7 @@ public sealed class DownloadProxyEndpointTests : IClassFixture<BackupApiWebAppli
                     fileResult: null,
                     externalResult: new DownloadProxyResult(payloadPath, "application/zip")));
             }))
-            .CreateClient();
+            .CreateAuthenticatedClient();
 
         HttpResponseMessage response = await client.GetAsync("/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip");
 
@@ -123,7 +123,7 @@ public sealed class DownloadProxyEndpointTests : IClassFixture<BackupApiWebAppli
                     fileResult: null,
                     externalResult: null));
             }))
-            .CreateClient();
+            .CreateAuthenticatedClient();
 
         HttpResponseMessage response = await client.GetAsync("/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip");
 
@@ -143,7 +143,7 @@ public sealed class DownloadProxyEndpointTests : IClassFixture<BackupApiWebAppli
                     fileResult: null,
                     externalResult: new DownloadProxyResult(payloadPath, "application/zip")));
             }))
-            .CreateClient();
+            .CreateAuthenticatedClient();
 
         using HttpRequestMessage request = new(HttpMethod.Head, "/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip");
         HttpResponseMessage response = await client.SendAsync(request);
@@ -162,7 +162,7 @@ public sealed class DownloadProxyEndpointTests : IClassFixture<BackupApiWebAppli
                     fileResult: null,
                     externalResult: null));
             }))
-            .CreateClient();
+            .CreateAuthenticatedClient();
 
         using HttpRequestMessage request = new(HttpMethod.Head, "/downloads/external?sourceUrl=https%3A%2F%2Fcdn.example%2Flive-song.zip");
         HttpResponseMessage response = await client.SendAsync(request);

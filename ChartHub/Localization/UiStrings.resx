@@ -165,6 +165,7 @@
   <data name="Encore.LabelModchart" xml:space="preserve"><value>Modchart</value></data>
   <data name="Encore.CheckModchart" xml:space="preserve"><value>Modchart</value></data>
   <data name="Encore.ApplyFilters" xml:space="preserve"><value>Apply Encore Filters</value></data>
+  <data name="Encore.UnknownArtist" xml:space="preserve"><value>Unknown Artist</value></data>
 
   <data name="Common.Muted" xml:space="preserve"><value>Muted</value></data>
   <data name="Common.CurrentPercent" xml:space="preserve"><value>Current: {0}%</value></data>
@@ -275,4 +276,29 @@
   <data name="Input.Keyboard.Key.Tab" xml:space="preserve"><value>Tab</value></data>
   <data name="Input.Keyboard.Hint" xml:space="preserve"><value>Type here…</value></data>
   <data name="StatusBar.ServerUnavailable" xml:space="preserve"><value>Server unavailable — retrying connection…</value></data>
+
+  <data name="Song.UnknownTitle" xml:space="preserve"><value>Unknown Song</value></data>
+
+  <data name="RhythmVerse.Instrument.None" xml:space="preserve"><value>None</value></data>
+  <data name="RhythmVerse.Instrument.Bass" xml:space="preserve"><value>Bass</value></data>
+  <data name="RhythmVerse.Instrument.BassGhl" xml:space="preserve"><value>Bass (GHL 6 Fret)</value></data>
+  <data name="RhythmVerse.Instrument.Drums" xml:space="preserve"><value>Drums</value></data>
+  <data name="RhythmVerse.Instrument.Guitar" xml:space="preserve"><value>Guitar</value></data>
+  <data name="RhythmVerse.Instrument.GuitarGhl" xml:space="preserve"><value>Guitar (GHL 6 Fret)</value></data>
+  <data name="RhythmVerse.Instrument.Keys" xml:space="preserve"><value>Keys</value></data>
+  <data name="RhythmVerse.Instrument.ProKeys" xml:space="preserve"><value>Pro Keys</value></data>
+  <data name="RhythmVerse.Instrument.Vocals" xml:space="preserve"><value>Vocals</value></data>
+  <data name="RhythmVerse.Instrument.GuitarCoop" xml:space="preserve"><value>Guitar Co-Op</value></data>
+  <data name="RhythmVerse.Instrument.Coop" xml:space="preserve"><value>Co-op (Unspecified)</value></data>
+  <data name="RhythmVerse.Instrument.ProBass" xml:space="preserve"><value>Pro Bass</value></data>
+  <data name="RhythmVerse.Instrument.RealDrums" xml:space="preserve"><value>Real Drums</value></data>
+  <data name="RhythmVerse.Instrument.ProGuitar" xml:space="preserve"><value>Pro Guitar</value></data>
+  <data name="RhythmVerse.Instrument.Rhythm" xml:space="preserve"><value>Rhythm Guitar</value></data>
+
+  <data name="Settings.Secret.GoogleDesktopClientSecretLabel" xml:space="preserve"><value>Google Desktop Client Secret</value></data>
+  <data name="Settings.Secret.GoogleDesktopClientSecretDescription" xml:space="preserve"><value>Sensitive OAuth client secret used for desktop auth flow.</value></data>
+  <data name="Settings.Secret.GoogleRefreshTokenLabel" xml:space="preserve"><value>Google Refresh Token</value></data>
+  <data name="Settings.Secret.GoogleRefreshTokenDescription" xml:space="preserve"><value>OAuth refresh token used to obtain new access tokens.</value></data>
+  <data name="Settings.Secret.GoogleAccessTokenLabel" xml:space="preserve"><value>Google Access Token</value></data>
+  <data name="Settings.Secret.GoogleAccessTokenDescription" xml:space="preserve"><value>Current short-lived access token. Usually set automatically.</value></data>
 </root>

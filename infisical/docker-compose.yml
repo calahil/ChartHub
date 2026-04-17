@@ -1,0 +1,90 @@
+# Infisical self-hosted stack
+# Deploy on the second server (charthub-build host).
+#
+# First-time setup:
+#   1. Copy infisical/.env.example to infisical/.env and fill in the values.
+#   2. docker compose --project-name infisical -f infisical/docker-compose.yml up -d
+#   3. Visit http://<server-ip>:8080 and complete the web setup wizard.
+#   4. Create a ChartHub project inside Infisical.
+#   5. Add environments: dev, staging, production (match GitHub environment names).
+#   6. Populate secrets (see .env.example for the full variable list).
+#   7. Connect the GitHub integration:
+#      Infisical → Project → Integrations → GitHub → Authorize
+#      Map each Infisical environment to the matching GitHub environment.
+#   8. On each dev machine: install the Infisical CLI and run `infisical login`.
+
+services:
+  infisical-db:
+    image: postgres:16-alpine
+    container_name: infisical-postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=${INFISICAL_DB_USER:-infisical}
+      - POSTGRES_PASSWORD=${INFISICAL_DB_PASSWORD}
+      - POSTGRES_DB=${INFISICAL_DB_NAME:-infisical}
+    volumes:
+      - infisical_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $$POSTGRES_DB -U $$POSTGRES_USER"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - infisical_internal
+
+  infisical-redis:
+    image: redis:7-alpine
+    container_name: infisical-redis
+    restart: always
+    command: redis-server --requirepass ${INFISICAL_REDIS_PASSWORD}
+    volumes:
+      - infisical_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - infisical_internal
+
+  infisical:
+    image: infisical/infisical:latest-postgres
+    container_name: infisical
+    restart: always
+    depends_on:
+      infisical-db:
+        condition: service_healthy
+      infisical-redis:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - ENCRYPTION_KEY=${INFISICAL_ENCRYPTION_KEY}
+      - AUTH_SECRET=${INFISICAL_AUTH_SECRET}
+      - DB_CONNECTION_URI=postgresql://${INFISICAL_DB_USER:-infisical}:${INFISICAL_DB_PASSWORD}@infisical-postgres:5432/${INFISICAL_DB_NAME:-infisical}
+      - REDIS_URL=redis://:${INFISICAL_REDIS_PASSWORD}@infisical-redis:6379
+      - SITE_URL=${INFISICAL_SITE_URL}
+      - SMTP_HOST=${INFISICAL_SMTP_HOST:-}
+      - SMTP_PORT=${INFISICAL_SMTP_PORT:-587}
+      - SMTP_USERNAME=${INFISICAL_SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${INFISICAL_SMTP_PASSWORD:-}
+      - SMTP_FROM_ADDRESS=${INFISICAL_SMTP_FROM_ADDRESS:-noreply@example.com}
+      - SMTP_FROM_NAME=${INFISICAL_SMTP_FROM_NAME:-Infisical}
+    ports:
+      - "${INFISICAL_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8080/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - infisical_internal
+
+networks:
+  infisical_internal:
+    driver: bridge
+
+volumes:
+  infisical_db_data:
+  infisical_redis_data:

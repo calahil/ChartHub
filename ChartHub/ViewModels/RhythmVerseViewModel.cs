@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 
 using ChartHub.Configuration.Interfaces;
+using ChartHub.Localization;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Strings;
@@ -386,21 +387,21 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         });
         Instruments =
         [
-            new InstrumentItem { DisplayName = "None", Value = string.Empty },
-            new InstrumentItem { DisplayName = "Bass", Value = "bass" },
-            new InstrumentItem { DisplayName = "Bass (GHL 6 Fret)", Value = "bassghl" },
-            new InstrumentItem { DisplayName = "Drums", Value = "drums" },
-            new InstrumentItem { DisplayName = "Guitar", Value = "guitar" },
-            new InstrumentItem { DisplayName = "Guitar (GHL 6 Fret)", Value = "guitarghl" },
-            new InstrumentItem { DisplayName = "Keys", Value = "keys" },
-            new InstrumentItem { DisplayName = "Pro Keys", Value = "prokeys" },
-            new InstrumentItem { DisplayName = "Vocals", Value = "vocals" },
-            new InstrumentItem { DisplayName = "Guitar Co-Op", Value = "guitar_coop" },
-            new InstrumentItem { DisplayName = "Co-op (Unspecified)", Value = "guitarcoop" },
-            new InstrumentItem { DisplayName = "Pro Bass", Value = "probass" },
-            new InstrumentItem { DisplayName = "Real Drums", Value = "prodrums" },
-            new InstrumentItem { DisplayName = "Pro Guitar", Value = "proguitar" },
-            new InstrumentItem { DisplayName = "Rhythm Guitar", Value = "rhythm" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.None"), Value = string.Empty },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.Bass"), Value = "bass" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.BassGhl"), Value = "bassghl" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.Drums"), Value = "drums" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.Guitar"), Value = "guitar" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.GuitarGhl"), Value = "guitarghl" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.Keys"), Value = "keys" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.ProKeys"), Value = "prokeys" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.Vocals"), Value = "vocals" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.GuitarCoop"), Value = "guitar_coop" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.Coop"), Value = "guitarcoop" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.ProBass"), Value = "probass" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.RealDrums"), Value = "prodrums" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.ProGuitar"), Value = "proguitar" },
+            new InstrumentItem { DisplayName = UiLocalization.Get("RhythmVerse.Instrument.Rhythm"), Value = "rhythm" },
         ];
         _selectedInstruments = [Instruments[0]];
 

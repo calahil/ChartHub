@@ -58,14 +58,24 @@ public sealed class DesktopEntryEndpointsIntegrationTests
     }
 
     [Fact]
-    public async Task IconEndpointIsPublic()
+    public async Task IconEndpointReturnsIconWhenAuthenticated()
     {
-        await using TestAppFixture fixture = await TestAppFixture.CreateAsync(authenticatedClient: false);
+        await using TestAppFixture fixture = await TestAppFixture.CreateAsync(authenticatedClient: true);
 
         HttpResponseMessage response = await fixture.Client.GetAsync("/desktopentry-icons/retro/retro.png");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task IconEndpointReturns401WhenUnauthenticated()
+    {
+        await using TestAppFixture fixture = await TestAppFixture.CreateAsync(authenticatedClient: false);
+
+        HttpResponseMessage response = await fixture.Client.GetAsync("/desktopentry-icons/retro/retro.png");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]

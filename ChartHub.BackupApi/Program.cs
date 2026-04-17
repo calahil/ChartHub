@@ -1,10 +1,14 @@
+using System.Threading.RateLimiting;
+
 using ChartHub.BackupApi.Endpoints;
+using ChartHub.BackupApi.Middleware;
 using ChartHub.BackupApi.Models;
 using ChartHub.BackupApi.Options;
 using ChartHub.BackupApi.Persistence;
 using ChartHub.BackupApi.Services;
 
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 using NpgsqlTypes;
@@ -15,6 +19,7 @@ using Serilog.Sinks.PostgreSQL.ColumnWriters;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+builder.Services.Configure<ApiKeyOptions>(builder.Configuration.GetSection(ApiKeyOptions.SectionName));
 builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.SectionName));
 builder.Services.Configure<RhythmVerseSourceOptions>(builder.Configuration.GetSection(RhythmVerseSourceOptions.SectionName));
 builder.Services.Configure<SyncOptions>(builder.Configuration.GetSection(SyncOptions.SectionName));
@@ -22,11 +27,19 @@ builder.Services.Configure<DownloadOptions>(builder.Configuration.GetSection(Dow
 builder.Services.Configure<ImageCacheOptions>(builder.Configuration.GetSection(ImageCacheOptions.SectionName));
 builder.Services.Configure<LoggingOptions>(builder.Configuration.GetSection(LoggingOptions.SectionName));
 
+// Fail fast: API key must be configured before the app starts.
+string apiKey = builder.Configuration[$"{ApiKeyOptions.SectionName}:{nameof(ApiKeyOptions.Key)}"] ?? string.Empty;
+if (!builder.Environment.IsEnvironment("Testing") && string.IsNullOrWhiteSpace(apiKey))
+{
+    throw new InvalidOperationException("ApiKey:Key must be set. Configure it via the ApiKey__Key environment variable.");
+}
+
 // Read DB provider and logging options early for Serilog sink configuration.
 string dbProvider = builder.Configuration[$"{DatabaseOptions.SectionName}:{nameof(DatabaseOptions.Provider)}"]
     ?? new DatabaseOptions().Provider;
 string pgConnectionString = builder.Configuration[$"{DatabaseOptions.SectionName}:{nameof(DatabaseOptions.PostgreSqlConnectionString)}"]
     ?? new DatabaseOptions().PostgreSqlConnectionString;
+
 LoggingOptions loggingOptions = builder.Configuration
     .GetSection(LoggingOptions.SectionName)
     .Get<LoggingOptions>() ?? new LoggingOptions();
@@ -91,6 +104,16 @@ builder.Services.AddDbContext<BackupDbContext>((serviceProvider, options) =>
     }
 });
 
+builder.Services
+    .AddOptions<DatabaseOptions>()
+    .Bind(builder.Configuration.GetSection(DatabaseOptions.SectionName))
+    .Validate(
+        opts => !string.Equals(opts.Provider, "postgresql", StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrWhiteSpace(opts.PostgreSqlConnectionString),
+        $"{DatabaseOptions.SectionName}:{nameof(DatabaseOptions.PostgreSqlConnectionString)} must be set when using the postgresql provider.")
+    .ValidateOnStart();
+
+builder.Services.AddSingleton<IDnsResolver, SystemDnsResolver>();
 builder.Services.AddHttpClient<IRhythmVerseUpstreamClient, RhythmVerseUpstreamClient>();
 builder.Services.AddHttpClient<IImageProxyService, ImageProxyService>();
 builder.Services.AddHttpClient<IDownloadProxyService, DownloadProxyService>();
@@ -105,6 +128,27 @@ if (!builder.Environment.IsEnvironment("Testing"))
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        {
+            string clientIp = context.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim()
+                ?? context.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown";
+            return RateLimitPartition.GetTokenBucketLimiter(clientIp, _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = 60,
+                ReplenishmentPeriod = TimeSpan.FromMinutes(1),
+                TokensPerPeriod = 60,
+                AutoReplenishment = true,
+            });
+        });
+    });
+}
+
 WebApplication app = builder.Build();
 
 using (IServiceScope scope = app.Services.CreateScope())
@@ -118,6 +162,13 @@ using (IServiceScope scope = app.Services.CreateScope())
         dbContext.Database.Migrate();
     }
 }
+
+if (!app.Environment.IsEnvironment("Testing"))
+{
+    app.UseRateLimiter();
+}
+
+app.UseMiddleware<ApiKeyMiddleware>();
 
 app.UseExceptionHandler(errorApp =>
 {
@@ -152,8 +203,11 @@ app.UseSerilogRequestLogging(options =>
     };
 });
 
-app.UseSwagger();
-app.UseSwaggerUI();
+if (!app.Environment.IsProduction())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
     .WithName("GetBackupApiHealth")

@@ -11,6 +11,10 @@ OUTPUT_ENV_FILE="${ROOT_DIR}/.env.local"
 STRICT_MODE=true
 APPLY_USER_SECRETS=false
 DRY_RUN=false
+USE_INFISICAL=false
+INFISICAL_PROJECT="${INFISICAL_PROJECT_ID:-}"
+INFISICAL_HOST_URL="${INFISICAL_HOST:-}"
+INFISICAL_ENV_SLUG="dev"
 
 declare -A FILE_VALUES
 declare -A EFFECTIVE_VALUES
@@ -23,6 +27,9 @@ Generates a ChartHub .env.local file and optionally applies dotnet user-secrets.
 
 Options:
   --env-file <path>       Seed values from this env file.
+  --infisical             Pull secrets from Infisical CLI instead of a file.
+  --infisical-env <slug>  Infisical environment slug to pull (default: dev).
+  --infisical-project <id> Infisical project ID (overrides INFISICAL_PROJECT_ID env var).
   --output <path>         Output path for generated env file (default: .env.local).
   --strict                Fail when required values are placeholders (default).
   --no-strict             Allow placeholder values.
@@ -32,7 +39,7 @@ Options:
 
 Notes:
   - This script never writes .env.
-  - If no --env-file is provided, it uses .env.local when present, otherwise .env.example.
+  - If no --env-file or --infisical is provided, it uses .env.local when present, otherwise .env.example.
 EOF
 }
 
@@ -174,6 +181,20 @@ while [[ $# -gt 0 ]]; do
       APPLY_USER_SECRETS=true
       shift
       ;;
+    --infisical)
+      USE_INFISICAL=true
+      shift
+      ;;
+    --infisical-env)
+      [[ $# -ge 2 ]] || fail "--infisical-env requires a slug"
+      INFISICAL_ENV_SLUG="$2"
+      shift 2
+      ;;
+    --infisical-project)
+      [[ $# -ge 2 ]] || fail "--infisical-project requires an ID"
+      INFISICAL_PROJECT="$2"
+      shift 2
+      ;;
     --dry-run)
       DRY_RUN=true
       shift
@@ -194,6 +215,27 @@ if [[ -z "$SOURCE_ENV_FILE" ]]; then
   else
     SOURCE_ENV_FILE="${ROOT_DIR}/.env.example"
   fi
+fi
+
+if [[ "$USE_INFISICAL" == true ]]; then
+  command -v infisical >/dev/null 2>&1 || fail "infisical CLI not found. Install from https://infisical.com/docs/cli/overview"
+  [[ -n "$INFISICAL_PROJECT" ]] || fail "INFISICAL_PROJECT_ID is not set. Export it or pass --infisical-project."
+
+  host_flag=()
+  if [[ -n "$INFISICAL_HOST_URL" ]]; then
+    host_flag=(--domain "$INFISICAL_HOST_URL")
+  fi
+
+  log "Fetching secrets from Infisical (env: ${INFISICAL_ENV_SLUG})"
+  INFISICAL_TMP=$(mktemp)
+  trap 'rm -f "$INFISICAL_TMP"' EXIT
+  infisical export \
+    --projectId "$INFISICAL_PROJECT" \
+    --env "$INFISICAL_ENV_SLUG" \
+    --format dotenv \
+    "${host_flag[@]}" > "$INFISICAL_TMP" 2>/dev/null || \
+    fail "infisical export failed. Are you logged in? Run: infisical login"
+  SOURCE_ENV_FILE="$INFISICAL_TMP"
 fi
 
 if [[ "$OUTPUT_ENV_FILE" != /* ]]; then
@@ -222,26 +264,25 @@ set_effective "BACKUP_DOWNLOADS_MODE" "redirect"
 set_effective "BACKUP_DOWNLOADS_EXTERNAL_REDIRECT_CACHE_HOURS" "48"
 set_effective "BACKUP_DOWNLOADS_HOST_PATH" "./ChartHub.BackupApi/cache/downloads"
 set_effective "BACKUP_IMAGES_HOST_PATH" "./ChartHub.BackupApi/cache/images"
+set_effective "BACKUP_API_KEY" ""
 set_effective "CHARTHUB_SERVER_PORT" "5180"
 set_effective "CHARTHUB_SERVER_JWT_SIGNING_KEY" ""
 set_effective "CHARTHUB_SERVER_JWT_ISSUER" "charthub-server"
 set_effective "CHARTHUB_SERVER_JWT_AUDIENCE" "charthub-clients"
-set_effective "CHARTHUB_SERVER_ALLOWED_EMAIL_0" ""
-set_effective "CHARTHUB_SERVER_ALLOWED_AUDIENCE_0" ""
-set_effective "CHARTHUB_SERVER_ALLOWED_AUDIENCE_1" ""
+set_effective "CHARTHUB_SERVER_ALLOWED_EMAILS" "[]"
+set_effective "CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES" "[]"
 set_effective "CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY" ""
+set_effective "CHARTHUB_SERVER_CONFIG_PATH" "dev-data/config"
+set_effective "CHARTHUB_SERVER_DATA_PATH" "dev-data/charthub"
+set_effective "CHARTHUB_SERVER_DOWNLOADS_PATH" "dev-data/charthub/downloads"
+set_effective "CHARTHUB_SERVER_STAGING_PATH" "dev-data/charthub/staging"
+set_effective "CHARTHUB_SERVER_CLONEHERO_PATH" "dev-data/clonehero"
+set_effective "CHARTHUB_SERVER_DB_PATH" "dev-data/config/charthub-server.db"
+set_effective "CHARTHUB_SERVER_LOGS_PATH" "logs"
 
 set_effective "GOOGLEDRIVE_DESKTOP_CLIENT_ID" ""
 set_effective "GOOGLEDRIVE_DESKTOP_CLIENT_SECRET" ""
 set_effective "GOOGLEDRIVE_ANDROID_CLIENT_ID" "32662681450-gk9vocigkqomedf3vkk1fjtu20slobo1.apps.googleusercontent.com"
-
-if is_placeholder "${EFFECTIVE_VALUES[CHARTHUB_SERVER_ALLOWED_AUDIENCE_0]}"; then
-  EFFECTIVE_VALUES["CHARTHUB_SERVER_ALLOWED_AUDIENCE_0"]="${EFFECTIVE_VALUES[GOOGLEDRIVE_DESKTOP_CLIENT_ID]}"
-fi
-
-if is_placeholder "${EFFECTIVE_VALUES[CHARTHUB_SERVER_ALLOWED_AUDIENCE_1]}"; then
-  EFFECTIVE_VALUES["CHARTHUB_SERVER_ALLOWED_AUDIENCE_1"]="${EFFECTIVE_VALUES[GOOGLEDRIVE_ANDROID_CLIENT_ID]}"
-fi
 
 generated_jwt=false
 if is_placeholder "${EFFECTIVE_VALUES[CHARTHUB_SERVER_JWT_SIGNING_KEY]}"; then
@@ -257,6 +298,7 @@ fi
 
 required_manual=(
   "RHYTHMVERSE_TOKEN"
+  "BACKUP_API_KEY"
 )
 
 if [[ "$STRICT_MODE" == true ]]; then
@@ -293,16 +335,23 @@ BACKUP_DOWNLOADS_MODE=${EFFECTIVE_VALUES[BACKUP_DOWNLOADS_MODE]}
 BACKUP_DOWNLOADS_EXTERNAL_REDIRECT_CACHE_HOURS=${EFFECTIVE_VALUES[BACKUP_DOWNLOADS_EXTERNAL_REDIRECT_CACHE_HOURS]}
 BACKUP_DOWNLOADS_HOST_PATH=${EFFECTIVE_VALUES[BACKUP_DOWNLOADS_HOST_PATH]}
 BACKUP_IMAGES_HOST_PATH=${EFFECTIVE_VALUES[BACKUP_IMAGES_HOST_PATH]}
+BACKUP_API_KEY=${EFFECTIVE_VALUES[BACKUP_API_KEY]}
 
 # ChartHub.Server local settings
 CHARTHUB_SERVER_PORT=${EFFECTIVE_VALUES[CHARTHUB_SERVER_PORT]}
 CHARTHUB_SERVER_JWT_SIGNING_KEY=${EFFECTIVE_VALUES[CHARTHUB_SERVER_JWT_SIGNING_KEY]}
 CHARTHUB_SERVER_JWT_ISSUER=${EFFECTIVE_VALUES[CHARTHUB_SERVER_JWT_ISSUER]}
 CHARTHUB_SERVER_JWT_AUDIENCE=${EFFECTIVE_VALUES[CHARTHUB_SERVER_JWT_AUDIENCE]}
-CHARTHUB_SERVER_ALLOWED_EMAIL_0=${EFFECTIVE_VALUES[CHARTHUB_SERVER_ALLOWED_EMAIL_0]}
-CHARTHUB_SERVER_ALLOWED_AUDIENCE_0=${EFFECTIVE_VALUES[CHARTHUB_SERVER_ALLOWED_AUDIENCE_0]}
-CHARTHUB_SERVER_ALLOWED_AUDIENCE_1=${EFFECTIVE_VALUES[CHARTHUB_SERVER_ALLOWED_AUDIENCE_1]}
+CHARTHUB_SERVER_ALLOWED_EMAILS=${EFFECTIVE_VALUES[CHARTHUB_SERVER_ALLOWED_EMAILS]}
+CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES=${EFFECTIVE_VALUES[CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES]}
 CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY=${EFFECTIVE_VALUES[CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY]}
+CHARTHUB_SERVER_CONFIG_PATH=${EFFECTIVE_VALUES[CHARTHUB_SERVER_CONFIG_PATH]}
+CHARTHUB_SERVER_DATA_PATH=${EFFECTIVE_VALUES[CHARTHUB_SERVER_DATA_PATH]}
+CHARTHUB_SERVER_DOWNLOADS_PATH=${EFFECTIVE_VALUES[CHARTHUB_SERVER_DOWNLOADS_PATH]}
+CHARTHUB_SERVER_STAGING_PATH=${EFFECTIVE_VALUES[CHARTHUB_SERVER_STAGING_PATH]}
+CHARTHUB_SERVER_CLONEHERO_PATH=${EFFECTIVE_VALUES[CHARTHUB_SERVER_CLONEHERO_PATH]}
+CHARTHUB_SERVER_DB_PATH=${EFFECTIVE_VALUES[CHARTHUB_SERVER_DB_PATH]}
+CHARTHUB_SERVER_LOGS_PATH=${EFFECTIVE_VALUES[CHARTHUB_SERVER_LOGS_PATH]}
 
 # Optional desktop Google OAuth values for ChartHub user-secrets.
 GOOGLEDRIVE_DESKTOP_CLIENT_ID=${EFFECTIVE_VALUES[GOOGLEDRIVE_DESKTOP_CLIENT_ID]}
@@ -335,16 +384,41 @@ if [[ "$APPLY_USER_SECRETS" == true ]]; then
   set_user_secret "$SERVER_PROJECT" "Auth:JwtSigningKey" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_JWT_SIGNING_KEY]}"
   set_user_secret "$SERVER_PROJECT" "Auth:Issuer" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_JWT_ISSUER]}"
   set_user_secret "$SERVER_PROJECT" "Auth:Audience" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_JWT_AUDIENCE]}"
-  set_user_secret "$SERVER_PROJECT" "Auth:AllowedEmails:0" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_ALLOWED_EMAIL_0]}"
-  set_user_secret "$SERVER_PROJECT" "GoogleAuth:AllowedAudiences:0" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_ALLOWED_AUDIENCE_0]}"
-  set_user_secret "$SERVER_PROJECT" "GoogleAuth:AllowedAudiences:1" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_ALLOWED_AUDIENCE_1]}"
+  # Parse JSON arrays and set indexed user-secrets for Auth:AllowedEmails and GoogleAuth:AllowedAudiences.
+  allowed_emails_json="${EFFECTIVE_VALUES[CHARTHUB_SERVER_ALLOWED_EMAILS]}"
+  if [[ "$allowed_emails_json" != "[]" && -n "$allowed_emails_json" ]]; then
+    email_index=0
+    while IFS= read -r email_item; do
+      [[ -n "$email_item" ]] || continue
+      set_user_secret "$SERVER_PROJECT" "Auth:AllowedEmails:${email_index}" "$email_item"
+      email_index=$((email_index + 1))
+    done < <(python3 -c "import json,sys; [print(x) for x in json.loads(sys.argv[1])]" "$allowed_emails_json" 2>/dev/null)
+  fi
+
+  allowed_audiences_json="${EFFECTIVE_VALUES[CHARTHUB_SERVER_GOOGLE_ALLOWED_AUDIENCES]}"
+  if [[ "$allowed_audiences_json" != "[]" && -n "$allowed_audiences_json" ]]; then
+    audience_index=0
+    while IFS= read -r audience_item; do
+      [[ -n "$audience_item" ]] || continue
+      set_user_secret "$SERVER_PROJECT" "GoogleAuth:AllowedAudiences:${audience_index}" "$audience_item"
+      audience_index=$((audience_index + 1))
+    done < <(python3 -c "import json,sys; [print(x) for x in json.loads(sys.argv[1])]" "$allowed_audiences_json" 2>/dev/null)
+  fi
   set_user_secret "$SERVER_PROJECT" "GoogleDrive:ApiKey" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY]}"
+  set_user_secret "$SERVER_PROJECT" "ServerPaths:ConfigRoot" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_CONFIG_PATH]}"
+  set_user_secret "$SERVER_PROJECT" "ServerPaths:ChartHubRoot" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_DATA_PATH]}"
+  set_user_secret "$SERVER_PROJECT" "ServerPaths:DownloadsDir" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_DOWNLOADS_PATH]}"
+  set_user_secret "$SERVER_PROJECT" "ServerPaths:StagingDir" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_STAGING_PATH]}"
+  set_user_secret "$SERVER_PROJECT" "ServerPaths:CloneHeroRoot" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_CLONEHERO_PATH]}"
+  set_user_secret "$SERVER_PROJECT" "ServerPaths:SqliteDbPath" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_DB_PATH]}"
+  set_user_secret "$SERVER_PROJECT" "ServerLogging:LogDirectory" "${EFFECTIVE_VALUES[CHARTHUB_SERVER_LOGS_PATH]}"
 
   backup_connection_string="Host=localhost;Port=5432;Database=${EFFECTIVE_VALUES[PSQL_DB]};Username=${EFFECTIVE_VALUES[PSQL_USER]};Password=${EFFECTIVE_VALUES[PSQL_PASSWORD]}"
   set_user_secret "$BACKUP_API_PROJECT" "Database:Provider" "postgresql"
   set_user_secret "$BACKUP_API_PROJECT" "Database:PostgreSqlConnectionString" "$backup_connection_string"
   set_user_secret "$BACKUP_API_PROJECT" "RhythmVerseSource:BaseUrl" "${EFFECTIVE_VALUES[RHYTHMVERSE_BASE_URL]}"
   set_user_secret "$BACKUP_API_PROJECT" "RhythmVerseSource:Token" "${EFFECTIVE_VALUES[RHYTHMVERSE_TOKEN]}"
+  set_user_secret "$BACKUP_API_PROJECT" "ApiKey:Key" "${EFFECTIVE_VALUES[BACKUP_API_KEY]}"
 
   chart_hub_server_base_url="http://127.0.0.1:${EFFECTIVE_VALUES[CHARTHUB_SERVER_PORT]}"
   set_user_secret "$CHART_HUB_PROJECT" "Runtime:ServerApiBaseUrl" "$chart_hub_server_base_url"

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ChartHub.Server.Contracts;
 
 public sealed class CreateDownloadJobRequest
@@ -6,8 +8,10 @@ public sealed class CreateDownloadJobRequest
 
     public required string SourceId { get; init; }
 
+    [MaxLength(500)]
     public required string DisplayName { get; init; }
 
+    [MaxLength(2048)]
     public required string SourceUrl { get; init; }
 }
 

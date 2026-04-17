@@ -22,20 +22,16 @@ on:
 jobs:
   quality:
     name: Quality gates
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, charthub-build]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ inputs.dotnet_version }}
-
       - name: Restore service and test projects
         run: |
           dotnet restore ChartHub.Server/ChartHub.Server.csproj
+          dotnet restore ChartHub.Server.Tests/ChartHub.Server.Tests.csproj
           dotnet restore ChartHub.Tests/ChartHub.Tests.csproj /p:TargetFramework=net10.0
 
       - name: Restore BackupApi test projects
@@ -43,9 +39,6 @@ jobs:
         run: |
           dotnet restore ChartHub.BackupApi/ChartHub.BackupApi.csproj
           dotnet restore ChartHub.BackupApi.Tests/ChartHub.BackupApi.Tests.csproj
-
-      - name: Install ripgrep
-        run: sudo apt-get update && sudo apt-get install -y ripgrep
 
       - name: Fail on warning suppressions
         run: |
@@ -70,11 +63,18 @@ jobs:
       - name: Build
         run: |
           dotnet build ChartHub.Server/ChartHub.Server.csproj --configuration Release --no-restore
+          dotnet build ChartHub.Server.Tests/ChartHub.Server.Tests.csproj --configuration Release --no-restore
           dotnet build ChartHub.Tests/ChartHub.Tests.csproj --configuration Release --no-restore /p:TargetFramework=net10.0
           if [ "${{ inputs.run_backupapi_tests }}" = "true" ]; then
             dotnet build ChartHub.BackupApi/ChartHub.BackupApi.csproj --configuration Release --no-restore
             dotnet build ChartHub.BackupApi.Tests/ChartHub.BackupApi.Tests.csproj --configuration Release --no-restore
           fi
+
+      - name: Test ChartHub.Server.Tests
+        run: >-
+          dotnet test ChartHub.Server.Tests/ChartHub.Server.Tests.csproj
+          --configuration Release
+          --no-build
 
       - name: Test ChartHub with coverage threshold
         run: >-

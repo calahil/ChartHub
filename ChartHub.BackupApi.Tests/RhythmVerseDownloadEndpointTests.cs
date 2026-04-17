@@ -42,6 +42,7 @@ public sealed class RhythmVerseDownloadEndpointTests : IClassFixture<BackupApiWe
         {
             AllowAutoRedirect = false,
         });
+        client.DefaultRequestHeaders.Add("X-Api-Key", BackupApiWebApplicationFactory.TestApiKey);
 
         using HttpRequestMessage request = new(HttpMethod.Head, "/api/rhythmverse/download/abc123");
         HttpResponseMessage response = await client.SendAsync(request);
@@ -59,6 +60,7 @@ public sealed class RhythmVerseDownloadEndpointTests : IClassFixture<BackupApiWe
         {
             AllowAutoRedirect = false,
         });
+        client.DefaultRequestHeaders.Add("X-Api-Key", BackupApiWebApplicationFactory.TestApiKey);
 
         using HttpRequestMessage request = new(HttpMethod.Head, "/api/rhythmverse/download/missing-file");
         HttpResponseMessage response = await client.SendAsync(request);

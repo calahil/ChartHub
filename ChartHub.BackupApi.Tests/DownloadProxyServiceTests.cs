@@ -169,7 +169,9 @@ public sealed class DownloadProxyServiceTests : IDisposable
         }
     }
 
-    private DownloadProxyService BuildService(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> sendAsync)
+    private DownloadProxyService BuildService(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> sendAsync,
+        IDnsResolver? dnsResolver = null)
     {
         Directory.CreateDirectory(_tempRootPath);
 
@@ -189,6 +191,7 @@ public sealed class DownloadProxyServiceTests : IDisposable
             Microsoft.Extensions.Options.Options.Create(downloadOptions),
             Microsoft.Extensions.Options.Options.Create(sourceOptions),
             new TestHostEnvironment(_tempRootPath),
+            dnsResolver ?? new FakeDnsResolver([System.Net.IPAddress.Parse("8.8.8.8")]),
             NullLogger<DownloadProxyService>.Instance);
     }
 
@@ -209,5 +212,11 @@ public sealed class DownloadProxyServiceTests : IDisposable
         public string ContentRootPath { get; set; } = contentRootPath;
 
         public IFileProvider ContentRootFileProvider { get; set; } = new PhysicalFileProvider(contentRootPath);
+    }
+
+    private sealed class FakeDnsResolver(System.Net.IPAddress[] addresses) : IDnsResolver
+    {
+        public Task<System.Net.IPAddress[]> GetHostAddressesAsync(string hostNameOrAddress, CancellationToken cancellationToken)
+            => Task.FromResult(addresses);
     }
 }

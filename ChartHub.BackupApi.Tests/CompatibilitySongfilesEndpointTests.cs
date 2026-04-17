@@ -26,7 +26,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(2, "Other Artist", "Song B", diffBass: 2),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/search/live",
             new FormUrlEncodedContent(
@@ -54,7 +54,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(2, "Unrelated Artist", "Other Song"),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/search/live",
             new FormUrlEncodedContent(
@@ -82,7 +82,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(2, "Unrelated Artist", "Other Song"),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/search/live",
             new FormUrlEncodedContent(
@@ -109,7 +109,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(12, "No Guitar Artist", "Track 12", diffBass: 2),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/list",
             new FormUrlEncodedContent(
@@ -137,7 +137,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(15, "No Match", "Track 15"),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/list",
             new FormUrlEncodedContent(
@@ -168,7 +168,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(22, "Alpha Artist", "Track A", diffGuitar: 1),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/list",
             new FormUrlEncodedContent(
@@ -197,7 +197,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(32, "Beta", "Track 32", authorId: "author-2", recordUpdatedUnix: 20),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/list",
             new FormUrlEncodedContent(
@@ -246,7 +246,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(34, "Delta", "Track 34", authorId: "author-id-34", recordUpdatedUnix: 20),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/list",
             new FormUrlEncodedContent(
@@ -318,7 +318,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(37, "Gamma", "Track 37", authorId: "other-id", recordUpdatedUnix: 30),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/list",
             new FormUrlEncodedContent(
@@ -348,7 +348,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(42, "Newer", "Track 42", recordUpdatedUnix: 200),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/list",
             new FormUrlEncodedContent(
@@ -377,7 +377,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(52, "Beta", "Track 52", recordUpdatedUnix: 200),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/search/live",
             new FormUrlEncodedContent(
@@ -403,7 +403,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(62, "Beta", "Track 62"),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/list",
             new FormUrlEncodedContent(
@@ -430,7 +430,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
             Song(73, "C", "Track 73", recordUpdatedUnix: 100),
         ]);
 
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.PostAsync(
             "/api/all/songfiles/list",
             new FormUrlEncodedContent(
@@ -452,7 +452,7 @@ public sealed class CompatibilitySongfilesEndpointTests : IClassFixture<BackupAp
     [Fact]
     public async Task LegacyGetSongsRoute_IsNotMapped()
     {
-        HttpClient client = _factory.CreateClient();
+        HttpClient client = _factory.CreateAuthenticatedClient();
         HttpResponseMessage response = await client.GetAsync("/api/rhythmverse/songs");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

@@ -4,13 +4,15 @@ using System.Text.Json;
 using ChartHub.BackupApi.Models;
 using ChartHub.BackupApi.Options;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace ChartHub.BackupApi.Services;
 
-public sealed class RhythmVerseUpstreamClient(
+public sealed partial class RhythmVerseUpstreamClient(
     HttpClient httpClient,
-    IOptions<RhythmVerseSourceOptions> sourceOptions) : IRhythmVerseUpstreamClient
+    IOptions<RhythmVerseSourceOptions> sourceOptions,
+    ILogger<RhythmVerseUpstreamClient> logger) : IRhythmVerseUpstreamClient
 {
     public async Task<RhythmVersePageEnvelope> FetchSongsPageAsync(int page, int records, long? updatedSince, CancellationToken cancellationToken)
     {
@@ -29,22 +31,12 @@ public sealed class RhythmVerseUpstreamClient(
 
         using HttpResponseMessage response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
-        // Log status code before throwing to aid diagnostics
+        // Log status code before throwing to aid diagnostics.
+        // The response body is intentionally omitted: upstream error payloads may contain
+        // reflected auth details or other sensitive upstream data.
         if (!response.IsSuccessStatusCode)
         {
-            string responseBody = string.Empty;
-            try
-            {
-                responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                if (responseBody.Length > 200)
-                {
-                    responseBody = string.Concat(responseBody.AsSpan(0, 200), "...");
-                }
-            }
-            catch
-            {
-                // Ignore errors reading response body for logging
-            }
+            Log.FetchSongsPageFailed(logger, (int)response.StatusCode);
         }
 
         response.EnsureSuccessStatusCode();
@@ -256,5 +248,11 @@ public sealed class RhythmVerseUpstreamClient(
             : property.ToString();
 
         return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private static partial class Log
+    {
+        [LoggerMessage(EventId = 2001, Level = LogLevel.Warning, Message = "RhythmVerse upstream request returned non-success status {StatusCode}.")]
+        public static partial void FetchSongsPageFailed(ILogger logger, int statusCode);
     }
 }
