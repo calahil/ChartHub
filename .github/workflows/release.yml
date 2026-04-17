@@ -923,7 +923,7 @@ jobs:
     name: Deploy ChartHub Server bundle to staging
     if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
     runs-on: [self-hosted, linux, charthub-build]
-    needs: [classify, build-server-bundle, deploy-server-dev]
+    needs: [classify, build-server-bundle]
     environment: server-staging
     steps:
       - uses: actions/checkout@v4

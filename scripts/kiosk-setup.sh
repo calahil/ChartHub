@@ -100,7 +100,7 @@ echo "==> Installing Openbox..."
 apt-get install -y openbox
 
 # ---------------------------------------------------------------------------
-# 3. Remove XFCE4 desktop environment
+# 4. Remove XFCE4 desktop environment
 # ---------------------------------------------------------------------------
 echo "==> Removing XFCE4..."
 apt-get remove -y --auto-remove \
@@ -126,7 +126,7 @@ apt-get remove -y --auto-remove \
     || true
 
 # ---------------------------------------------------------------------------
-# 4. Remove print stack (no printers on a gaming kiosk)
+# 5. Remove print stack (no printers on a gaming kiosk)
 # ---------------------------------------------------------------------------
 echo "==> Removing CUPS / printer stack..."
 apt-get remove -y --auto-remove \
@@ -160,7 +160,7 @@ apt-get remove -y --auto-remove \
     || true
 
 # ---------------------------------------------------------------------------
-# 5. Remove scanner stack (SANE)
+# 6. Remove scanner stack (SANE)
 # ---------------------------------------------------------------------------
 echo "==> Removing SANE scanner stack..."
 apt-get remove -y --auto-remove \
@@ -171,7 +171,7 @@ apt-get remove -y --auto-remove \
     || true
 
 # ---------------------------------------------------------------------------
-# 6. Remove Bluetooth UI (bluez itself retained — some game controllers use BT)
+# 7. Remove Bluetooth UI (bluez itself retained — some game controllers use BT)
 #    Remove blueman (GUI), bluez-obexd (file transfer), and BT audio module.
 #    If no BT controllers are used at all, also remove bluez here.
 #
@@ -188,7 +188,7 @@ apt-get remove -y --auto-remove \
     || true
 
 # ---------------------------------------------------------------------------
-# 7. Remove NFS / RPC (no network file shares on a kiosk)
+# 8. Remove NFS / RPC (no network file shares on a kiosk)
 # ---------------------------------------------------------------------------
 echo "==> Removing NFS and RPC..."
 apt-get remove -y --auto-remove \
@@ -198,7 +198,7 @@ apt-get remove -y --auto-remove \
     || true
 
 # ---------------------------------------------------------------------------
-# 8. Remove snapd (no snap packages used; saves ~100–200 MB)
+# 9. Remove snapd (no snap packages used; saves ~100–200 MB)
 # ---------------------------------------------------------------------------
 echo "==> Removing snapd..."
 apt-get remove -y --auto-remove snapd || true
@@ -210,7 +210,7 @@ Pin-Priority: -1
 EOF
 
 # ---------------------------------------------------------------------------
-# 9. Remove build toolchain (not needed at runtime)
+# 10. Remove build toolchain (not needed at runtime)
 #    Keeps: make (used by dkms internally), gcc-13-base (shared lib base)
 # ---------------------------------------------------------------------------
 echo "==> Removing build toolchain..."
@@ -247,7 +247,7 @@ apt-get remove -y --auto-remove \
     || true
 
 # ---------------------------------------------------------------------------
-# 10. Remove .NET SDK; keep only the runtime needed by ChartHub.Server
+# 11. Remove .NET SDK; keep only the runtime needed by ChartHub.Server
 #     dotnet-runtime-8.0 and aspnetcore-runtime-8.0 are retained.
 #     NOTE: if ChartHub.Server targets net10.0, adjust the version kept here.
 # ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ apt-get remove -y --auto-remove \
     || true
 
 # ---------------------------------------------------------------------------
-# 11. Remove crash reporters and telemetry
+# 12. Remove crash reporters and telemetry
 # ---------------------------------------------------------------------------
 echo "==> Removing apport crash reporter..."
 apt-get remove -y --auto-remove \
@@ -272,7 +272,7 @@ apt-get remove -y --auto-remove \
     || true
 
 # ---------------------------------------------------------------------------
-# 12. Remove cloud-init (not a cloud VM; saves time on boot)
+# 13. Remove cloud-init (not a cloud VM; saves time on boot)
 # ---------------------------------------------------------------------------
 echo "==> Removing cloud-init..."
 apt-get remove -y --auto-remove cloud-init cloud-guest-utils || true
@@ -280,7 +280,7 @@ apt-get remove -y --auto-remove cloud-init cloud-guest-utils || true
 echo 'datasource_list: [ None ]' > /etc/cloud/cloud.cfg.d/99-disable.cfg 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
-# 13. Remove spell checkers (no text editor on the kiosk)
+# 14. Remove spell checkers (no text editor on the kiosk)
 # ---------------------------------------------------------------------------
 echo "==> Removing spell checkers..."
 apt-get remove -y --auto-remove \
@@ -291,7 +291,7 @@ apt-get remove -y --auto-remove \
     || true
 
 # ---------------------------------------------------------------------------
-# 14. Remove avahi mDNS (not needed; ChartHub uses direct IP)
+# 15. Remove avahi mDNS (not needed; ChartHub uses direct IP)
 #     NOTE: avahi-daemon is pulled by some Bluetooth stack components.
 #     Only remove if you have no mDNS discovery need.
 # ---------------------------------------------------------------------------
@@ -299,7 +299,7 @@ echo "==> Removing avahi-daemon..."
 apt-get remove -y --auto-remove avahi-daemon || true
 
 # ---------------------------------------------------------------------------
-# 15. Remove bpfcc / bpftrace tracing tools (developer tools, not runtime deps)
+# 16. Remove bpfcc / bpftrace tracing tools (developer tools, not runtime deps)
 # ---------------------------------------------------------------------------
 echo "==> Removing bpf tracing tools..."
 apt-get remove -y --auto-remove \
@@ -309,13 +309,13 @@ apt-get remove -y --auto-remove \
     || true
 
 # ---------------------------------------------------------------------------
-# 16. Remove synaptic package manager GUI (no GUI package mgmt on kiosk)
+# 17. Remove synaptic package manager GUI (no GUI package mgmt on kiosk)
 # ---------------------------------------------------------------------------
 echo "==> Removing synaptic..."
 apt-get remove -y --auto-remove synaptic software-properties-gtk || true
 
 # ---------------------------------------------------------------------------
-# 17. Remove dkms and linux headers (no kernel modules to recompile)
+# 18. Remove dkms and linux headers (no kernel modules to recompile)
 #     CAUTION: skip this if you have NVIDIA/AMD/WiFi drivers installed via dkms
 # ---------------------------------------------------------------------------
 echo "==> Checking for dkms modules before removing..."
@@ -332,7 +332,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 18. Disable systemd charthub-server service if present
+# 19. Disable systemd charthub-server service if present
 #     On the kiosk machine the server is tied to the X session via
 #     start-kiosk-session.sh, not systemd. Running both would start two
 #     server instances.
@@ -348,19 +348,19 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 19. Final autoremove pass (catch any orphaned deps)
+# 20. Final autoremove pass (catch any orphaned deps)
 # ---------------------------------------------------------------------------
 echo "==> Final autoremove..."
 apt-get autoremove -y --purge
 
 # ---------------------------------------------------------------------------
-# 20. Install the kiosk session script
+# 21. Install the kiosk session script
 # ---------------------------------------------------------------------------
 echo "==> Installing kiosk session script to ${SESSION_SCRIPT}..."
 install -m 0755 "${SCRIPT_DIR}/start-kiosk-session.sh" "${SESSION_SCRIPT}"
 
 # ---------------------------------------------------------------------------
-# 21. Register the X session
+# 22. Register the X session
 # ---------------------------------------------------------------------------
 echo "==> Registering charthub-kiosk X session at ${SESSION_DESKTOP}..."
 mkdir -p "$(dirname "${SESSION_DESKTOP}")"
@@ -373,7 +373,7 @@ Type=Application
 EOF
 
 # ---------------------------------------------------------------------------
-# 22. LightDM: auto-login + disable greeter screen lock
+# 23. LightDM: auto-login + disable greeter screen lock
 # ---------------------------------------------------------------------------
 AUTOLOGIN_USER="${KIOSK_USER:-${SUDO_USER:-$(logname 2>/dev/null || echo "")}}"
 if [[ -z "$AUTOLOGIN_USER" ]]; then
@@ -396,7 +396,7 @@ xserver-command=X -s 0 -dpms
 EOF
 
 # ---------------------------------------------------------------------------
-# 23. Disable lightdm-gtk-greeter screen locker (if present)
+# 24. Disable lightdm-gtk-greeter screen locker (if present)
 # ---------------------------------------------------------------------------
 GREETER_CONF="/etc/lightdm/lightdm-gtk-greeter.conf"
 if [[ -f "$GREETER_CONF" ]]; then
