@@ -107,7 +107,15 @@ apt-get remove -y --auto-remove \
 # 6. Remove Bluetooth UI (bluez itself retained — some game controllers use BT)
 #    Remove blueman (GUI), bluez-obexd (file transfer), and BT audio module.
 #    If no BT controllers are used at all, also remove bluez here.
+#
+#    pulseaudio is explicitly marked auto=no (apt-mark manual) before removal
+#    of the XFCE pulseaudio plugin to prevent --auto-remove from pulling out
+#    the PulseAudio daemon itself — which Unity/SDL2 games require for audio,
+#    and which also drives USB microphone and USB audio device routing.
 # ---------------------------------------------------------------------------
+echo "==> Protecting pulseaudio from auto-removal (needed by games and USB audio)..."
+apt-mark manual pulseaudio pulseaudio-utils || true
+
 echo "==> Removing Bluetooth GUI and unused BT services..."
 apt-get remove -y --auto-remove \
     blueman \
@@ -260,19 +268,35 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 18. Final autoremove pass (catch any orphaned deps)
+# 18. Disable systemd charthub-server service if present
+#     On the kiosk machine the server is tied to the X session via
+#     start-kiosk-session.sh, not systemd. Running both would start two
+#     server instances.
+# ---------------------------------------------------------------------------
+echo "==> Disabling charthub-server systemd service (if installed)..."
+if systemctl list-unit-files charthub-server.service &>/dev/null | grep -q charthub-server; then
+    systemctl stop charthub-server.service 2>/dev/null || true
+    systemctl disable charthub-server.service 2>/dev/null || true
+    systemctl mask charthub-server.service
+    echo "    charthub-server.service masked."
+else
+    echo "    charthub-server.service not found — nothing to do."
+fi
+
+# ---------------------------------------------------------------------------
+# 19. Final autoremove pass (catch any orphaned deps)
 # ---------------------------------------------------------------------------
 echo "==> Final autoremove..."
 apt-get autoremove -y --purge
 
 # ---------------------------------------------------------------------------
-# 19. Install the kiosk session script
+# 20. Install the kiosk session script
 # ---------------------------------------------------------------------------
 echo "==> Installing kiosk session script to ${SESSION_SCRIPT}..."
 install -m 0755 "${SCRIPT_DIR}/start-kiosk-session.sh" "${SESSION_SCRIPT}"
 
 # ---------------------------------------------------------------------------
-# 20. Register the X session
+# 21. Register the X session
 # ---------------------------------------------------------------------------
 echo "==> Registering charthub-kiosk X session at ${SESSION_DESKTOP}..."
 mkdir -p "$(dirname "${SESSION_DESKTOP}")"
@@ -285,7 +309,7 @@ Type=Application
 EOF
 
 # ---------------------------------------------------------------------------
-# 21. LightDM: auto-login + disable greeter screen lock
+# 22. LightDM: auto-login + disable greeter screen lock
 # ---------------------------------------------------------------------------
 AUTOLOGIN_USER="${KIOSK_USER:-${SUDO_USER:-$(logname 2>/dev/null || echo "")}}"
 if [[ -z "$AUTOLOGIN_USER" ]]; then
@@ -308,7 +332,7 @@ xserver-command=X -s 0 -dpms
 EOF
 
 # ---------------------------------------------------------------------------
-# 22. Disable lightdm-gtk-greeter screen locker (if present)
+# 23. Disable lightdm-gtk-greeter screen locker (if present)
 # ---------------------------------------------------------------------------
 GREETER_CONF="/etc/lightdm/lightdm-gtk-greeter.conf"
 if [[ -f "$GREETER_CONF" ]]; then
@@ -334,6 +358,7 @@ echo " Packages intentionally kept:"
 echo "   bluez        — Bluetooth game controllers"
 echo "   ffmpeg       — game audio/video codecs"
 echo "   dotnet-runtime-8.0 / aspnetcore-runtime-8.0"
-echo "   alsa-utils   — audio control (ChartHub.Server volume service)"
+echo "   alsa-utils   — audio + MIDI (USB drum kit, USB mic)"
+echo "   pulseaudio   — audio daemon required by Unity/SDL2 games and USB audio"
 echo "   openbox      — WM required by Unity/SDL2 games"
 echo "========================================="

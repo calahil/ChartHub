@@ -833,19 +833,29 @@ jobs:
             rm -f \"/tmp/charthub-server-${VERSION}-linux-x64.zip\"
           "
 
-      - name: Install or update systemd unit
+      - name: Install or update systemd unit and write kiosk env
         env:
           SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
           SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
           SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONFIG="${CONFIG_PATH:-/srv/appdata/charthub/config}"
+          INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
           scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
             .github/systemd/charthub-server.service "${SSH_USER}@${SSH_HOST}:/tmp/charthub-server.service"
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
-            sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service
-            sudo systemctl daemon-reload
-            sudo systemctl enable charthub-server.service
+            # Write kiosk env inside the install root — the deploy user already owns this
+            # directory so no sudo is required. start-kiosk-session.sh sources this file
+            # to know which binary to run. Safe to write on non-kiosk machines too.
+            printf 'CHARTHUB_SERVER=%s/current/ChartHub.Server\\n' \"${INSTALL_ROOT}\" \
+              > \"${INSTALL_ROOT}/kiosk.env\"
+            # Install systemd unit. On kiosk machines the service is masked by kiosk-setup.sh
+            # so enable will silently fail; that is intentional.
+            sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service 2>/dev/null || true
+            sudo systemctl daemon-reload || true
+            sudo systemctl enable charthub-server.service 2>/dev/null || true
             rm -f /tmp/charthub-server.service
           "
 
@@ -857,8 +867,16 @@ jobs:
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
-            sudo systemctl restart charthub-server.service
-            sudo systemctl --no-pager --full status charthub-server.service || true
+            if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
+               sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
+              sudo systemctl restart charthub-server.service
+              sudo systemctl --no-pager --full status charthub-server.service || true
+            else
+              # Kiosk mode: service is masked; kill the running process so the X session
+              # exits and LightDM restarts it via start-kiosk-session.sh with the new binary.
+              pkill -f 'ChartHub.Server' || true
+              echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
+            fi
           "
 
       - name: Verify health
@@ -1055,19 +1073,29 @@ jobs:
             rm -f \"/tmp/charthub-server-${VERSION}-linux-x64.zip\"
           "
 
-      - name: Install or update systemd unit
+      - name: Install or update systemd unit and write kiosk env
         env:
           SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
           SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
           SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONFIG="${CONFIG_PATH:-/srv/appdata/charthub/config}"
+          INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
           scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
             .github/systemd/charthub-server.service "${SSH_USER}@${SSH_HOST}:/tmp/charthub-server.service"
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
-            sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service
-            sudo systemctl daemon-reload
-            sudo systemctl enable charthub-server.service
+            # Write kiosk env inside the install root — the deploy user already owns this
+            # directory so no sudo is required. start-kiosk-session.sh sources this file
+            # to know which binary to run. Safe to write on non-kiosk machines too.
+            printf 'CHARTHUB_SERVER=%s/current/ChartHub.Server\\n' \"${INSTALL_ROOT}\" \
+              > \"${INSTALL_ROOT}/kiosk.env\"
+            # Install systemd unit. On kiosk machines the service is masked by kiosk-setup.sh
+            # so enable will silently fail; that is intentional.
+            sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service 2>/dev/null || true
+            sudo systemctl daemon-reload || true
+            sudo systemctl enable charthub-server.service 2>/dev/null || true
             rm -f /tmp/charthub-server.service
           "
 
@@ -1079,8 +1107,16 @@ jobs:
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
-            sudo systemctl restart charthub-server.service
-            sudo systemctl --no-pager --full status charthub-server.service || true
+            if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
+               sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
+              sudo systemctl restart charthub-server.service
+              sudo systemctl --no-pager --full status charthub-server.service || true
+            else
+              # Kiosk mode: service is masked; kill the running process so the X session
+              # exits and LightDM restarts it via start-kiosk-session.sh with the new binary.
+              pkill -f 'ChartHub.Server' || true
+              echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
+            fi
           "
 
       - name: Verify health
@@ -1277,19 +1313,29 @@ jobs:
             rm -f \"/tmp/charthub-server-${VERSION}-linux-x64.zip\"
           "
 
-      - name: Install or update systemd unit
+      - name: Install or update systemd unit and write kiosk env
         env:
           SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
           SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
           SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONFIG="${CONFIG_PATH:-/srv/appdata/charthub/config}"
+          INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
           scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
             .github/systemd/charthub-server.service "${SSH_USER}@${SSH_HOST}:/tmp/charthub-server.service"
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
-            sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service
-            sudo systemctl daemon-reload
-            sudo systemctl enable charthub-server.service
+            # Write kiosk env inside the install root — the deploy user already owns this
+            # directory so no sudo is required. start-kiosk-session.sh sources this file
+            # to know which binary to run. Safe to write on non-kiosk machines too.
+            printf 'CHARTHUB_SERVER=%s/current/ChartHub.Server\\n' \"${INSTALL_ROOT}\" \
+              > \"${INSTALL_ROOT}/kiosk.env\"
+            # Install systemd unit. On kiosk machines the service is masked by kiosk-setup.sh
+            # so enable will silently fail; that is intentional.
+            sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service 2>/dev/null || true
+            sudo systemctl daemon-reload || true
+            sudo systemctl enable charthub-server.service 2>/dev/null || true
             rm -f /tmp/charthub-server.service
           "
 
@@ -1301,8 +1347,16 @@ jobs:
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
-            sudo systemctl restart charthub-server.service
-            sudo systemctl --no-pager --full status charthub-server.service || true
+            if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
+               sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
+              sudo systemctl restart charthub-server.service
+              sudo systemctl --no-pager --full status charthub-server.service || true
+            else
+              # Kiosk mode: service is masked; kill the running process so the X session
+              # exits and LightDM restarts it via start-kiosk-session.sh with the new binary.
+              pkill -f 'ChartHub.Server' || true
+              echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
+            fi
           "
 
       - name: Verify health

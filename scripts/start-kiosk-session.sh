@@ -14,10 +14,22 @@
 set -euo pipefail
 
 # ---------------------------------------------------------------------------
-# Configuration — override via environment or edit below
+# Configuration
 # ---------------------------------------------------------------------------
-# Path to the published ChartHub.Server binary
-CHARTHUB_SERVER="${CHARTHUB_SERVER:-/opt/charthub/server/ChartHub.Server}"
+# The deployment workflow writes <INSTALL_ROOT>/kiosk.env with CHARTHUB_SERVER
+# pointing at the current symlink for whichever channel (dev/staging/prod) was
+# last deployed. Sourcing it here means a re-deploy automatically updates the
+# binary this session uses without editing this script.
+# The file lives in the install root (not /etc) so the deploy user can write it
+# without elevated privileges.
+KIOSK_ENV_FILE="${KIOSK_ENV_FILE:-/srv/appdata/charthub/kiosk.env}"
+if [[ -f "$KIOSK_ENV_FILE" ]]; then
+    # shellcheck source=/dev/null
+    source "$KIOSK_ENV_FILE"
+fi
+
+# Fallback if the env file hasn't been written yet (first-run / manual setup)
+CHARTHUB_SERVER="${CHARTHUB_SERVER:-/srv/appdata/charthub/current/ChartHub.Server}"
 
 # Optional display resolution (e.g. "1920x1080"). Leave empty to skip.
 KIOSK_RESOLUTION="${KIOSK_RESOLUTION:-}"
