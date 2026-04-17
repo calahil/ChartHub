@@ -121,9 +121,7 @@ builder.Services.AddRateLimiter(options =>
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
     {
-        string clientIp = context.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim()
-            ?? context.Connection.RemoteIpAddress?.ToString()
-            ?? "unknown";
+        string clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         return RateLimitPartition.GetTokenBucketLimiter(clientIp, _ => new TokenBucketRateLimiterOptions
         {
             TokenLimit = 120,
@@ -162,6 +160,14 @@ app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSecond
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
+
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    await next(context);
+});
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
     .WithName("GetChartHubServerHealth")

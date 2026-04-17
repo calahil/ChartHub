@@ -268,7 +268,7 @@ public sealed partial class DesktopEntryService(
             };
         }
 
-        int killExitCode = await RunProcessAsync("kill", $"-TERM {trackedPid}", cancellationToken).ConfigureAwait(false);
+        int killExitCode = await RunProcessAsync("kill", ["-TERM", trackedPid.ToString()], cancellationToken).ConfigureAwait(false);
         if (killExitCode != 0)
         {
             throw new DesktopEntryServiceException(StatusCodes.Status500InternalServerError, "kill_failed", "Failed to send SIGTERM to process.");
@@ -512,20 +512,24 @@ public sealed partial class DesktopEntryService(
         return value;
     }
 
-    private static async Task<int> RunProcessAsync(string fileName, string arguments, CancellationToken cancellationToken)
+    private static async Task<int> RunProcessAsync(string fileName, string[] arguments, CancellationToken cancellationToken)
     {
         using Process process = new()
         {
             StartInfo = new ProcessStartInfo
             {
                 FileName = fileName,
-                Arguments = arguments,
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
             },
         };
+
+        foreach (string arg in arguments)
+        {
+            process.StartInfo.ArgumentList.Add(arg);
+        }
 
         if (!process.Start())
         {

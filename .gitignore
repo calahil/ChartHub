@@ -389,7 +389,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-ChartHub/Resources/Raw/desktop-sync-qr.png
 ChartHub.BackupApi/cache
 dev-data/
 merges//site/

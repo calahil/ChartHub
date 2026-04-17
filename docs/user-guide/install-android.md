@@ -1,6 +1,6 @@
 # Install on Android
 
-The ChartHub Android companion app is sideloaded from the APK released on GitHub.
+The ChartHub Android companion app is installed by sideloading the APK released on GitHub. Sideloading means installing directly from a file rather than through the Play Store — this is required because ChartHub is not yet published on Google Play (coming soon). The APK is signed by the developer and is safe to install.
 
 ---
 

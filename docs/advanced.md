@@ -84,7 +84,7 @@ The Backup API mirrors RhythmVerse song metadata into a local database for read 
 
 Primary references:
 
-- [docs/backup-api-self-hosting.md](backup-api-self-hosting.md)
+- [docs/backup-api-self-hosting.md](self-hosting/backup-api.md)
 - [ChartHub.BackupApi/README.docker.md](../ChartHub.BackupApi/README.docker.md)
 - [ChartHub.BackupApi/Program.cs](../ChartHub.BackupApi/Program.cs)
 

@@ -3,7 +3,7 @@
 Install and manage rhythm game song charts for Clone Hero.
 
 [![Build](https://github.com/calahilstudios/charthub/actions/workflows/dotnet-guardrails.yml/badge.svg)](https://github.com/calahilstudios/charthub/actions/workflows/dotnet-guardrails.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.txt)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
 
 **Full documentation: [docs.calahilstudios.com](https://docs.calahilstudios.com)**
 
@@ -47,6 +47,12 @@ dotnet test ChartHub.Tests/ChartHub.Tests.csproj --configuration Release --no-bu
 ```
 
 Contribution rules: [`.governance/AGENTS.md`](.governance/AGENTS.md) · Architecture: [`.governance/architecture.md`](.governance/architecture.md)
+
+---
+
+## AI-Assisted Development
+
+ChartHub is developed with assistance from AI coding agents (GitHub Copilot). All agent-contributed code is reviewed by a human maintainer before merging. Agent behavior policies are documented in [`.governance/AGENTS.md`](.governance/AGENTS.md).
 
 ---
 

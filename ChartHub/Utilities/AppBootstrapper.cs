@@ -137,11 +137,9 @@ public static class AppBootstrapper
         }
 
 #if ANDROID
-        services.AddSingleton<IQrCodeScannerService, AndroidQrCodeScannerService>();
         services.AddSingleton<IVolumeHardwareButtonSource, AndroidVolumeHardwareButtonSource>();
         services.AddSingleton<IOrientationService, AndroidOrientationService>();
 #else
-        services.AddSingleton<IQrCodeScannerService, NoOpQrCodeScannerService>();
         services.AddSingleton<IVolumeHardwareButtonSource, NoOpVolumeHardwareButtonSource>();
         services.AddSingleton<IOrientationService, NullOrientationService>();
 #endif

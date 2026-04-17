@@ -145,6 +145,20 @@ jobs:
       - name: Install Android workload
         run: dotnet workload install android
 
+      - name: Inject Android OAuth client ID
+        env:
+          ANDROID_CLIENT_ID: ${{ secrets.GOOGLEDRIVE_ANDROID_CLIENT_ID }}
+        run: |
+          if [[ -z "$ANDROID_CLIENT_ID" ]]; then
+            echo "GOOGLEDRIVE_ANDROID_CLIENT_ID secret is not set"
+            exit 1
+          fi
+          # Extract the numeric prefix (everything before .apps.googleusercontent.com)
+          CLIENT_ID_PREFIX="${ANDROID_CLIENT_ID%.apps.googleusercontent.com}"
+          REDIRECT_SCHEME="com.googleusercontent.apps.${CLIENT_ID_PREFIX}"
+          sed -i "s|com.googleusercontent.apps.REPLACE_WITH_ANDROID_CLIENT_ID_PREFIX|${REDIRECT_SCHEME}|g" \
+            ChartHub/Android/GoogleSignInActivity.cs
+
       - name: Build APK
         run: >-
           dotnet build ChartHub/ChartHub.csproj

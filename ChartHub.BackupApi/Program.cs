@@ -116,7 +116,8 @@ builder.Services
 builder.Services.AddSingleton<IDnsResolver, SystemDnsResolver>();
 builder.Services.AddHttpClient<IRhythmVerseUpstreamClient, RhythmVerseUpstreamClient>();
 builder.Services.AddHttpClient<IImageProxyService, ImageProxyService>();
-builder.Services.AddHttpClient<IDownloadProxyService, DownloadProxyService>();
+builder.Services.AddHttpClient<IDownloadProxyService, DownloadProxyService>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddScoped<IRhythmVerseRepository, RhythmVerseRepository>();
 builder.Services.AddSingleton<ISchemaDocumentService, SchemaDocumentService>();
 
@@ -170,6 +171,14 @@ if (!app.Environment.IsEnvironment("Testing"))
 
 app.UseMiddleware<ApiKeyMiddleware>();
 
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    await next(context);
+});
+
 app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(async context =>
@@ -203,7 +212,7 @@ app.UseSerilogRequestLogging(options =>
     };
 });
 
-if (!app.Environment.IsProduction())
+if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();

@@ -282,7 +282,7 @@ set_effective "CHARTHUB_SERVER_LOGS_PATH" "logs"
 
 set_effective "GOOGLEDRIVE_DESKTOP_CLIENT_ID" ""
 set_effective "GOOGLEDRIVE_DESKTOP_CLIENT_SECRET" ""
-set_effective "GOOGLEDRIVE_ANDROID_CLIENT_ID" "32662681450-gk9vocigkqomedf3vkk1fjtu20slobo1.apps.googleusercontent.com"
+set_effective "GOOGLEDRIVE_ANDROID_CLIENT_ID" ""
 
 generated_jwt=false
 if is_placeholder "${EFFECTIVE_VALUES[CHARTHUB_SERVER_JWT_SIGNING_KEY]}"; then
@@ -299,6 +299,9 @@ fi
 required_manual=(
   "RHYTHMVERSE_TOKEN"
   "BACKUP_API_KEY"
+  "GOOGLEDRIVE_ANDROID_CLIENT_ID"
+  "GOOGLEDRIVE_DESKTOP_CLIENT_ID"
+  "GOOGLEDRIVE_DESKTOP_CLIENT_SECRET"
 )
 
 if [[ "$STRICT_MODE" == true ]]; then

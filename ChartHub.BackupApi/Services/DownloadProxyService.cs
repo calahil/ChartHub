@@ -158,6 +158,11 @@ public sealed partial class DownloadProxyService : IDownloadProxyService
                 return null;
             }
 
+            if (!await ValidateExternalUriAgainstSsrfAsync(resolvedMediaFireUri, cancellationToken).ConfigureAwait(false))
+            {
+                return null;
+            }
+
             requestUri = resolvedMediaFireUri;
         }
 

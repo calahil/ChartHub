@@ -18,8 +18,11 @@ namespace ChartHub
         DataPathPrefix = "/oauth2redirect")]
     internal sealed class OAuthRedirectActivity : Activity
     {
-        // Must match the Android OAuth client ID used by the app.
-        internal const string RedirectScheme = "com.googleusercontent.apps.32662681450-gk9vocigkqomedf3vkk1fjtu20slobo1";
+        // Must match the reverse-DNS form of the Android OAuth client ID: com.googleusercontent.apps.<client_id_prefix>
+        // This value is a compile-time constant (required for Android IntentFilter attributes) and must be
+        // updated to match the client ID configured in GoogleDrive:android_client_id / GOOGLEDRIVE_ANDROID_CLIENT_ID.
+        // Do NOT commit a real client ID here. Obtain the correct value from your team's secrets store.
+        internal const string RedirectScheme = "com.googleusercontent.apps.REPLACE_WITH_ANDROID_CLIENT_ID_PREFIX";
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {

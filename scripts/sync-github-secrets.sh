@@ -85,6 +85,14 @@ SERVER_SECRETS=(
   SERVER_DEPLOY_SSH_PORT
 )
 
+# Repository-level secrets (not scoped to any environment).
+# These are read from the Infisical 'dev' environment and pushed as repo secrets.
+REPO_SECRETS=(
+  GOOGLEDRIVE_ANDROID_CLIENT_ID
+  GOOGLEDRIVE_DESKTOP_CLIENT_ID
+  GOOGLEDRIVE_DESKTOP_CLIENT_SECRET
+)
+
 print_usage() {
   cat <<'EOF'
 Usage: scripts/sync-github-secrets.sh [options]
@@ -175,6 +183,35 @@ load_from_infisical() {
   done <<< "$raw_env"
 }
 
+push_to_github_repo() {
+  local -n secrets_ref="$1"
+
+  log "Syncing → GitHub repository secrets (repo-level)"
+
+  local missing=()
+  for secret in "${secrets_ref[@]}"; do
+    if [[ -z "${LOADED_SECRETS[$secret]+x}" || -z "${LOADED_SECRETS[$secret]}" ]]; then
+      missing+=("$secret")
+    fi
+  done
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    fail "Missing repo secrets: ${missing[*]}"
+  fi
+
+  for secret in "${secrets_ref[@]}"; do
+    local value="${LOADED_SECRETS[$secret]}"
+    if [[ "$DRY_RUN" == true ]]; then
+      log "  [dry-run] gh secret set ${secret} --repo (repo-level)"
+    else
+      printf '%s' "$value" | gh secret set "$secret" \
+        --repo "$REPO" \
+        --body -
+      log "  ✓ ${secret}"
+    fi
+  done
+}
+
 push_to_github_environment() {
   local github_env="$1"
   local -n secrets_ref="$2"
@@ -255,6 +292,7 @@ gh auth status --hostname github.com >/dev/null 2>&1 || fail "Not authenticated 
 if [[ -n "$ENV_FILE" ]]; then
   # Single env file mode: same values pushed to all targeted environments
   load_from_env_file "$ENV_FILE"
+  push_to_github_repo REPO_SECRETS
   for github_env in "${TARGET_ENVIRONMENTS[@]}"; do
     push_to_github_environment "$github_env" COMMON_SECRETS
   done
@@ -262,7 +300,10 @@ if [[ -n "$ENV_FILE" ]]; then
     push_to_github_environment "$github_env" SERVER_SECRETS
   done
 else
-  # Infisical mode: fetch per-environment secrets
+  # Infisical mode: repo secrets sourced from 'dev' (build-time, not deployment-specific)
+  load_from_infisical "dev"
+  push_to_github_repo REPO_SECRETS
+  # Per-environment secrets
   for github_env in "${TARGET_ENVIRONMENTS[@]}"; do
     infisical_env="${INFISICAL_ENV_MAP[$github_env]}"
     load_from_infisical "$infisical_env"
