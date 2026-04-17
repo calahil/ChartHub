@@ -27,7 +27,53 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Install Openbox
+# 2. Protect GPU, display, and audio packages from auto-removal
+#    Must run BEFORE any apt-get remove --auto-remove step.
+#
+#    AMD Radeon R5 (GCN integrated, APU): Mesa DRI/GLX/Vulkan are the only
+#    OpenGL/Vulkan stack — removing them kills X11 and Unity/SDL2 rendering.
+#    xserver-xorg-video-amdgpu / -radeon: X11 KMS display drivers.
+#    firmware-amd-graphics: GPU microcode; without it the display may not init.
+#    libdrm-amdgpu1 / libdrm2: kernel DRM interface used by Mesa and X11.
+#    libvulkan1 / mesa-vulkan-drivers: Vulkan, used by YARG and CloneHero.
+# ---------------------------------------------------------------------------
+echo "==> Protecting GPU, display, and audio packages from auto-removal..."
+apt-mark manual \
+    libgl1-mesa-dri \
+    libglx-mesa0 \
+    libgles2-mesa \
+    mesa-vulkan-drivers \
+    libvulkan1 \
+    libdrm2 \
+    libdrm-amdgpu1 \
+    libdrm-radeon1 \
+    xserver-xorg-video-amdgpu \
+    xserver-xorg-video-radeon \
+    xserver-xorg-core \
+    xserver-xorg \
+    firmware-amd-graphics \
+    pulseaudio \
+    pulseaudio-utils \
+    libasound2 \
+    alsa-utils \
+    || true
+
+# Also ensure Mesa and firmware are installed if they were already removed
+echo "==> Ensuring AMD GPU stack is installed..."
+apt-get install -y \
+    libgl1-mesa-dri \
+    libglx-mesa0 \
+    mesa-vulkan-drivers \
+    libvulkan1 \
+    libdrm2 \
+    libdrm-amdgpu1 \
+    xserver-xorg-video-amdgpu \
+    xserver-xorg-core \
+    firmware-amd-graphics \
+    || true
+
+# ---------------------------------------------------------------------------
+# 3. Install Openbox
 # ---------------------------------------------------------------------------
 echo "==> Installing Openbox..."
 apt-get install -y openbox
@@ -113,9 +159,6 @@ apt-get remove -y --auto-remove \
 #    the PulseAudio daemon itself — which Unity/SDL2 games require for audio,
 #    and which also drives USB microphone and USB audio device routing.
 # ---------------------------------------------------------------------------
-echo "==> Protecting pulseaudio from auto-removal (needed by games and USB audio)..."
-apt-mark manual pulseaudio pulseaudio-utils || true
-
 echo "==> Removing Bluetooth GUI and unused BT services..."
 apt-get remove -y --auto-remove \
     blueman \
@@ -355,6 +398,9 @@ echo "   2. Edit ${SESSION_SCRIPT} — set CHARTHUB_SERVER path"
 echo "   3. Reboot to activate the kiosk session"
 echo ""
 echo " Packages intentionally kept:"
+ echo "   libgl1-mesa-dri / mesa-vulkan-drivers — AMD Radeon R5 OpenGL + Vulkan"
+echo "   xserver-xorg-video-amdgpu / firmware-amd-graphics — X11 display driver + GPU firmware"
+echo "   libdrm2 / libdrm-amdgpu1 — kernel DRM interface"
 echo "   bluez        — Bluetooth game controllers"
 echo "   ffmpeg       — game audio/video codecs"
 echo "   dotnet-runtime-8.0 / aspnetcore-runtime-8.0"
