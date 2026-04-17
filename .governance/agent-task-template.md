@@ -18,12 +18,12 @@ Scope:
 2. <item>
 
 Mandatory rule sources (must be read and followed before edits):
-1. AGENTS.md
+1. .governance/AGENTS.md
 2. .github/copilot-instructions.md
-3. architecture.md
+3. .governance/architecture.md
 
 Architecture and boundary requirements (hard constraints):
-1. Enforce strict MVVM boundaries exactly as documented in architecture.md.
+1. Enforce strict MVVM boundaries exactly as documented in .governance/architecture.md.
 2. No IO in ViewModels.
 3. No business logic in Views.
 4. No View/Control dependencies from Services or Configuration.
@@ -72,7 +72,7 @@ Required validation gates (must pass):
 Definition of done:
 1. Build passes with zero warnings and zero errors.
 2. All tests pass.
-3. Changes comply with AGENTS.md, .github/copilot-instructions.md, and architecture.md.
+3. Changes comply with .governance/AGENTS.md, .github/copilot-instructions.md, and .governance/architecture.md.
 4. Final summary includes:
 - Files changed.
 - Why each change was made.

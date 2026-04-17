@@ -46,7 +46,7 @@ dotnet test ChartHub.Tests/ChartHub.Tests.csproj
 
 Repository completion requirements and agent rules are documented in:
 
-- [AGENTS.md](../AGENTS.md)
+- [.governance/AGENTS.md](../.governance/AGENTS.md)
 - [.github/copilot-instructions.md](../.github/copilot-instructions.md)
 
 ## Android Build And Install
@@ -291,6 +291,6 @@ Use the OpenAPI document for the request and response schemas rather than copyin
 
 If you are changing code rather than using the app, start with:
 
-- [architecture.md](../architecture.md)
-- [AGENTS.md](../AGENTS.md)
+- [.governance/architecture.md](../.governance/architecture.md)
+- [.governance/AGENTS.md](../.governance/AGENTS.md)
 - [.github/copilot-instructions.md](../.github/copilot-instructions.md)

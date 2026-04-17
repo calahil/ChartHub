@@ -1,0 +1,88 @@
+site_name: ChartHub
+site_url: https://docs.calahilstudios.com/
+site_description: Install and manage rhythm game song charts for Clone Hero.
+site_author: Calahil Studios
+repo_url: https://github.com/calahilstudios/charthub
+repo_name: calahilstudios/charthub
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mike:
+      alias_type: symlink
+      canonical_version: latest
+
+extra:
+  version:
+    provider: mike
+    default: latest
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/calahilstudios/charthub
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - User Guide:
+    - Getting Started: user-guide/getting-started.md
+    - Install on Windows: user-guide/install-windows.md
+    - Install on Linux: user-guide/install-linux.md
+    - Install on Android: user-guide/install-android.md
+    - Connect to ChartHub Server: user-guide/connect-to-server.md
+    - Song Sources: user-guide/song-sources.md
+    - Clone Hero Conversion: user-guide/clone-hero-conversion.md
+  - Self-Hosting:
+    - ChartHub Server Setup: self-hosting/server-setup.md
+    - Backup API: self-hosting/backup-api.md
+  - Developer:
+    - Architecture: developer/architecture.md
+    - Contributing: developer/contributing.md
+    - API Reference: developer/api-reference.md
+    - ChartHub Hud: developer/hud.md
+    - Self-Hosted Runners: developer/self-hosted-runners.md
+  - Reference:
+    - Changelog: reference/changelog.md

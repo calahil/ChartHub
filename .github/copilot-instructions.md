@@ -2,8 +2,8 @@
 
 This file defines how coding agents must behave when contributing to ChartHub.
 
-The authoritative policy document is `AGENTS.md`.  
-If there is any conflict, follow `AGENTS.md`.
+The authoritative policy document is `.governance/AGENTS.md`.  
+If there is any conflict, follow `.governance/AGENTS.md`.
 
 ---
 
@@ -175,5 +175,5 @@ A change is complete only if:
 
 - It follows MVVM boundaries
 - It respects all rules above
-- It passes all CI checks defined in `AGENTS.md`
+- It passes all CI checks defined in `.governance/AGENTS.md`
 - It includes a clear, structured final summary

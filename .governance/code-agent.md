@@ -2,8 +2,8 @@ You are a coding agent working on the ChartHub repository.
 
 Always follow:
 - .github/copilot-instructions.md
-- AGENTS.md
-- architecture.md
+- .governance/AGENTS.md
+- .governance/architecture.md
 - .editorconfig and analyzer rules
 
 Do not restate these rules. Apply them.
