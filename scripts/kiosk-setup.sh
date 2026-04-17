@@ -51,15 +51,17 @@ fi
 #    AMD Radeon R5 (GCN integrated, APU): Mesa DRI/GLX/Vulkan are the only
 #    OpenGL/Vulkan stack — removing them kills X11 and Unity/SDL2 rendering.
 #    xserver-xorg-video-amdgpu / -radeon: X11 KMS display drivers.
-#    firmware-amd-graphics: GPU microcode; without it the display may not init.
+#    linux-firmware: AMD GPU microcode on Ubuntu (firmware-amd-graphics is
+#                    Debian-only; Ubuntu ships all firmware in linux-firmware).
 #    libdrm-amdgpu1 / libdrm2: kernel DRM interface used by Mesa and X11.
 #    libvulkan1 / mesa-vulkan-drivers: Vulkan, used by YARG and CloneHero.
+#    libgles2: OpenGL ES (libgles2-mesa was merged into libgles2 on Ubuntu 24.04).
 # ---------------------------------------------------------------------------
 echo "==> Protecting GPU, display, and audio packages from auto-removal..."
 apt-mark manual \
     libgl1-mesa-dri \
     libglx-mesa0 \
-    libgles2-mesa \
+    libgles2 \
     mesa-vulkan-drivers \
     libvulkan1 \
     libdrm2 \
@@ -69,7 +71,7 @@ apt-mark manual \
     xserver-xorg-video-radeon \
     xserver-xorg-core \
     xserver-xorg \
-    firmware-amd-graphics \
+    linux-firmware \
     pulseaudio \
     pulseaudio-utils \
     libasound2 \
@@ -81,13 +83,14 @@ echo "==> Ensuring AMD GPU stack is installed..."
 apt-get install -y \
     libgl1-mesa-dri \
     libglx-mesa0 \
+    libgles2 \
     mesa-vulkan-drivers \
     libvulkan1 \
     libdrm2 \
     libdrm-amdgpu1 \
     xserver-xorg-video-amdgpu \
     xserver-xorg-core \
-    firmware-amd-graphics \
+    linux-firmware \
     || true
 
 # ---------------------------------------------------------------------------
@@ -417,7 +420,9 @@ echo "   3. Reboot to activate the kiosk session"
 echo ""
 echo " Packages intentionally kept:"
  echo "   libgl1-mesa-dri / mesa-vulkan-drivers — AMD Radeon R5 OpenGL + Vulkan"
-echo "   xserver-xorg-video-amdgpu / firmware-amd-graphics — X11 display driver + GPU firmware"
+echo "   xserver-xorg-video-amdgpu — X11 KMS display driver for AMD GCN"
+echo "   linux-firmware            — AMD GPU microcode (Ubuntu package)"
+echo "   libgles2 / libgl1-mesa-dri / mesa-vulkan-drivers — Mesa OpenGL + Vulkan"
 echo "   libdrm2 / libdrm-amdgpu1 — kernel DRM interface"
 echo "   bluez        — Bluetooth game controllers"
 echo "   ffmpeg       — game audio/video codecs"
