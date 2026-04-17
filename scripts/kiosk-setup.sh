@@ -7,6 +7,24 @@
 #   - Downgrades from dotnet-sdk to dotnet-runtime only
 #   - Disables LightDM screen lock and screensaver
 #   - Installs the charthub-kiosk X session
+#   - Protects AMD Radeon integrated GPU stack from auto-removal
+#
+# ---------------------------------------------------------------------------
+# Reference hardware (emubox — the machine this script was written for):
+#
+#   OS:     Lubuntu 24.04.3 LTS (Noble Numbat)
+#   CPU:    AMD A9-9400 Radeon R5, 5 Compute Cores 2C+3G @ 2.40 GHz (2 threads)
+#   GPU:    AMD Radeon R5 Graphics (Bristol Ridge, GCN 1.2 integrated APU)
+#           — no discrete GPU; Mesa radeonsi is the only OpenGL/Vulkan stack
+#   RAM:    8 GB DDR4
+#   Audio:  USB microphone + USB e-drum kit (MIDI) + Xbox 360 wireless receiver
+#   Games:  YARG, Clone Hero (Unity/SDL2, require X11 WM + Mesa + PulseAudio)
+#
+# If your hardware differs (e.g. NVIDIA GPU, different CPU, more RAM) review:
+#   - Section 2: GPU/Mesa packages to protect and reinstall
+#   - Section 19: dkms/kernel-headers removal safety check
+#   - Section 7: Bluetooth — remove bluez entirely if no BT controllers
+# ---------------------------------------------------------------------------
 #
 # Based on package inventory from installed.txt (Lubuntu 24.04.3 on emubox).
 # Packages confirmed present before removing; uses --auto-remove throughout.
