@@ -36,13 +36,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Install git-cliff
-        uses: taiki-e/install-action@v2
-        with:
-          tool: git-cliff
-
       - name: Generate changelog
-        run: git-cliff --output docs/reference/changelog.md
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --output docs/reference/changelog.md
 
       - name: Determine version alias
         id: version

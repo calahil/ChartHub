@@ -92,7 +92,8 @@ SERVER_SECRETS=(
 # Repository-level secrets (not scoped to any environment).
 # These are read from the Infisical 'dev' environment and pushed as repo secrets.
 REPO_SECRETS=(
-  TAILSCALE_AUTHKEY
+  TAILSCALE_OAUTH_CLIENT_ID
+  TAILSCALE_OAUTH_CLIENT_SECRET
   GOOGLEDRIVE_ANDROID_CLIENT_ID
   GOOGLEDRIVE_DESKTOP_CLIENT_ID
   GOOGLEDRIVE_DESKTOP_CLIENT_SECRET
