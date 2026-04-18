@@ -14,6 +14,7 @@ public sealed partial class DesktopEntryService(
     IOptions<DesktopEntryOptions> options,
     IWebHostEnvironment environment,
     IHudLifecycleService hudLifecycle,
+    IUnityLaunchOptimizer unityOptimizer,
     ILogger<DesktopEntryService> logger) : IDesktopEntryService
 {
     private static readonly string[] ExecFieldTokensToStrip =
@@ -47,6 +48,7 @@ public sealed partial class DesktopEntryService(
 
     private readonly DesktopEntryOptions _options = options.Value;
     private readonly IHudLifecycleService _hudLifecycle = hudLifecycle;
+    private readonly IUnityLaunchOptimizer _unityOptimizer = unityOptimizer;
     private readonly ILogger<DesktopEntryService> _logger = logger;
     private readonly string _catalogDirectoryPath = ServerContentPathResolver.Resolve(options.Value.CatalogDirectory, environment.ContentRootPath);
     private readonly string _iconCacheDirectoryPath = ServerContentPathResolver.Resolve(options.Value.IconCacheDirectory, environment.ContentRootPath);
@@ -176,6 +178,10 @@ public sealed partial class DesktopEntryService(
             throw new DesktopEntryServiceException(StatusCodes.Status400BadRequest, "invalid_exec", "Desktop entry Exec field is missing or invalid.");
         }
 
+        IReadOnlyDictionary<string, string> launchEnv = await _unityOptimizer
+            .OptimizeAsync(exec.FileName, cancellationToken)
+            .ConfigureAwait(false);
+
         await _hudLifecycle.SuspendAsync(cancellationToken).ConfigureAwait(false);
 
         try
@@ -193,6 +199,11 @@ public sealed partial class DesktopEntryService(
                 },
                 EnableRaisingEvents = true,
             };
+
+            foreach ((string key, string value) in launchEnv)
+            {
+                process.StartInfo.Environment[key] = value;
+            }
 
             foreach (string argument in exec.Arguments)
             {

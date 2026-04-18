@@ -47,6 +47,7 @@ public sealed class DesktopEntryServiceTests
                 }),
                 new TestHostEnvironment(root),
                 NullHudLifecycleService.Instance,
+                NullUnityLaunchOptimizer.Instance,
                 NullLogger<DesktopEntryService>.Instance);
 
             await sut.RefreshCatalogAsync(CancellationToken.None);
@@ -91,6 +92,7 @@ public sealed class DesktopEntryServiceTests
                 }),
                 new TestHostEnvironment(root),
                 NullHudLifecycleService.Instance,
+                NullUnityLaunchOptimizer.Instance,
                 NullLogger<DesktopEntryService>.Instance);
 
             await sut.RefreshCatalogAsync(CancellationToken.None);
@@ -124,6 +126,14 @@ public sealed class DesktopEntryServiceTests
         public Task SuspendAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task ResumeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class NullUnityLaunchOptimizer : IUnityLaunchOptimizer
+    {
+        public static readonly NullUnityLaunchOptimizer Instance = new();
+
+        public Task<IReadOnlyDictionary<string, string>> OptimizeAsync(string executablePath, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>());
     }
 
     private sealed class TestHostEnvironment(string contentRootPath) : IWebHostEnvironment

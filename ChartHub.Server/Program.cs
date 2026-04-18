@@ -26,6 +26,7 @@ builder.Services.Configure<GoogleDriveOptions>(builder.Configuration.GetSection(
 builder.Services.Configure<ServerPathOptions>(builder.Configuration.GetSection(ServerPathOptions.SectionName));
 builder.Services.Configure<DownloadsOptions>(builder.Configuration.GetSection(DownloadsOptions.SectionName));
 builder.Services.Configure<DesktopEntryOptions>(builder.Configuration.GetSection(DesktopEntryOptions.SectionName));
+builder.Services.Configure<UnityLaunchOptions>(builder.Configuration.GetSection(UnityLaunchOptions.SectionName));
 builder.Services.Configure<ServerLoggingOptions>(builder.Configuration.GetSection(ServerLoggingOptions.SectionName));
 builder.Services.Configure<InputOptions>(builder.Configuration.GetSection(InputOptions.SectionName));
 builder.Services.Configure<HudOptions>(builder.Configuration.GetSection(HudOptions.SectionName));
@@ -97,6 +98,7 @@ builder.Services.AddSingleton<IPostProcessingService, PostProcessingService>();
 builder.Services.AddSingleton<ISongIniPatchService, SongIniPatchService>();
 builder.Services.AddSingleton<IDownloadJobInstallService, DownloadJobInstallService>();
 builder.Services.AddSingleton<ICloneHeroLibraryService, CloneHeroLibraryService>();
+builder.Services.AddSingleton<IUnityLaunchOptimizer, UnityLaunchOptimizer>();
 builder.Services.AddSingleton<IDesktopEntryService, DesktopEntryService>();
 builder.Services.AddSingleton<IVolumeService, VolumeService>();
 builder.Services.AddSingleton<IInputConnectionTracker, InputConnectionTracker>();
