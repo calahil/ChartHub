@@ -1,3 +1,6 @@
+using ChartHub.Conversion;
+using ChartHub.Conversion.Models;
+
 using ChartHub.Server.Contracts;
 using ChartHub.Server.Options;
 
@@ -33,7 +36,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
     private readonly string _cloneHeroRoot;
     private readonly string _contentRootPath;
     private readonly IServerInstallFileTypeResolver _fileTypeResolver;
-    private readonly IServerOnyxInstallService _onyxInstallService;
+    private readonly IConversionService _conversionService;
     private readonly IServerSongIniMetadataParser _songIniParser;
     private readonly IServerCloneHeroDirectorySchemaService _schemaService;
     private readonly ILogger<DownloadJobInstallService> _logger;
@@ -43,7 +46,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         IOptions<ServerPathOptions> pathOptions,
         IWebHostEnvironment environment,
         IServerInstallFileTypeResolver fileTypeResolver,
-        IServerOnyxInstallService onyxInstallService,
+        IConversionService conversionService,
         IServerSongIniMetadataParser songIniParser,
         IServerCloneHeroDirectorySchemaService schemaService,
         ILogger<DownloadJobInstallService> logger,
@@ -54,7 +57,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         _stagingDir = ServerContentPathResolver.Resolve(paths.StagingDir, _contentRootPath);
         _cloneHeroRoot = ServerContentPathResolver.Resolve(paths.CloneHeroRoot, _contentRootPath);
         _fileTypeResolver = fileTypeResolver;
-        _onyxInstallService = onyxInstallService;
+        _conversionService = conversionService;
         _songIniParser = songIniParser;
         _schemaService = schemaService;
         _logger = logger;
@@ -99,7 +102,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
                 ServerInstallFileType.Zip or ServerInstallFileType.Rar or ServerInstallFileType.SevenZip
                     => await InstallArchiveAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
                 ServerInstallFileType.Con
-                    => await InstallOnyxAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
+                    => await InstallConAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
                 _ => throw new InvalidOperationException("Unsupported install artifact format."),
             };
 
@@ -156,19 +159,22 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         }
     }
 
-    private async Task<ServerRehomeInstallResult> InstallOnyxAsync(Guid jobId, string artifactPath, string source, CancellationToken cancellationToken)
+    private async Task<ServerRehomeInstallResult> InstallConAsync(Guid jobId, string artifactPath, string source, CancellationToken cancellationToken)
     {
         InstallLog.OnyxInstallStarted(_logger, artifactPath, source);
         _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2108), nameof(DownloadJobInstallService),
-            $"Onyx install started for '{artifactPath}', source '{source}'.", null);
+            $"CON install started for '{artifactPath}', source '{source}'.", null);
 
-        ServerOnyxInstallResult result = await _onyxInstallService.ConvertAsync(artifactPath, source, cancellationToken).ConfigureAwait(false);
+        string outputRoot = Path.Combine(_stagingDir, "con", jobId.ToString("N"));
+        Directory.CreateDirectory(outputRoot);
+        ConversionResult result = await _conversionService.ConvertAsync(artifactPath, outputRoot, cancellationToken).ConfigureAwait(false);
+        ServerSongMetadata serverMetadata = new(result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
 
         InstallLog.OnyxInstallCompleted(_logger, result.OutputDirectory, result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
         _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2109), nameof(DownloadJobInstallService),
-            $"Onyx install finished. Output '{result.OutputDirectory}', artist='{result.Metadata.Artist}', title='{result.Metadata.Title}', charter='{result.Metadata.Charter}'.", null);
+            $"CON install finished. Output '{result.OutputDirectory}', artist='{result.Metadata.Artist}', title='{result.Metadata.Title}', charter='{result.Metadata.Charter}'.", null);
 
-        return await RehomeInstalledDirectoryAsync(jobId, result.OutputDirectory, source, Path.GetFileNameWithoutExtension(artifactPath), cancellationToken, result.Metadata).ConfigureAwait(false);
+        return await RehomeInstalledDirectoryAsync(jobId, result.OutputDirectory, source, Path.GetFileNameWithoutExtension(artifactPath), cancellationToken, serverMetadata).ConfigureAwait(false);
     }
 
     private Task<ServerRehomeInstallResult> RehomeInstalledDirectoryAsync(

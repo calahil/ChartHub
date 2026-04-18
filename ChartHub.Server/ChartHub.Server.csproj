@@ -24,10 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="tools/**">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </None>
+    <ProjectReference Include="..\ChartHub.Conversion\ChartHub.Conversion.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,8 @@
 using System.IO.Compression;
 
+using ChartHub.Conversion;
+using ChartHub.Conversion.Models;
+
 using ChartHub.Server.Contracts;
 using ChartHub.Server.Options;
 using ChartHub.Server.Services;
@@ -307,7 +310,7 @@ public sealed class DownloadJobInstallServiceTests
                 pathOptions,
                 new StubWebHostEnvironment(Root),
                 new StubFileTypeResolver(fileType, cancelOnTypeResolve),
-                new StubOnyxInstallService(),
+                new StubConversionService(),
                 new ServerSongIniMetadataParser(),
                 new ServerCloneHeroDirectorySchemaService(),
                 NullLogger<DownloadJobInstallService>.Instance,
@@ -339,10 +342,10 @@ public sealed class DownloadJobInstallServiceTests
         }
     }
 
-    private sealed class StubOnyxInstallService : IServerOnyxInstallService
+    private sealed class StubConversionService : IConversionService
     {
-        public Task<ServerOnyxInstallResult> ConvertAsync(string songPath, string sourceSuffix, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException("Onyx not supported in unit tests.");
+        public Task<ConversionResult> ConvertAsync(string sourcePath, string outputRoot, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException("CON conversion not supported in unit tests.");
     }
 
     private sealed class StubWebHostEnvironment(string contentRootPath) : IWebHostEnvironment

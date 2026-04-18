@@ -1,6 +1,9 @@
 using System.Text;
 using System.Threading.RateLimiting;
 
+using ChartHub.Conversion;
+using ChartHub.Conversion.Models;
+
 using ChartHub.Server.Endpoints;
 using ChartHub.Server.Options;
 using ChartHub.Server.Services;
@@ -83,7 +86,7 @@ builder.Services.AddSingleton<IInstallConcurrencyLimiter, SemaphoreInstallConcur
 builder.Services.AddSingleton<IServerInstallFileTypeResolver, ServerInstallFileTypeResolver>();
 builder.Services.AddSingleton<IServerSongIniMetadataParser, ServerSongIniMetadataParser>();
 builder.Services.AddSingleton<IServerCloneHeroDirectorySchemaService, ServerCloneHeroDirectorySchemaService>();
-builder.Services.AddSingleton<IServerOnyxInstallService, ServerOnyxInstallService>();
+builder.Services.AddSingleton<IConversionService, ConversionService>();
 builder.Services.AddSingleton<IDownloadJobInstallService, DownloadJobInstallService>();
 builder.Services.AddSingleton<ICloneHeroLibraryService, CloneHeroLibraryService>();
 builder.Services.AddSingleton<IDesktopEntryService, DesktopEntryService>();

@@ -4,14 +4,12 @@ using Microsoft.Extensions.Options;
 
 namespace ChartHub.Server.Services;
 
-public sealed partial class ServerPathValidatorHostedService(
+public sealed class ServerPathValidatorHostedService(
     IOptions<ServerPathOptions> options,
-    IWebHostEnvironment environment,
-    ILogger<ServerPathValidatorHostedService> logger) : IHostedService
+    IWebHostEnvironment environment) : IHostedService
 {
     private readonly ServerPathOptions _options = options.Value;
     private readonly IWebHostEnvironment _environment = environment;
-    private readonly ILogger<ServerPathValidatorHostedService> _logger = logger;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -40,15 +38,6 @@ public sealed partial class ServerPathValidatorHostedService(
         Directory.CreateDirectory(sqliteDir);
         ValidateDirectoryWritable(sqliteDir);
 
-        try
-        {
-            _ = ServerOnyxInstallService.ResolveOnyxExecutablePath();
-        }
-        catch (FileNotFoundException)
-        {
-            LogOnyxExecutableNotFound(_logger);
-        }
-
         return Task.CompletedTask;
     }
 
@@ -65,10 +54,4 @@ public sealed partial class ServerPathValidatorHostedService(
         File.WriteAllText(probePath, "ok");
         File.Delete(probePath);
     }
-
-    [LoggerMessage(
-        EventId = 1001,
-        Level = LogLevel.Warning,
-        Message = "Onyx executable not found in trusted server locations. Expected under tools/onyx rooted at current directory or app base directory.")]
-    private static partial void LogOnyxExecutableNotFound(ILogger logger);
 }

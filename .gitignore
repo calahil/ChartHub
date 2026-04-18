@@ -391,4 +391,5 @@ MigrationBackup/
 FodyWeavers.xsd
 ChartHub.BackupApi/cache
 dev-data/
-merges//site/
+merges/
+/site/
