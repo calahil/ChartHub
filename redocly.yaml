@@ -1,0 +1,10 @@
+extends:
+  - recommended
+
+rules:
+  # Build-time generated docs have no runtime server URL; the spec uses relative url: /
+  # which is valid but the tool still warns. Suppress.
+  no-empty-servers: off
+  # WebSocket endpoints (Input) only produce HTTP 101 Switching Protocols, not a 2xx.
+  # This is correct behaviour; suppress to avoid false positives.
+  operation-2xx-response: warn

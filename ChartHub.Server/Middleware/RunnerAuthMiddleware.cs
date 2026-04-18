@@ -68,10 +68,17 @@ public sealed class RunnerAuthMiddleware
 public static class RunnerAuthMiddlewareExtensions
 {
     /// <summary>
+    /// Marker placed on route groups that require <c>Authorization: Runner {id}:{secret}</c>.
+    /// Detected by the OpenAPI operation transformer to emit the correct security requirement.
+    /// </summary>
+    public sealed class RequiresRunnerAuthMetadata;
+
+    /// <summary>
     /// Applies <see cref="RunnerAuthMiddleware"/> and returns the route group for chaining.
     /// </summary>
     public static RouteGroupBuilder RequireRunnerAuth(this RouteGroupBuilder group)
     {
+        group.WithMetadata(new RequiresRunnerAuthMetadata());
         group.AddEndpointFilter(async (ctx, next) =>
         {
             if (ctx.HttpContext.Items[RunnerAuthMiddleware.RunnerIdKey] is not string)

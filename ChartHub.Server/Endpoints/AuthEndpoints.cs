@@ -75,6 +75,10 @@ public static class AuthEndpoints
             })
             .WithName("ExchangeGoogleToken")
             .WithSummary("Exchange Google ID token for ChartHub JWT")
+            .Produces<AuthExchangeResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .RequireRateLimiting("auth");
 
         return group;

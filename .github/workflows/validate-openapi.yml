@@ -7,10 +7,14 @@ on:
     tags:
       - 'v*'
     paths:
-      - 'openapi.yaml'
+      - 'ChartHub.Server/Endpoints/**'
+      - 'ChartHub.Server/Contracts/**'
+      - 'ChartHub.Server/Program.cs'
   pull_request:
     paths:
-      - 'openapi.yaml'
+      - 'ChartHub.Server/Endpoints/**'
+      - 'ChartHub.Server/Contracts/**'
+      - 'ChartHub.Server/Program.cs'
 
 jobs:
   lint-openapi:
@@ -19,5 +23,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore ChartHub.Server/ChartHub.Server.csproj
+
+      - name: Build
+        run: dotnet build ChartHub.Server/ChartHub.Server.csproj --configuration Release --no-restore
+
       - name: Lint OpenAPI document
-        run: npx --yes @redocly/cli@latest lint openapi.yaml
+        run: npx --yes @redocly/cli@latest lint ChartHub.Server/obj/ChartHub.Server.json

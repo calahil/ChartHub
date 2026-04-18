@@ -6,6 +6,7 @@ using ChartHub.Conversion.Midi;
 using ChartHub.Conversion.Models;
 using ChartHub.Server.Endpoints;
 using ChartHub.Server.Middleware;
+using ChartHub.Server.OpenApi;
 using ChartHub.Server.Options;
 using ChartHub.Server.Services;
 
@@ -111,7 +112,11 @@ builder.Services.AddSingleton<IUinputGamepadService, UinputGamepadService>();
 builder.Services.AddSingleton<IUinputMouseService, UinputMouseService>();
 builder.Services.AddSingleton<IUinputKeyboardService, UinputKeyboardService>();
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<ChartHubDocumentTransformer>();
+    options.AddOperationTransformer<ChartHubOperationTransformer>();
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -186,6 +191,7 @@ app.Use(async (context, next) =>
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
     .WithName("GetChartHubServerHealth")
+    .WithSummary("Check server liveness")
     .WithTags("System");
 
 app.MapAuthEndpoints();

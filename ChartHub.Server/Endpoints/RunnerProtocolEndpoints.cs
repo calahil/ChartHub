@@ -70,7 +70,10 @@ public static class RunnerProtocolEndpoints
             }
         })
         .WithName("RegisterRunner")
-        .WithSummary("Exchange a one-time registration token for a permanent runner identity.");
+        .WithSummary("Exchange a one-time registration token for a permanent runner identity.")
+        .Produces<RegisterRunnerResponse>(StatusCodes.Status200OK)
+        .ProducesProblem(StatusCodes.Status400BadRequest)
+        .ProducesProblem(StatusCodes.Status401Unauthorized);
 
         // All other routes require runner authentication.
         RouteGroupBuilder authedGroup = app

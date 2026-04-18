@@ -375,6 +375,7 @@ public sealed class DownloadEndpointsIntegrationTests
             builder.Services.AddSingleton<IInstallConcurrencyLimiter, SemaphoreInstallConcurrencyLimiter>();
             builder.Services.AddSingleton<IJobLogSink>(logSink ?? new NullJobLogSink());
             builder.Services.AddSingleton<ICloneHeroLibraryService>(new NullCloneHeroLibraryService());
+            builder.Services.AddSingleton<ITranscriptionJobStore>(new NullTranscriptionJobStore());
 
             WebApplication app = builder.Build();
             app.UseAuthentication();
@@ -691,6 +692,30 @@ public sealed class DownloadEndpointsIntegrationTests
         public void Add(Guid jobId, LogLevel level, EventId eventId, string? category, string message, string? exception) { }
 
         public IReadOnlyList<JobLogEntry> GetLogs(Guid jobId) => [];
+    }
+
+    private sealed class NullTranscriptionJobStore : ITranscriptionJobStore
+    {
+        public TranscriptionJob CreateJob(string songId, string songFolderPath, TranscriptionAggressiveness aggressiveness, int attemptNumber = 1)
+            => throw new NotSupportedException();
+
+        public TranscriptionJob? TryClaimNext(string runnerId) => null;
+
+        public void UpdateStatus(string jobId, TranscriptionJobStatus status, string? failureReason = null) { }
+
+        public void MarkCompleted(string jobId, string midiFilePath) { }
+
+        public IReadOnlyList<TranscriptionJob> ListJobs(string? songId = null, TranscriptionJobStatus? status = null) => [];
+
+        public TranscriptionJob? GetJob(string jobId) => null;
+
+        public bool DeleteJob(string jobId) => false;
+
+        public TranscriptionResult? GetLatestApprovedResult(string songId) => null;
+
+        public IReadOnlyList<TranscriptionResult> ListResults(string? songId = null) => [];
+
+        public void ApproveResult(string resultId) { }
     }
 
     private sealed class StubJobLogSink : IJobLogSink
