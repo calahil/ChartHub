@@ -625,6 +625,137 @@ public class ApiClientServiceTests
         Assert.Equal("GHL Artist", results[0].Artist);
     }
 
+    [Fact]
+    public async Task GetSongFilesAsync_InstrumentPresence_SetsHasAndRatedFlags()
+    {
+        using var httpClient = new HttpClient(new StubHttpMessageHandler((_, _) => throw new InvalidOperationException()))
+        {
+            BaseAddress = new Uri("https://rhythmverse.co"),
+        };
+
+        ApiClientService sut = CreateService(
+            configurationValues: new Dictionary<string, string?>
+            {
+                ["UseMockData"] = "True",
+                ["rhythmverseToken"] = "token-test",
+            },
+            httpClient,
+            loadEmbeddedMockData: () => BuildInstrumentPresenceResponseJson(),
+            resolveMockDataPath: () => null);
+
+        IReadOnlyList<ViewSong> results = await sut.GetSongFilesAsync(
+            search: false,
+            searchString: string.Empty,
+            sort: "downloads",
+            order: "desc",
+            instrument: [],
+            authorText: string.Empty);
+
+        Assert.Equal(5, results.Count);
+
+        // Song 0: guitar DrumsClass → HasGuitar=true, GuitarRated=true; all others absent.
+        ViewSong guitarOnly = results[0];
+        Assert.True(guitarOnly.HasGuitar);
+        Assert.True(guitarOnly.GuitarRated);
+        Assert.False(guitarOnly.HasDrums);
+        Assert.False(guitarOnly.HasBass);
+        Assert.False(guitarOnly.HasVocals);
+        Assert.False(guitarOnly.HasKeys);
+
+        // Song 1: guitarghl DrumsClass → rolls up to HasGuitar=true, GuitarRated=true.
+        ViewSong ghlOnly = results[1];
+        Assert.True(ghlOnly.HasGuitar);
+        Assert.True(ghlOnly.GuitarRated);
+        Assert.False(ghlOnly.HasBass);
+        Assert.False(ghlOnly.HasVocals);
+
+        // Song 2: drums DrumsClass, bass/vocals empty [] → HasDrums+Rated=true, HasBass=true+Rated=false,
+        //          vocals_lyrics_only=0 but vocals is [] → HasVocals=false.
+        ViewSong drumsAndBassUnrated = results[2];
+        Assert.True(drumsAndBassUnrated.HasDrums);
+        Assert.True(drumsAndBassUnrated.DrumRated);
+        Assert.True(drumsAndBassUnrated.HasBass);
+        Assert.False(drumsAndBassUnrated.BassRated);
+        Assert.False(drumsAndBassUnrated.HasVocals); // vocals [] + lyrics_only=0 → still absent
+        Assert.False(drumsAndBassUnrated.HasGuitar);
+        Assert.False(drumsAndBassUnrated.HasKeys);
+
+        // Song 3: vocals DrumsClass with lyrics_only=0 → HasVocals=true, VocalRated=true.
+        ViewSong withVocals = results[3];
+        Assert.True(withVocals.HasVocals);
+        Assert.True(withVocals.VocalRated);
+
+        // Song 4: vocals DrumsClass with lyrics_only=1 → HasVocals=false.
+        ViewSong lyricsOnly = results[4];
+        Assert.False(lyricsOnly.HasVocals);
+        Assert.True(lyricsOnly.HasGuitar); // guitar is still present
+    }
+
+    private static string BuildInstrumentPresenceResponseJson()
+    {
+        return """
+        {
+          "status": "ok",
+          "data": {
+            "records": { "total_available": 5, "total_filtered": 5, "returned": 5 },
+            "pagination": { "start": 0, "records": "25", "page": "1" },
+            "songs": [
+              {
+                "data": { "artist": "Guitar Only", "title": "T1", "album": "A", "year": 2020, "genre": "Rock", "song_length": 180 },
+                "file": {
+                  "file_id": "f1", "file_name": "f1.zip", "file_artist": "Guitar Only", "file_title": "T1",
+                  "download_url": "https://example.com/f1.zip", "gameformat": "ch",
+                  "vocals_lyrics_only": 1,
+                  "author": { "name": "Charter" },
+                  "difficulties": { "guitar": { "e": 1, "m": 2, "h": 3, "x": 4, "all": 4 } }
+                }
+              },
+              {
+                "data": { "artist": "GHL Only", "title": "T2", "album": "A", "year": 2020, "genre": "Rock", "song_length": 180 },
+                "file": {
+                  "file_id": "f2", "file_name": "f2.zip", "file_artist": "GHL Only", "file_title": "T2",
+                  "download_url": "https://example.com/f2.zip", "gameformat": "ch",
+                  "vocals_lyrics_only": 1,
+                  "author": { "name": "Charter" },
+                  "difficulties": { "guitarghl": { "e": 1, "m": 2, "h": 3, "x": 4, "all": 4 } }
+                }
+              },
+              {
+                "data": { "artist": "Drums Rated Bass Unrated", "title": "T3", "album": "A", "year": 2020, "genre": "Rock", "song_length": 180 },
+                "file": {
+                  "file_id": "f3", "file_name": "f3.zip", "file_artist": "Drums Rated Bass Unrated", "file_title": "T3",
+                  "download_url": "https://example.com/f3.zip", "gameformat": "ch",
+                  "vocals_lyrics_only": 0,
+                  "author": { "name": "Charter" },
+                  "difficulties": { "drums": { "e": 1, "m": 2, "h": 3, "x": 4, "all": 4 }, "bass": [], "vocals": [] }
+                }
+              },
+              {
+                "data": { "artist": "With Vocals", "title": "T4", "album": "A", "year": 2020, "genre": "Rock", "song_length": 180 },
+                "file": {
+                  "file_id": "f4", "file_name": "f4.zip", "file_artist": "With Vocals", "file_title": "T4",
+                  "download_url": "https://example.com/f4.zip", "gameformat": "ch",
+                  "vocals_lyrics_only": 0,
+                  "author": { "name": "Charter" },
+                  "difficulties": { "guitar": { "x": 1 }, "vocals": { "e": 1, "m": 2, "h": 3, "x": 4, "all": 4 } }
+                }
+              },
+              {
+                "data": { "artist": "Lyrics Only", "title": "T5", "album": "A", "year": 2020, "genre": "Rock", "song_length": 180 },
+                "file": {
+                  "file_id": "f5", "file_name": "f5.zip", "file_artist": "Lyrics Only", "file_title": "T5",
+                  "download_url": "https://example.com/f5.zip", "gameformat": "ch",
+                  "vocals_lyrics_only": 1,
+                  "author": { "name": "Charter" },
+                  "difficulties": { "guitar": { "x": 1 }, "vocals": { "e": 1, "m": 2, "h": 3, "x": 4, "all": 4 } }
+                }
+              }
+            ]
+          }
+        }
+        """;
+    }
+
     private static string BuildDifficultiesAsObjectsResponseJson()
     {
         return """

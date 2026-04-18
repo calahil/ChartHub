@@ -67,6 +67,30 @@ public partial class SongRatingControl : UserControl
     public static readonly StyledProperty<int> KeysStringProperty =
         AvaloniaProperty.Register<SongRatingControl, int>(nameof(KeysString), defaultValue: 0);
 
+    // Instrument presence — whether each row should be shown at all.
+    public static readonly StyledProperty<bool> HasDrumsProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(nameof(HasDrums), defaultValue: true);
+    public static readonly StyledProperty<bool> HasGuitarProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(nameof(HasGuitar), defaultValue: true);
+    public static readonly StyledProperty<bool> HasBassProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(nameof(HasBass), defaultValue: true);
+    public static readonly StyledProperty<bool> HasVocalsProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(nameof(HasVocals), defaultValue: true);
+    public static readonly StyledProperty<bool> HasKeysProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(nameof(HasKeys), defaultValue: true);
+
+    // Rated flags — true when tier data is present, false when instrument exists but has no tiers ([]).
+    public static readonly StyledProperty<bool> DrumRatedProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(nameof(DrumRated), defaultValue: true);
+    public static readonly StyledProperty<bool> GuitarRatedProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(nameof(GuitarRated), defaultValue: true);
+    public static readonly StyledProperty<bool> BassRatedProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(nameof(BassRated), defaultValue: true);
+    public static readonly StyledProperty<bool> VocalRatedProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(nameof(VocalRated), defaultValue: true);
+    public static readonly StyledProperty<bool> KeysRatedProperty =
+        AvaloniaProperty.Register<SongRatingControl, bool>(nameof(KeysRated), defaultValue: true);
+
     public ViewSong RhythmSong
     {
         get => (ViewSong)GetValue(RhythmSongProperty);
@@ -145,6 +169,66 @@ public partial class SongRatingControl : UserControl
         private set => SetValue(KeysStringProperty, value);
     }
 
+    public bool HasDrums
+    {
+        get => GetValue(HasDrumsProperty);
+        private set => SetValue(HasDrumsProperty, value);
+    }
+
+    public bool HasGuitar
+    {
+        get => GetValue(HasGuitarProperty);
+        private set => SetValue(HasGuitarProperty, value);
+    }
+
+    public bool HasBass
+    {
+        get => GetValue(HasBassProperty);
+        private set => SetValue(HasBassProperty, value);
+    }
+
+    public bool HasVocals
+    {
+        get => GetValue(HasVocalsProperty);
+        private set => SetValue(HasVocalsProperty, value);
+    }
+
+    public bool HasKeys
+    {
+        get => GetValue(HasKeysProperty);
+        private set => SetValue(HasKeysProperty, value);
+    }
+
+    public bool DrumRated
+    {
+        get => GetValue(DrumRatedProperty);
+        private set => SetValue(DrumRatedProperty, value);
+    }
+
+    public bool GuitarRated
+    {
+        get => GetValue(GuitarRatedProperty);
+        private set => SetValue(GuitarRatedProperty, value);
+    }
+
+    public bool BassRated
+    {
+        get => GetValue(BassRatedProperty);
+        private set => SetValue(BassRatedProperty, value);
+    }
+
+    public bool VocalRated
+    {
+        get => GetValue(VocalRatedProperty);
+        private set => SetValue(VocalRatedProperty, value);
+    }
+
+    public bool KeysRated
+    {
+        get => GetValue(KeysRatedProperty);
+        private set => SetValue(KeysRatedProperty, value);
+    }
+
     // ── Property change handling ──────────────────────────────────────────
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
@@ -167,6 +251,9 @@ public partial class SongRatingControl : UserControl
             BassString = e.BassDifficulty ?? 0;
             VocalString = e.VocalsDifficulty ?? 0;
             KeysString = e.KeysDifficulty ?? 0;
+            // EncoreSong always shows all rows (no presence filtering).
+            HasDrums = true; HasGuitar = true; HasBass = true; HasVocals = true; HasKeys = true;
+            DrumRated = true; GuitarRated = true; BassRated = true; VocalRated = true; KeysRated = true;
         }
         else if (song is ViewSong sv)
         {
@@ -175,6 +262,16 @@ public partial class SongRatingControl : UserControl
             BassString = sv.BassString;
             VocalString = sv.VocalString;
             KeysString = sv.KeysString;
+            HasDrums = sv.HasDrums;
+            HasGuitar = sv.HasGuitar;
+            HasBass = sv.HasBass;
+            HasVocals = sv.HasVocals;
+            HasKeys = sv.HasKeys;
+            DrumRated = sv.DrumRated;
+            GuitarRated = sv.GuitarRated;
+            BassRated = sv.BassRated;
+            VocalRated = sv.VocalRated;
+            KeysRated = sv.KeysRated;
         }
         else
         {
@@ -184,6 +281,16 @@ public partial class SongRatingControl : UserControl
             BassString = rv.BassString;
             VocalString = rv.VocalString;
             KeysString = rv.KeysString;
+            HasDrums = rv.HasDrums;
+            HasGuitar = rv.HasGuitar;
+            HasBass = rv.HasBass;
+            HasVocals = rv.HasVocals;
+            HasKeys = rv.HasKeys;
+            DrumRated = rv.DrumRated;
+            GuitarRated = rv.GuitarRated;
+            BassRated = rv.BassRated;
+            VocalRated = rv.VocalRated;
+            KeysRated = rv.KeysRated;
         }
     }
 

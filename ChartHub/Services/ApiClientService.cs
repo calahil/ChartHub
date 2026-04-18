@@ -370,6 +370,7 @@ public class ApiClientService : INotifyPropertyChanged
                                 songView.BassString = GiveMeRatingsNow(song, "bass");
                                 songView.VocalString = GiveMeRatingsNow(song, "vocals");
                                 songView.KeysString = GiveMeRatingsNow(song, "keys");
+                                ResolveInstrumentPresence(song.File, songView);
 
                                 string gameFormat = song.File.Gameformat ?? string.Empty;
                                 if (_gameFormatMetadata.TryGetValue(gameFormat, out List<string>? value))
@@ -740,6 +741,34 @@ public class ApiClientService : INotifyPropertyChanged
             default:
                 return 0;
         }
+    }
+
+    private static void ResolveInstrumentPresence(FileData file, ViewSong songView)
+    {
+        Difficulties diff = file.Difficulties;
+        if (diff == null)
+        {
+            // No difficulties key in payload — leave all Has*/Rated defaults (true) intact.
+            return;
+        }
+
+        bool drumPresent = diff.Drums != null;
+        bool guitarPresent = diff.Guitar != null || diff.Guitarghl != null;
+        bool bassPresent = diff.Bass != null;
+        // Vocals: shown only when lyrics_only=0 AND value has tier data (DrumsClass, not empty []).
+        bool vocalsPresent = file.VocalsLyricsOnly != 1 && diff.Vocals is DrumsClass;
+        bool keysPresent = diff.Keys != null || diff.Prokeys != null;
+
+        songView.HasDrums = drumPresent;
+        songView.DrumRated = diff.Drums is DrumsClass;
+        songView.HasGuitar = guitarPresent;
+        songView.GuitarRated = diff.Guitar is DrumsClass || diff.Guitarghl is DrumsClass;
+        songView.HasBass = bassPresent;
+        songView.BassRated = diff.Bass is DrumsClass;
+        songView.HasVocals = vocalsPresent;
+        songView.VocalRated = vocalsPresent; // by definition: vocals requires DrumsClass to be present
+        songView.HasKeys = keysPresent;
+        songView.KeysRated = diff.Keys is DrumsClass || diff.Prokeys is DrumsClass;
     }
 
 
