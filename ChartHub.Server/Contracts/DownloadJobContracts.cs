@@ -13,6 +13,12 @@ public sealed class CreateDownloadJobRequest
 
     [MaxLength(2048)]
     public required string SourceUrl { get; init; }
+
+    /// <summary>
+    /// When true the server will auto-queue an AI drum transcription job after install
+    /// for songs whose source has no drum track.
+    /// </summary>
+    public bool DrumGenRequested { get; init; }
 }
 
 public sealed class DownloadJobResponse
@@ -52,6 +58,9 @@ public sealed class DownloadJobResponse
     public string? Error { get; init; }
 
     public string? FileType { get; init; }
+
+    /// <summary>Whether AI drum generation was requested for this job.</summary>
+    public bool DrumGenRequested { get; init; }
 
     public required DateTimeOffset CreatedAtUtc { get; init; }
 

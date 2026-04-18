@@ -104,6 +104,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     source_md5,
                     source_chart_hash,
                     installed_relative_path,
+                    drum_gen_requested,
                     created_at_utc,
                     updated_at_utc
                 ) VALUES (
@@ -121,6 +122,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     NULL,
                     NULL,
                     NULL,
+                    $drumGenRequested,
                     $createdAtUtc,
                     $updatedAtUtc
                 );
@@ -132,6 +134,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             command.Parameters.AddWithValue("$sourceUrl", request.SourceUrl);
             command.Parameters.AddWithValue("$stage", "Queued");
             command.Parameters.AddWithValue("$progressPercent", 0d);
+            command.Parameters.AddWithValue("$drumGenRequested", request.DrumGenRequested ? 1 : 0);
             command.Parameters.AddWithValue("$createdAtUtc", now.ToString("O"));
             command.Parameters.AddWithValue("$updatedAtUtc", now.ToString("O"));
             command.ExecuteNonQuery();
@@ -167,7 +170,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     error,
                     created_at_utc,
                     updated_at_utc,
-                    file_type
+                    file_type,
+                    drum_gen_requested
                 FROM download_jobs
                 ORDER BY updated_at_utc DESC;
                 """;
@@ -210,7 +214,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     error,
                     created_at_utc,
                     updated_at_utc,
-                    file_type
+                    file_type,
+                    drum_gen_requested
                 FROM download_jobs
                 WHERE job_id = $jobId
                 LIMIT 1;
@@ -304,7 +309,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     error,
                     created_at_utc,
                     updated_at_utc,
-                    file_type
+                    file_type,
+                    drum_gen_requested
                 FROM download_jobs
                 WHERE stage = 'Queued'
                 ORDER BY created_at_utc ASC
@@ -413,7 +419,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     error,
                     created_at_utc,
                     updated_at_utc,
-                    file_type
+                    file_type,
+                    drum_gen_requested
                 FROM download_jobs
                 WHERE stage = 'Downloaded'
                   AND (file_type IS NULL OR file_type = 'Unknown')
@@ -643,6 +650,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             EnsureColumnExists(connection, "source_md5", "TEXT NULL");
             EnsureColumnExists(connection, "source_chart_hash", "TEXT NULL");
             EnsureColumnExists(connection, "file_type", "TEXT NULL");
+            EnsureColumnExists(connection, "drum_gen_requested", "INTEGER NOT NULL DEFAULT 0");
 
             using SqliteCommand migrateLegacy = connection.CreateCommand();
             migrateLegacy.CommandText = """
@@ -750,6 +758,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             CreatedAtUtc = DateTimeOffset.Parse(reader.GetString(17)),
             UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(18)),
             FileType = reader.FieldCount > 19 && !reader.IsDBNull(19) ? reader.GetString(19) : null,
+            DrumGenRequested = reader.FieldCount > 20 && reader.GetInt32(20) != 0,
         };
     }
 

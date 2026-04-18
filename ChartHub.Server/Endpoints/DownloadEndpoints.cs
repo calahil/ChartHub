@@ -80,6 +80,7 @@ public static partial class DownloadEndpoints
                 ICloneHeroLibraryService cloneHeroLibraryService,
                 IInstallConcurrencyLimiter concurrencyLimiter,
                 IHostApplicationLifetime lifetime,
+                ITranscriptionJobStore transcriptionJobStore,
                 ILogger<DownloadInstallEndpointLogCategory> logger) =>
             {
                 if (!store.TryGet(jobId, out DownloadJobResponse? job) || job is null)
@@ -107,7 +108,7 @@ public static partial class DownloadEndpoints
                 DownloadEndpointLog.InstallRequestStarted(logger, job.JobId, job.Source, job.SourceId, job.DisplayName, job.DownloadedPath);
                 store.UpdateProgress(jobId, "InstallQueued", 88);
 
-                _ = Task.Run(() => ProcessInstallInBackgroundAsync(job.JobId, store, installService, cloneHeroLibraryService, concurrencyLimiter, lifetime.ApplicationStopping, logger));
+                _ = Task.Run(() => ProcessInstallInBackgroundAsync(job.JobId, store, installService, cloneHeroLibraryService, concurrencyLimiter, transcriptionJobStore, lifetime.ApplicationStopping, logger));
 
                 if (!store.TryGet(jobId, out DownloadJobResponse? queuedJob) || queuedJob is null)
                 {
@@ -225,6 +226,7 @@ public static partial class DownloadEndpoints
         IDownloadJobInstallService installService,
         ICloneHeroLibraryService cloneHeroLibraryService,
         IInstallConcurrencyLimiter concurrencyLimiter,
+        ITranscriptionJobStore transcriptionJobStore,
         CancellationToken cancellationToken,
         ILogger logger)
     {
@@ -265,6 +267,12 @@ public static partial class DownloadEndpoints
                 InstalledRelativePath: installResult.InstalledRelativePath));
 
             DownloadEndpointLog.InstallRequestSucceeded(logger, job.JobId, installResult.StagedPath, installResult.InstalledPath);
+
+            // If drum generation was requested and no approved result exists, enqueue a transcription job.
+            if (job.DrumGenRequested && transcriptionJobStore.GetLatestApprovedResult(job.JobId.ToString()) is null)
+            {
+                transcriptionJobStore.CreateJob(job.JobId.ToString(), installResult.InstalledPath, TranscriptionAggressiveness.Medium);
+            }
         }
         catch (Exception ex)
         {

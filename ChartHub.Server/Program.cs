@@ -2,7 +2,10 @@ using System.Text;
 using System.Threading.RateLimiting;
 
 using ChartHub.Conversion;
+using ChartHub.Conversion.Midi;
 using ChartHub.Conversion.Models;
+
+using ChartHub.Server.Middleware;
 
 using ChartHub.Server.Endpoints;
 using ChartHub.Server.Options;
@@ -87,6 +90,11 @@ builder.Services.AddSingleton<IServerInstallFileTypeResolver, ServerInstallFileT
 builder.Services.AddSingleton<IServerSongIniMetadataParser, ServerSongIniMetadataParser>();
 builder.Services.AddSingleton<IServerCloneHeroDirectorySchemaService, ServerCloneHeroDirectorySchemaService>();
 builder.Services.AddSingleton<IConversionService, ConversionService>();
+builder.Services.AddSingleton<IDrumMidiMerger, DrumMidiMerger>();
+builder.Services.AddSingleton<ITranscriptionRunnerRegistry, TranscriptionRunnerRegistry>();
+builder.Services.AddSingleton<ITranscriptionJobStore, TranscriptionJobStore>();
+builder.Services.AddSingleton<IPostProcessingService, PostProcessingService>();
+builder.Services.AddSingleton<ISongIniPatchService, SongIniPatchService>();
 builder.Services.AddSingleton<IDownloadJobInstallService, DownloadJobInstallService>();
 builder.Services.AddSingleton<ICloneHeroLibraryService, CloneHeroLibraryService>();
 builder.Services.AddSingleton<IDesktopEntryService, DesktopEntryService>();
@@ -163,6 +171,10 @@ app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSecond
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
+app.UseWhen(
+    ctx => ctx.Request.Path.StartsWithSegments("/api/v1/runner") &&
+           !ctx.Request.Path.StartsWithSegments("/api/v1/runner/register"),
+    branch => branch.UseMiddleware<RunnerAuthMiddleware>());
 
 app.Use(async (context, next) =>
 {
@@ -183,6 +195,9 @@ app.MapDesktopEntryEndpoints();
 app.MapVolumeEndpoints();
 app.MapInputEndpoints();
 app.MapHudStatusEndpoints();
+app.MapRunnerManagementEndpoints();
+app.MapRunnerProtocolEndpoints();
+app.MapTranscriptionEndpoints();
 
 app.Run();
 

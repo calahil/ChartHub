@@ -26,3 +26,20 @@ public sealed class CloneHeroSongResponse
 
     public required DateTimeOffset UpdatedAtUtc { get; init; }
 }
+
+/// <summary>Partial update request for song.ini metadata. All fields are optional.</summary>
+public sealed class SongIniPatchRequest
+{
+    public string? Artist { get; init; }
+
+    public string? Title { get; init; }
+
+    public string? Charter { get; init; }
+
+    public string? Genre { get; init; }
+
+    public int? Year { get; init; }
+
+    /// <summary>Overall band difficulty (-1 = unset, 0–6 = Easy…Expert+).</summary>
+    public int? DifficultyBand { get; init; }
+}

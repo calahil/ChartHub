@@ -20,6 +20,8 @@ public sealed class ServerPathValidatorHostedService(
             ResolvePath(_options.DownloadsDir),
             ResolvePath(_options.StagingDir),
             ResolvePath(_options.CloneHeroRoot),
+            ResolvePath(_options.CloneHeroPostProcessRoot),
+            ResolvePath(_options.CloneHeroArchiveRoot),
         ];
 
         foreach (string path in requiredPaths)
