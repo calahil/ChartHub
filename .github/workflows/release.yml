@@ -375,10 +375,8 @@ jobs:
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-          tags: tag:ci
-          version: latest
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          args: --accept-routes
 
       - name: Setup SSH
         env:
@@ -524,10 +522,8 @@ jobs:
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-          tags: tag:ci
-          version: latest
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          args: --accept-routes
 
       - name: Setup SSH
         env:
@@ -696,10 +692,8 @@ jobs:
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-          tags: tag:ci
-          version: latest
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          args: --accept-routes
 
       - name: Setup SSH
         env:
@@ -900,10 +894,8 @@ jobs:
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-          tags: tag:ci
-          version: latest
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          args: --accept-routes
 
       - name: Setup SSH
         env:
@@ -1149,10 +1141,8 @@ jobs:
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-          tags: tag:ci
-          version: latest
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          args: --accept-routes
 
       - name: Setup SSH
         env:
@@ -1397,10 +1387,8 @@ jobs:
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
-          tags: tag:ci
-          version: latest
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          args: --accept-routes
 
       - name: Setup SSH
         env:

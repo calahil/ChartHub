@@ -158,6 +158,21 @@ Releases are created by pushing a `vMAJOR.MINOR.PATCH` tag (for example `v1.2.0`
 
 ---
 
+## CI Secrets Policy
+
+When modifying a CI workflow step that depends on a secret, agents must:
+
+1. Identify every GitHub environment the job runs under (check the `environment:` key on the job).
+2. Verify the secret is present in `scripts/sync-github-secrets.sh` for **each** of those environments:
+   - Secrets needed by `dev`, `staging`, `production` jobs → must be in `COMMON_SECRETS`.
+   - Secrets needed by `server-dev`, `server-staging`, `server-production` jobs → must be in `SERVER_SECRETS`.
+   - Secrets shared by all environments → add to **both** `COMMON_SECRETS` and `SERVER_SECRETS`.
+3. Do not rely on `REPO_SECRETS` as a substitute for environment-scoped secrets in environment-gated jobs. GitHub does not guarantee repo-level secrets are available in environment-scoped jobs.
+4. The sync script update and the workflow change must be in the same commit.
+5. After updating the sync script, instruct the user to run `scripts/sync-github-secrets.sh` to push the new secrets to GitHub.
+
+---
+
 ## Security Policy
 
 Agents must follow these rules on all production code changes:
