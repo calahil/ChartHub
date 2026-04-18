@@ -1,7 +1,9 @@
 ﻿
+using System;
 using System.ComponentModel;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 using Avalonia.Platform;
 
@@ -151,7 +153,14 @@ public class ApiClientService : INotifyPropertyChanged
         _currentPage = 1;
     }
 
-    public async Task<IReadOnlyList<ViewSong>> GetSongFilesAsync(bool search, string searchString, string sort, string order, List<InstrumentItem> instrument, string authorText)
+    public async Task<IReadOnlyList<ViewSong>> GetSongFilesAsync(
+        bool search,
+        string searchString,
+        string sort,
+        string order,
+        List<InstrumentItem> instrument,
+        string authorText,
+        CancellationToken cancellationToken = default)
     {
         Uri baseUri = ResolveBaseUri(_configuration);
         string baseUrl = baseUri.AbsoluteUri.TrimEnd('/');
@@ -161,251 +170,221 @@ public class ApiClientService : INotifyPropertyChanged
             CurrentPage = 1;
             HasMoreRecords = true;
         }
+
+        string endpoint = string.IsNullOrEmpty(searchString)
+            ? "api/all/songfiles/list"
+            : "api/all/songfiles/search/live";
+
         try
         {
-            string endpoint;
-
+            var collection = new List<KeyValuePair<string, string>>();
+            foreach (InstrumentItem item in instrument)
+            {
+                if (!string.IsNullOrEmpty(item.Value))
+                {
+                    collection.Add(new("instrument", item.Value));
+                }
+            }
+            if (!string.IsNullOrEmpty(authorText))
+            {
+                collection.Add(new("author", authorText));
+            }
+            collection.Add(new("sort[0][sort_by]", sort));
+            collection.Add(new("sort[0][sort_order]", order));
+            collection.Add(new("data_type", "full"));
             if (!string.IsNullOrEmpty(searchString))
             {
-                endpoint = "api/all/songfiles/search/live";
+                collection.Add(new("text", searchString));
+            }
+            collection.Add(new("page", $"{CurrentPage}"));
+            collection.Add(new("records", $"{RecordsPerPage}"));
+            var content = new FormUrlEncodedContent(collection);
+
+            string responseBody = await FetchResponseBodyAsync(baseUri, endpoint, content, cancellationToken).ConfigureAwait(false);
+
+            var decodedResponse = RootResponse.FromJson(responseBody);
+            var pageItems = new List<ViewSong>();
+
+            if (decodedResponse?.Data != null)
+            {
+                TotalResults = decodedResponse.Data.Records.TotalFiltered;
+                TotalPages = TotalResults / RecordsPerPage;
+                if ((TotalResults % RecordsPerPage) > 0)
+                {
+                    TotalPages++;
+                }
+
+                if (decodedResponse.Data.Pagination.Start + 1 > 0)
+                {
+                    StartRecord = decodedResponse.Data.Pagination.Start + 1;
+                    EndRecord = StartRecord + RecordsPerPage - 1;
+                }
+
+                foreach (Song song in decodedResponse.Data.Songs)
+                {
+                    if (song?.File is not FileData songFile)
+                    {
+                        continue;
+                    }
+
+                    string downloadUrl = ResolvePreferredDownloadUrl(songFile);
+                    if (downloadUrl.StartsWith("http://marketplace.xbox.com") || downloadUrl.StartsWith("https://store.xbox.com/"))
+                    {
+                        continue;
+                    }
+
+                    ViewSong? songView = MapSong(song, songFile, downloadUrl, baseUrl, baseUri);
+                    if (songView != null)
+                    {
+                        pageItems.Add(songView);
+                    }
+                }
+
+                HasMoreRecords = CurrentPage < TotalPages;
             }
             else
             {
-                endpoint = "api/all/songfiles/list";
+                HasMoreRecords = false;
             }
 
-            try
-            {
-
-                var pageItems = new List<ViewSong>();
-
-                var collection = new List<KeyValuePair<string, string>>();
-                foreach (InstrumentItem item in instrument)
-                {
-
-                    if (!string.IsNullOrEmpty(item.Value))
-                    {
-                        collection.Add(new("instrument", $"{item.Value}"));
-                    }
-                }
-                if (!string.IsNullOrEmpty(authorText))
-                {
-                    collection.Add(new("author", $"{authorText}"));
-                }
-                collection.Add(new("sort[0][sort_by]", $"{sort}"));
-                collection.Add(new("sort[0][sort_order]", $"{order}"));
-                collection.Add(new("data_type", "full"));
-                if (!string.IsNullOrEmpty(searchString))
-                {
-                    collection.Add(new("text", $"{searchString}"));
-                }
-                collection.Add(new("page", $"{CurrentPage}"));
-                collection.Add(new("records", $"{RecordsPerPage}"));
-                var content = new FormUrlEncodedContent(collection);
-
-                string responseBody;
-
-                bool useMockData = IsMockDataEnabled(_configuration);
-
-                if (useMockData)
-                {
-                    responseBody = _loadEmbeddedMockData() ?? string.Empty;
-
-                    if (string.IsNullOrEmpty(responseBody))
-                    {
-                        string? mockDataPath = _resolveMockDataPath();
-                        if (mockDataPath != null)
-                        {
-                            responseBody = await File.ReadAllTextAsync(mockDataPath);
-                        }
-                    }
-
-                    if (string.IsNullOrEmpty(responseBody))
-                    {
-                        Logger.LogInfo("Api", "Mock data file was not found; falling back to live API");
-                        HttpResponseMessage response = await _httpClient.PostAsync(new Uri(baseUri, endpoint), content);
-                        response.EnsureSuccessStatusCode();
-                        responseBody = await response.Content.ReadAsStringAsync();
-                    }
-                }
-                else
-                {
-                    HttpResponseMessage response = await _httpClient.PostAsync(new Uri(baseUri, endpoint), content);
-                    response.EnsureSuccessStatusCode();
-                    responseBody = await response.Content.ReadAsStringAsync();
-                }
-                var DecodedResponse = RootResponse.FromJson(responseBody);
-
-                if (DecodedResponse != null && DecodedResponse.Data != null)
-                {
-                    TotalResults = DecodedResponse.Data.Records.TotalFiltered;
-                    TotalPages = TotalResults / RecordsPerPage;
-                    if ((TotalResults % RecordsPerPage) > 0)
-                    {
-                        TotalPages++;
-                    }
-
-                    if (DecodedResponse.Data.Pagination.Start + 1 > 0)
-                    {
-                        StartRecord = DecodedResponse.Data.Pagination.Start + 1;
-                        EndRecord = StartRecord + RecordsPerPage - 1;
-                    }
-
-                    foreach (Song song in DecodedResponse.Data.Songs)
-                    {
-                        if (song != null)
-                        {
-                            FileData? songFile = song.File;
-                            if (songFile is null)
-                            {
-                                continue;
-                            }
-
-                            string downloadUrl = ResolvePreferredDownloadUrl(songFile);
-                            if (!downloadUrl.StartsWith("http://marketplace.xbox.com") && !downloadUrl.StartsWith("https://store.xbox.com/"))
-                            {
-                                var songView = new ViewSong();
-                                DataData? songData = song.Data.DataData;
-
-                                if (songData != null)
-                                {
-                                    songView.Artist = songFile.FileArtist as string ?? songData.Artist ?? songFile.Filename ?? "Unknown";
-                                    songView.Title = songFile.FileTitle as string ?? songData.Title ?? songFile.Filename ?? "Unknown";
-                                    songView.Album = songFile.FileAlbum as string ?? songData.Album ?? songFile.Filename ?? "Unknown";
-                                    songView.Downloads = songFile.Downloads != 0 ? songFile.Downloads : songData.Downloads;
-                                    songView.Comments = songFile.Comments ?? 0;
-
-                                    if (songData.SongLength > 0)
-                                    {
-                                        songView.SongLength = songData.SongLength;
-                                    }
-                                    else
-                                    {
-                                        songView.SongLength = songFile.SongLength;
-                                    }
-                                    songView.Genre = songData.Genre ?? songFile.FileGenre ?? "Music";
-                                    songView.Year = songData.Year.ToString() ?? songFile.FileYear.ToString() ?? "1955";
-                                }
-                                else
-                                {
-                                    songView.Artist = songFile.FileArtist as string ?? songFile.Filename ?? "Unknown";
-                                    songView.Title = songFile.FileTitle as string ?? songFile.Filename ?? "Unknown";
-                                    songView.Album = songFile.FileAlbum as string ?? songFile.Filename ?? "Unknown";
-                                    songView.Downloads = songFile.Downloads != 0 ? songFile.Downloads : 0;
-                                    songView.Comments = songFile.Comments ?? 0;
-                                    songView.Year = songFile.FileYear.ToString() ?? "1955";
-                                    songView.Genre = songFile.FileGenre ?? "Music";
-
-                                    if (songFile.SongLength > 0)
-                                    {
-                                        songView.SongLength = songFile.SongLength;
-                                    }
-                                    else
-                                    {
-                                        songView.SongLength = songFile.FileSongLength as long?;
-                                    }
-                                }
-                                songView.FileName = songFile.FileName ?? songFile.Filename ?? "missing";
-                                songView.FileSize = songFile.Size;
-
-                                string? apiAlbumArt = songData?.AlbumArt.String;
-                                string? fileAlbumArt = songFile.AlbumArt;
-                                string? image = !string.IsNullOrWhiteSpace(apiAlbumArt)
-                                    ? apiAlbumArt
-                                    : (!string.IsNullOrWhiteSpace(fileAlbumArt) ? fileAlbumArt : null);
-
-                                if (image != null && !string.IsNullOrWhiteSpace(image))
-                                {
-                                    if (!image.StartsWith("http", StringComparison.OrdinalIgnoreCase)
-                                        && !image.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        image = CombineWithBaseUrl(baseUrl, image);
-                                    }
-                                    songView.AlbumArt = image;
-                                }
-                                else
-                                {
-                                    songView.AlbumArt = "avares://ChartHub/Resources/Images/noalbumart.svg";
-                                }
-
-                                songView.FormattedTime = Toolbox.ConvertSecondstoText(songView.SongLength);
-
-                                Author author = song.File.Author ?? new Author();
-
-                                string avatarPath = author.AvatarPath;
-                                if (avatarPath != null)
-                                {
-                                    if (!avatarPath.StartsWith("http"))
-                                    {
-                                        avatarPath = CombineWithBaseUrl(baseUrl, avatarPath);
-                                    }
-
-                                    author.AvatarPath = avatarPath;
-                                }
-                                else
-                                {
-                                    author.AvatarPath = "avares://ChartHub/Resources/Images/blankprofile.svg";
-                                }
-
-                                songView.Author = author;
-
-                                if (!downloadUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    songView.DownloadLink = CombineWithBaseUrl(baseUrl, downloadUrl);
-                                }
-                                else
-                                {
-                                    songView.DownloadLink = RewriteExternalDownloadUrl(baseUri, downloadUrl);
-                                }
-
-                                songView.SourceName = LibrarySourceNames.RhythmVerse;
-                                songView.SourceId = !string.IsNullOrWhiteSpace(songFile.FileId)
-                                    ? songFile.FileId
-                                    : (!string.IsNullOrWhiteSpace(songFile.FileName)
-                                        ? songFile.FileName
-                                        : songView.DownloadLink);
-
-                                songView.DrumString = GiveMeRatingsNow(song, "drums");
-                                songView.GuitarString = GiveMeRatingsNow(song, "guitar");
-                                songView.BassString = GiveMeRatingsNow(song, "bass");
-                                songView.VocalString = GiveMeRatingsNow(song, "vocals");
-                                songView.KeysString = GiveMeRatingsNow(song, "keys");
-                                ResolveInstrumentPresence(song.File, songView);
-
-                                string gameFormat = song.File.Gameformat ?? string.Empty;
-                                if (_gameFormatMetadata.TryGetValue(gameFormat, out List<string>? value))
-                                {
-                                    songView.Gameformat = value[1];
-                                }
-
-                                pageItems.Add(songView);
-                            }
-                        }
-                    }
-
-                    HasMoreRecords = CurrentPage < TotalPages;
-
-                }
-                else
-                {
-                    HasMoreRecords = false;
-                }
-                return pageItems;
-            }
-
-            catch (HttpRequestException e)
-            {
-                Logger.LogError("Api", "Request error while loading song data", e);
-                return Array.Empty<ViewSong>();
-            }
+            return pageItems;
         }
-
-
+        catch (HttpRequestException e)
+        {
+            Logger.LogError("Api", "Request error while loading song data", e);
+            return Array.Empty<ViewSong>();
+        }
         catch (Exception ex)
         {
             Logger.LogError("Api", "Unexpected error while loading song data", ex);
             return Array.Empty<ViewSong>();
         }
+    }
+
+    private async Task<string> FetchResponseBodyAsync(Uri baseUri, string endpoint, FormUrlEncodedContent content, CancellationToken cancellationToken)
+    {
+        bool useMockData = IsMockDataEnabled(_configuration);
+
+        if (useMockData)
+        {
+            string? responseBody = _loadEmbeddedMockData();
+
+            if (string.IsNullOrEmpty(responseBody))
+            {
+                string? mockDataPath = _resolveMockDataPath();
+                if (mockDataPath != null)
+                {
+                    responseBody = await File.ReadAllTextAsync(mockDataPath, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(responseBody))
+            {
+                return responseBody;
+            }
+
+            Logger.LogInfo("Api", "Mock data file was not found; falling back to live API");
+        }
+
+        HttpResponseMessage response = await _httpClient.PostAsync(new Uri(baseUri, endpoint), content, cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private ViewSong? MapSong(Song song, FileData songFile, string downloadUrl, string baseUrl, Uri baseUri)
+    {
+        var songView = new ViewSong();
+        DataData? songData = song.Data.DataData;
+
+        if (songData != null)
+        {
+            songView.Artist = songFile.FileArtist as string ?? songData.Artist ?? songFile.Filename ?? "Unknown";
+            songView.Title = songFile.FileTitle as string ?? songData.Title ?? songFile.Filename ?? "Unknown";
+            songView.Album = songFile.FileAlbum as string ?? songData.Album ?? songFile.Filename ?? "Unknown";
+            songView.Downloads = songFile.Downloads != 0 ? songFile.Downloads : songData.Downloads;
+            songView.Comments = songFile.Comments ?? 0;
+            songView.SongLength = songData.SongLength > 0 ? songData.SongLength : songFile.SongLength;
+            songView.Genre = songData.Genre ?? songFile.FileGenre ?? "Music";
+            songView.Year = songData.Year.ToString() ?? songFile.FileYear.ToString() ?? "1955";
+        }
+        else
+        {
+            songView.Artist = songFile.FileArtist as string ?? songFile.Filename ?? "Unknown";
+            songView.Title = songFile.FileTitle as string ?? songFile.Filename ?? "Unknown";
+            songView.Album = songFile.FileAlbum as string ?? songFile.Filename ?? "Unknown";
+            songView.Downloads = songFile.Downloads != 0 ? songFile.Downloads : 0;
+            songView.Comments = songFile.Comments ?? 0;
+            songView.Year = songFile.FileYear.ToString() ?? "1955";
+            songView.Genre = songFile.FileGenre ?? "Music";
+            songView.SongLength = songFile.SongLength > 0 ? songFile.SongLength : songFile.FileSongLength as long?;
+        }
+
+        songView.FileName = songFile.FileName ?? songFile.Filename ?? "missing";
+        songView.FileSize = songFile.Size;
+
+        string? apiAlbumArt = songData?.AlbumArt.String;
+        string? fileAlbumArt = songFile.AlbumArt;
+        string? image = !string.IsNullOrWhiteSpace(apiAlbumArt)
+            ? apiAlbumArt
+            : (!string.IsNullOrWhiteSpace(fileAlbumArt) ? fileAlbumArt : null);
+
+        if (!string.IsNullOrWhiteSpace(image))
+        {
+            if (!image.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                && !image.StartsWith("avares://", StringComparison.OrdinalIgnoreCase))
+            {
+                image = CombineWithBaseUrl(baseUrl, image);
+            }
+            songView.AlbumArt = image;
+        }
+        else
+        {
+            songView.AlbumArt = "avares://ChartHub/Resources/Images/noalbumart.svg";
+        }
+
+        songView.FormattedTime = Toolbox.ConvertSecondstoText(songView.SongLength);
+
+        Author author = song.File.Author ?? new Author();
+        string avatarPath = author.AvatarPath;
+        if (avatarPath != null)
+        {
+            if (!avatarPath.StartsWith("http"))
+            {
+                avatarPath = CombineWithBaseUrl(baseUrl, avatarPath);
+            }
+            author.AvatarPath = avatarPath;
+        }
+        else
+        {
+            author.AvatarPath = "avares://ChartHub/Resources/Images/blankprofile.svg";
+        }
+        songView.Author = author;
+
+        songView.DownloadLink = downloadUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+            ? RewriteExternalDownloadUrl(baseUri, downloadUrl)
+            : CombineWithBaseUrl(baseUrl, downloadUrl);
+
+        songView.SourceName = LibrarySourceNames.RhythmVerse;
+        songView.SourceId = !string.IsNullOrWhiteSpace(songFile.FileId)
+            ? songFile.FileId
+            : (!string.IsNullOrWhiteSpace(songFile.FileName)
+                ? songFile.FileName
+                : songView.DownloadLink);
+
+        songView.DrumString = GiveMeRatingsNow(song, "drums");
+        songView.GuitarString = GiveMeRatingsNow(song, "guitar");
+        songView.BassString = GiveMeRatingsNow(song, "bass");
+        songView.VocalString = GiveMeRatingsNow(song, "vocals");
+        songView.KeysString = GiveMeRatingsNow(song, "keys");
+        ResolveInstrumentPresence(song.File, songView);
+
+        string gameFormat = song.File.Gameformat ?? string.Empty;
+        if (_gameFormatMetadata.TryGetValue(gameFormat, out List<string>? value))
+        {
+            songView.Gameformat = value[1];
+        }
+
+        return songView;
     }
 
     private static HttpClient CreateHttpClient(IConfiguration configuration)
@@ -415,6 +394,7 @@ public class ApiClientService : INotifyPropertyChanged
             BaseAddress = ResolveBaseUri(configuration)
         };
         httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", configuration["rhythmverseToken"]);
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("ChartHub/1.0 (https://github.com/calahil/rhythmverse-client)");
         return httpClient;
     }
 

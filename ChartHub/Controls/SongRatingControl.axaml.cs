@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 using Avalonia;
@@ -246,14 +247,10 @@ public partial class SongRatingControl : UserControl
         object? song = Song;
         if (song is EncoreSong e)
         {
-            DrumString = e.DrumsDifficulty ?? 0;
-            GuitarString = e.GuitarDifficulty ?? 0;
-            BassString = e.BassDifficulty ?? 0;
-            VocalString = e.VocalsDifficulty ?? 0;
-            KeysString = e.KeysDifficulty ?? 0;
-            // EncoreSong always shows all rows (no presence filtering).
-            HasDrums = true; HasGuitar = true; HasBass = true; HasVocals = true; HasKeys = true;
-            DrumRated = true; GuitarRated = true; BassRated = true; VocalRated = true; KeysRated = true;
+            EncoreInstrumentRatings r = ResolveEncoreInstrumentRatings(e);
+            HasDrums = r.HasDrums; HasGuitar = r.HasGuitar; HasBass = r.HasBass; HasVocals = r.HasVocals; HasKeys = r.HasKeys;
+            DrumRated = r.DrumRated; GuitarRated = r.GuitarRated; BassRated = r.BassRated; VocalRated = r.VocalRated; KeysRated = r.KeysRated;
+            DrumString = r.DrumString; GuitarString = r.GuitarString; BassString = r.BassString; VocalString = r.VocalString; KeysString = r.KeysString;
         }
         else if (song is ViewSong sv)
         {
@@ -298,4 +295,69 @@ public partial class SongRatingControl : UserControl
     {
         InitializeComponent();
     }
+
+    /// <summary>
+    /// Computes instrument presence and rated flags for an Encore song.
+    /// Extracted as a pure static method to allow unit testing without Avalonia.
+    /// </summary>
+    public static EncoreInstrumentRatings ResolveEncoreInstrumentRatings(EncoreSong e)
+    {
+        // Guitar family: guitar, guitarghl, guitar_coop, rhythm all share one row.
+        bool hasGuitar = e.GuitarDifficulty != null || e.GuitarGhlDifficulty != null
+            || e.GuitarCoopDifficulty != null || e.RhythmDifficulty != null;
+        int guitarValue = e.GuitarDifficulty ?? e.GuitarGhlDifficulty ?? e.GuitarCoopDifficulty ?? e.RhythmDifficulty ?? 0;
+
+        // Bass family: bass + bassghl share one row.
+        bool hasBass = e.BassDifficulty != null || e.BassGhlDifficulty != null;
+        int bassValue = e.BassDifficulty ?? e.BassGhlDifficulty ?? 0;
+
+        // Drums family: drums + real drums share one row.
+        bool hasDrums = e.DrumsDifficulty != null || e.RealDrumsDifficulty != null;
+        int drumsValue = e.DrumsDifficulty ?? e.RealDrumsDifficulty ?? 0;
+
+        bool hasVocals = e.VocalsDifficulty != null;
+        int vocalsValue = e.VocalsDifficulty ?? 0;
+
+        bool hasKeys = e.KeysDifficulty != null;
+        int keysValue = e.KeysDifficulty ?? 0;
+
+        return new EncoreInstrumentRatings
+        {
+            HasDrums = hasDrums,
+            HasGuitar = hasGuitar,
+            HasBass = hasBass,
+            HasVocals = hasVocals,
+            HasKeys = hasKeys,
+            // Rated = charted AND has a real tier (>= 0). Value -1 = charted but unrated → shows "—".
+            DrumRated = hasDrums && drumsValue >= 0,
+            GuitarRated = hasGuitar && guitarValue >= 0,
+            BassRated = hasBass && bassValue >= 0,
+            VocalRated = hasVocals && vocalsValue >= 0,
+            KeysRated = hasKeys && keysValue >= 0,
+            DrumString = Math.Max(0, drumsValue),
+            GuitarString = Math.Max(0, guitarValue),
+            BassString = Math.Max(0, bassValue),
+            VocalString = Math.Max(0, vocalsValue),
+            KeysString = Math.Max(0, keysValue),
+        };
+    }
+}
+
+public sealed class EncoreInstrumentRatings
+{
+    public bool HasDrums { get; init; }
+    public bool HasGuitar { get; init; }
+    public bool HasBass { get; init; }
+    public bool HasVocals { get; init; }
+    public bool HasKeys { get; init; }
+    public bool DrumRated { get; init; }
+    public bool GuitarRated { get; init; }
+    public bool BassRated { get; init; }
+    public bool VocalRated { get; init; }
+    public bool KeysRated { get; init; }
+    public int DrumString { get; init; }
+    public int GuitarString { get; init; }
+    public int BassString { get; init; }
+    public int VocalString { get; init; }
+    public int KeysString { get; init; }
 }

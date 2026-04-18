@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
+using ChartHub.Controls;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
@@ -782,5 +783,131 @@ public class EncoreViewModelTests
             SettingsChanged?.Invoke(Current);
             return Task.CompletedTask;
         }
+    }
+}
+
+[Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.Unit)]
+public class EncoreInstrumentRatingsTests
+{
+    [Fact]
+    public void AllNull_HidesAllInstruments()
+    {
+        var song = new EncoreSong();
+        EncoreInstrumentRatings r = SongRatingControl.ResolveEncoreInstrumentRatings(song);
+
+        Assert.False(r.HasDrums);
+        Assert.False(r.HasGuitar);
+        Assert.False(r.HasBass);
+        Assert.False(r.HasVocals);
+        Assert.False(r.HasKeys);
+    }
+
+    [Fact]
+    public void GuitarDifficulty_Rated_SetsHasAndRated()
+    {
+        var song = new EncoreSong { GuitarDifficulty = 3 };
+        EncoreInstrumentRatings r = SongRatingControl.ResolveEncoreInstrumentRatings(song);
+
+        Assert.True(r.HasGuitar);
+        Assert.True(r.GuitarRated);
+        Assert.Equal(3, r.GuitarString);
+        Assert.False(r.HasBass);
+        Assert.False(r.HasDrums);
+    }
+
+    [Fact]
+    public void GuitarGhlDifficulty_RollsUpToGuitarRow()
+    {
+        var song = new EncoreSong { GuitarGhlDifficulty = 2 };
+        EncoreInstrumentRatings r = SongRatingControl.ResolveEncoreInstrumentRatings(song);
+
+        Assert.True(r.HasGuitar);
+        Assert.True(r.GuitarRated);
+        Assert.Equal(2, r.GuitarString);
+    }
+
+    [Fact]
+    public void BassGhlDifficulty_RollsUpToBassRow()
+    {
+        var song = new EncoreSong { BassGhlDifficulty = 1 };
+        EncoreInstrumentRatings r = SongRatingControl.ResolveEncoreInstrumentRatings(song);
+
+        Assert.True(r.HasBass);
+        Assert.True(r.BassRated);
+        Assert.Equal(1, r.BassString);
+    }
+
+    [Fact]
+    public void RealDrumsDifficulty_RollsUpToDrumsRow()
+    {
+        var song = new EncoreSong { RealDrumsDifficulty = 4 };
+        EncoreInstrumentRatings r = SongRatingControl.ResolveEncoreInstrumentRatings(song);
+
+        Assert.True(r.HasDrums);
+        Assert.True(r.DrumRated);
+        Assert.Equal(4, r.DrumString);
+    }
+
+    [Fact]
+    public void DiffMinusOne_ShowsRowButUnrated()
+    {
+        // diff = -1 means charted but no tier assigned → show "—" (HasX=true, *Rated=false).
+        var song = new EncoreSong
+        {
+            GuitarDifficulty = -1,
+            DrumsDifficulty = -1,
+            BassDifficulty = -1,
+            VocalsDifficulty = -1,
+            KeysDifficulty = -1,
+        };
+        EncoreInstrumentRatings r = SongRatingControl.ResolveEncoreInstrumentRatings(song);
+
+        Assert.True(r.HasGuitar);
+        Assert.False(r.GuitarRated);
+        Assert.Equal(0, r.GuitarString); // clamped to 0
+
+        Assert.True(r.HasDrums);
+        Assert.False(r.DrumRated);
+
+        Assert.True(r.HasBass);
+        Assert.False(r.BassRated);
+
+        Assert.True(r.HasVocals);
+        Assert.False(r.VocalRated);
+
+        Assert.True(r.HasKeys);
+        Assert.False(r.KeysRated);
+    }
+
+    [Fact]
+    public void GuitarCoop_AndRhythm_ContributeToGuitarRow()
+    {
+        var song = new EncoreSong { GuitarCoopDifficulty = 2, RhythmDifficulty = 3 };
+        EncoreInstrumentRatings r = SongRatingControl.ResolveEncoreInstrumentRatings(song);
+
+        Assert.True(r.HasGuitar);
+        Assert.True(r.GuitarRated);
+        // Primary guitar is null, so fallback chains: null ?? null ?? 2
+        Assert.Equal(2, r.GuitarString);
+    }
+
+    [Fact]
+    public void FullBand_AllRated_SetsAllFlags()
+    {
+        var song = new EncoreSong
+        {
+            GuitarDifficulty = 4,
+            BassDifficulty = 3,
+            DrumsDifficulty = 5,
+            VocalsDifficulty = 2,
+            KeysDifficulty = 1,
+        };
+        EncoreInstrumentRatings r = SongRatingControl.ResolveEncoreInstrumentRatings(song);
+
+        Assert.True(r.HasGuitar && r.GuitarRated);
+        Assert.True(r.HasBass && r.BassRated);
+        Assert.True(r.HasDrums && r.DrumRated);
+        Assert.True(r.HasVocals && r.VocalRated);
+        Assert.True(r.HasKeys && r.KeysRated);
     }
 }
