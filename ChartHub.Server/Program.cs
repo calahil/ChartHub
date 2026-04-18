@@ -4,10 +4,8 @@ using System.Threading.RateLimiting;
 using ChartHub.Conversion;
 using ChartHub.Conversion.Midi;
 using ChartHub.Conversion.Models;
-
-using ChartHub.Server.Middleware;
-
 using ChartHub.Server.Endpoints;
+using ChartHub.Server.Middleware;
 using ChartHub.Server.Options;
 using ChartHub.Server.Services;
 

@@ -1,8 +1,8 @@
 using ChartHub.Server.Contracts;
 using ChartHub.Server.Services;
 
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ChartHub.Server.Endpoints;
 
