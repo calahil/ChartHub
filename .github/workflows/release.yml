@@ -93,7 +93,7 @@ jobs:
   build-desktop:
     name: Publish desktop (${{ matrix.rid }})
     if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
-    runs-on: [self-hosted, linux, charthub-build]
+    runs-on: ubuntu-latest
     needs: [classify, validate]
     strategy:
       fail-fast: true
@@ -101,6 +101,10 @@ jobs:
         rid: [linux-x64, win-x64]
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
 
       - name: Restore
         run: dotnet restore ChartHub/ChartHub.csproj -r ${{ matrix.rid }} /p:TargetFramework=net10.0
@@ -186,7 +190,7 @@ jobs:
 
   build-api-image:
     name: Build and push Backup API image
-    runs-on: [self-hosted, linux, charthub-host]
+    runs-on: ubuntu-latest
     needs: [classify, validate]
     outputs:
       image_digest: ${{ steps.push.outputs.digest }}
@@ -259,10 +263,14 @@ jobs:
   build-server-bundle:
     name: Publish ChartHub.Server (linux-x64)
     if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
-    runs-on: [self-hosted, linux, charthub-build]
+    runs-on: ubuntu-latest
     needs: [classify, validate]
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
 
       - name: Restore
         run: dotnet restore ChartHub.Server/ChartHub.Server.csproj -r linux-x64
@@ -358,19 +366,47 @@ jobs:
   deploy-dev:
     name: Deploy Backup API to dev
     if: needs.classify.outputs.release_channel == 'dev'
-    runs-on: [self-hosted, linux, charthub-host]
+    runs-on: ubuntu-latest
     needs: [classify, build-api-image]
     environment: dev
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
-      - name: Write env file
+      - name: Setup SSH
         env:
+          SSH_PRIVATE_KEY: ${{ secrets.BACKUP_API_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p "$EFFECTIVE_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Log in to GHCR on host
+        env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          printf '%s\n' "$GH_TOKEN" | ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker login ghcr.io -u '${GH_ACTOR}' --password-stdin"
+
+      - name: Write and transfer env file
+        env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
           BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api:${{ needs.classify.outputs.image_tag }}
           PSQL_CONTAINER_NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
           PSQL_PORT: ${{ secrets.PSQL_PORT }}
@@ -402,16 +438,31 @@ jobs:
           printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
           printenv DB_VOLUME            | xargs -I{} printf 'DB_VOLUME=%s\n' "{}" >> .env.deploy
           printenv BACKUP_API_KEY       | xargs -I{} printf 'BACKUP_API_KEY=%s\n' "{}" >> .env.deploy
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_PORT" -o BatchMode=yes \
+            docker-compose.yml .env.deploy "${SSH_USER}@${SSH_HOST}:/tmp/"
+          rm -f .env.deploy
 
       - name: Pull and deploy
+        env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
         run: |
-          docker compose --project-name charthub-dev --env-file .env.deploy pull backup-api
-          docker compose --project-name charthub-dev --env-file .env.deploy up -d --no-build backup-api
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            docker compose -f /tmp/docker-compose.yml --project-name charthub-dev --env-file /tmp/.env.deploy pull backup-api
+            docker compose -f /tmp/docker-compose.yml --project-name charthub-dev --env-file /tmp/.env.deploy up -d --no-build backup-api
+          "
 
       - name: Verify health
         env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
           API_PORT: ${{ secrets.API_PORT }}
         run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
           EFFECTIVE_API_PORT="${API_PORT:-5147}"
           if [[ -z "${API_PORT:-}" ]]; then
             echo "API_PORT secret is not set; using compose default port ${EFFECTIVE_API_PORT}"
@@ -422,34 +473,44 @@ jobs:
           fi
 
           for i in $(seq 1 24); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${EFFECTIVE_API_PORT}/health" 2>/dev/null || echo "000")
+            STATUS=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/health 2>/dev/null || echo 000")
             if [[ "$STATUS" == "200" ]]; then
               break
             fi
             if [[ "$i" == "24" ]]; then
               echo "Dev /health check failed on port ${EFFECTIVE_API_PORT}"
-              docker compose --project-name charthub-dev ps || true
-              docker compose --project-name charthub-dev logs --tail 200 backup-api || true
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "docker compose --project-name charthub-dev ps || true; docker compose --project-name charthub-dev logs --tail 200 backup-api || true"
               exit 1
             fi
             sleep 5
           done
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync" 2>/dev/null || echo "000")
+          HTTP=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync 2>/dev/null || echo 000")
           if [[ "$HTTP" != "200" ]]; then
             echo "Dev sync health check failed on port ${EFFECTIVE_API_PORT}"
-            docker compose --project-name charthub-dev ps || true
-            docker compose --project-name charthub-dev logs --tail 200 backup-api || true
+            ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "docker compose --project-name charthub-dev ps || true; docker compose --project-name charthub-dev logs --tail 200 backup-api || true"
             exit 1
           fi
 
-      - name: Clean up env file
+      - name: Clean up
         if: always()
-        run: rm -f .env.deploy
+        env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "rm -f /tmp/.env.deploy /tmp/docker-compose.yml" || true
+          rm -f ~/.ssh/deploy_key
 
   deploy-staging:
     name: Deploy Backup API to staging
     if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
-    runs-on: [self-hosted, linux, charthub-host]
+    runs-on: ubuntu-latest
     needs: [classify, build-api-image]
     outputs:
       staged_image_ref: ${{ steps.capture-staged-image.outputs.staged_image_ref }}
@@ -457,13 +518,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
-      - name: Write env file
+      - name: Setup SSH
         env:
+          SSH_PRIVATE_KEY: ${{ secrets.BACKUP_API_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p "$EFFECTIVE_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Log in to GHCR on host
+        env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          printf '%s\n' "$GH_TOKEN" | ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker login ghcr.io -u '${GH_ACTOR}' --password-stdin"
+
+      - name: Write and transfer env file
+        env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
           BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
           PSQL_CONTAINER_NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
           PSQL_PORT: ${{ secrets.PSQL_PORT }}
@@ -495,16 +584,31 @@ jobs:
           printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
           printenv DB_VOLUME            | xargs -I{} printf 'DB_VOLUME=%s\n' "{}" >> .env.deploy
           printenv BACKUP_API_KEY       | xargs -I{} printf 'BACKUP_API_KEY=%s\n' "{}" >> .env.deploy
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_PORT" -o BatchMode=yes \
+            docker-compose.yml .env.deploy "${SSH_USER}@${SSH_HOST}:/tmp/"
+          rm -f .env.deploy
 
       - name: Pull and deploy
+        env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
         run: |
-          docker compose --project-name charthub-staging --env-file .env.deploy pull backup-api
-          docker compose --project-name charthub-staging --env-file .env.deploy up -d --no-build backup-api
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            docker compose -f /tmp/docker-compose.yml --project-name charthub-staging --env-file /tmp/.env.deploy pull backup-api
+            docker compose -f /tmp/docker-compose.yml --project-name charthub-staging --env-file /tmp/.env.deploy up -d --no-build backup-api
+          "
 
       - name: Verify health
         env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
           API_PORT: ${{ secrets.API_PORT }}
         run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
           EFFECTIVE_API_PORT="${API_PORT:-5147}"
           if [[ -z "${API_PORT:-}" ]]; then
             echo "API_PORT secret is not set; using compose default port ${EFFECTIVE_API_PORT}"
@@ -515,34 +619,43 @@ jobs:
           fi
 
           for i in $(seq 1 24); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${EFFECTIVE_API_PORT}/health" 2>/dev/null || echo "000")
+            STATUS=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/health 2>/dev/null || echo 000")
             if [[ "$STATUS" == "200" ]]; then
               break
             fi
             if [[ "$i" == "24" ]]; then
               echo "Staging /health check failed on port ${EFFECTIVE_API_PORT}"
-              docker compose --project-name charthub-staging ps || true
-              docker compose --project-name charthub-staging logs --tail 200 backup-api || true
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "docker compose --project-name charthub-staging ps || true; docker compose --project-name charthub-staging logs --tail 200 backup-api || true"
               exit 1
             fi
             sleep 5
           done
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync" 2>/dev/null || echo "000")
+          HTTP=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync 2>/dev/null || echo 000")
           if [[ "$HTTP" != "200" ]]; then
             echo "Staging sync health check failed on port ${EFFECTIVE_API_PORT}"
-            docker compose --project-name charthub-staging ps || true
-            docker compose --project-name charthub-staging logs --tail 200 backup-api || true
+            ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "docker compose --project-name charthub-staging ps || true; docker compose --project-name charthub-staging logs --tail 200 backup-api || true"
             exit 1
           fi
 
       - name: Verify staged image digest
         id: capture-staged-image
         env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
           EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
         run: |
-          EXPECTED_IMAGE_ID=$(docker image inspect "$EXPECTED_IMAGE_REF" --format '{{ .Id }}')
-          ACTUAL_IMAGE_ID=$(docker inspect charthub-staging-backup-api --format '{{ .Image }}')
-          ACTUAL_IMAGE_REF=$(docker inspect charthub-staging-backup-api --format '{{ .Config.Image }}')
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          EXPECTED_IMAGE_ID=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker image inspect '${EXPECTED_IMAGE_REF}' --format '{{ .Id }}'")
+          ACTUAL_IMAGE_ID=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker inspect charthub-staging-backup-api --format '{{ .Image }}'")
+          ACTUAL_IMAGE_REF=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker inspect charthub-staging-backup-api --format '{{ .Config.Image }}'")
           if [[ "$ACTUAL_IMAGE_ID" != "$EXPECTED_IMAGE_ID" ]]; then
             echo "Staging deployed unexpected image"
             echo "Expected: $EXPECTED_IMAGE_REF"
@@ -553,23 +666,44 @@ jobs:
           fi
           echo "staged_image_ref=$EXPECTED_IMAGE_REF" >> "$GITHUB_OUTPUT"
 
-      - name: Clean up env file
+      - name: Clean up
         if: always()
-        run: rm -f .env.deploy
+        env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "rm -f /tmp/.env.deploy /tmp/docker-compose.yml" || true
+          rm -f ~/.ssh/deploy_key
 
   deploy-production:
     name: Deploy Backup API to production
     if: needs.classify.outputs.release_channel == 'stable'
-    runs-on: [self-hosted, linux, charthub-host]
+    runs-on: ubuntu-latest
     needs: [classify, build-api-image, deploy-staging]
     environment: production
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.BACKUP_API_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-            docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p "$EFFECTIVE_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Verify promotion digest from staging
         env:
@@ -587,8 +721,23 @@ jobs:
             exit 1
           fi
 
-      - name: Write env file
+      - name: Log in to GHCR on host
         env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          printf '%s\n' "$GH_TOKEN" | ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker login ghcr.io -u '${GH_ACTOR}' --password-stdin"
+
+      - name: Write and transfer env file
+        env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
           BACKUP_API_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
           PSQL_CONTAINER_NAME: ${{ secrets.PSQL_CONTAINER_NAME }}
           PSQL_PORT: ${{ secrets.PSQL_PORT }}
@@ -620,16 +769,31 @@ jobs:
           printenv BACKUP_SYNC_ENABLED  | xargs -I{} printf 'BACKUP_SYNC_ENABLED=%s\n' "{}" >> .env.deploy
           printenv DB_VOLUME            | xargs -I{} printf 'DB_VOLUME=%s\n' "{}" >> .env.deploy
           printenv BACKUP_API_KEY       | xargs -I{} printf 'BACKUP_API_KEY=%s\n' "{}" >> .env.deploy
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_PORT" -o BatchMode=yes \
+            docker-compose.yml .env.deploy "${SSH_USER}@${SSH_HOST}:/tmp/"
+          rm -f .env.deploy
 
       - name: Pull and deploy
+        env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
         run: |
-          docker compose --project-name charthub-prod --env-file .env.deploy pull backup-api
-          docker compose --project-name charthub-prod --env-file .env.deploy up -d --no-build backup-api
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            docker compose -f /tmp/docker-compose.yml --project-name charthub-prod --env-file /tmp/.env.deploy pull backup-api
+            docker compose -f /tmp/docker-compose.yml --project-name charthub-prod --env-file /tmp/.env.deploy up -d --no-build backup-api
+          "
 
       - name: Verify health
         env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
           API_PORT: ${{ secrets.API_PORT }}
         run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
           EFFECTIVE_API_PORT="${API_PORT:-5147}"
           if [[ -z "${API_PORT:-}" ]]; then
             echo "API_PORT secret is not set; using compose default port ${EFFECTIVE_API_PORT}"
@@ -640,33 +804,42 @@ jobs:
           fi
 
           for i in $(seq 1 24); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${EFFECTIVE_API_PORT}/health" 2>/dev/null || echo "000")
+            STATUS=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/health 2>/dev/null || echo 000")
             if [[ "$STATUS" == "200" ]]; then
               break
             fi
             if [[ "$i" == "24" ]]; then
               echo "Production /health check failed on port ${EFFECTIVE_API_PORT}"
-              docker compose --project-name charthub-prod ps || true
-              docker compose --project-name charthub-prod logs --tail 200 backup-api || true
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "docker compose --project-name charthub-prod ps || true; docker compose --project-name charthub-prod logs --tail 200 backup-api || true"
               exit 1
             fi
             sleep 5
           done
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync" 2>/dev/null || echo "000")
+          HTTP=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync 2>/dev/null || echo 000")
           if [[ "$HTTP" != "200" ]]; then
             echo "Production sync health check failed on port ${EFFECTIVE_API_PORT}"
-            docker compose --project-name charthub-prod ps || true
-            docker compose --project-name charthub-prod logs --tail 200 backup-api || true
+            ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "docker compose --project-name charthub-prod ps || true; docker compose --project-name charthub-prod logs --tail 200 backup-api || true"
             exit 1
           fi
 
       - name: Verify production image digest
         env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
           EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
         run: |
-          EXPECTED_IMAGE_ID=$(docker image inspect "$EXPECTED_IMAGE_REF" --format '{{ .Id }}')
-          ACTUAL_IMAGE_ID=$(docker inspect charthub-prod-backup-api --format '{{ .Image }}')
-          ACTUAL_IMAGE_REF=$(docker inspect charthub-prod-backup-api --format '{{ .Config.Image }}')
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          EXPECTED_IMAGE_ID=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker image inspect '${EXPECTED_IMAGE_REF}' --format '{{ .Id }}'")
+          ACTUAL_IMAGE_ID=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker inspect charthub-prod-backup-api --format '{{ .Image }}'")
+          ACTUAL_IMAGE_REF=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker inspect charthub-prod-backup-api --format '{{ .Config.Image }}'")
           if [[ "$ACTUAL_IMAGE_ID" != "$EXPECTED_IMAGE_ID" ]]; then
             echo "Production deployed unexpected image"
             echo "Expected: $EXPECTED_IMAGE_REF"
@@ -688,14 +861,22 @@ jobs:
             echo "- Time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Clean up env file
+      - name: Clean up
         if: always()
-        run: rm -f .env.deploy
+        env:
+          SSH_HOST: ${{ secrets.BACKUP_API_SSH_HOST }}
+          SSH_USER: ${{ secrets.BACKUP_API_SSH_USER }}
+          SSH_PORT: ${{ secrets.BACKUP_API_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "rm -f /tmp/.env.deploy /tmp/docker-compose.yml" || true
+          rm -f ~/.ssh/deploy_key
 
   deploy-server-dev:
     name: Deploy ChartHub Server bundle to dev
     if: needs.classify.outputs.release_channel == 'dev'
-    runs-on: [self-hosted, linux, charthub-build]
+    runs-on: ubuntu-latest
     needs: [classify, build-server-bundle]
     environment: server-dev
     steps:
@@ -706,6 +887,11 @@ jobs:
         with:
           name: server-linux-x64
           path: ./.server-release
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Setup SSH
         env:
@@ -936,7 +1122,7 @@ jobs:
   deploy-server-staging:
     name: Deploy ChartHub Server bundle to staging
     if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
-    runs-on: [self-hosted, linux, charthub-build]
+    runs-on: ubuntu-latest
     needs: [classify, build-server-bundle]
     environment: server-staging
     steps:
@@ -947,6 +1133,11 @@ jobs:
         with:
           name: server-linux-x64
           path: ./.server-release
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Setup SSH
         env:
@@ -1176,7 +1367,7 @@ jobs:
   deploy-server-production:
     name: Deploy ChartHub Server bundle to production
     if: needs.classify.outputs.release_channel == 'stable'
-    runs-on: [self-hosted, linux, charthub-build]
+    runs-on: ubuntu-latest
     needs: [classify, build-server-bundle, deploy-server-staging]
     environment: server-production
     steps:
@@ -1187,6 +1378,11 @@ jobs:
         with:
           name: server-linux-x64
           path: ./.server-release
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Setup SSH
         env:

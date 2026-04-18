@@ -2,7 +2,13 @@
 
 This document defines GitHub Actions secrets required for ChartHub release and deployment workflows.
 
-## BackupApi Secrets (existing)
+## Tailscale (repository-level)
+
+Required by all deploy jobs to reach machines on the private Tailscale network.
+
+- `TAILSCALE_AUTHKEY` — reusable ephemeral auth key generated from the Tailscale admin console (ephemeral + reusable options enabled)
+
+## BackupApi Secrets (existing, repository-level)
 
 These are used by BackupApi Docker deployments in `release.yml`.
 
@@ -18,6 +24,18 @@ These are used by BackupApi Docker deployments in `release.yml`.
 - `BACKUP_IMAGES_HOST_PATH`
 - `RHYTHMVERSE_TOKEN`
 - `BACKUP_SYNC_ENABLED`
+- `BACKUP_API_KEY`
+
+## BackupApi SSH Secrets (environment-level)
+
+Required for all three BackupApi environments (`dev`, `staging`, `production`).
+These should be set as environment-level secrets on each GitHub Environment.
+They provide SSH access from GitHub-hosted runners (via Tailscale) to the BackupApi host machine.
+
+- `BACKUP_API_SSH_HOST` — Tailscale IP (100.x.x.x) of the BackupApi host machine
+- `BACKUP_API_SSH_USER` — SSH user on the BackupApi host (must have Docker access)
+- `BACKUP_API_SSH_PRIVATE_KEY` — PEM-encoded private key (ed25519 or RSA); corresponding public key must be in `~/.ssh/authorized_keys` on the host
+- `BACKUP_API_SSH_PORT` — optional; SSH port, defaults to `22`
 
 ## ChartHub.Server Secrets (bundled executable deploy)
 
@@ -88,7 +106,11 @@ These paths are now fixed in workflow/systemd configuration:
 
 ## Validation checklist
 
+- `TAILSCALE_AUTHKEY` exists as a repository secret.
+- Both deploy target machines are joined to the Tailscale network.
 - BackupApi secrets exist in repository settings.
+- BackupApi SSH secrets (`BACKUP_API_SSH_HOST`, `BACKUP_API_SSH_USER`, `BACKUP_API_SSH_PRIVATE_KEY`) are set in each BackupApi environment (`dev`, `staging`, `production`).
+- The BackupApi SSH public key is present in `authorized_keys` on the BackupApi host for the deploy user.
 - Server repository secrets exist in repository settings.
 - `server-dev`, `server-staging`, and `server-production` GitHub Environments exist.
 - SSH secrets (`SERVER_DEPLOY_SSH_HOST`, `SERVER_DEPLOY_SSH_USER`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`) are set in each server environment.

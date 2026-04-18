@@ -61,6 +61,10 @@ COMMON_SECRETS=(
   BACKUP_SYNC_ENABLED
   DB_VOLUME
   BACKUP_API_KEY
+  BACKUP_API_SSH_HOST
+  BACKUP_API_SSH_USER
+  BACKUP_API_SSH_PRIVATE_KEY
+  BACKUP_API_SSH_PORT
 )
 
 # The complete set of secrets each GitHub ChartHub.Server environment needs.
@@ -88,6 +92,7 @@ SERVER_SECRETS=(
 # Repository-level secrets (not scoped to any environment).
 # These are read from the Infisical 'dev' environment and pushed as repo secrets.
 REPO_SECRETS=(
+  TAILSCALE_AUTHKEY
   GOOGLEDRIVE_ANDROID_CLIENT_ID
   GOOGLEDRIVE_DESKTOP_CLIENT_ID
   GOOGLEDRIVE_DESKTOP_CLIENT_SECRET
