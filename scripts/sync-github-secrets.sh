@@ -172,15 +172,18 @@ load_from_infisical() {
   # Clear previously loaded secrets for this environment pass
   for k in "${!LOADED_SECRETS[@]}"; do unset "LOADED_SECRETS[$k]"; done
 
-  local key value
-  while IFS= read -r key && IFS= read -r value; do
+  local key value encoded
+  while IFS= read -r encoded; do
+    key="${encoded%%=*}"
+    value="$(printf '%s' "${encoded#*=}" | base64 -d)"
     LOADED_SECRETS["$key"]="$value"
   done < <(printf '%s' "$raw_json" | python3 -c "
-import json, sys
+import json, sys, base64
 data = json.load(sys.stdin)
 for item in data:
-    print(item['key'])
-    print(item['value'])
+    k = item['key']
+    v = base64.b64encode(item['value'].encode()).decode()
+    print(f'{k}={v}')
 ")
 }
 
