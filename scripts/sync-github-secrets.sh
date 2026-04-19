@@ -47,7 +47,6 @@ declare -A INFISICAL_ENV_MAP=(
 
 # The complete set of secrets each GitHub BackupApi environment needs.
 COMMON_SECRETS=(
-  TAILSCALE_AUTHKEY
   PSQL_CONTAINER_NAME
   PSQL_PORT
   PSQL_USER
@@ -70,7 +69,6 @@ COMMON_SECRETS=(
 
 # The complete set of secrets each GitHub ChartHub.Server environment needs.
 SERVER_SECRETS=(
-  TAILSCALE_AUTHKEY
   CHARTHUB_SERVER_JWT_SIGNING_KEY
   CHARTHUB_SERVER_JWT_ISSUER
   CHARTHUB_SERVER_JWT_AUDIENCE
