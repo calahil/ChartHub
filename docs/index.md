@@ -16,12 +16,6 @@ ChartHub installs and manages rhythm game song charts from official sources and 
 
 ---
 
-## AI-Assisted Development
-
-ChartHub is developed with assistance from AI coding agents (GitHub Copilot). All agent-contributed code is reviewed by a human maintainer before merging.
-
----
-
 ## Quick Links
 
 <div class="grid cards" markdown>

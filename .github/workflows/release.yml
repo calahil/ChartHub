@@ -372,6 +372,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Diagnose Tailscale secret
+        env:
+          TS_KEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+        run: |
+          if [ -z "${TS_KEY}" ]; then
+            echo "::error::TAILSCALE_AUTHKEY is EMPTY - secret not delivered to this job"
+            exit 1
+          fi
+          echo "TAILSCALE_AUTHKEY length: ${#TS_KEY}"
+          echo "TAILSCALE_AUTHKEY prefix: ${TS_KEY:0:8}..."
+
       - name: Connect to Tailscale
         uses: tailscale/github-action@v4
         with:
