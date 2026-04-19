@@ -162,30 +162,26 @@ load_from_infisical() {
 
   log "Fetching secrets from Infisical (env: ${infisical_env}, project: ${INFISICAL_PROJECT})"
 
-  local raw_env
-  raw_env=$(infisical export \
+  local raw_json
+  raw_json=$(infisical export \
     --projectId "$INFISICAL_PROJECT" \
     --env "$infisical_env" \
-    --format dotenv \
+    --format json \
     "${host_flag[@]}" 2>/dev/null) || fail "infisical export failed for environment '${infisical_env}'. Are you logged in? Run: infisical login"
 
   # Clear previously loaded secrets for this environment pass
   for k in "${!LOADED_SECRETS[@]}"; do unset "LOADED_SECRETS[$k]"; done
 
-  local line key value
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    line="${line%$'\r'}"
-    [[ -z "${line// }" ]] && continue
-    [[ "${line#\#}" != "$line" ]] && continue
-    [[ "$line" != *=* ]] && continue
-    key="${line%%=*}"
-    value="${line#*=}"
-    key="${key%%[[:space:]]*}"
-    [[ -z "$key" ]] && continue
-    if [[ "$value" =~ ^\".*\"$ ]]; then value="${value:1:${#value}-2}"; fi
-    if [[ "$value" =~ ^\'.*\'$ ]]; then value="${value:1:${#value}-2}"; fi
+  local key value
+  while IFS= read -r key && IFS= read -r value; do
     LOADED_SECRETS["$key"]="$value"
-  done <<< "$raw_env"
+  done < <(printf '%s' "$raw_json" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for item in data:
+    print(item['key'])
+    print(item['value'])
+")
 }
 
 push_to_github_repo() {
