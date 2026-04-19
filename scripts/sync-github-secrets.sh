@@ -174,8 +174,8 @@ load_from_infisical() {
 
   local key value encoded
   while IFS= read -r encoded; do
-    key="${encoded%%=*}"
-    value="$(printf '%s' "${encoded#*=}" | base64 -d)"
+    key="${encoded%%|*}"
+    value="$(printf '%s' "${encoded#*|}" | base64 -d)"
     LOADED_SECRETS["$key"]="$value"
   done < <(printf '%s' "$raw_json" | python3 -c "
 import json, sys, base64
@@ -183,7 +183,7 @@ data = json.load(sys.stdin)
 for item in data:
     k = item['key']
     v = base64.b64encode(item['value'].encode()).decode()
-    print(f'{k}={v}')
+    print(f'{k}|{v}')
 ")
 }
 
