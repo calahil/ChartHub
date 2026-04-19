@@ -373,10 +373,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          args: --accept-routes
 
       - name: Setup SSH
         env:
@@ -520,10 +519,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          args: --accept-routes
 
       - name: Setup SSH
         env:
@@ -690,10 +688,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          args: --accept-routes
 
       - name: Setup SSH
         env:
@@ -892,10 +889,9 @@ jobs:
           path: ./.server-release
 
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          args: --accept-routes
 
       - name: Setup SSH
         env:
@@ -1139,10 +1135,9 @@ jobs:
           path: ./.server-release
 
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          args: --accept-routes
 
       - name: Setup SSH
         env:
@@ -1385,10 +1380,9 @@ jobs:
           path: ./.server-release
 
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          args: --accept-routes
 
       - name: Setup SSH
         env:
