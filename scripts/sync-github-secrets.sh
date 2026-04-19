@@ -208,9 +208,9 @@ push_to_github_repo() {
     if [[ "$DRY_RUN" == true ]]; then
       log "  [dry-run] gh secret set ${secret} --repo (repo-level)"
     else
-      printf '%s' "$value" | gh secret set "$secret" \
+      gh secret set "$secret" \
         --repo "$REPO" \
-        --body -
+        --body "$value"
       log "  ✓ ${secret}"
     fi
   done
@@ -238,10 +238,10 @@ push_to_github_environment() {
     if [[ "$DRY_RUN" == true ]]; then
       log "  [dry-run] gh secret set ${secret} --env ${github_env}"
     else
-      printf '%s' "$value" | gh secret set "$secret" \
+      gh secret set "$secret" \
         --repo "$REPO" \
         --env "$github_env" \
-        --body -
+        --body "$value"
       log "  ✓ ${secret}"
     fi
   done

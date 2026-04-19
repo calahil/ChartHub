@@ -497,14 +497,20 @@ jobs:
             fi
             sleep 5
           done
-          HTTP=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
-            "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync 2>/dev/null || echo 000")
-          if [[ "$HTTP" != "200" ]]; then
-            echo "Dev sync health check failed on port ${EFFECTIVE_API_PORT}"
-            ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
-              "docker compose --project-name charthub-dev ps || true; docker compose --project-name charthub-dev logs --tail 200 backup-api || true"
-            exit 1
-          fi
+          for i in $(seq 1 12); do
+            HTTP=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync 2>/dev/null || echo 000")
+            if [[ "$HTTP" == "200" ]]; then
+              break
+            fi
+            if [[ "$i" == "12" ]]; then
+              echo "Dev sync health check failed on port ${EFFECTIVE_API_PORT}"
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "docker compose --project-name charthub-dev ps || true; docker compose --project-name charthub-dev logs --tail 200 backup-api || true"
+              exit 1
+            fi
+            sleep 5
+          done
 
       - name: Clean up
         if: always()
@@ -654,14 +660,20 @@ jobs:
             fi
             sleep 5
           done
-          HTTP=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
-            "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync 2>/dev/null || echo 000")
-          if [[ "$HTTP" != "200" ]]; then
-            echo "Staging sync health check failed on port ${EFFECTIVE_API_PORT}"
-            ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
-              "docker compose --project-name charthub-staging ps || true; docker compose --project-name charthub-staging logs --tail 200 backup-api || true"
-            exit 1
-          fi
+          for i in $(seq 1 12); do
+            HTTP=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync 2>/dev/null || echo 000")
+            if [[ "$HTTP" == "200" ]]; then
+              break
+            fi
+            if [[ "$i" == "12" ]]; then
+              echo "Staging sync health check failed on port ${EFFECTIVE_API_PORT}"
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "docker compose --project-name charthub-staging ps || true; docker compose --project-name charthub-staging logs --tail 200 backup-api || true"
+              exit 1
+            fi
+            sleep 5
+          done
 
       - name: Verify staged image digest
         id: capture-staged-image
@@ -850,14 +862,20 @@ jobs:
             fi
             sleep 5
           done
-          HTTP=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
-            "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync 2>/dev/null || echo 000")
-          if [[ "$HTTP" != "200" ]]; then
-            echo "Production sync health check failed on port ${EFFECTIVE_API_PORT}"
-            ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
-              "docker compose --project-name charthub-prod ps || true; docker compose --project-name charthub-prod logs --tail 200 backup-api || true"
-            exit 1
-          fi
+          for i in $(seq 1 12); do
+            HTTP=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "curl -s -o /dev/null -w '%{http_code}' http://localhost:${EFFECTIVE_API_PORT}/api/rhythmverse/health/sync 2>/dev/null || echo 000")
+            if [[ "$HTTP" == "200" ]]; then
+              break
+            fi
+            if [[ "$i" == "12" ]]; then
+              echo "Production sync health check failed on port ${EFFECTIVE_API_PORT}"
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "docker compose --project-name charthub-prod ps || true; docker compose --project-name charthub-prod logs --tail 200 backup-api || true"
+              exit 1
+            fi
+            sleep 5
+          done
 
       - name: Verify production image digest
         env:
