@@ -18,7 +18,7 @@
         <link rel="prev" href="../api-reference/">
       
       
-        <link rel="next" href="../self-hosted-runners/">
+        <link rel="next" href="../../reference/changelog/">
       
       
         
@@ -998,6 +998,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#device-name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Device Name
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1024,7 +1057,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../self-hosted-runners/" class="md-nav__link">
+      <a href="../self-hosted-runners.md" class="md-nav__link">
         
   
   
@@ -1188,6 +1221,39 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#device-name" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Device Name
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1224,18 +1290,14 @@
 
 
 <h1 id="charthub-hud">ChartHub Hud<a class="headerlink" href="#charthub-hud" title="Permanent link">&para;</a></h1>
-<p>ChartHub Hud is the Emubox window manager splash screen and status UI that pairs with ChartHub Server.</p>
+<p>ChartHub Hud is the window manager UI and status display for the ChartHub game console. It runs on a dedicated emulation or media PC as the user-facing interface of the <strong>ChartHub Kiosk</strong> session (Emubox WM) — a purpose-built session that replaces the standard Linux desktop with a minimal, full-screen rhythm game console UI.</p>
 <hr />
 <h2 id="purpose">Purpose<a class="headerlink" href="#purpose" title="Permanent link">&para;</a></h2>
-<p>ChartHub Hud is designed to run on a dedicated emulation or media PC using Emubox WM. It provides:</p>
-<ul>
-<li>A splash/startup screen while ChartHub Server initializes.</li>
-<li>A status display showing server readiness and connectivity.</li>
-<li>Integration with the Emubox window manager session lifecycle.</li>
-</ul>
+<p>In the kiosk session, ChartHub Server is the root process. It manages the Hud as a subprocess, providing users with a status display and replacing the desktop while no game is running. The Android app's Input suite (controller, touchpad, keyboard WebSocket connections) is the primary way users interact with the console. The Hud reflects that connection state at a glance.</p>
+<p>A game/app launcher view is planned for a future iteration; the current scope is status display only.</p>
 <hr />
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
-<p>ChartHub Hud is a separate Avalonia application (<code>ChartHub.Hud/</code>) that communicates with ChartHub Server over its local API. It follows the same strict MVVM architecture as the main ChartHub client.</p>
+<p>ChartHub Hud is a separate Avalonia application (<code>ChartHub.Hud/</code>) that communicates with ChartHub Server over its local SSE API. It follows the same strict MVVM architecture as the main ChartHub client.</p>
 <table>
 <thead>
 <tr>
@@ -1246,7 +1308,7 @@
 <tbody>
 <tr>
 <td><code>ChartHub.Hud/Views/</code></td>
-<td>Splash and status views</td>
+<td>Fullscreen Hud window</td>
 </tr>
 <tr>
 <td><code>ChartHub.Hud/ViewModels/</code></td>
@@ -1254,17 +1316,37 @@
 </tr>
 <tr>
 <td><code>ChartHub.Hud/Services/</code></td>
-<td>ChartHub Server health polling</td>
+<td>ChartHub Server SSE status stream consumer</td>
 </tr>
 </tbody>
 </table>
 <hr />
+<h2 id="layout">Layout<a class="headerlink" href="#layout" title="Permanent link">&para;</a></h2>
+<p>The Hud window is fullscreen with no decorations and a dark background.</p>
+<ul>
+<li><strong>Top strip</strong> (64px, opaque) — spans the full width:</li>
+<li>Left: the connected Android device's hostname</li>
+<li>Right: a green/red indicator dot (green = Input WebSocket open, red = none)</li>
+<li><strong>Main area</strong> — the ChartHub logo centered in the remaining space below the strip</li>
+</ul>
+<p>When no Android device is connected, the left side of the top strip is empty and the dot is red.</p>
+<hr />
+<h2 id="device-name">Device Name<a class="headerlink" href="#device-name" title="Permanent link">&para;</a></h2>
+<p>The Android app sends its device hostname when opening an Input WebSocket connection via the <code>X-Device-Name</code> HTTP header on the upgrade request. ChartHub Server reads this name, tracks it in <code>InputConnectionTracker</code>, and broadcasts it to the Hud via the SSE status stream.</p>
+<p>Only one Input WebSocket connection is permitted at a time (globally across all three endpoints — controller, touchpad, keyboard). A second connection attempt while one is active is rejected immediately.</p>
+<hr />
+<h2 id="lifecycle">Lifecycle<a class="headerlink" href="#lifecycle" title="Permanent link">&para;</a></h2>
+<p>ChartHub Server spawns the Hud process on startup via <code>HudLifecycleService</code>. When an Android app launches a DesktopEntry, the server kills the Hud process to free all resources for the game. When that application exits or is killed, the server respawns the Hud.</p>
+<p>This kill-and-respawn approach is intentional — the target hardware is resource-constrained.</p>
+<blockquote>
+<p>The kiosk session itself (Openbox X session, LightDM autologin, and deployment configuration) is documented in the operator setup guide.</p>
+</blockquote>
+<hr />
 <h2 id="running">Running<a class="headerlink" href="#running" title="Permanent link">&para;</a></h2>
-<p>ChartHub Hud is typically launched by the Emubox WM session startup script before ChartHub Server is fully ready, then dismissed automatically once the server reports healthy.</p>
-<p>For manual testing:</p>
+<p>The Hud is spawned automatically by ChartHub Server in a kiosk session. For manual testing:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>dotnet<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>ChartHub.Hud/ChartHub.Hud.csproj
 </code></pre></div>
-<p>ChartHub Server must be running (or starting) on the same host for the status indicators to populate.</p>
+<p>ChartHub Server must be running on the same host for the status stream to populate.</p>
 
 
 
@@ -1317,13 +1399,13 @@
         
         
           
-          <a href="../self-hosted-runners/" class="md-footer__link md-footer__link--next" aria-label="Next: Self-Hosted Runners">
+          <a href="../../reference/changelog/" class="md-footer__link md-footer__link--next" aria-label="Next: Changelog">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Self-Hosted Runners
+                Changelog
               </div>
             </div>
             <div class="md-footer__button md-icon">

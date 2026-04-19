@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://docs.calahilstudios.com/latest/reference/changelog/">
       
       
-        <link rel="prev" href="../../developer/self-hosted-runners/">
+        <link rel="prev" href="../../developer/hud/">
       
       
       
@@ -937,7 +937,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../developer/self-hosted-runners/" class="md-nav__link">
+      <a href="../../developer/self-hosted-runners.md" class="md-nav__link">
         
   
   
@@ -1564,12 +1564,12 @@
 <h2 id="100-rc3-2026-04-19">[1.0.0-rc.3] - 2026-04-19<a class="headerlink" href="#100-rc3-2026-04-19" title="Permanent link">&para;</a></h2>
 <h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Add Tailscale secret diagnosis step to workflows</li>
+<li>Enhance Hud status management and connection tracking; update WebSocket services to include device name</li>
 </ul>
 <h2 id="100-rc2-2026-04-19">[1.0.0-rc.2] - 2026-04-19<a class="headerlink" href="#100-rc2-2026-04-19" title="Permanent link">&para;</a></h2>
 <h3 id="features_1">Features<a class="headerlink" href="#features_1" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Update workflows to enhance changelog generation and Tailscale secret validation</li>
+<li>Exempt sync health endpoint from API key authentication</li>
 </ul>
 <h2 id="100-rc1-2026-04-19">[1.0.0-rc.1] - 2026-04-19<a class="headerlink" href="#100-rc1-2026-04-19" title="Permanent link">&para;</a></h2>
 <h3 id="bug-fixes">Bug Fixes<a class="headerlink" href="#bug-fixes" title="Permanent link">&para;</a></h3>
@@ -1671,6 +1671,12 @@
 <li>Update Tailscale integration to use authkey and modify CI secrets policy</li>
 <li>Remove TAILSCALE_AUTHKEY from common secrets in sync-github-secrets.sh</li>
 <li>Upgrade Tailscale GitHub Action to v4 and remove unnecessary args</li>
+<li>Update workflows to enhance changelog generation and Tailscale secret validation</li>
+<li>Add Tailscale secret diagnosis step to workflows</li>
+<li>Update Infisical export format to JSON and streamline secret loading process</li>
+<li>Update secret loading process to handle base64 encoding for values</li>
+<li>Update secret loading format to use pipe delimiter for key-value pairs</li>
+<li>Refactor GitHub secret setting to use direct body input instead of printf</li>
 </ul>
 <h3 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h3>
 <ul>
@@ -1757,7 +1763,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../../developer/self-hosted-runners/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Self-Hosted Runners">
+          <a href="../../developer/hud/" class="md-footer__link md-footer__link--prev" aria-label="Previous: ChartHub Hud">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1767,7 +1773,7 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Self-Hosted Runners
+                ChartHub Hud
               </div>
             </div>
           </a>
