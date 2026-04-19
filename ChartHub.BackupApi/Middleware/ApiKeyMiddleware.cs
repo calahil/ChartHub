@@ -26,8 +26,9 @@ public sealed class ApiKeyMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // The /health endpoint is exempt so infrastructure probes work without credentials.
-        if (context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase))
+        // The /health and sync health endpoints are exempt so infrastructure probes work without credentials.
+        if (context.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase) ||
+            context.Request.Path.StartsWithSegments("/api/rhythmverse/health", StringComparison.OrdinalIgnoreCase))
         {
             await _next(context);
             return;

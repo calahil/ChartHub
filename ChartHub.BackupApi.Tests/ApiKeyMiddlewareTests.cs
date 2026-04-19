@@ -55,4 +55,16 @@ public sealed class ApiKeyMiddlewareTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+
+    [Fact]
+    public async Task SyncHealthEndpoint_WithoutApiKey_Returns200()
+    {
+        using BackupApiWebApplicationFactory factory = new();
+        using HttpClient client = factory.CreateClient();
+        client.DefaultRequestHeaders.Remove("X-Api-Key");
+
+        HttpResponseMessage response = await client.GetAsync("/api/rhythmverse/health/sync");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }

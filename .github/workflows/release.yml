@@ -1080,7 +1080,6 @@ jobs:
             unzip -q \"/tmp/charthub-server-${VERSION}-linux-x64.zip\" -d \"\$RELEASE_DIR\"
             ln -sfn \"\$RELEASE_DIR/server-linux-x64\" \"${INSTALL_ROOT}/current\"
             chmod +x \"${INSTALL_ROOT}/current/ChartHub.Server\" || true
-            chmod +x \"${INSTALL_ROOT}/current/tools/onyx\" || true
             rm -f \"/tmp/charthub-server-${VERSION}-linux-x64.zip\"
           "
 
@@ -1336,7 +1335,6 @@ jobs:
             unzip -q \"/tmp/charthub-server-${VERSION}-linux-x64.zip\" -d \"\$RELEASE_DIR\"
             ln -sfn \"\$RELEASE_DIR/server-linux-x64\" \"${INSTALL_ROOT}/current\"
             chmod +x \"${INSTALL_ROOT}/current/ChartHub.Server\" || true
-            chmod +x \"${INSTALL_ROOT}/current/tools/onyx\" || true
             rm -f \"/tmp/charthub-server-${VERSION}-linux-x64.zip\"
           "
 
@@ -1592,7 +1590,6 @@ jobs:
             unzip -q \"/tmp/charthub-server-${VERSION}-linux-x64.zip\" -d \"\$RELEASE_DIR\"
             ln -sfn \"\$RELEASE_DIR/server-linux-x64\" \"${INSTALL_ROOT}/current\"
             chmod +x \"${INSTALL_ROOT}/current/ChartHub.Server\" || true
-            chmod +x \"${INSTALL_ROOT}/current/tools/onyx\" || true
             rm -f \"/tmp/charthub-server-${VERSION}-linux-x64.zip\"
           "
 
