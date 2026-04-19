@@ -98,7 +98,7 @@ public sealed class VirtualControllerViewModel : INotifyPropertyChanged, IDispos
 
         try
         {
-            await _webSocketService.ConnectAsync(baseUrl, token, "api/v1/input/controller/ws").ConfigureAwait(false);
+            await _webSocketService.ConnectAsync(baseUrl, token, "api/v1/input/controller/ws", System.Net.Dns.GetHostName()).ConfigureAwait(false);
             IsConnected = true;
             StatusMessage = UiLocalization.Get("Input.Controller.Status.Connected");
         }

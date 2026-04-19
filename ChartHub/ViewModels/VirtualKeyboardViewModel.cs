@@ -142,7 +142,7 @@ public sealed class VirtualKeyboardViewModel : INotifyPropertyChanged, IDisposab
 
         try
         {
-            await _webSocketService.ConnectAsync(baseUrl, token, "api/v1/input/keyboard/ws").ConfigureAwait(false);
+            await _webSocketService.ConnectAsync(baseUrl, token, "api/v1/input/keyboard/ws", System.Net.Dns.GetHostName()).ConfigureAwait(false);
             IsConnected = true;
             StatusMessage = UiLocalization.Get("Input.Keyboard.Status.Connected");
         }

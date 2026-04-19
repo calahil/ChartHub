@@ -118,6 +118,20 @@ public sealed partial class HudLifecycleService(
             EnableRaisingEvents = true,
         };
 
+        // Forward X display variables explicitly so the Hud can open a window
+        // even if the environment is altered between server startup and Hud spawn.
+        string? display = Environment.GetEnvironmentVariable("DISPLAY");
+        string? xauthority = Environment.GetEnvironmentVariable("XAUTHORITY");
+        if (display is not null)
+        {
+            process.StartInfo.Environment["DISPLAY"] = display;
+        }
+
+        if (xauthority is not null)
+        {
+            process.StartInfo.Environment["XAUTHORITY"] = xauthority;
+        }
+
         process.StartInfo.ArgumentList.Add("--server-port");
         process.StartInfo.ArgumentList.Add(_options.ServerPort.ToString());
 

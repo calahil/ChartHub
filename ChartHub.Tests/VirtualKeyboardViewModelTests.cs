@@ -163,7 +163,7 @@ public sealed class VirtualKeyboardViewModelTests
         public int ConnectCallCount { get; private set; }
         public List<string> SentMessages { get; } = [];
 
-        public Task ConnectAsync(string baseUrl, string bearerToken, string path, CancellationToken cancellationToken = default)
+        public Task ConnectAsync(string baseUrl, string bearerToken, string path, string deviceName, CancellationToken cancellationToken = default)
         {
             IsConnected = true;
             ConnectCallCount++;

@@ -15,6 +15,7 @@ public sealed class HudViewModel : INotifyPropertyChanged, IDisposable
     private readonly ServerStatusService _statusService;
     private readonly CancellationTokenSource _cts = new();
     private int _deviceCount;
+    private string _deviceName = string.Empty;
 
     public HudViewModel(ServerStatusService statusService)
     {
@@ -35,15 +36,25 @@ public sealed class HudViewModel : INotifyPropertyChanged, IDisposable
             _deviceCount = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IndicatorColor));
-            OnPropertyChanged(nameof(DeviceCountLabel));
+        }
+    }
+
+    public string DeviceName
+    {
+        get => _deviceName;
+        private set
+        {
+            if (_deviceName == value)
+            {
+                return;
+            }
+
+            _deviceName = value;
+            OnPropertyChanged();
         }
     }
 
     public IBrush IndicatorColor => _deviceCount > 0 ? ConnectedBrush : DisconnectedBrush;
-
-    public string DeviceCountLabel => _deviceCount == 1
-        ? "1 device"
-        : $"{_deviceCount} devices";
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -55,9 +66,10 @@ public sealed class HudViewModel : INotifyPropertyChanged, IDisposable
 
     private async Task RunWatchLoopAsync(CancellationToken cancellationToken)
     {
-        await foreach (int count in _statusService.WatchAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (HudStatus status in _statusService.WatchAsync(cancellationToken).ConfigureAwait(false))
         {
-            DeviceCount = count;
+            DeviceCount = status.ConnectedDeviceCount;
+            DeviceName = status.DeviceName ?? string.Empty;
         }
     }
 

@@ -5,7 +5,7 @@ namespace ChartHub.Hud.Services;
 
 /// <summary>
 /// Connects to ChartHub.Server's loopback SSE endpoint and streams
-/// connected-device-count updates. Reconnects with exponential backoff
+/// Hud status updates. Reconnects with exponential backoff
 /// if the server is not yet available or if the connection drops.
 /// </summary>
 public sealed class ServerStatusService : IDisposable
@@ -24,18 +24,17 @@ public sealed class ServerStatusService : IDisposable
         _statusStreamUrl = $"http://localhost:{serverPort}/api/v1/hud/status/stream";
     }
 
-    public async IAsyncEnumerable<int> WatchAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<HudStatus> WatchAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var backoff = TimeSpan.FromSeconds(1);
         const int MaxBackoffSeconds = 30;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            // Drain any counts collected during a connected session.
-            await foreach (int count in ConnectAndReadAsync(cancellationToken).ConfigureAwait(false))
+            await foreach (HudStatus status in ConnectAndReadAsync(cancellationToken).ConfigureAwait(false))
             {
                 backoff = TimeSpan.FromSeconds(1);
-                yield return count;
+                yield return status;
             }
 
             if (cancellationToken.IsCancellationRequested)
@@ -60,7 +59,7 @@ public sealed class ServerStatusService : IDisposable
         }
     }
 
-    private async IAsyncEnumerable<int> ConnectAndReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    private async IAsyncEnumerable<HudStatus> ConnectAndReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         HttpResponseMessage? response = null;
         Stream? stream = null;
@@ -96,9 +95,9 @@ public sealed class ServerStatusService : IDisposable
         using (stream)
         using (reader)
         {
-            await foreach (int count in ReadSseEventsAsync(reader, cancellationToken).ConfigureAwait(false))
+            await foreach (HudStatus status in ReadSseEventsAsync(reader, cancellationToken).ConfigureAwait(false))
             {
-                yield return count;
+                yield return status;
             }
         }
     }
@@ -108,7 +107,7 @@ public sealed class ServerStatusService : IDisposable
         _httpClient.Dispose();
     }
 
-    private static async IAsyncEnumerable<int> ReadSseEventsAsync(
+    private static async IAsyncEnumerable<HudStatus> ReadSseEventsAsync(
         StreamReader reader,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -131,10 +130,10 @@ public sealed class ServerStatusService : IDisposable
             else if (line.Length == 0 && dataLine is not null)
             {
                 // Empty line = end of SSE event.
-                int? count = ParseCount(dataLine);
-                if (count.HasValue)
+                HudStatus? status = ParseStatus(dataLine);
+                if (status.HasValue)
                 {
-                    yield return count.Value;
+                    yield return status.Value;
                 }
 
                 dataLine = null;
@@ -142,15 +141,22 @@ public sealed class ServerStatusService : IDisposable
         }
     }
 
-    private static int? ParseCount(string json)
+    private static HudStatus? ParseStatus(string json)
     {
         try
         {
             using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("connectedDeviceCount", out JsonElement el)
-                && el.TryGetInt32(out int count))
+            if (doc.RootElement.TryGetProperty("connectedDeviceCount", out JsonElement countEl)
+                && countEl.TryGetInt32(out int count))
             {
-                return count;
+                string? deviceName = null;
+                if (doc.RootElement.TryGetProperty("deviceName", out JsonElement nameEl)
+                    && nameEl.ValueKind == JsonValueKind.String)
+                {
+                    deviceName = nameEl.GetString();
+                }
+
+                return new HudStatus(count, deviceName);
             }
         }
         catch (JsonException)
@@ -161,3 +167,5 @@ public sealed class ServerStatusService : IDisposable
         return null;
     }
 }
+
+public readonly record struct HudStatus(int ConnectedDeviceCount, string? DeviceName);

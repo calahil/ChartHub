@@ -119,7 +119,7 @@ public sealed class VirtualTouchPadViewModel : INotifyPropertyChanged, IDisposab
 
         try
         {
-            await _webSocketService.ConnectAsync(baseUrl, token, "api/v1/input/touchpad/ws").ConfigureAwait(false);
+            await _webSocketService.ConnectAsync(baseUrl, token, "api/v1/input/touchpad/ws", System.Net.Dns.GetHostName()).ConfigureAwait(false);
             IsConnected = true;
             StatusMessage = UiLocalization.Get("Input.Touchpad.Status.Connected");
         }

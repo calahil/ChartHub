@@ -37,9 +37,9 @@ public static partial class HudStatusEndpoints
 
         try
         {
-            await foreach (int count in tracker.WatchAsync(cancellationToken).ConfigureAwait(false))
+            await foreach (HudStatusUpdate update in tracker.WatchAsync(cancellationToken).ConfigureAwait(false))
             {
-                HudStatusPayload payload = new() { ConnectedDeviceCount = count };
+                HudStatusPayload payload = new() { ConnectedDeviceCount = update.ConnectedDeviceCount, DeviceName = update.DeviceName };
                 await context.Response.WriteAsync("event: hud-status\n", cancellationToken).ConfigureAwait(false);
                 await context.Response.WriteAsync($"data: {JsonSerializer.Serialize(payload)}\n\n", cancellationToken).ConfigureAwait(false);
                 await context.Response.Body.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -62,5 +62,6 @@ public static partial class HudStatusEndpoints
     private sealed class HudStatusPayload
     {
         public int ConnectedDeviceCount { get; init; }
+        public string? DeviceName { get; init; }
     }
 }

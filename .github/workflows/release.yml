@@ -275,9 +275,22 @@ jobs:
       - name: Restore
         run: dotnet restore ChartHub.Server/ChartHub.Server.csproj -r linux-x64
 
-      - name: Publish
+      - name: Publish server
         run: >-
           dotnet publish ChartHub.Server/ChartHub.Server.csproj
+          --configuration Release
+          --no-restore
+          -r linux-x64
+          --self-contained true
+          -p:Version=${{ needs.classify.outputs.version }}
+          -o ./publish/server-linux-x64
+
+      - name: Restore Hud
+        run: dotnet restore ChartHub.Hud/ChartHub.Hud.csproj -r linux-x64
+
+      - name: Publish Hud
+        run: >-
+          dotnet publish ChartHub.Hud/ChartHub.Hud.csproj
           --configuration Release
           --no-restore
           -r linux-x64
@@ -1033,6 +1046,8 @@ jobs:
             echo "ServerLogging__LogDirectory=${EFFECTIVE_LOGS}"
             echo "ServerLogging__FileName=charthub-server.log"
             echo "CHARTHUB_SERVER_PORT=${EFFECTIVE_PORT}"
+            echo "Hud__ExecutablePath=$(dirname \"${EFFECTIVE_CONFIG}\")/current/ChartHub.Hud"
+            echo "Hud__ServerPort=${EFFECTIVE_PORT}"
           } > "$LOCAL_ENV_FILE"
 
           # Parse JSON array secrets (e.g. ["email@domain.com","other@domain.com"])
@@ -1289,6 +1304,8 @@ jobs:
             echo "ServerLogging__LogDirectory=${EFFECTIVE_LOGS}"
             echo "ServerLogging__FileName=charthub-server.log"
             echo "CHARTHUB_SERVER_PORT=${EFFECTIVE_PORT}"
+            echo "Hud__ExecutablePath=$(dirname \"${EFFECTIVE_CONFIG}\")/current/ChartHub.Hud"
+            echo "Hud__ServerPort=${EFFECTIVE_PORT}"
           } > "$LOCAL_ENV_FILE"
 
           auth_allowed_index=0
@@ -1544,6 +1561,8 @@ jobs:
             echo "ServerLogging__LogDirectory=${EFFECTIVE_LOGS}"
             echo "ServerLogging__FileName=charthub-server.log"
             echo "CHARTHUB_SERVER_PORT=${EFFECTIVE_PORT}"
+            echo "Hud__ExecutablePath=$(dirname \"${EFFECTIVE_CONFIG}\")/current/ChartHub.Hud"
+            echo "Hud__ServerPort=${EFFECTIVE_PORT}"
           } > "$LOCAL_ENV_FILE"
 
           auth_allowed_index=0

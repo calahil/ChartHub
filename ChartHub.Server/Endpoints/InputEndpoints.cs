@@ -58,9 +58,18 @@ public static partial class InputEndpoints
             return;
         }
 
+        string deviceName = context.Request.Headers["X-Device-Name"].FirstOrDefault() ?? "unknown";
+
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
-        connectionTracker.RegisterConnection();
-        LogControllerConnected(logger);
+
+        if (!connectionTracker.RegisterConnection(deviceName))
+        {
+            await ws.CloseAsync(WebSocketCloseStatus.PolicyViolation, "connection slot occupied", CancellationToken.None);
+            LogControllerRejected(logger, deviceName);
+            return;
+        }
+
+        LogControllerConnected(logger, deviceName);
 
         try
         {
@@ -88,10 +97,10 @@ public static partial class InputEndpoints
         }
         finally
         {
-            connectionTracker.UnregisterConnection();
+            connectionTracker.UnregisterConnection(deviceName);
         }
 
-        LogControllerDisconnected(logger);
+        LogControllerDisconnected(logger, deviceName);
     }
 
     private static async Task HandleTouchpadAsync(
@@ -107,9 +116,18 @@ public static partial class InputEndpoints
             return;
         }
 
+        string deviceName = context.Request.Headers["X-Device-Name"].FirstOrDefault() ?? "unknown";
+
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
-        connectionTracker.RegisterConnection();
-        LogTouchpadConnected(logger);
+
+        if (!connectionTracker.RegisterConnection(deviceName))
+        {
+            await ws.CloseAsync(WebSocketCloseStatus.PolicyViolation, "connection slot occupied", CancellationToken.None);
+            LogTouchpadRejected(logger, deviceName);
+            return;
+        }
+
+        LogTouchpadConnected(logger, deviceName);
 
         try
         {
@@ -137,10 +155,10 @@ public static partial class InputEndpoints
         }
         finally
         {
-            connectionTracker.UnregisterConnection();
+            connectionTracker.UnregisterConnection(deviceName);
         }
 
-        LogTouchpadDisconnected(logger);
+        LogTouchpadDisconnected(logger, deviceName);
     }
 
     private static async Task HandleKeyboardAsync(
@@ -156,9 +174,18 @@ public static partial class InputEndpoints
             return;
         }
 
+        string deviceName = context.Request.Headers["X-Device-Name"].FirstOrDefault() ?? "unknown";
+
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
-        connectionTracker.RegisterConnection();
-        LogKeyboardConnected(logger);
+
+        if (!connectionTracker.RegisterConnection(deviceName))
+        {
+            await ws.CloseAsync(WebSocketCloseStatus.PolicyViolation, "connection slot occupied", CancellationToken.None);
+            LogKeyboardRejected(logger, deviceName);
+            return;
+        }
+
+        LogKeyboardConnected(logger, deviceName);
 
         try
         {
@@ -186,10 +213,10 @@ public static partial class InputEndpoints
         }
         finally
         {
-            connectionTracker.UnregisterConnection();
+            connectionTracker.UnregisterConnection(deviceName);
         }
 
-        LogKeyboardDisconnected(logger);
+        LogKeyboardDisconnected(logger, deviceName);
     }
 
     private static async Task ReceiveLoopAsync(
@@ -245,23 +272,32 @@ public static partial class InputEndpoints
         }
     }
 
-    [LoggerMessage(EventId = 8101, Level = LogLevel.Information, Message = "InputEndpoints: controller WebSocket connected.")]
-    private static partial void LogControllerConnected(ILogger logger);
+    [LoggerMessage(EventId = 8101, Level = LogLevel.Information, Message = "InputEndpoints: controller WebSocket connected. Device={DeviceName}")]
+    private static partial void LogControllerConnected(ILogger logger, string deviceName);
 
-    [LoggerMessage(EventId = 8102, Level = LogLevel.Information, Message = "InputEndpoints: controller WebSocket closed.")]
-    private static partial void LogControllerDisconnected(ILogger logger);
+    [LoggerMessage(EventId = 8102, Level = LogLevel.Information, Message = "InputEndpoints: controller WebSocket closed. Device={DeviceName}")]
+    private static partial void LogControllerDisconnected(ILogger logger, string deviceName);
 
-    [LoggerMessage(EventId = 8103, Level = LogLevel.Information, Message = "InputEndpoints: touchpad WebSocket connected.")]
-    private static partial void LogTouchpadConnected(ILogger logger);
+    [LoggerMessage(EventId = 8109, Level = LogLevel.Warning, Message = "InputEndpoints: controller WebSocket rejected — slot occupied. Device={DeviceName}")]
+    private static partial void LogControllerRejected(ILogger logger, string deviceName);
 
-    [LoggerMessage(EventId = 8104, Level = LogLevel.Information, Message = "InputEndpoints: touchpad WebSocket closed.")]
-    private static partial void LogTouchpadDisconnected(ILogger logger);
+    [LoggerMessage(EventId = 8103, Level = LogLevel.Information, Message = "InputEndpoints: touchpad WebSocket connected. Device={DeviceName}")]
+    private static partial void LogTouchpadConnected(ILogger logger, string deviceName);
 
-    [LoggerMessage(EventId = 8105, Level = LogLevel.Information, Message = "InputEndpoints: keyboard WebSocket connected.")]
-    private static partial void LogKeyboardConnected(ILogger logger);
+    [LoggerMessage(EventId = 8104, Level = LogLevel.Information, Message = "InputEndpoints: touchpad WebSocket closed. Device={DeviceName}")]
+    private static partial void LogTouchpadDisconnected(ILogger logger, string deviceName);
 
-    [LoggerMessage(EventId = 8106, Level = LogLevel.Information, Message = "InputEndpoints: keyboard WebSocket closed.")]
-    private static partial void LogKeyboardDisconnected(ILogger logger);
+    [LoggerMessage(EventId = 8110, Level = LogLevel.Warning, Message = "InputEndpoints: touchpad WebSocket rejected — slot occupied. Device={DeviceName}")]
+    private static partial void LogTouchpadRejected(ILogger logger, string deviceName);
+
+    [LoggerMessage(EventId = 8105, Level = LogLevel.Information, Message = "InputEndpoints: keyboard WebSocket connected. Device={DeviceName}")]
+    private static partial void LogKeyboardConnected(ILogger logger, string deviceName);
+
+    [LoggerMessage(EventId = 8106, Level = LogLevel.Information, Message = "InputEndpoints: keyboard WebSocket closed. Device={DeviceName}")]
+    private static partial void LogKeyboardDisconnected(ILogger logger, string deviceName);
+
+    [LoggerMessage(EventId = 8111, Level = LogLevel.Warning, Message = "InputEndpoints: keyboard WebSocket rejected — slot occupied. Device={DeviceName}")]
+    private static partial void LogKeyboardRejected(ILogger logger, string deviceName);
 
     [LoggerMessage(EventId = 8107, Level = LogLevel.Debug, Message = "InputEndpoints: WebSocket receive error: {Message}")]
     private static partial void LogWebSocketError(ILogger logger, string message);

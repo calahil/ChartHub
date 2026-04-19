@@ -12,7 +12,7 @@ public sealed class InputWebSocketService : IInputWebSocketService
 
     public bool IsConnected => _ws?.State == WebSocketState.Open;
 
-    public async Task ConnectAsync(string baseUrl, string bearerToken, string path, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(string baseUrl, string bearerToken, string path, string deviceName, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -22,6 +22,11 @@ public sealed class InputWebSocketService : IInputWebSocketService
         if (!string.IsNullOrWhiteSpace(bearerToken))
         {
             _ws.Options.SetRequestHeader("Authorization", $"Bearer {bearerToken}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(deviceName))
+        {
+            _ws.Options.SetRequestHeader("X-Device-Name", deviceName);
         }
 
         Uri wsUri = BuildWebSocketUri(baseUrl, path);
