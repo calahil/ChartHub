@@ -1,39 +1,66 @@
 # ChartHub Hud
 
-ChartHub Hud is the Emubox window manager splash screen and status UI that pairs with ChartHub Server.
+ChartHub Hud is the window manager UI and status display for the ChartHub game console. It runs on a dedicated emulation or media PC as the user-facing interface of the **ChartHub Kiosk** session (Emubox WM) — a purpose-built session that replaces the standard Linux desktop with a minimal, full-screen rhythm game console UI.
 
 ---
 
 ## Purpose
 
-ChartHub Hud is designed to run on a dedicated emulation or media PC using Emubox WM. It provides:
+In the kiosk session, ChartHub Server is the root process. It manages the Hud as a subprocess, providing users with a status display and replacing the desktop while no game is running. The Android app's Input suite (controller, touchpad, keyboard WebSocket connections) is the primary way users interact with the console. The Hud reflects that connection state at a glance.
 
-- A splash/startup screen while ChartHub Server initializes.
-- A status display showing server readiness and connectivity.
-- Integration with the Emubox window manager session lifecycle.
+A game/app launcher view is planned for a future iteration; the current scope is status display only.
 
 ---
 
 ## Architecture
 
-ChartHub Hud is a separate Avalonia application (`ChartHub.Hud/`) that communicates with ChartHub Server over its local API. It follows the same strict MVVM architecture as the main ChartHub client.
+ChartHub Hud is a separate Avalonia application (`ChartHub.Hud/`) that communicates with ChartHub Server over its local SSE API. It follows the same strict MVVM architecture as the main ChartHub client.
 
 | Path | Purpose |
 |---|---|
-| `ChartHub.Hud/Views/` | Splash and status views |
+| `ChartHub.Hud/Views/` | Fullscreen Hud window |
 | `ChartHub.Hud/ViewModels/` | Status state and server connectivity orchestration |
-| `ChartHub.Hud/Services/` | ChartHub Server health polling |
+| `ChartHub.Hud/Services/` | ChartHub Server SSE status stream consumer |
+
+---
+
+## Layout
+
+The Hud window is fullscreen with no decorations and a dark background.
+
+- **Top strip** (64px, opaque) — spans the full width:
+  - Left: the connected Android device's hostname
+  - Right: a green/red indicator dot (green = Input WebSocket open, red = none)
+- **Main area** — the ChartHub logo centered in the remaining space below the strip
+
+When no Android device is connected, the left side of the top strip is empty and the dot is red.
+
+---
+
+## Device Name
+
+The Android app sends its device hostname when opening an Input WebSocket connection via the `X-Device-Name` HTTP header on the upgrade request. ChartHub Server reads this name, tracks it in `InputConnectionTracker`, and broadcasts it to the Hud via the SSE status stream.
+
+Only one Input WebSocket connection is permitted at a time (globally across all three endpoints — controller, touchpad, keyboard). A second connection attempt while one is active is rejected immediately.
+
+---
+
+## Lifecycle
+
+ChartHub Server spawns the Hud process on startup via `HudLifecycleService`. When an Android app launches a DesktopEntry, the server kills the Hud process to free all resources for the game. When that application exits or is killed, the server respawns the Hud.
+
+This kill-and-respawn approach is intentional — the target hardware is resource-constrained.
+
+> The kiosk session itself (Openbox X session, LightDM autologin, and deployment configuration) is documented in the operator setup guide.
 
 ---
 
 ## Running
 
-ChartHub Hud is typically launched by the Emubox WM session startup script before ChartHub Server is fully ready, then dismissed automatically once the server reports healthy.
-
-For manual testing:
+The Hud is spawned automatically by ChartHub Server in a kiosk session. For manual testing:
 
 ```bash
 dotnet run --project ChartHub.Hud/ChartHub.Hud.csproj
 ```
 
-ChartHub Server must be running (or starting) on the same host for the status indicators to populate.
+ChartHub Server must be running on the same host for the status stream to populate.

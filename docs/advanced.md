@@ -1,202 +1,422 @@
-# Advanced ChartHub Docs
+# Advanced Developer Reference
 
-This page keeps the technical material that was removed from the root README so the landing page can stay focused on end users.
+This is the authoritative developer reference for building, running, configuring, and contributing to all ChartHub subsystems.
 
-Use this document if you are:
-
-- Building ChartHub from source
-- Running the Backup API locally
-- Working on Android builds
-- Integrating with the desktop sync API
-- Contributing code to the repository
+---
 
 ## Repository Layout
 
-- [ChartHub](../ChartHub): main app project for desktop and optional Android targets
-- [ChartHub.BackupApi](../ChartHub.BackupApi): backup and mirroring service for RhythmVerse catalog data
-- [ChartHub.Server](../ChartHub.Server): server-hosted download and Clone Hero library API
-- [ChartHub.Tests](../ChartHub.Tests): test suite for the main app
-- [ChartHub.BackupApi.Tests](../ChartHub.BackupApi.Tests): test suite for the backup API
-- [ChartHub.Server.Tests](../ChartHub.Server.Tests): test suite for server endpoints and services
-- [ChartHub.sln](../ChartHub.sln): solution entry point
+| Project | Purpose |
+|---|---|
+| `ChartHub/` | Main client app — desktop (`net10.0`) and Android (`net10.0-android`) |
+| `ChartHub.Server/` | Server API — download orchestration, Clone Hero library, virtual input, runner coordination |
+| `ChartHub.BackupApi/` | RhythmVerse mirror and proxy service |
+| `ChartHub.Conversion/` | Chart conversion library (CON/RB3CON → Clone Hero) |
+| `ChartHub.TranscriptionRunner/` | AI drum transcription runner agent |
+| `ChartHub.Hud/` | HUD overlay displayed while playing (reads from ChartHub.Server) |
+| `ChartHub.Tests/` | Client app tests |
+| `ChartHub.Server.Tests/` | Server API tests |
+| `ChartHub.BackupApi.Tests/` | BackupApi tests |
+| `ChartHub.Conversion.Tests/` | Conversion library tests |
+| `ChartHub.sln` | Solution entry point |
+| `scripts/` | Dev, deploy, and ops scripts |
+| `.governance/` | Agent rules, architecture policy, contribution definition of done |
+
+---
 
 ## Requirements
 
-- .NET SDK 10.0
-- For Android builds:
-	- Android SDK installed at `$HOME/Android/Sdk`
-	- An emulator or physical Android device
+- **.NET SDK** `10.0.100` (enforced by `global.json`)
+- **Android builds additionally require:**
+  - Android SDK at `$HOME/Android/Sdk`
+  - Java 21 (`/usr/lib/jvm/java-21-openjdk-amd64` by default in tasks)
+  - AVD named `Medium_Phone_API_36` for the emulator tasks
 
-## Local Development Quick Start
+---
 
-From the repository root:
+## Build and Run
+
+### Desktop client
 
 ```bash
-dotnet build ChartHub/ChartHub.csproj
-dotnet run --project ChartHub/ChartHub.csproj
+dotnet build ChartHub/ChartHub.csproj -f net10.0
+dotnet run --project ChartHub/ChartHub.csproj --framework net10.0
 ```
 
-## Validation And Tests
+### Android — build
 
-Basic test entry point:
+```bash
+dotnet build ChartHub/ChartHub.csproj -f net10.0-android \
+  -p:JavaSdkDirectory=/usr/lib/jvm/java-21-openjdk-amd64 \
+  -p:AndroidSdkDirectory=$HOME/Android/Sdk
+```
+
+### Android — install to emulator (emulator-5554)
+
+```bash
+dotnet build ChartHub/ChartHub.csproj -t:Install \
+  -p:EnableAndroid=true -f net10.0-android \
+  -p:Device=emulator-5554 -p:RuntimeIdentifier=android-x64 \
+  -p:AndroidSdkDirectory=$HOME/Android/Sdk
+```
+
+### Android — install to physical device
+
+```bash
+dotnet build ChartHub/ChartHub.csproj -t:Install \
+  -p:EnableAndroid=true -f net10.0-android \
+  -p:Device=<DEVICE_SERIAL> -p:RuntimeIdentifier=android-arm64 \
+  -p:AndroidSdkDirectory=$HOME/Android/Sdk
+```
+
+### ChartHub.Server
+
+```bash
+dotnet run --project ChartHub.Server/ChartHub.Server.csproj --no-launch-profile
+```
+
+> `--no-launch-profile` is required for deterministic port binding. `launchSettings.json` can override `ASPNETCORE_URLS` and break health and OpenAPI probes.
+
+### ChartHub.BackupApi
+
+```bash
+dotnet run --project ChartHub.BackupApi/ChartHub.BackupApi.csproj --no-launch-profile
+```
+
+VS Code tasks cover all common desktop, Android, and server flows — see `.vscode/tasks.json`.
+
+---
+
+## Testing
+
+Run each test project individually:
 
 ```bash
 dotnet test ChartHub.Tests/ChartHub.Tests.csproj
+dotnet test ChartHub.Server.Tests/ChartHub.Server.Tests.csproj
+dotnet test ChartHub.BackupApi.Tests/ChartHub.BackupApi.Tests.csproj
+dotnet test ChartHub.Conversion.Tests/ChartHub.Conversion.Tests.csproj
 ```
 
-Repository completion requirements and agent rules are documented in:
-
-- [.governance/AGENTS.md](../.governance/AGENTS.md)
-- [.github/copilot-instructions.md](../.github/copilot-instructions.md)
-
-## Android Build And Install
-
-Build the Android target:
+Full validation before merging (required by `.governance/AGENTS.md`):
 
 ```bash
-dotnet build ChartHub/ChartHub.csproj -p:EnableAndroid=true -f net10.0-android -p:AndroidSdkDirectory=$HOME/Android/Sdk
+dotnet format ChartHub.sln --verify-no-changes --severity error --no-restore
+dotnet build ChartHub.sln --configuration Release --no-restore
+dotnet test ChartHub.Tests/ChartHub.Tests.csproj
+dotnet test ChartHub.Server.Tests/ChartHub.Server.Tests.csproj
+dotnet test ChartHub.BackupApi.Tests/ChartHub.BackupApi.Tests.csproj
+dotnet test ChartHub.Conversion.Tests/ChartHub.Conversion.Tests.csproj
 ```
 
-Install to an emulator or connected device:
+Test categories in use: `Unit`, `IntegrationLite`.
+
+---
+
+## ChartHub Client — Configuration
+
+**appsettings.json** ([ChartHub/appsettings.json](../ChartHub/appsettings.json)):
+
+| Key | Default | Purpose |
+|---|---|---|
+| `UseMockData` | `true` | Use mock API responses instead of live server (flip to `false` for real server) |
+| `GoogleDrive.android_client_id` | `""` | Google OAuth client ID for Android |
+
+**User secrets** (dev only):
 
 ```bash
-dotnet build ChartHub/ChartHub.csproj -t:Install -p:EnableAndroid=true -f net10.0-android -p:AndroidSdkDirectory=$HOME/Android/Sdk
+dotnet user-secrets set "<key>" "<value>" --project ChartHub/ChartHub.csproj
+# UserSecretsId: b0e751a2-ccc2-493f-96d7-3a78ffe23a8b
 ```
 
-The workspace also exposes build and run tasks for common desktop and Android flows.
+**Library catalog:** Installed song identities are tracked in `library-catalog.db` under the application config directory (platform-specific app data path at runtime). Source IDs are keyed by provider — `rhythmverse` and `encore`.
 
-## Configuration Notes
+---
 
-- Runtime defaults live in [ChartHub/appsettings.json](../ChartHub/appsettings.json)
-- Local development secrets use the `UserSecretsId` defined in [ChartHub/ChartHub.csproj](../ChartHub/ChartHub.csproj)
-- The current backend-compatible API authentication key name is `rhythmverseToken`
+## ChartHub.Server — Self-Hosting
 
-## Data Sources And Library Catalog
+### Key configuration
 
-- ChartHub supports both RhythmVerse and Chorus Encore as search and download sources
-- Downloads from both sources are routed through the same local destination flow
-- Library source membership is tracked in `library-catalog.db` under the application config directory
-- Source IDs are stored per provider, currently including `rhythmverse` and `encore`, to support in-library indicators across views
+**Auth (`Auth:*`):**
 
-## Backup API And Self-Hosting
+| Key | Default | Notes |
+|---|---|---|
+| `JwtSigningKey` | — | **Required.** Minimum 32 characters |
+| `Issuer` | `charthub-server` | |
+| `Audience` | `charthub-clients` | |
+| `AccessTokenMinutes` | `60` | |
+| `AllowedEmails` | `[]` | **Required.** Allowlist of Google accounts |
 
-The Backup API mirrors RhythmVerse song metadata into a local database for read access, filtering, and download redirection.
+**GoogleAuth (`GoogleAuth:*`):**
 
-Primary references:
+| Key | Notes |
+|---|---|
+| `AllowedAudiences` | Google OAuth client IDs that the server will accept tokens from |
 
-- [docs/backup-api-self-hosting.md](backup-api-self-hosting.md)
-- [ChartHub.BackupApi/README.docker.md](../ChartHub.BackupApi/README.docker.md)
-- [ChartHub.BackupApi/Program.cs](../ChartHub.BackupApi/Program.cs)
+**Server paths (`ServerPaths:*`):**
 
-### Docker Setup
+| Key | Default (container) | Notes |
+|---|---|---|
+| `ConfigRoot` | `/config` | Config and SQLite DB directory |
+| `ChartHubRoot` | `/charthub` | Working directory for downloads and staging |
+| `DownloadsDir` | `/charthub/downloads` | |
+| `StagingDir` | `/charthub/staging` | |
+| `CloneHeroRoot` | `/clonehero` | Clone Hero songs library root |
+| `SqliteDbPath` | `/config/charthub-server.db` | SQLite database file |
+| `RunnerAudioSigningKey` | `change-me-runner-audio-key` | **Required for transcription.** HMAC key for signing runner audio download URLs |
 
-The repository includes Docker Compose support for the Backup API and PostgreSQL.
+**Desktop entries (`DesktopEntry:*`):**
 
-1. Generate local env values:
+| Key | Default | Notes |
+|---|---|---|
+| `Enabled` | `true` | |
+| `CatalogDirectory` | `/usr/share/applications` | Where to scan for `.desktop` files |
+| `IconCacheDirectory` | `cache/desktop-entry-icons` | |
+| `SseIntervalSeconds` | `2` | |
+
+**HUD (`Hud:*`):**
+
+| Key | Default | Notes |
+|---|---|---|
+| `ExecutablePath` | `""` | Path to `ChartHub.Hud` binary |
+| `ServerPort` | `5000` | Port the server listens on |
+
+**Downloads (`Downloads:*`):**
+
+| Key | Default | Notes |
+|---|---|---|
+| `CompletedJobRetentionDays` | `7` | Days to keep completed jobs before cleanup |
+
+### Local dev setup
+
+Create the dev directory structure:
 
 ```bash
+./scripts/init-charthub-server-dev-paths.sh
+```
+
+This creates `dev-data/config/`, `dev-data/charthub/`, and `dev-data/clonehero/` under the repository root, matching the `appsettings.Development.json` paths.
+
+### Environment variables (container / production)
+
+From [ChartHub.Server/.env.example](../ChartHub.Server/.env.example):
+
+```bash
+CHARTHUB_SERVER_ENVIRONMENT=Production
+CHARTHUB_SERVER_PORT=5180
+CHARTHUB_SERVER_JWT_SIGNING_KEY=<32+ char secret>
+CHARTHUB_SERVER_JWT_ISSUER=charthub-server
+CHARTHUB_SERVER_JWT_AUDIENCE=charthub-clients
+CHARTHUB_SERVER_GOOGLE_DRIVE_API_KEY=
+CHARTHUB_SERVER_CONFIG_PATH=./dev-data/config
+CHARTHUB_SERVER_CHARTHUB_PATH=./dev-data/charthub
+CHARTHUB_SERVER_CLONEHERO_PATH=./dev-data/clonehero
+```
+
+User secrets for local dev:
+
+```bash
+# UserSecretsId: a4e27a88-521b-4eea-941a-fe09b3aff5cb
+dotnet user-secrets set "Auth:JwtSigningKey" "<key>" --project ChartHub.Server/ChartHub.Server.csproj
+dotnet user-secrets set "Auth:AllowedEmails:0" "you@example.com" --project ChartHub.Server/ChartHub.Server.csproj
+```
+
+---
+
+## ChartHub.BackupApi — Self-Hosting
+
+The BackupApi mirrors RhythmVerse song metadata into a local database (PostgreSQL or SQLite) and serves it to ChartHub clients.
+
+### Key configuration
+
+**Auth (`ApiKey:*`):**
+
+| Key | Default | Notes |
+|---|---|---|
+| `Key` | `""` | **Required.** Shared API key for all client requests |
+
+**Database (`Database:*`):**
+
+| Key | Default | Notes |
+|---|---|---|
+| `Provider` | `postgresql` | `postgresql` or `sqlite` |
+| `PostgreSqlConnectionString` | — | Used when `Provider` is `postgresql` |
+| `SqliteConnectionString` | `Data Source=charthub-backup.db` | Used when `Provider` is `sqlite` |
+
+**Sync (`Sync:*`):**
+
+| Key | Default | Notes |
+|---|---|---|
+| `Enabled` | `true` | |
+| `IntervalMinutes` | `10080` | 7 days between full sweeps |
+| `RecordsPerPage` | `100` | |
+| `MaxPagesPerRun` | `5000` | Cap on pages per run; incomplete runs do not soft-delete |
+| `InitialDelayMinutes` | `0` | Delay before first sync after startup |
+
+**Downloads (`Downloads:*`):**
+
+| Key | Default | Notes |
+|---|---|---|
+| `Mode` | `redirect` | Currently only `redirect` is implemented |
+| `CacheDirectory` | `./cache/downloads` | |
+| `ExternalRedirectCacheHours` | `48` | How long to cache resolved redirect URLs |
+
+**ImageCache (`ImageCache:*`):**
+
+| Key | Default | Notes |
+|---|---|---|
+| `CacheDirectory` | `./cache/images` | |
+
+User secrets for local dev:
+
+```bash
+# UserSecretsId: c272e404-7bd9-4951-9cdd-22ba952f0d31
+dotnet user-secrets set "ApiKey:Key" "<key>" --project ChartHub.BackupApi/ChartHub.BackupApi.csproj
+dotnet user-secrets set "RhythmVerseSource:Token" "<token>" --project ChartHub.BackupApi/ChartHub.BackupApi.csproj
+```
+
+### Docker Compose setup
+
+```bash
+# 1. Generate local env values (writes .env.local, never overwrites .env)
 ./scripts/setup-local-secrets.sh
-```
 
-2. Set `RHYTHMVERSE_TOKEN` in `.env.local` (or export it before running the script).
-3. Start the stack:
+# 2. Set RHYTHMVERSE_TOKEN in .env.local if not already populated
 
-```bash
+# 3. Start the stack
 docker compose up -d --build
 ```
 
-The script writes `.env.local` and never overwrites `.env`.
+The BackupApi is exposed at `http://127.0.0.1:5147`. Cache directories are mounted as bind volumes; host paths are configured via `BACKUP_DOWNLOADS_HOST_PATH` and `BACKUP_IMAGES_HOST_PATH`.
 
-The Backup API is exposed on `http://127.0.0.1:5147`.
+### Sync model
 
-Cache directories are mounted as bind mounts:
+- Each run is a full reconciliation sweep starting from page 1
+- A run completes when it receives either an empty page or a partial page (`returned < records`)
+- Songs seen in a completed run are retained; songs not seen are soft-deleted
+- Soft-deleted songs are automatically restored if they reappear in a later run
+- An incomplete run (hit `MaxPagesPerRun` before reaching a terminal page) does not soft-delete anything
+- The upstream RhythmVerse endpoint ignores `updatedSince` — correctness depends on full sweeps, not incremental watermarks
 
-- `/cache/downloads`
-- `/cache/images`
+### Client compatibility routes
 
-Host paths are configured through:
-
-- `BACKUP_DOWNLOADS_HOST_PATH`
-- `BACKUP_IMAGES_HOST_PATH`
-
-### Client Compatibility Routes
-
-To match the ChartHub client contract, the Backup API exposes:
+The BackupApi exposes the RhythmVerse-compatible query shape consumed by ChartHub clients:
 
 - `POST /api/all/songfiles/list`
 - `POST /api/all/songfiles/search/live`
 
-Supported form fields include:
+Supported form fields: `page`, `records`, `text`, `author`, `instrument` (repeatable, OR semantics), `sort[0][sort_by]`, `sort[0][sort_order]`, `data_type` (legacy, accepted but ignored).
 
-- `instrument` as a repeatable field
-- `author`
-- `sort[0][sort_by]`
-- `sort[0][sort_order]`
-- `data_type`
-- `text`
-- `page`
-- `records`
+### Health endpoint
 
-Compatibility semantics currently include:
+`GET /api/rhythmverse/health/sync` (no auth required) — useful fields:
 
-- exact `AuthorId` matching for author filters
-- instrument matching when any selected instrument maps to a non-null difficulty field
-- broad sort allow-list handling with fallback ordering for unknown sort keys
+| Field | Notes |
+|---|---|
+| `last_success_utc` | UTC timestamp of last completed sweep |
+| `lag_seconds` | Seconds since last success |
+| `total_available` | Total song count in database |
+| `reconciliation_in_progress` | `true` if a sweep is currently running |
+| `last_run_completed` | `false` if the last run hit `MaxPagesPerRun` before finishing |
 
-### Backup Sync Model
+### Operational notes
 
-- Sync runs as a full reconciliation sweep
-- Each run starts from page 1 and continues until it reaches either an empty page or a short final page where `returned < records`
-- Songs seen in the current run are marked with that run identifier
-- Songs not seen in a completed run are soft-deleted
-- Soft-deleted songs are restored automatically if they reappear upstream
-- Incomplete runs do not soft-delete unseen songs
+- Apply EF migrations before deploying reconciliation changes
+- Soft-deleted songs are excluded from all public queries by default
+- Incomplete runs leave soft-delete state unchanged — safe to limit `MaxPagesPerRun` for large catalogs
 
-### Default Cadence
+---
 
-- `Sync.IntervalMinutes` defaults to `10080`, which is one week
-- `Sync.RecordsPerPage` and `Sync.MaxPagesPerRun` are the main controls for shaping sweep size
-- If `MaxPagesPerRun` is too low to reach a terminal page, the run remains incomplete by design
+## ChartHub.Conversion — Chart Conversion Library
 
-### Health Endpoint
+`ChartHub.Conversion` converts Rock Band CON packages into Clone Hero song folders.
 
-The Backup API exposes `GET /api/rhythmverse/health/sync`.
+**Supported input formats:** `.con`, `.rb3con`
 
-Useful response fields include:
+**Entry point:**
 
-- `last_success_utc`
-- `lag_seconds`
-- `total_available`
-- `last_record_updated_unix`
-- `reconciliation_current_run_id`
-- `reconciliation_started_utc`
-- `reconciliation_completed_utc`
-- `reconciliation_in_progress`
-- `last_run_completed`
+```csharp
+IConversionService.ConvertAsync(sourcePath, outputRoot, cancellationToken)
+```
 
-### Upstream Constraint
+**Internal components:**
 
-The upstream RhythmVerse endpoint currently ignores the `updatedSince` input used by the client code, so correctness depends on full-run reconciliation rather than incremental watermark filtering.
+| Component | File | Purpose |
+|---|---|---|
+| STFS reader | `Stfs/StfsReader.cs` | Reads the STFS block chain format used by CON packages |
+| DTA parser | `Dta/DtaParser.cs` | Parses `songs.dta` metadata (artist, title, charter, instruments) |
+| MIDI converter | `Midi/RbMidiConverter.cs` | Converts Rock Band MIDI track layout → Clone Hero format |
+| Drum merger | `Midi/DrumMidiMerger.cs` | Merges Rock Band drum lanes into Clone Hero drum tracks |
+| Audio extractor | `Audio/MoggExtractor.cs` | Extracts and splits MOGG audio streams |
+| Image decoder | `Image/PngXboxDecoder.cs` | Converts Xbox DXT1/DXT5 textures → standard PNG |
+| song.ini generator | `SongIni/SongIniGenerator.cs` | Writes Clone Hero `song.ini` metadata file |
 
-### Operational Notes
+See [ChartHub.Conversion/ConversionService.cs](../ChartHub.Conversion/ConversionService.cs) for the full pipeline.
 
-- Apply Backup API EF migrations before deploying reconciliation changes
-- Public Backup API song and download lookups exclude soft-deleted rows by default
-- Soft delete is intentional so removed upstream rows are hidden from normal reads while still retained in persistence
+---
 
-## ChartHub.Server And Self-Hosting
+## ChartHub.TranscriptionRunner — Runner Agent
 
-ChartHub.Server provides authenticated endpoints for:
+`ChartHub.TranscriptionRunner` is a standalone worker that registers with a ChartHub.Server instance, claims drum transcription jobs, runs AI inference, and submits MIDI results.
 
-- download job orchestration
-- source URL resolution and staged installs
-- Clone Hero library operations (list/get/delete/restore/install-from-staged)
+### Registration (one-time)
 
-Primary references:
+First, issue a registration token from the server (requires JWT auth):
 
-- [ChartHub.Server/Program.cs](../ChartHub.Server/Program.cs)
-- [ChartHub.Server/.env.example](../ChartHub.Server/.env.example)
-- [ChartHub.Server/README.docker.md](../ChartHub.Server/README.docker.md)
+```
+POST /api/v1/runners/registration-tokens
+```
+
+Then register the runner:
+
+```bash
+dotnet run --project ChartHub.TranscriptionRunner/ChartHub.TranscriptionRunner.csproj -- \
+  register \
+  --server https://<charthub-server-host> \
+  --token <registration-token> \
+  --name <runner-name> \
+  --concurrency 1
+```
+
+This writes `~/.charthub-runner/config.json` containing the `runner_id` and hashed secret.
+
+### Running
+
+```bash
+dotnet run --project ChartHub.TranscriptionRunner/ChartHub.TranscriptionRunner.csproj -- run
+# or with explicit config path:
+dotnet run --project ChartHub.TranscriptionRunner/ChartHub.TranscriptionRunner.csproj -- run \
+  --config /path/to/config.json
+```
+
+### Worker protocol
+
+```
+register → periodic heartbeat (POST /api/v1/runner/heartbeat)
+         → claim job (POST /api/v1/runner/jobs/claim)
+         → signal processing (POST .../processing)
+         → fetch audio (GET .../audio via HMAC-signed URL)
+         → run inference
+         → upload MIDI result (POST .../complete, multipart/form-data)
+         → on error: yield (returns to queue) or fail (terminal)
+```
+
+Auth header for all runner requests: `Authorization: Runner {runnerId}:{secret}`
+
+See [API Reference — Runner Protocol](developer/api-reference.md#runner-protocol) for full endpoint and message schemas.
+
+---
+
+## Scripts
+
+| Script | Purpose |
+|---|---|
+| `scripts/init-charthub-server-dev-paths.sh` | Creates `dev-data/config/`, `dev-data/charthub/`, `dev-data/clonehero/` for local server dev |
+| `scripts/setup-local-secrets.sh` | Populates `.env.local` from Infisical or existing `.env`; never overwrites `.env` |
+| `scripts/publish-tag.sh` | Validates repo state and tags a release commit |
+| `scripts/sync-github-secrets.sh` | Pushes secrets from Infisical (or `.env`) to GitHub repository environments via `gh` CLI |
+| `scripts/kiosk-setup.sh` | Configures Lubuntu 24.04 as a ChartHub.Server kiosk (removes XFCE4, installs Openbox, sets up X session) |
+| `scripts/start-kiosk-session.sh` | LightDM X session entry point for kiosk mode; starts Openbox and launches ChartHub.Server |
 
 ### Docker Setup
 
@@ -244,48 +464,6 @@ Expected response:
 	"status": "ok"
 }
 ```
-
-## Desktop And Android Sync API
-
-The desktop sync API is the transport used between the desktop host and the Android companion.
-
-Primary references:
-
-- [docs/sync-api.md](sync-api.md)
-- [openapi.yaml](../openapi.yaml)
-- [docs/swagger-ui.html](swagger-ui.html)
-
-### Runtime Model
-
-- Desktop listens on `http://0.0.0.0:15123/`
-- Companion-facing bootstrap URLs are resolved from LAN interfaces automatically
-- If no routable LAN IPv4 address is available, ChartHub falls back to `http://127.0.0.1:15123`
-- `GET /health` is unauthenticated and returns a simple status response
-- `POST /api/pair/claim` is unauthenticated and exchanges a pair code for the sync token
-- Other `/api/*` endpoints require either `X-ChartHub-Sync-Token` or bearer-token authentication
-
-Configuration values are sourced from [ChartHub/appsettings.json](../ChartHub/appsettings.json), including:
-
-- `Runtime.SyncApiAuthToken`
-- `Runtime.SyncApiPairCode`
-- `Runtime.SyncApiPairCodeTtlMinutes`
-- `Runtime.AllowSyncApiStateOverride`
-
-### Endpoint Summary
-
-The main API surface includes:
-
-1. `GET /api/version`
-2. `POST /api/pair/claim`
-3. `GET /api/ingestions`
-4. `GET /api/ingestions/{id}`
-5. `POST /api/ingestions`
-6. `POST /api/ingestions/{id}/events`
-7. `POST /api/ingestions/{id}/actions/retry`
-8. `POST /api/ingestions/{id}/actions/install`
-9. `POST /api/ingestions/{id}/actions/open-folder`
-
-Use the OpenAPI document for the request and response schemas rather than copying the raw contract into multiple files.
 
 ## Architecture And Contribution Guidance
 

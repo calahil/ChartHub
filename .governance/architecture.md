@@ -1,6 +1,6 @@
 # Architecture
 
-This document defines the code structure for ChartHub and the boundaries contributors must follow.
+This document defines the **rules** contributors must follow. The authoritative **reference** (full service catalog, ViewModel list, DI graph, ingestion pipeline, build settings) is in [`docs/developer/architecture.md`](../docs/developer/architecture.md).
 
 ## Goals
 
@@ -11,14 +11,6 @@ This document defines the code structure for ChartHub and the boundaries contrib
 ## High-Level Design
 
 ChartHub follows a strict MVVM architecture with supporting service and configuration layers.
-
-Flow:
-
-1. View receives user interaction.
-2. View forwards intent to ViewModel.
-3. ViewModel orchestrates use cases via interfaces.
-4. Services and configuration stores perform IO and integration work.
-5. ViewModel updates state for the View to render.
 
 Required directional flow:
 
@@ -57,7 +49,7 @@ Not allowed:
 
 - Direct IO (filesystem, HTTP, DB, platform APIs).
 - Parsing logic implementation.
-- Direct dependencies on view namespaces.
+- Direct dependencies on `ChartHub.Views` or `ChartHub.Controls` namespaces.
 
 ### Model (`ChartHub/Models`)
 
@@ -75,38 +67,22 @@ Not allowed:
 Allowed:
 
 - All external IO (filesystem, HTTP, DB, OS/platform integration, parsing).
-- Provider integrations (RhythmVerse, Encore, Google Drive, sync APIs).
+- Provider integrations (RhythmVerse, Encore, Google Auth, sync APIs).
 - Config persistence and migration.
 
 Not allowed:
 
 - UI rendering concerns.
-- Dependencies on View or Control namespaces.
-
-## Repository Structure
-
-- `ChartHub/`
-- `ChartHub/Views/`: Window/page views.
-- `ChartHub/Controls/`: Reusable UI controls.
-- `ChartHub/ViewModels/`: Presentation state and orchestration.
-- `ChartHub/Models/`: Data models and DTO-like contracts.
-- `ChartHub/Services/`: Business services, integration clients, parsers, orchestrators.
-- `ChartHub/Configuration/`: Config models, metadata, migration, storage abstractions.
-- `ChartHub/Utilities/`: Shared helpers that do not violate layer boundaries.
-- `ChartHub/Android/`: Android-specific platform integration.
-- `ChartHub.Tests/`: Unit and integration-style tests for behavior and boundaries.
+- Dependencies on `ChartHub.Views` or `ChartHub.Controls` namespaces.
 
 ## Boundary Enforcement
 
-Architecture boundaries are enforced by tests, including:
+Architecture boundaries are enforced by tests:
 
 - `ArchitectureBoundariesTests.Services_And_Configuration_DoNotDependOn_ViewLayer`
 - `ArchitectureBoundariesTests.ViewModels_DoNotDependOn_ViewsOrControls`
 
-These guard against forbidden dependencies from:
-
-- Services/Configuration -> Views/Controls
-- ViewModels -> Views/Controls
+These guard against forbidden namespace imports from Services/Configuration or ViewModels into Views/Controls.
 
 ## Dependency Rules
 
@@ -114,12 +90,17 @@ These guard against forbidden dependencies from:
 - Keep dependencies flowing inward toward stable abstractions.
 - Avoid introducing new dependencies unless clearly necessary.
 
+## Platform-Specific Code
+
+All Android-specific code and usings must be guarded with `#if ANDROID`.
+
 ## Async and Error Handling
 
 - Use async end-to-end for IO paths where possible.
 - Do not block on async (`.Result` and `.Wait()` are forbidden).
 - Avoid `async void` except UI event handlers.
 - Handle failure paths explicitly with meaningful context.
+- Avoid catch-all `catch (Exception)` unless justified.
 
 ## Change Checklist
 
@@ -128,8 +109,8 @@ Before merging architecture-impacting changes:
 1. Verify MVVM responsibilities are still respected.
 2. Verify no IO was added to ViewModels.
 3. Verify no View/Control dependencies were introduced in Services or Configuration.
-4. Build with zero warnings.
-5. Run and pass tests.
+4. Build with zero warnings (`TreatWarningsAsErrors` is active).
+5. Run and pass tests. Update `docs/developer/architecture.md` if the catalog changed.
 
 ## Notes for Contributors
 
