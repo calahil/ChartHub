@@ -280,8 +280,10 @@ apt-get clean
 # 15. Create 'gamer' user (CI deploy user; owns all appdata)
 # ---------------------------------------------------------------------------
 echo "==> Creating 'gamer' user..."
+groupadd -f autologin
+groupadd -f nopasswdlogin
 if ! id gamer &>/dev/null; then
-    useradd -m -s /bin/bash -G sudo gamer
+    useradd -m -s /bin/bash -G sudo,autologin,nopasswdlogin,audio,video,input,bluetooth,plugdev,dialout gamer
     passwd -l gamer
 fi
 mkdir -p /home/gamer/.ssh
@@ -332,7 +334,7 @@ echo "==> Installing charthub-server.service..."
 cat > /etc/systemd/system/charthub-server.service <<'SERVICE_EOF'
 [Unit]
 Description=ChartHub Server
-After=network-online.target
+After=network-online.target graphical.target
 Wants=network-online.target
 
 [Service]

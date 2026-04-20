@@ -1,6 +1,6 @@
 [Unit]
 Description=ChartHub Server
-After=network-online.target
+After=network-online.target graphical.target
 Wants=network-online.target
 
 [Service]
@@ -9,6 +9,7 @@ WorkingDirectory=/srv/appdata/charthub/active/current
 EnvironmentFile=/srv/appdata/charthub/active/config/charthub-server.env
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/gamer/.Xauthority
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=PULSE_SERVER=unix:/run/user/1000/pulse/native
 ExecStart=/srv/appdata/charthub/active/current/ChartHub.Server
