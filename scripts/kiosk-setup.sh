@@ -329,8 +329,30 @@ chown -R gamer:gamer /srv/appdata/charthub
 #     systemd will fail to start until the binary is deployed; that is expected.
 # ---------------------------------------------------------------------------
 echo "==> Installing charthub-server.service..."
-install -m 0644 "${SCRIPT_DIR}/../.github/systemd/charthub-server.service" \
-    /etc/systemd/system/charthub-server.service
+cat > /etc/systemd/system/charthub-server.service <<'SERVICE_EOF'
+[Unit]
+Description=ChartHub Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/appdata/charthub/active/current
+EnvironmentFile=/srv/appdata/charthub/active/config/charthub-server.env
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=PULSE_SERVER=unix:/run/user/1000/pulse/native
+ExecStart=/srv/appdata/charthub/active/current/ChartHub.Server
+Restart=always
+RestartSec=5
+User=gamer
+Group=gamer
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+chmod 0644 /etc/systemd/system/charthub-server.service
 systemctl daemon-reload
 systemctl enable charthub-server.service
 echo "    NOTE: Start will fail until CI deploys the binary — this is expected."
