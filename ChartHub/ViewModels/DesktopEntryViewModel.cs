@@ -21,6 +21,9 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
     private readonly CancellationTokenSource _streamCts = new();
     private bool _streamStarted;
 
+    /// <summary>Raised on the UI thread after a desktop entry is successfully launched.</summary>
+    public event EventHandler? AppLaunched;
+
     public bool IsCompanionMode => OperatingSystem.IsAndroid();
 
     public bool IsDesktopMode => !OperatingSystem.IsAndroid();
@@ -173,6 +176,7 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
                 DesktopEntryCardItem? item = Entries.FirstOrDefault(candidate => candidate.EntryId == result.EntryId);
                 item?.Apply(result.Status, result.ProcessId);
                 StatusMessage = result.Message;
+                AppLaunched?.Invoke(this, EventArgs.Empty);
             });
         }
         catch (ChartHubServerApiException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)

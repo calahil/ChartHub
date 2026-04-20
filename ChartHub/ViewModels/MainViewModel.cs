@@ -488,6 +488,10 @@ public class MainViewModel : INotifyPropertyChanged
         _downloadViewModel = downloadViewModel;
         _cloneHeroViewModel = cloneHeroViewModel;
         _desktopEntryViewModel = desktopEntryViewModel;
+        if (_isAndroidMode)
+        {
+            _desktopEntryViewModel.AppLaunched += (_, _) => NavigateToTab(7);
+        }
         _volumeViewModel = volumeViewModel;
         _settingsViewModel = settingsViewModel;
         _virtualControllerViewModel = virtualControllerViewModel ?? new VirtualControllerViewModel();
