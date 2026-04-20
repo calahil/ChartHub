@@ -20,10 +20,15 @@
     "aliases": []
   },
   {
-    "version": "v1.0.0-dev",
-    "title": "v1.0.0-dev",
+    "version": "v1.0.0-dev.1",
+    "title": "v1.0.0-dev.1",
     "aliases": [
       "latest"
     ]
+  },
+  {
+    "version": "v1.0.0-dev",
+    "title": "v1.0.0-dev",
+    "aliases": []
   }
 ]
