@@ -22,14 +22,24 @@ set -euo pipefail
 # binary this session uses without editing this script.
 # The file lives in the install root (not /etc) so the deploy user can write it
 # without elevated privileges.
-KIOSK_ENV_FILE="${KIOSK_ENV_FILE:-/srv/appdata/charthub/prod/kiosk.env}"
+KIOSK_ENV_FILE="${KIOSK_ENV_FILE:-/srv/appdata/charthub/active/kiosk.env}"
 if [[ -f "$KIOSK_ENV_FILE" ]]; then
     # shellcheck source=/dev/null
     source "$KIOSK_ENV_FILE"
 fi
 
 # Fallback if the env file hasn't been written yet (first-run / manual setup)
-CHARTHUB_SERVER="${CHARTHUB_SERVER:-/srv/appdata/charthub/prod/current/ChartHub.Server}"
+CHARTHUB_SERVER="${CHARTHUB_SERVER:-/srv/appdata/charthub/active/current/ChartHub.Server}"
+
+# Load the server runtime env (ServerPaths__*, Auth__*, etc.) so the server
+# has the same environment it would get from the systemd EnvironmentFile=.
+SERVER_ENV_FILE="${SERVER_ENV_FILE:-/srv/appdata/charthub/active/config/charthub-server.env}"
+if [[ -f "$SERVER_ENV_FILE" ]]; then
+    # shellcheck source=/dev/null
+    set -a
+    source "$SERVER_ENV_FILE"
+    set +a
+fi
 
 # Optional display resolution (e.g. "1920x1080"). Leave empty to skip.
 KIOSK_RESOLUTION="${KIOSK_RESOLUTION:-}"
