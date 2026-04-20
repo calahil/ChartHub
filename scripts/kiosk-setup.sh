@@ -53,12 +53,23 @@ fi
 # 2. Generate ed25519 deploy keypair
 #    Public key → /home/gamer/.ssh/authorized_keys (baked into image)
 #    Private key → printed at end for operator to add to GitHub Secrets
+#
+#    Skipped if /home/gamer/.ssh/authorized_keys already contains a key —
+#    re-running the script will not rotate credentials already in GitHub Secrets.
 # ---------------------------------------------------------------------------
-_KEY_TMP="$(mktemp -d)"
-ssh-keygen -t ed25519 -C "charthub-deploy" -N "" -f "${_KEY_TMP}/deploy_key" -q
-DEPLOY_SSH_PUBLIC_KEY="$(cat "${_KEY_TMP}/deploy_key.pub")"
-DEPLOY_SSH_PRIVATE_KEY="$(cat "${_KEY_TMP}/deploy_key")"
-rm -rf "${_KEY_TMP}"
+EXISTING_AUTHORIZED_KEYS="/home/gamer/.ssh/authorized_keys"
+if [[ -s "$EXISTING_AUTHORIZED_KEYS" ]]; then
+    echo "==> SSH keypair already exists in ${EXISTING_AUTHORIZED_KEYS} — skipping keygen."
+    echo "    Delete ${EXISTING_AUTHORIZED_KEYS} and re-run to rotate credentials."
+    DEPLOY_SSH_PUBLIC_KEY="$(cat "$EXISTING_AUTHORIZED_KEYS")"
+    DEPLOY_SSH_PRIVATE_KEY="(already generated — check your GitHub Secrets)"
+else
+    _KEY_TMP="$(mktemp -d)"
+    ssh-keygen -t ed25519 -C "charthub-deploy" -N "" -f "${_KEY_TMP}/deploy_key" -q
+    DEPLOY_SSH_PUBLIC_KEY="$(cat "${_KEY_TMP}/deploy_key.pub")"
+    DEPLOY_SSH_PRIVATE_KEY="$(cat "${_KEY_TMP}/deploy_key")"
+    rm -rf "${_KEY_TMP}"
+fi
 
 # ---------------------------------------------------------------------------
 # 3. Refresh package lists
@@ -276,7 +287,9 @@ fi
 mkdir -p /home/gamer/.ssh
 chown gamer:gamer /home/gamer/.ssh
 chmod 700 /home/gamer/.ssh
-printf '%s\n' "${DEPLOY_SSH_PUBLIC_KEY}" > /home/gamer/.ssh/authorized_keys
+if [[ ! -s /home/gamer/.ssh/authorized_keys ]]; then
+    printf '%s\n' "${DEPLOY_SSH_PUBLIC_KEY}" > /home/gamer/.ssh/authorized_keys
+fi
 chown gamer:gamer /home/gamer/.ssh/authorized_keys
 chmod 600 /home/gamer/.ssh/authorized_keys
 
