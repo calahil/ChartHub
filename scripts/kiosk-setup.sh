@@ -50,6 +50,18 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Generate an ed25519 deploy keypair (no passphrase).
+# The public key is baked into /home/gamer/.ssh/authorized_keys.
+# The private key is printed at the end for the operator to add to GitHub
+# Secrets as SERVER_DEPLOY_SSH_PRIVATE_KEY, then deleted from disk.
+# ---------------------------------------------------------------------------
+_KEY_TMP="$(mktemp -d)"
+ssh-keygen -t ed25519 -C "charthub-deploy" -N "" -f "${_KEY_TMP}/deploy_key" -q
+DEPLOY_SSH_PUBLIC_KEY="$(cat "${_KEY_TMP}/deploy_key.pub")"
+DEPLOY_SSH_PRIVATE_KEY="$(cat "${_KEY_TMP}/deploy_key")"
+rm -rf "${_KEY_TMP}"
+
+# ---------------------------------------------------------------------------
 # 1a. Refresh package lists (required inside Cubic chroot and on fresh installs)
 # ---------------------------------------------------------------------------
 echo "==> Refreshing package lists..."
@@ -427,12 +439,7 @@ fi
 #     After flashing, run manually: sudo tailscale up --authkey <key>
 # ---------------------------------------------------------------------------
 echo "==> Installing Tailscale..."
-curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.nosugar.key \
-    | gpg --dearmor -o /usr/share/keyrings/tailscale-archive-keyring.gpg
-echo 'deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu noble main' \
-    > /etc/apt/sources.list.d/tailscale.list
-apt-get update -q
-apt-get install -y tailscale
+curl -fsSL https://tailscale.com/install.sh | sh
 systemctl enable tailscaled
 
 # ---------------------------------------------------------------------------
@@ -447,8 +454,7 @@ fi
 mkdir -p /home/gamer/.ssh
 chown gamer:gamer /home/gamer/.ssh
 chmod 700 /home/gamer/.ssh
-# Placeholder authorized_keys — CI deploy key must be added before deployment
-touch /home/gamer/.ssh/authorized_keys
+printf '%s\n' "${DEPLOY_SSH_PUBLIC_KEY}" > /home/gamer/.ssh/authorized_keys
 chown gamer:gamer /home/gamer/.ssh/authorized_keys
 chmod 600 /home/gamer/.ssh/authorized_keys
 
@@ -564,8 +570,8 @@ echo "========================================="
 echo " Next steps:"
 echo "   1. Verify autologin user in ${LIGHTDM_CONF}: ${AUTOLOGIN_USER}"
 echo "   2. After first boot: sudo tailscale up --authkey <key>"
-echo "   3. Add CI deploy SSH public key to /home/gamer/.ssh/authorized_keys"
-echo "   4. Run CI prod deploy — it will drop the binary and start the server"
+echo "   3. Copy the private key printed below into GitHub Secret SERVER_DEPLOY_SSH_PRIVATE_KEY"
+echo "   4. Run CI deploy — it will drop the binary and start the server"
 echo ""
 echo " Packages intentionally kept:"
 echo "   libgl1-mesa-dri / mesa-vulkan-drivers — AMD Radeon R5 OpenGL + Vulkan"
@@ -580,4 +586,14 @@ echo "   alsa-utils    — audio + MIDI (USB drum kit, USB mic)"
 echo "   pulseaudio    — audio daemon required by Unity/SDL2 games and USB audio"
 echo "   openbox       — WM required by Unity/SDL2 games"
 echo "   tailscale     — remote SSH access for CI deployment"
-echo "=========================================" 
+echo "========================================="
+echo ""
+echo "========================================="
+echo " ACTION REQUIRED: Save this private key as"
+echo " GitHub Secret: SERVER_DEPLOY_SSH_PRIVATE_KEY"
+echo "-----------------------------------------"
+printf '%s\n' "${DEPLOY_SSH_PRIVATE_KEY}"
+echo "-----------------------------------------"
+echo " Public key baked into /home/gamer/.ssh/authorized_keys:"
+printf '%s\n' "${DEPLOY_SSH_PUBLIC_KEY}"
+echo "========================================="
