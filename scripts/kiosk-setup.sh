@@ -360,13 +360,21 @@ systemctl --root / enable charthub-server.service
 echo "    NOTE: Start will fail until CI deploys the binary — this is expected."
 
 # ---------------------------------------------------------------------------
-# 18. Install the kiosk session script
+# 18. udev rule: grant input group read/write access to /dev/uinput
+#     Required for ChartHub.Server to create virtual gamepads via uinput.
+# ---------------------------------------------------------------------------
+echo "==> Installing uinput udev rule..."
+echo 'KERNEL=="uinput", GROUP="input", MODE="0660"' > /etc/udev/rules.d/99-uinput.rules
+chmod 0644 /etc/udev/rules.d/99-uinput.rules
+
+# ---------------------------------------------------------------------------
+# 19. Install the kiosk session script
 # ---------------------------------------------------------------------------
 echo "==> Installing kiosk session script to ${SESSION_SCRIPT}..."
 install -m 0755 "${SCRIPT_DIR}/start-kiosk-session.sh" "${SESSION_SCRIPT}"
 
 # ---------------------------------------------------------------------------
-# 19. Register the X session
+# 20. Register the X session
 # ---------------------------------------------------------------------------
 echo "==> Registering charthub-kiosk X session at ${SESSION_DESKTOP}..."
 mkdir -p "$(dirname "${SESSION_DESKTOP}")"
@@ -379,7 +387,7 @@ Type=Application
 SESSION_EOF
 
 # ---------------------------------------------------------------------------
-# 20. Configure LightDM autologin into the kiosk session
+# 21. Configure LightDM autologin into the kiosk session
 # ---------------------------------------------------------------------------
 AUTOLOGIN_USER="${KIOSK_USER:-${SUDO_USER:-$(logname 2>/dev/null || echo "")}}"
 if [[ -z "$AUTOLOGIN_USER" ]]; then
