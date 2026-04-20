@@ -262,7 +262,7 @@ jobs:
 
   build-server-bundle:
     name: Publish ChartHub.Server (linux-x64)
-    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
+    if: needs.classify.outputs.release_channel == 'dev' || needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
     runs-on: ubuntu-latest
     needs: [classify, validate]
     steps:
