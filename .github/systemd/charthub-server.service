@@ -5,13 +5,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/srv/appdata/charthub/current
-EnvironmentFile=/srv/appdata/charthub/config/charthub-server.env
+WorkingDirectory=/srv/appdata/charthub/active/current
+EnvironmentFile=/srv/appdata/charthub/active/config/charthub-server.env
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 Environment=DISPLAY=:0
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=PULSE_SERVER=unix:/run/user/1000/pulse/native
-ExecStart=/srv/appdata/charthub/current/ChartHub.Server
+ExecStart=/srv/appdata/charthub/active/current/ChartHub.Server
 Restart=always
 RestartSec=5
 User=gamer

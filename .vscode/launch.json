@@ -43,6 +43,32 @@
             }
         },
         {
+            "name": "Server: Local Debug (dev-data + .env.local)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-server-api",
+            "program": "${workspaceFolder}/ChartHub.Server/bin/Debug/net10.0/ChartHub.Server.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/ChartHub.Server",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "internalConsoleOptions": "openOnSessionStart",
+            "envFile": "${workspaceFolder}/.env.local",
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": "http://0.0.0.0:5180",
+                "ServerPaths__ConfigRoot": "${workspaceFolder}/dev-data/config",
+                "ServerPaths__ChartHubRoot": "${workspaceFolder}/dev-data/data",
+                "ServerPaths__DownloadsDir": "${workspaceFolder}/dev-data/data/downloads",
+                "ServerPaths__StagingDir": "${workspaceFolder}/dev-data/data/staging",
+                "ServerPaths__CloneHeroRoot": "${workspaceFolder}/dev-data/music",
+                "ServerPaths__SqliteDbPath": "${workspaceFolder}/dev-data/db/charthub.db",
+                "ServerLogging__LogDirectory": "${workspaceFolder}/dev-data/logs",
+                "ServerLogging__FileName": "charthub-server.log",
+                "CHARTHUB_SERVER_PORT": "5180"
+            }
+        },
+        {
             "name": "Android: Install To Emulator (emulator-5554)",
             "type": "node-terminal",
             "request": "launch",

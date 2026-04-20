@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
 # kiosk-setup.sh
-# Configures a minimal Lubuntu 24.04 machine to run ChartHub.Server as a kiosk:
-#   - Replaces XFCE4 with bare Openbox (Unity/SDL2 games require a WM for window mapping)
-#   - Removes confirmed-installed bloat: CUPS/printers, Bluetooth UI, XFCE4, NFS,
-#     snapd, build tools, .NET SDK, crash reporters, cloud-init, spell checkers
-#   - Downgrades from dotnet-sdk to dotnet-runtime only
-#   - Disables LightDM screen lock and screensaver
-#   - Installs the charthub-kiosk X session
+# Configures a minimal Xubuntu 24.04.3 machine to run ChartHub.Server as a kiosk.
+#
+# Designed to be run inside Cubic's chroot before ISO export, producing an image
+# where a fresh install requires only CI deployment to become fully operational.
+#
+# What this script does:
+#   - Creates 'gamer' user and /srv/appdata/charthub/prod/ directory tree
+#   - Installs: Openbox, dotnet-runtime-8.0+10.0, aspnetcore-runtime-8.0+10.0, Tailscale
+#   - Removes: XFCE4, CUPS, build toolchain (GCC/Clang/Go/Node/Rust/C-dev-headers),
+#     .NET SDK, crash reporters, cloud-init, snapd, spell checkers, avahi, NFS
 #   - Protects AMD Radeon integrated GPU stack from auto-removal
+#   - Disables LightDM screen lock; configures charthub-kiosk autologin session
+#   - Installs and enables charthub-server.service (binary provided by CI on first deploy)
 #
 # ---------------------------------------------------------------------------
-# Reference hardware (emubox — the machine this script was written for):
+# Reference hardware (emubox — production kiosk):
 #
-#   OS:     Lubuntu 24.04.3 LTS (Noble Numbat)
+#   OS:     Xubuntu 24.04.3 LTS (Noble Numbat) — minimal install
 #   CPU:    AMD A9-9400 Radeon R5, 5 Compute Cores 2C+3G @ 2.40 GHz (2 threads)
 #   GPU:    AMD Radeon R5 Graphics (Bristol Ridge, GCN 1.2 integrated APU)
 #           — no discrete GPU; Mesa radeonsi is the only OpenGL/Vulkan stack
@@ -20,13 +25,13 @@
 #   Audio:  USB microphone + USB e-drum kit (MIDI) + Xbox 360 wireless receiver
 #   Games:  YARG, Clone Hero (Unity/SDL2, require X11 WM + Mesa + PulseAudio)
 #
-# If your hardware differs (e.g. NVIDIA GPU, different CPU, more RAM) review:
+# If your hardware differs (e.g. NVIDIA GPU, different CPU) review:
 #   - Section 2: GPU/Mesa packages to protect and reinstall
-#   - Section 19: dkms/kernel-headers removal safety check
+#   - Section 18: dkms/kernel-headers removal safety check
 #   - Section 7: Bluetooth — remove bluez entirely if no BT controllers
 # ---------------------------------------------------------------------------
 #
-# Based on package inventory from installed.txt (Lubuntu 24.04.3 on emubox).
+# Based on package inventory from merges/install.txt (Xubuntu 24.04.3 on emubox).
 # Packages confirmed present before removing; uses --auto-remove throughout.
 
 set -euo pipefail
@@ -247,17 +252,96 @@ apt-get remove -y --auto-remove \
     || true
 
 # ---------------------------------------------------------------------------
-# 11. Remove .NET SDK; keep only the runtime needed by ChartHub.Server
-#     dotnet-runtime-8.0 and aspnetcore-runtime-8.0 are retained.
-#     NOTE: if ChartHub.Server targets net10.0, adjust the version kept here.
+# 11. Remove .NET SDK; install runtimes needed by ChartHub.Server
+#     ChartHub.Server targets net10.0; net8.0 runtime retained for other tools.
 # ---------------------------------------------------------------------------
-echo "==> Removing .NET SDK (keeping runtime)..."
+echo "==> Removing .NET SDK (all versions)..."
 apt-get remove -y --auto-remove \
     dotnet-sdk-8.0 \
+    dotnet-sdk-9.0 \
+    dotnet-sdk-10.0 \
     dotnet-templates-8.0 \
+    dotnet-templates-9.0 \
+    dotnet-templates-10.0 \
     dotnet-apphost-pack-8.0 \
+    dotnet-apphost-pack-9.0 \
+    dotnet-apphost-pack-10.0 \
     dotnet-targeting-pack-8.0 \
+    dotnet-targeting-pack-9.0 \
+    dotnet-targeting-pack-10.0 \
     aspnetcore-targeting-pack-8.0 \
+    aspnetcore-targeting-pack-9.0 \
+    aspnetcore-targeting-pack-10.0 \
+    || true
+
+echo "==> Installing .NET runtimes (8.0 + 10.0)..."
+# Add Microsoft package feed if not already present
+if [[ ! -f /etc/apt/sources.list.d/microsoft-prod.list ]]; then
+    curl -fsSL https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb \
+        -o /tmp/packages-microsoft-prod.deb
+    dpkg -i /tmp/packages-microsoft-prod.deb
+    rm -f /tmp/packages-microsoft-prod.deb
+    apt-get update -q
+fi
+apt-get install -y \
+    dotnet-runtime-8.0 \
+    aspnetcore-runtime-8.0 \
+    dotnet-runtime-10.0 \
+    aspnetcore-runtime-10.0 \
+    || true
+
+# ---------------------------------------------------------------------------
+# 11a. Remove Go toolchain (present in Xubuntu image; not needed at runtime)
+# ---------------------------------------------------------------------------
+echo "==> Removing Go toolchain..."
+apt-get remove -y --auto-remove \
+    golang \
+    golang-go \
+    golang-src \
+    golang-doc \
+    golang-1.22 \
+    golang-1.22-go \
+    golang-1.22-src \
+    golang-1.22-doc \
+    || true
+
+# ---------------------------------------------------------------------------
+# 11b. Remove Node.js dev tools (present in Xubuntu image; not needed at runtime)
+# ---------------------------------------------------------------------------
+echo "==> Removing Node.js dev tools..."
+apt-get remove -y --auto-remove \
+    nodejs \
+    libnode-dev \
+    eslint \
+    gyp \
+    handlebars \
+    javascript-common \
+    || true
+# Remove all libjs-* packages (JS libraries pulled by npm/eslint)
+dpkg -l 'libjs-*' 2>/dev/null | awk '/^ii/{print $2}' | xargs -r apt-get remove -y --auto-remove || true
+
+# ---------------------------------------------------------------------------
+# 11c. Remove C dev headers (dev-only; not needed at runtime)
+# ---------------------------------------------------------------------------
+echo "==> Removing C dev headers..."
+apt-get remove -y --auto-remove \
+    libc6-dev \
+    libc-dev-bin \
+    libc-devtools \
+    libffi-dev \
+    libicu-dev \
+    icu-devtools \
+    libncurses-dev \
+    libgcc-13-dev \
+    libcrypt-dev \
+    libasan8 \
+    libobjc-13-dev \
+    libitm1 \
+    liblsan0 \
+    libhwasan0 \
+    libtsan2 \
+    libubsan1 \
+    fakeroot \
     || true
 
 # ---------------------------------------------------------------------------
@@ -332,35 +416,93 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 19. Disable systemd charthub-server service if present
-#     On the kiosk machine the server is tied to the X session via
-#     start-kiosk-session.sh, not systemd. Running both would start two
-#     server instances.
+# 19. Install Tailscale
+#     Tailscale is pre-installed so CI can SSH to the machine after first boot.
+#     After flashing, run manually: sudo tailscale up --authkey <key>
 # ---------------------------------------------------------------------------
-echo "==> Disabling charthub-server systemd service (if installed)..."
-if systemctl list-unit-files charthub-server.service &>/dev/null | grep -q charthub-server; then
-    systemctl stop charthub-server.service 2>/dev/null || true
-    systemctl disable charthub-server.service 2>/dev/null || true
-    systemctl mask charthub-server.service
-    echo "    charthub-server.service masked."
-else
-    echo "    charthub-server.service not found — nothing to do."
-fi
+echo "==> Installing Tailscale..."
+curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/noble.nosugar.key \
+    | gpg --dearmor -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+echo 'deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu noble main' \
+    > /etc/apt/sources.list.d/tailscale.list
+apt-get update -q
+apt-get install -y tailscale
+systemctl enable tailscaled
 
 # ---------------------------------------------------------------------------
-# 20. Final autoremove pass (catch any orphaned deps)
+# 20. Create 'gamer' user (CI deploy user; owns all appdata)
+# ---------------------------------------------------------------------------
+echo "==> Creating 'gamer' user..."
+if ! id gamer &>/dev/null; then
+    useradd -m -s /bin/bash -G sudo gamer
+    # Lock password — login only via SSH key or autologin
+    passwd -l gamer
+fi
+mkdir -p /home/gamer/.ssh
+chown gamer:gamer /home/gamer/.ssh
+chmod 700 /home/gamer/.ssh
+# Placeholder authorized_keys — CI deploy key must be added before deployment
+touch /home/gamer/.ssh/authorized_keys
+chown gamer:gamer /home/gamer/.ssh/authorized_keys
+chmod 600 /home/gamer/.ssh/authorized_keys
+
+# ---------------------------------------------------------------------------
+# 21. Create /srv/appdata/charthub/{prod,staging,dev}/ directory trees
+#     CI deploys into these trees; binary slot (current/) is created by CI.
+#     prod/ is the default active env (emubox). dev/ and staging/ are for the VM.
+# ---------------------------------------------------------------------------
+_SUBDIRS=(
+    config
+    data/downloads
+    data/staging/install
+    data/staging/jobs
+    data/staging/onyx
+    db
+    logs
+    music
+    releases
+)
+
+echo "==> Creating /srv/appdata/charthub/{prod,staging,dev}/ directory trees..."
+for ENV in prod staging dev; do
+    for SUBDIR in "${_SUBDIRS[@]}"; do
+        mkdir -p "/srv/appdata/charthub/${ENV}/${SUBDIR}"
+    done
+done
+
+# 'active' points at prod by default.
+# On the VM, CI will flip this symlink to 'dev' or 'staging' on each deploy.
+ln -sfn /srv/appdata/charthub/prod /srv/appdata/charthub/active
+
+chown -R gamer:gamer /srv/appdata/charthub
+
+# ---------------------------------------------------------------------------
+# 22. Install and enable charthub-server.service
+#     The binary does not exist yet — CI provides it on first deploy.
+#     systemd will fail to start until the binary is deployed; that is expected.
+# ---------------------------------------------------------------------------
+echo "==> Installing charthub-server.service..."
+install -m 0644 "${SCRIPT_DIR}/../.github/systemd/charthub-server.service" \
+    /etc/systemd/system/charthub-server.service
+systemctl daemon-reload
+systemctl enable charthub-server.service
+echo "    charthub-server.service installed and enabled."
+echo "    NOTE: Start will fail until CI deploys the binary."
+
+# ---------------------------------------------------------------------------
+# 23. Final autoremove pass (catch any orphaned deps)
 # ---------------------------------------------------------------------------
 echo "==> Final autoremove..."
 apt-get autoremove -y --purge
 
 # ---------------------------------------------------------------------------
-# 21. Install the kiosk session script
+# 24. Install the kiosk session script
 # ---------------------------------------------------------------------------
 echo "==> Installing kiosk session script to ${SESSION_SCRIPT}..."
 install -m 0755 "${SCRIPT_DIR}/start-kiosk-session.sh" "${SESSION_SCRIPT}"
 
 # ---------------------------------------------------------------------------
-# 22. Register the X session
+# 25. Register the X session
 # ---------------------------------------------------------------------------
 echo "==> Registering charthub-kiosk X session at ${SESSION_DESKTOP}..."
 mkdir -p "$(dirname "${SESSION_DESKTOP}")"
@@ -373,7 +515,7 @@ Type=Application
 EOF
 
 # ---------------------------------------------------------------------------
-# 23. LightDM: auto-login + disable greeter screen lock
+# 26. LightDM: auto-login + disable greeter screen lock
 # ---------------------------------------------------------------------------
 AUTOLOGIN_USER="${KIOSK_USER:-${SUDO_USER:-$(logname 2>/dev/null || echo "")}}"
 if [[ -z "$AUTOLOGIN_USER" ]]; then
@@ -396,7 +538,7 @@ xserver-command=X -s 0 -dpms
 EOF
 
 # ---------------------------------------------------------------------------
-# 24. Disable lightdm-gtk-greeter screen locker (if present)
+# 27. Disable lightdm-gtk-greeter screen locker (if present)
 # ---------------------------------------------------------------------------
 GREETER_CONF="/etc/lightdm/lightdm-gtk-greeter.conf"
 if [[ -f "$GREETER_CONF" ]]; then
@@ -415,19 +557,21 @@ echo " Kiosk setup complete."
 echo "========================================="
 echo " Next steps:"
 echo "   1. Verify autologin user in ${LIGHTDM_CONF}: ${AUTOLOGIN_USER}"
-echo "   2. Edit ${SESSION_SCRIPT} — set CHARTHUB_SERVER path"
-echo "   3. Reboot to activate the kiosk session"
+echo "   2. After first boot: sudo tailscale up --authkey <key>"
+echo "   3. Add CI deploy SSH public key to /home/gamer/.ssh/authorized_keys"
+echo "   4. Run CI prod deploy — it will drop the binary and start the server"
 echo ""
 echo " Packages intentionally kept:"
- echo "   libgl1-mesa-dri / mesa-vulkan-drivers — AMD Radeon R5 OpenGL + Vulkan"
-echo "   xserver-xorg-video-amdgpu — X11 KMS display driver for AMD GCN"
-echo "   linux-firmware            — AMD GPU microcode (Ubuntu package)"
-echo "   libgles2 / libgl1-mesa-dri / mesa-vulkan-drivers — Mesa OpenGL + Vulkan"
-echo "   libdrm2 / libdrm-amdgpu1 — kernel DRM interface"
-echo "   bluez        — Bluetooth game controllers"
-echo "   ffmpeg       — game audio/video codecs"
-echo "   dotnet-runtime-8.0 / aspnetcore-runtime-8.0"
-echo "   alsa-utils   — audio + MIDI (USB drum kit, USB mic)"
-echo "   pulseaudio   — audio daemon required by Unity/SDL2 games and USB audio"
-echo "   openbox      — WM required by Unity/SDL2 games"
-echo "========================================="
+echo "   libgl1-mesa-dri / mesa-vulkan-drivers — AMD Radeon R5 OpenGL + Vulkan"
+echo "   xserver-xorg-video-amdgpu             — X11 KMS display driver for AMD GCN"
+echo "   linux-firmware                        — AMD GPU microcode (Ubuntu package)"
+echo "   libdrm2 / libdrm-amdgpu1              — kernel DRM interface"
+echo "   bluez                                 — Bluetooth game controllers"
+echo "   ffmpeg                                — game audio/video codecs"
+echo "   dotnet-runtime-8.0 + aspnetcore-runtime-8.0   — retained as fallback"
+echo "   dotnet-runtime-10.0 + aspnetcore-runtime-10.0 — ChartHub.Server target"
+echo "   alsa-utils    — audio + MIDI (USB drum kit, USB mic)"
+echo "   pulseaudio    — audio daemon required by Unity/SDL2 games and USB audio"
+echo "   openbox       — WM required by Unity/SDL2 games"
+echo "   tailscale     — remote SSH access for CI deployment"
+echo "=========================================" 
