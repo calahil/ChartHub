@@ -267,7 +267,7 @@ apt-mark manual \
 # ---------------------------------------------------------------------------
 echo "==> Installing Tailscale..."
 curl -fsSL https://tailscale.com/install.sh | sh
-systemctl enable tailscaled
+systemctl --root / enable tailscaled
 
 # ---------------------------------------------------------------------------
 # 14. Final autoremove pass
@@ -353,8 +353,8 @@ Group=gamer
 WantedBy=multi-user.target
 SERVICE_EOF
 chmod 0644 /etc/systemd/system/charthub-server.service
-systemctl daemon-reload
-systemctl enable charthub-server.service
+systemctl --root / daemon-reload 2>/dev/null || true
+systemctl --root / enable charthub-server.service
 echo "    NOTE: Start will fail until CI deploys the binary — this is expected."
 
 # ---------------------------------------------------------------------------
