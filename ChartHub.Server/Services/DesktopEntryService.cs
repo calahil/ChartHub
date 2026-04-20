@@ -95,6 +95,8 @@ public sealed partial class DesktopEntryService(
                 string name = ReadDesktopField(content, "Name") ?? Path.GetFileNameWithoutExtension(filePath);
                 string exec = ReadDesktopField(content, "Exec") ?? string.Empty;
                 string iconField = ReadDesktopField(content, "Icon") ?? string.Empty;
+                string? desktopPath = ReadDesktopField(content, "Path");
+                string? workingDirectory = string.IsNullOrWhiteSpace(desktopPath) ? null : desktopPath.Trim();
 
                 string? cachedIconAbsolutePath = CacheIconFile(iconField, filePath, appId);
                 string? iconFileName = cachedIconAbsolutePath is null ? null : Path.GetFileName(cachedIconAbsolutePath);
@@ -102,7 +104,7 @@ public sealed partial class DesktopEntryService(
                     ? null
                     : $"/desktopentry-icons/{Uri.EscapeDataString(appId)}/{Uri.EscapeDataString(iconFileName)}";
 
-                discovered[appId] = new CatalogEntry(appId, name, filePath, exec, iconFileName, iconUrl);
+                discovered[appId] = new CatalogEntry(appId, name, filePath, exec, iconFileName, iconUrl, workingDirectory);
             }
 
             _catalog.Clear();
@@ -195,7 +197,10 @@ public sealed partial class DesktopEntryService(
                     RedirectStandardOutput = false,
                     RedirectStandardError = false,
                     CreateNoWindow = true,
-                    WorkingDirectory = Path.GetDirectoryName(entry.DesktopFilePath) ?? "/",
+                    WorkingDirectory = entry.WorkingDirectory
+                        ?? Path.GetDirectoryName(exec.FileName)
+                        ?? Path.GetDirectoryName(entry.DesktopFilePath)
+                        ?? "/",
                 },
                 EnableRaisingEvents = true,
             };
@@ -701,7 +706,8 @@ public sealed partial class DesktopEntryService(
         string DesktopFilePath,
         string Exec,
         string? IconFileName,
-        string? IconUrl);
+        string? IconUrl,
+        string? WorkingDirectory);
 
     private sealed record ParsedExec(string FileName, IReadOnlyList<string> Arguments);
 }

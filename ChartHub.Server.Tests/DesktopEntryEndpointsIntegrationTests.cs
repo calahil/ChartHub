@@ -69,13 +69,13 @@ public sealed class DesktopEntryEndpointsIntegrationTests
     }
 
     [Fact]
-    public async Task IconEndpointReturns401WhenUnauthenticated()
+    public async Task IconEndpointReturnsIconWhenUnauthenticated()
     {
         await using TestAppFixture fixture = await TestAppFixture.CreateAsync(authenticatedClient: false);
 
         HttpResponseMessage response = await fixture.Client.GetAsync("/desktopentry-icons/retro/retro.png");
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]

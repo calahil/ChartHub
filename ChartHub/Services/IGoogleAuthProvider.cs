@@ -196,12 +196,7 @@ public sealed class AndroidGoogleAuthProvider(IConfiguration configuration, ISec
     private static readonly Uri DefaultAuthUri = new("https://accounts.google.com/o/oauth2/v2/auth");
     private static readonly Uri DefaultTokenUri = new("https://oauth2.googleapis.com/token");
     private const string DataStorePrefix = "google-oauth-android";
-
-    // Android OAuth client ID must be set via GoogleDrive:android_client_id in user-secrets or
-    // the GOOGLEDRIVE_ANDROID_CLIENT_ID environment variable. No fallback is provided here so
-    // a misconfigured build fails fast with a clear error message instead of silently using a
-    // stale value.
-    // Set up via: dotnet user-secrets set "GoogleDrive:android_client_id" "<YOUR_CLIENT_ID>.apps.googleusercontent.com"
+    private const string FallbackAndroidClientId = "32662681450-gk9vocigkqomedf3vkk1fjtu20slobo1.apps.googleusercontent.com";
 
     private static string GetCredentialStorePath() =>
         Path.Combine(
@@ -212,7 +207,8 @@ public sealed class AndroidGoogleAuthProvider(IConfiguration configuration, ISec
     private string? ResolveAndroidClientId() =>
         _configuration["GoogleDrive:android_client_id"]
         ?? _configuration["GoogleDrive:AndroidClientId"]
-        ?? Environment.GetEnvironmentVariable("GOOGLEDRIVE_ANDROID_CLIENT_ID");
+        ?? Environment.GetEnvironmentVariable("GOOGLEDRIVE_ANDROID_CLIENT_ID")
+        ?? FallbackAndroidClientId;
 
     private string ResolveAndroidRedirectUri(string clientId)
     {
