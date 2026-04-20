@@ -35,15 +35,16 @@ jobs:
 
           TAG="${REF_NAME}"
 
-          if [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-dev$ ]]; then
+          if [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)-dev\.([0-9]+)$ ]]; then
             MAJOR="${BASH_REMATCH[1]}"
             MINOR="${BASH_REMATCH[2]}"
             PATCH="${BASH_REMATCH[3]}"
+            DEV_NUM="${BASH_REMATCH[4]}"
             echo "release_channel=dev" >> "$GITHUB_OUTPUT"
             echo "is_tag_release=true" >> "$GITHUB_OUTPUT"
             echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
-            echo "version=${MAJOR}.${MINOR}.${PATCH}-dev" >> "$GITHUB_OUTPUT"
-            echo "image_tag=${MAJOR}.${MINOR}.${PATCH}-dev" >> "$GITHUB_OUTPUT"
+            echo "version=${MAJOR}.${MINOR}.${PATCH}-dev.${DEV_NUM}" >> "$GITHUB_OUTPUT"
+            echo "image_tag=${MAJOR}.${MINOR}.${PATCH}-dev.${DEV_NUM}" >> "$GITHUB_OUTPUT"
             echo "image_tag_minor=" >> "$GITHUB_OUTPUT"
             echo "android_version_code=$(( MAJOR * 1000000 + MINOR * 1000 + PATCH ))" >> "$GITHUB_OUTPUT"
             exit 0

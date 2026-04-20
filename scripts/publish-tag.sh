@@ -62,7 +62,7 @@ echo
 echo "Tags must match one of:"
 echo "  vX.Y.Z"
 echo "  vX.Y.Z-rc.N"
-echo "  vX.Y.Z-dev"
+echo "  vX.Y.Z-dev.N"
 echo
 
 if [[ -z "$tag_name" ]]; then
@@ -80,8 +80,8 @@ if [[ -z "$tag_name" ]]; then
   exit 1
 fi
 
-if [[ ! "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+|-dev)?$ ]]; then
-  echo "Invalid tag '$tag_name'. Expected vX.Y.Z, vX.Y.Z-rc.N, or vX.Y.Z-dev."
+if [[ ! "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+|-dev\.[0-9]+)?$ ]]; then
+  echo "Invalid tag '$tag_name'. Expected vX.Y.Z, vX.Y.Z-rc.N, or vX.Y.Z-dev.N."
   exit 1
 fi
 
