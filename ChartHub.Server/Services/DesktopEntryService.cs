@@ -184,10 +184,10 @@ public sealed partial class DesktopEntryService(
             .OptimizeAsync(exec.FileName, cancellationToken)
             .ConfigureAwait(false);
 
-        if (launchEnv.Count > 0)
+        if (launchEnv.Count > 0 && _logger.IsEnabled(LogLevel.Information))
         {
-            LogDesktopEntryLaunchEnv(_logger, entry.EntryId,
-                string.Join(' ', launchEnv.Select(kv => $"{kv.Key}={kv.Value}")));
+            string envStr = string.Join(' ', launchEnv.Select(kv => $"{kv.Key}={kv.Value}"));
+            LogDesktopEntryLaunchEnv(_logger, entry.EntryId, envStr);
         }
 
         await _hudLifecycle.SuspendAsync(cancellationToken).ConfigureAwait(false);
@@ -238,7 +238,7 @@ public sealed partial class DesktopEntryService(
             string capturedEntryId = entry.EntryId;
             ILogger<DesktopEntryService> capturedLogger = _logger;
             DateTimeOffset launchTime = DateTimeOffset.UtcNow;
-            process.Exited += (sender, _) =>
+            process.Exited += (sender, e) =>
             {
                 int exitCode = -1;
                 try { exitCode = (sender as Process)?.ExitCode ?? -1; } catch { }
@@ -253,7 +253,7 @@ public sealed partial class DesktopEntryService(
                 {
                     LogDesktopEntryExited(capturedLogger, capturedEntryId, exitCode);
                 }
-                _ = _hudLifecycle.ResumeAsync(CancellationToken.None);
+                _ = _hudLifecycle.ResumeAsync(CancellationToken.None).ConfigureAwait(false);
             };
 
             if (!process.Start())
@@ -263,8 +263,12 @@ public sealed partial class DesktopEntryService(
             }
 
             _trackedProcesses[entry.EntryId] = process.Id;
-            LogDesktopEntryExecuted(_logger, entry.EntryId, process.Id, exec.FileName,
-                string.Join(' ', exec.Arguments), process.StartInfo.WorkingDirectory);
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                string arguments = string.Join(' ', exec.Arguments);
+                LogDesktopEntryExecuted(_logger, entry.EntryId, process.Id, exec.FileName,
+                    arguments, process.StartInfo.WorkingDirectory);
+            }
 
             return new DesktopEntryActionResponse
             {
