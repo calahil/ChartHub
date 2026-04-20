@@ -84,6 +84,7 @@ public sealed partial class HudLifecycleService(
 
             _suspended = false;
             SpawnHud();
+            LogHudResumed(_logger);
         }
         finally
         {
@@ -202,7 +203,16 @@ public sealed partial class HudLifecycleService(
 
     private void OnHudExited(object? sender, EventArgs e)
     {
-        LogHudExited(_logger);
+        // If _suspended is true the kill was intentional (game launching) — log at Info.
+        // If _suspended is false the HUD exited on its own — that is unexpected, log at Warning.
+        if (_suspended)
+        {
+            LogHudExited(_logger);
+        }
+        else
+        {
+            LogHudCrashed(_logger);
+        }
 
         // Clean up without re-spawning — re-spawn is driven by ResumeAsync after game exits.
         _hudProcess?.Dispose();
@@ -227,6 +237,12 @@ public sealed partial class HudLifecycleService(
     [LoggerMessage(EventId = 9006, Level = LogLevel.Warning, Message = "HudLifecycleService: Exception while killing HUD process.")]
     private static partial void LogHudKillException(ILogger logger, Exception ex);
 
-    [LoggerMessage(EventId = 9007, Level = LogLevel.Information, Message = "HudLifecycleService: HUD process exited.")]
+    [LoggerMessage(EventId = 9007, Level = LogLevel.Information, Message = "HudLifecycleService: HUD process exited (suspended for game launch).")]
     private static partial void LogHudExited(ILogger logger);
+
+    [LoggerMessage(EventId = 9008, Level = LogLevel.Warning, Message = "HudLifecycleService: HUD process exited unexpectedly (not suspended).")]
+    private static partial void LogHudCrashed(ILogger logger);
+
+    [LoggerMessage(EventId = 9009, Level = LogLevel.Information, Message = "HudLifecycleService: HUD resumed after game exit.")]
+    private static partial void LogHudResumed(ILogger logger);
 }

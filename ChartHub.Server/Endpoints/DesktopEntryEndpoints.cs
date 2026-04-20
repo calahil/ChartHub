@@ -161,12 +161,17 @@ public static class DesktopEntryEndpoints
     private static IResult GetDesktopEntryIconAsync(
         string entryId,
         string fileName,
-        IDesktopEntryService service)
+        IDesktopEntryService service,
+        HttpContext context)
     {
         if (!service.TryResolveIconFile(entryId, fileName, out string iconPath, out string contentType))
         {
             return Results.NotFound();
         }
+
+        // Icon filenames are content-addressed (entry ID hash + original name) and never change
+        // for a given icon, so long-lived immutable caching is safe.
+        context.Response.Headers.CacheControl = "public, max-age=86400, immutable";
 
         return Results.File(iconPath, contentType);
     }

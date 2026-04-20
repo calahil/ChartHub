@@ -184,6 +184,12 @@ public sealed partial class DesktopEntryService(
             .OptimizeAsync(exec.FileName, cancellationToken)
             .ConfigureAwait(false);
 
+        if (launchEnv.Count > 0)
+        {
+            LogDesktopEntryLaunchEnv(_logger, entry.EntryId,
+                string.Join(' ', launchEnv.Select(kv => $"{kv.Key}={kv.Value}")));
+        }
+
         await _hudLifecycle.SuspendAsync(cancellationToken).ConfigureAwait(false);
 
         try
@@ -210,16 +216,43 @@ public sealed partial class DesktopEntryService(
                 process.StartInfo.Environment[key] = value;
             }
 
+            // Explicitly forward X11 display variables so the game can open a window
+            // even if ProcessStartInfo.Environment was populated before these were set.
+            string? display = Environment.GetEnvironmentVariable("DISPLAY");
+            string? xauthority = Environment.GetEnvironmentVariable("XAUTHORITY");
+            if (display is not null)
+            {
+                process.StartInfo.Environment["DISPLAY"] = display;
+            }
+
+            if (xauthority is not null)
+            {
+                process.StartInfo.Environment["XAUTHORITY"] = xauthority;
+            }
+
             foreach (string argument in exec.Arguments)
             {
                 process.StartInfo.ArgumentList.Add(argument);
             }
 
             string capturedEntryId = entry.EntryId;
-            process.Exited += (_, _) =>
+            ILogger<DesktopEntryService> capturedLogger = _logger;
+            DateTimeOffset launchTime = DateTimeOffset.UtcNow;
+            process.Exited += (sender, _) =>
             {
+                int exitCode = -1;
+                try { exitCode = (sender as Process)?.ExitCode ?? -1; } catch { }
+                TimeSpan elapsed = DateTimeOffset.UtcNow - launchTime;
                 _trackedProcesses.TryRemove(capturedEntryId, out _);
                 process.Dispose();
+                if (elapsed.TotalSeconds < 5)
+                {
+                    LogDesktopEntryFastExit(capturedLogger, capturedEntryId, exitCode, (int)elapsed.TotalMilliseconds);
+                }
+                else
+                {
+                    LogDesktopEntryExited(capturedLogger, capturedEntryId, exitCode);
+                }
                 _ = _hudLifecycle.ResumeAsync(CancellationToken.None);
             };
 
@@ -230,7 +263,8 @@ public sealed partial class DesktopEntryService(
             }
 
             _trackedProcesses[entry.EntryId] = process.Id;
-            LogDesktopEntryExecuted(_logger, entry.EntryId, process.Id);
+            LogDesktopEntryExecuted(_logger, entry.EntryId, process.Id, exec.FileName,
+                string.Join(' ', exec.Arguments), process.StartInfo.WorkingDirectory);
 
             return new DesktopEntryActionResponse
             {
@@ -284,6 +318,7 @@ public sealed partial class DesktopEntryService(
             };
         }
 
+        LogDesktopEntrySigTerm(_logger, entryId, trackedPid);
         int killExitCode = await RunProcessAsync("kill", ["-TERM", trackedPid.ToString()], cancellationToken).ConfigureAwait(false);
         if (killExitCode != 0)
         {
@@ -298,6 +333,7 @@ public sealed partial class DesktopEntryService(
         }
 
         _trackedProcesses.TryRemove(entryId, out _);
+        LogDesktopEntryKilled(_logger, entryId, trackedPid);
         await _hudLifecycle.ResumeAsync(cancellationToken).ConfigureAwait(false);
 
         return new DesktopEntryActionResponse
@@ -691,14 +727,44 @@ public sealed partial class DesktopEntryService(
     [LoggerMessage(
         EventId = 7103,
         Level = LogLevel.Information,
-        Message = "DesktopEntry executed. EntryId={EntryId}, ProcessId={ProcessId}")]
-    private static partial void LogDesktopEntryExecuted(ILogger logger, string entryId, int processId);
+        Message = "DesktopEntry executed. EntryId={EntryId}, ProcessId={ProcessId}, FileName={FileName}, Arguments={Arguments}, WorkingDirectory={WorkingDirectory}")]
+    private static partial void LogDesktopEntryExecuted(ILogger logger, string entryId, int processId, string fileName, string arguments, string workingDirectory);
 
     [LoggerMessage(
         EventId = 7104,
         Level = LogLevel.Warning,
         Message = "DesktopEntry execute failed. EntryId={EntryId}")]
     private static partial void LogDesktopEntryExecuteFailed(ILogger logger, string entryId, Exception exception);
+
+    [LoggerMessage(
+        EventId = 7105,
+        Level = LogLevel.Information,
+        Message = "DesktopEntry process exited. EntryId={EntryId}, ExitCode={ExitCode}")]
+    private static partial void LogDesktopEntryExited(ILogger logger, string entryId, int exitCode);
+
+    [LoggerMessage(
+        EventId = 7106,
+        Level = LogLevel.Warning,
+        Message = "DesktopEntry process exited very quickly (possible wrapper script). EntryId={EntryId}, ExitCode={ExitCode}, ElapsedMs={ElapsedMs}")]
+    private static partial void LogDesktopEntryFastExit(ILogger logger, string entryId, int exitCode, int elapsedMs);
+
+    [LoggerMessage(
+        EventId = 7107,
+        Level = LogLevel.Information,
+        Message = "DesktopEntry launch env vars applied. EntryId={EntryId}, Env={Env}")]
+    private static partial void LogDesktopEntryLaunchEnv(ILogger logger, string entryId, string env);
+
+    [LoggerMessage(
+        EventId = 7108,
+        Level = LogLevel.Information,
+        Message = "DesktopEntry sending SIGTERM. EntryId={EntryId}, ProcessId={ProcessId}")]
+    private static partial void LogDesktopEntrySigTerm(ILogger logger, string entryId, int processId);
+
+    [LoggerMessage(
+        EventId = 7109,
+        Level = LogLevel.Information,
+        Message = "DesktopEntry process killed. EntryId={EntryId}, ProcessId={ProcessId}")]
+    private static partial void LogDesktopEntryKilled(ILogger logger, string entryId, int processId);
 
     private sealed record CatalogEntry(
         string EntryId,

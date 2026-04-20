@@ -288,25 +288,51 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
                 .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
-            ObservableCollection<DesktopEntryCardItem> updated = new();
-            foreach (ChartHubServerDesktopEntryResponse entry in ordered)
+            // Reconcile the existing collection in-place so AsyncImageLoader bindings
+            // are not torn down and rebuilt on every SSE snapshot (which causes icon flickering).
+
+            // Remove stale entries.
+            HashSet<string> incomingIds = new(ordered.Select(e => e.EntryId), StringComparer.Ordinal);
+            for (int i = Entries.Count - 1; i >= 0; i--)
             {
-                string? iconUrl = ResolveAbsoluteIconUrl(baseUrl, entry.IconUrl);
-                if (!existing.TryGetValue(entry.EntryId, out DesktopEntryCardItem? card))
+                if (!incomingIds.Contains(Entries[i].EntryId))
                 {
-                    card = new DesktopEntryCardItem(entry.EntryId, entry.Name, entry.Status, entry.ProcessId, iconUrl);
+                    Entries.RemoveAt(i);
                 }
-                else
+            }
+
+            // Add new entries and update existing ones, maintaining sorted order.
+            for (int i = 0; i < ordered.Length; i++)
+            {
+                ChartHubServerDesktopEntryResponse entry = ordered[i];
+                string? iconUrl = ResolveAbsoluteIconUrl(baseUrl, entry.IconUrl);
+
+                if (existing.TryGetValue(entry.EntryId, out DesktopEntryCardItem? card))
                 {
                     card.Name = entry.Name;
                     card.IconUrl = iconUrl;
                     card.Apply(entry.Status, entry.ProcessId);
-                }
 
-                updated.Add(card);
+                    int currentIndex = Entries.IndexOf(card);
+                    if (currentIndex != i)
+                    {
+                        Entries.Move(currentIndex, i);
+                    }
+                }
+                else
+                {
+                    card = new DesktopEntryCardItem(entry.EntryId, entry.Name, entry.Status, entry.ProcessId, iconUrl);
+                    if (i >= Entries.Count)
+                    {
+                        Entries.Add(card);
+                    }
+                    else
+                    {
+                        Entries.Insert(i, card);
+                    }
+                }
             }
 
-            Entries = updated;
             StatusMessage = statusMessage;
         });
     }
