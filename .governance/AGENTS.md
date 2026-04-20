@@ -73,6 +73,31 @@ When making code changes, agents must:
 4. Preserve existing architecture unless a structural change is necessary.
 5. Avoid adding new dependencies unless justified.
 
+## Regression Investigation Rule
+
+When the user reports that something previously worked and no longer does:
+
+1. **Check `git log` for the relevant files before touching anything.** Do not hypothesize a cause and start editing. Find the commit.
+2. Present findings — the specific commit, the specific line — before proposing a fix.
+3. The fix must be the smallest possible revert or patch. Do not introduce a new mechanism to replace one that was broken.
+4. New mechanisms (scripts, CI steps, config patterns) require explicit user approval before implementation.
+
+## Two-Strike Rule
+
+If the agent has made two attempts at a fix and both failed:
+
+1. Stop making changes.
+2. Describe what was tried and what was observed.
+3. Ask the user for direction before attempting a third approach.
+
+## Proposal Before Action Rule
+
+For any change that touches more than one file, or that introduces a new script, CI step, or architectural mechanism:
+
+1. Describe the proposed change and which files will be affected.
+2. Wait for explicit user approval before making edits.
+3. Do not chain multi-file edits across a single response without approval for each file.
+
 ## Suppressions Policy
 
 Do not add:

@@ -173,11 +173,23 @@
         },
         {
             "label": "run-debug-android-phone",
+            "command": "dotnet",
             "type": "shell",
-            "command": "bash",
             "args": [
-                "-lc",
-                "set -euo pipefail; SECRETS_FILE=\"${HOME}/.microsoft/usersecrets/b0e751a2-ccc2-493f-96d7-3a78ffe23a8b/secrets.json\"; ANDROID_CLIENT_ID=$(python3 -c \"import json,sys; d=json.load(open(sys.argv[1])); print(d.get('GoogleDrive:android_client_id',''))\" \"$SECRETS_FILE\"); if [[ -z \"$ANDROID_CLIENT_ID\" ]]; then echo 'ERROR: GoogleDrive:android_client_id not set in user secrets'; exit 1; fi; CLIENT_ID_PREFIX=\"${ANDROID_CLIENT_ID%.apps.googleusercontent.com}\"; REDIRECT_SCHEME=\"com.googleusercontent.apps.${CLIENT_ID_PREFIX}\"; ACTIVITY=\"${workspaceFolder}/ChartHub/Android/GoogleSignInActivity.cs\"; sed -i \"s|com.googleusercontent.apps.REPLACE_WITH_ANDROID_CLIENT_ID_PREFIX|${REDIRECT_SCHEME}|g\" \"$ACTIVITY\"; cleanup() { sed -i \"s|${REDIRECT_SCHEME}|com.googleusercontent.apps.REPLACE_WITH_ANDROID_CLIENT_ID_PREFIX|g\" \"$ACTIVITY\"; }; trap cleanup EXIT; dotnet build ${workspaceFolder}/ChartHub/ChartHub.csproj -t:Run -c Debug -p:EnableAndroid=true -f net10.0-android -p:Device=R5CY10G7DWP -p:RuntimeIdentifier=android-arm64 -p:AndroidAttachDebugger=true -p:AndroidSdbHostPort=10002 -p:AndroidSdbTargetPort=10002 -p:AndroidSdkDirectory=${HOME}/Android/Sdk; ADB=\"${HOME}/Android/Sdk/platform-tools/adb\"; APP_DATA=$(\"$ADB\" -s R5CY10G7DWP shell run-as com.calahilstudios.charthub sh -c 'echo $HOME' 2>/dev/null | tr -d '\\r' || echo ''); CONFIG_JSON=$(python3 -c \"import json,sys; d=json.load(open(sys.argv[1])); base={}; base.setdefault('GoogleDrive',{})['android_client_id']=d.get('GoogleDrive:android_client_id',''); print(json.dumps(base,indent=2))\" \"$SECRETS_FILE\"); echo \"$CONFIG_JSON\" | \"$ADB\" -s R5CY10G7DWP shell run-as com.calahilstudios.charthub sh -c 'cat > files/ChartHub/appsettings.json' || echo 'WARNING: Could not push appsettings.json to device'"
+                "build",
+                "${workspaceFolder}/ChartHub/ChartHub.csproj",
+                "-t:Run",
+                "-c",
+                "Debug",
+                "-p:EnableAndroid=true",
+                "-f",
+                "net10.0-android",
+                "-p:Device=R5CY10G7DWP",
+                "-p:RuntimeIdentifier=android-arm64",
+                "-p:AndroidAttachDebugger=true",
+                "-p:AndroidSdbHostPort=10002",
+                "-p:AndroidSdbTargetPort=10002",
+                "-p:AndroidSdkDirectory=${env:HOME}/Android/Sdk"
             ],
             "problemMatcher": "$msCompile",
             "group": "test"
