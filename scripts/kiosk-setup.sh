@@ -50,6 +50,12 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 1a. Refresh package lists (required inside Cubic chroot and on fresh installs)
+# ---------------------------------------------------------------------------
+echo "==> Refreshing package lists..."
+apt-get update -q
+
+# ---------------------------------------------------------------------------
 # 2. Protect GPU, display, and audio packages from auto-removal
 #    Must run BEFORE any apt-get remove --auto-remove step.
 #
