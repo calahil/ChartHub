@@ -7,6 +7,8 @@ namespace ChartHub.Server.Endpoints;
 
 public static partial class HudStatusEndpoints
 {
+    private static readonly JsonSerializerOptions SseJsonOptions = new(JsonSerializerDefaults.Web);
+
     public static IEndpointRouteBuilder MapHudStatusEndpoints(this IEndpointRouteBuilder app)
     {
         // No authentication — restricted to loopback callers only (see LoopbackOnly guard below).
@@ -52,7 +54,7 @@ public static partial class HudStatusEndpoints
                     UinputAvailable = uinputAvailable,
                 };
                 await context.Response.WriteAsync("event: hud-status\n", cancellationToken).ConfigureAwait(false);
-                await context.Response.WriteAsync($"data: {JsonSerializer.Serialize(payload)}\n\n", cancellationToken).ConfigureAwait(false);
+                await context.Response.WriteAsync($"data: {JsonSerializer.Serialize(payload, SseJsonOptions)}\n\n", cancellationToken).ConfigureAwait(false);
                 await context.Response.Body.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
 
