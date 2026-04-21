@@ -46,9 +46,14 @@ fi
 echo "==> Installing plymouth and imagemagick..."
 apt-get install -y \
     plymouth \
-    plymouth-theme-script \
     plymouth-themes \
     imagemagick
+
+if ! find /usr/lib -path '*/plymouth/script.so' -print -quit | grep -q .; then
+    echo "ERROR: Plymouth script engine was not found after installation." >&2
+    echo "       Expected a script.so plugin under /usr/lib/*/plymouth/." >&2
+    exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # 3. Create theme directory
