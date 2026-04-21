@@ -23,7 +23,7 @@
 #   INFISICAL_HOST         Infisical host URL (default: https://app.infisical.com — set to your self-hosted URL)
 
 set -euo pipefail
-
+source "$(dirname "$0")/../merges/.env"
 REPO="calahil/ChartHub"
 ALL_ENVIRONMENTS=(dev staging production)
 ALL_SERVER_ENVIRONMENTS=(server-dev server-staging server-production)
