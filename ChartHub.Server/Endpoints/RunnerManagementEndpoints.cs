@@ -29,7 +29,9 @@ public static class RunnerManagementEndpoints
         // Accepts either:
         //   - Authorization: Bearer <user-jwt>   (interactive user session)
         //   - X-Runner-Api-Key: <static-key>     (CI / automation — never expires)
-        group.MapPost("/registration-tokens", (
+        // This endpoint is registered OUTSIDE the RequireAuthorization group so the JWT
+        // middleware does not short-circuit unauthenticated API-key requests with 401.
+        app.MapPost("/api/v1/runners/registration-tokens", (
             HttpContext ctx,
             [FromBody] IssueRunnerRegistrationTokenRequest request,
             ITranscriptionRunnerRegistry registry,
@@ -39,6 +41,7 @@ public static class RunnerManagementEndpoints
             RunnerRegistrationTokenResponse token = registry.IssueRegistrationToken(TimeSpan.FromMinutes(ttlMinutes));
             return Results.Ok(token);
         })
+        .WithTags("Runners")
         .WithName("IssueRunnerRegistrationToken")
         .WithSummary("Issue a one-time runner registration token. Accepts user JWT or X-Runner-Api-Key header.")
         .AllowAnonymous()
