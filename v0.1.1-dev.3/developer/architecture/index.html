@@ -1,0 +1,2565 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Install and manage rhythm game song charts for Clone Hero.">
+      
+      
+        <meta name="author" content="Calahil Studios">
+      
+      
+        <link rel="canonical" href="https://docs.calahilstudios.com/latest/developer/architecture/">
+      
+      
+        <link rel="prev" href="../../self-hosting/backup-api/">
+      
+      
+        <link rel="next" href="../contributing/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Architecture - ChartHub</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="ChartHub" class="md-header__button md-logo" aria-label="ChartHub" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ChartHub
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/calahilstudios/charthub" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    calahilstudios/charthub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user-guide/getting-started/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../self-hosting/server-setup/" class="md-tabs__link">
+          
+  
+  
+  Self-Hosting
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Developer
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../reference/changelog/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="ChartHub" class="md-nav__button md-logo" aria-label="ChartHub" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    ChartHub
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/calahilstudios/charthub" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    calahilstudios/charthub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/install-windows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install on Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/install-linux/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install on Linux
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/install-android/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install on Android
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/connect-to-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connect to ChartHub Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/song-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Song Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/clone-hero-conversion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Clone Hero Conversion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self-Hosting
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Self-Hosting
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../self-hosting/server-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChartHub Server Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../self-hosting/backup-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mvvm-layer-responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MVVM Layer Responsibilities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MVVM Layer Responsibilities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#view-charthubviews-charthubcontrols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        View (ChartHub/Views, ChartHub/Controls)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#viewmodel-charthubviewmodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ViewModel (ChartHub/ViewModels)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-charthubmodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model (ChartHub/Models)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#services-and-infrastructure-charthubservices-charthubconfiguration-charthubandroid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Services and Infrastructure (ChartHub/Services, ChartHub/Configuration, ChartHub/Android)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repository-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repository Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#services-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Services Catalog
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#viewmodels-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ViewModels Catalog
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#views-and-controls-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Views and Controls Catalog
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Views and Controls Catalog">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#views-charthubviews" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Views (ChartHub/Views/)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controls-charthubcontrols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controls (ChartHub/Controls/)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#song-ingestion-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Song Ingestion Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-and-secrets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration and Secrets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration and Secrets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interfaces
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stores
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependency-injection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependency Injection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dependency Injection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configuration-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration &amp; Persistence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#platform-specific-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform-Specific Services
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Services
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#viewmodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ViewModels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-specific-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform-Specific Code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-and-quality-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build and Quality Gates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#boundary-enforcement-and-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundary Enforcement and Tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#async-and-error-handling-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Async and Error Handling Rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hud/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChartHub Hud
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../self-hosted-runners.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Self-Hosted Runners
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mvvm-layer-responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MVVM Layer Responsibilities
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MVVM Layer Responsibilities">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#view-charthubviews-charthubcontrols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        View (ChartHub/Views, ChartHub/Controls)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#viewmodel-charthubviewmodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ViewModel (ChartHub/ViewModels)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#model-charthubmodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model (ChartHub/Models)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#services-and-infrastructure-charthubservices-charthubconfiguration-charthubandroid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Services and Infrastructure (ChartHub/Services, ChartHub/Configuration, ChartHub/Android)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repository-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repository Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#services-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Services Catalog
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#viewmodels-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ViewModels Catalog
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#views-and-controls-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Views and Controls Catalog
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Views and Controls Catalog">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#views-charthubviews" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Views (ChartHub/Views/)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#controls-charthubcontrols" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controls (ChartHub/Controls/)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#song-ingestion-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Song Ingestion Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-and-secrets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration and Secrets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration and Secrets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#interfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interfaces
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stores
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dependency-injection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependency Injection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dependency Injection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#configuration-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration &amp; Persistence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#platform-specific-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform-Specific Services
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Services
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#viewmodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ViewModels
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#platform-specific-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform-Specific Code
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-and-quality-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build and Quality Gates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#boundary-enforcement-and-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Boundary Enforcement and Tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#async-and-error-handling-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Async and Error Handling Rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/calahilstudios/charthub/edit/main/docs/developer/architecture.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
+<p>This document is the authoritative reference for ChartHub's code structure, layer boundaries, service catalog, and subsystem design. Rules and contribution policy are in <a href=".governance/architecture.md"><code>.governance/architecture.md</code></a>.</p>
+<hr />
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>ChartHub is a multi-target application (<code>net10.0</code> desktop + <code>net10.0-android</code>) built on Avalonia. It communicates with a user-deployed <strong>ChartHub Server</strong> instance and optionally a <strong>ChartHub BackupApi</strong> instance.</p>
+<p><strong>Data flow (required, never violated):</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>View → ViewModel → Service/Configuration → ViewModel → View
+</code></pre></div>
+<p><strong>Forbidden flows:</strong></p>
+<ul>
+<li><code>View → Service</code> (direct)</li>
+<li><code>View → Model mutation</code></li>
+<li><code>Service → View</code></li>
+</ul>
+<hr />
+<h2 id="mvvm-layer-responsibilities">MVVM Layer Responsibilities<a class="headerlink" href="#mvvm-layer-responsibilities" title="Permanent link">&para;</a></h2>
+<h3 id="view-charthubviews-charthubcontrols">View (<code>ChartHub/Views</code>, <code>ChartHub/Controls</code>)<a class="headerlink" href="#view-charthubviews-charthubcontrols" title="Permanent link">&para;</a></h3>
+<p><strong>Allowed:</strong>
+- XAML rendering, binding declarations, visual states
+- Presentation-only event handlers</p>
+<p><strong>Not allowed:</strong>
+- Business logic
+- Direct IO (filesystem, HTTP, DB, parsing)
+- Calling service implementations directly</p>
+<h3 id="viewmodel-charthubviewmodels">ViewModel (<code>ChartHub/ViewModels</code>)<a class="headerlink" href="#viewmodel-charthubviewmodels" title="Permanent link">&para;</a></h3>
+<p><strong>Allowed:</strong>
+- UI state and command orchestration
+- Coordinating use cases through service interfaces
+- Mapping service results into presentation models</p>
+<p><strong>Not allowed:</strong>
+- Direct IO (filesystem, HTTP, DB, platform APIs)
+- Parsing logic
+- Dependencies on <code>ChartHub.Views</code> or <code>ChartHub.Controls</code> namespaces</p>
+<h3 id="model-charthubmodels">Model (<code>ChartHub/Models</code>)<a class="headerlink" href="#model-charthubmodels" title="Permanent link">&para;</a></h3>
+<p><strong>Allowed:</strong>
+- Pure data contracts and value containers</p>
+<p><strong>Not allowed:</strong>
+- Side effects, IO</p>
+<h3 id="services-and-infrastructure-charthubservices-charthubconfiguration-charthubandroid">Services and Infrastructure (<code>ChartHub/Services</code>, <code>ChartHub/Configuration</code>, <code>ChartHub/Android</code>)<a class="headerlink" href="#services-and-infrastructure-charthubservices-charthubconfiguration-charthubandroid" title="Permanent link">&para;</a></h3>
+<p><strong>Allowed:</strong>
+- All external IO (filesystem, HTTP, DB, OS/platform integration, parsing)
+- Provider integrations (RhythmVerse, Encore, Google Auth)
+- Config persistence and migration</p>
+<p><strong>Not allowed:</strong>
+- UI rendering concerns
+- Dependencies on <code>ChartHub.Views</code> or <code>ChartHub.Controls</code> namespaces</p>
+<hr />
+<h2 id="repository-structure">Repository Structure<a class="headerlink" href="#repository-structure" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ChartHub/Views/</code></td>
+<td>Window and page views</td>
+</tr>
+<tr>
+<td><code>ChartHub/Controls/</code></td>
+<td>Reusable UI controls</td>
+</tr>
+<tr>
+<td><code>ChartHub/ViewModels/</code></td>
+<td>Presentation state and command orchestration</td>
+</tr>
+<tr>
+<td><code>ChartHub/Models/</code></td>
+<td>Pure data contracts</td>
+</tr>
+<tr>
+<td><code>ChartHub/Services/</code></td>
+<td>Business services, integration clients, parsers, state machines</td>
+</tr>
+<tr>
+<td><code>ChartHub/Configuration/</code></td>
+<td>Config models, interfaces, stores, migration</td>
+</tr>
+<tr>
+<td><code>ChartHub/Utilities/</code></td>
+<td>Cross-cutting helpers (layer-boundary-safe)</td>
+</tr>
+<tr>
+<td><code>ChartHub/Android/</code></td>
+<td>Android-specific platform integration (<code>#if ANDROID</code>)</td>
+</tr>
+<tr>
+<td><code>ChartHub/Resources/</code></td>
+<td>Fonts, icons, images, splash assets</td>
+</tr>
+<tr>
+<td><code>ChartHub/Themes/</code></td>
+<td>Catppuccin Macchiato color theme (<code>Palette.axaml</code>, <code>Theme.axaml</code>)</td>
+</tr>
+<tr>
+<td><code>ChartHub/Localization/</code></td>
+<td>Culture configuration and <code>.resx</code> resource file</td>
+</tr>
+<tr>
+<td><code>ChartHub/Strings/</code></td>
+<td>Compiled string key constants and icon glyph references</td>
+</tr>
+<tr>
+<td><code>ChartHub.Tests/</code></td>
+<td>Unit and integration-style tests</td>
+</tr>
+<tr>
+<td><code>ChartHub.Server/</code></td>
+<td>Server API — library management, virtual input, runner coordination</td>
+</tr>
+<tr>
+<td><code>ChartHub.Hud/</code></td>
+<td>HUD UI (game console overlay) for ChartHub Server</td>
+</tr>
+<tr>
+<td><code>ChartHub.BackupApi/</code></td>
+<td>RhythmVerse mirror and proxy service</td>
+</tr>
+<tr>
+<td><code>ChartHub.Conversion/</code></td>
+<td>Chart conversion library (MIDI, audio, image, song.ini)</td>
+</tr>
+<tr>
+<td><code>ChartHub.TranscriptionRunner/</code></td>
+<td>AI drum transcription runner agent</td>
+</tr>
+<tr>
+<td><code>.governance/</code></td>
+<td>Agent governance, architecture rules, contribution policy</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="services-catalog">Services Catalog<a class="headerlink" href="#services-catalog" title="Permanent link">&para;</a></h2>
+<p>All services live in <code>ChartHub/Services/</code>. Platform-specific variants are registered via DI (see <a href="#dependency-injection">Dependency Injection</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Interface</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ChartHubServerApiClient</code></td>
+<td><code>IChartHubServerApiClient</code></td>
+<td>HTTP client for all ChartHub Server API endpoints</td>
+</tr>
+<tr>
+<td><code>InputWebSocketService</code></td>
+<td><code>IInputWebSocketService</code></td>
+<td>WebSocket relay for virtual controller/keyboard/touchpad input</td>
+</tr>
+<tr>
+<td><code>LibraryCatalogService</code></td>
+<td>—</td>
+<td>SQLite-backed catalog of installed songs with source identity keys</td>
+</tr>
+<tr>
+<td><code>SongIngestionStateMachine</code></td>
+<td>—</td>
+<td>Orchestrates the multi-stage download → extract → convert → install pipeline</td>
+</tr>
+<tr>
+<td><code>SongIngestionCatalogService</code></td>
+<td>—</td>
+<td>Persists ingestion state, attempts, assets, and manifest files</td>
+</tr>
+<tr>
+<td><code>SongMetadataParserService</code></td>
+<td>—</td>
+<td>Parses artist/title/charter metadata from chart and MIDI files</td>
+</tr>
+<tr>
+<td><code>SharedDownloadQueue</code></td>
+<td>—</td>
+<td>Observable collection of active <code>DownloadFile</code> items for UI binding</td>
+</tr>
+<tr>
+<td><code>EncoreApiService</code></td>
+<td>—</td>
+<td>Integration client for the Encore chart source</td>
+</tr>
+<tr>
+<td><code>LibraryIdentityService</code></td>
+<td>— (static)</td>
+<td>Chart identity normalization and source key generation</td>
+</tr>
+<tr>
+<td><code>LibrarySourceNames</code></td>
+<td>— (static)</td>
+<td>Source name constants (<code>RhythmVerse</code>, <code>Encore</code>) and validation helpers</td>
+</tr>
+<tr>
+<td><code>GoogleAuthTokenDataStore</code></td>
+<td><code>IDataStore</code></td>
+<td>OAuth token persistence adapter</td>
+</tr>
+<tr>
+<td><code>DesktopGoogleAuthProvider</code></td>
+<td><code>IGoogleAuthProvider</code></td>
+<td>Google OAuth — desktop implementation</td>
+</tr>
+<tr>
+<td><code>AndroidGoogleAuthProvider</code></td>
+<td><code>IGoogleAuthProvider</code></td>
+<td>Google OAuth — Android implementation (<code>#if ANDROID</code>)</td>
+</tr>
+<tr>
+<td><code>StatusBarService</code></td>
+<td><code>IStatusBarService</code></td>
+<td>Platform status bar / notification center integration</td>
+</tr>
+<tr>
+<td><code>AndroidOrientationService</code></td>
+<td><code>IOrientationService</code></td>
+<td>Android device orientation sensor (<code>#if ANDROID</code>)</td>
+</tr>
+<tr>
+<td><code>NullOrientationService</code></td>
+<td><code>IOrientationService</code></td>
+<td>Desktop no-op orientation stub</td>
+</tr>
+<tr>
+<td><code>AndroidVolumeHardwareButtonSource</code></td>
+<td><code>IVolumeHardwareButtonSource</code></td>
+<td>Android hardware volume button events (<code>#if ANDROID</code>)</td>
+</tr>
+<tr>
+<td><code>NoOpVolumeHardwareButtonSource</code></td>
+<td><code>IVolumeHardwareButtonSource</code></td>
+<td>Desktop no-op hardware button stub</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="viewmodels-catalog">ViewModels Catalog<a class="headerlink" href="#viewmodels-catalog" title="Permanent link">&para;</a></h2>
+<p>All ViewModels live in <code>ChartHub/ViewModels/</code> and receive dependencies exclusively via constructor injection.</p>
+<table>
+<thead>
+<tr>
+<th>ViewModel</th>
+<th>Purpose</th>
+<th>Key dependencies</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MainViewModel</code></td>
+<td>Root container; coordinates all child VMs and shared download queue</td>
+<td>All child VMs, <code>SharedDownloadQueue</code></td>
+</tr>
+<tr>
+<td><code>AppShellViewModel</code></td>
+<td>Root app shell state and navigation</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>SplashViewModel</code></td>
+<td>Splash/initialization screen state</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>DownloadViewModel</code></td>
+<td>Download queue, progress, cancel, retry</td>
+<td><code>AppGlobalSettings</code>, <code>IChartHubServerApiClient</code>, <code>SharedDownloadQueue</code>, <code>CloneHeroViewModel</code>, <code>IStatusBarService</code></td>
+</tr>
+<tr>
+<td><code>CloneHeroViewModel</code></td>
+<td>Clone Hero library browsing and install management</td>
+<td><code>AppGlobalSettings</code>, <code>IChartHubServerApiClient</code></td>
+</tr>
+<tr>
+<td><code>RhythmVerseViewModel</code></td>
+<td>RhythmVerse catalog browsing and ingestion</td>
+<td><code>IConfiguration</code>, <code>LibraryCatalogService</code>, <code>SharedDownloadQueue</code>, <code>ISettingsOrchestrator</code>, <code>IChartHubServerApiClient</code></td>
+</tr>
+<tr>
+<td><code>EncoreViewModel</code></td>
+<td>Encore chart source search and results</td>
+<td><code>EncoreApiService</code></td>
+</tr>
+<tr>
+<td><code>SettingsViewModel</code></td>
+<td>App settings/preferences UI</td>
+<td><code>ISettingsOrchestrator</code>, <code>IAppConfigStore</code></td>
+</tr>
+<tr>
+<td><code>DesktopEntryViewModel</code></td>
+<td>Desktop shortcut launcher management</td>
+<td><code>AppGlobalSettings</code>, <code>IChartHubServerApiClient</code></td>
+</tr>
+<tr>
+<td><code>VolumeViewModel</code></td>
+<td>Volume control and hardware button handling</td>
+<td><code>AppGlobalSettings</code>, <code>IChartHubServerApiClient</code>, <code>IVolumeHardwareButtonSource</code></td>
+</tr>
+<tr>
+<td><code>VirtualControllerViewModel</code></td>
+<td>Virtual gamepad input relay</td>
+<td><code>AppGlobalSettings</code>, <code>IInputWebSocketService</code>, <code>IOrientationService</code></td>
+</tr>
+<tr>
+<td><code>VirtualTouchPadViewModel</code></td>
+<td>Virtual touchpad gesture relay</td>
+<td><code>AppGlobalSettings</code>, <code>IInputWebSocketService</code>, <code>IOrientationService</code></td>
+</tr>
+<tr>
+<td><code>VirtualKeyboardViewModel</code></td>
+<td>Virtual keyboard input relay</td>
+<td><code>AppGlobalSettings</code>, <code>IInputWebSocketService</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="views-and-controls-catalog">Views and Controls Catalog<a class="headerlink" href="#views-and-controls-catalog" title="Permanent link">&para;</a></h2>
+<h3 id="views-charthubviews">Views (<code>ChartHub/Views/</code>)<a class="headerlink" href="#views-charthubviews" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>View</th>
+<th>Bound to</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AppShellView</code></td>
+<td><code>AppShellViewModel</code></td>
+</tr>
+<tr>
+<td><code>SplashView</code></td>
+<td><code>SplashViewModel</code></td>
+</tr>
+<tr>
+<td><code>MainView</code></td>
+<td><code>MainViewModel</code></td>
+</tr>
+<tr>
+<td><code>DownloadView</code></td>
+<td><code>DownloadViewModel</code></td>
+</tr>
+<tr>
+<td><code>CloneHeroView</code></td>
+<td><code>CloneHeroViewModel</code></td>
+</tr>
+<tr>
+<td><code>RhythmVerseView</code></td>
+<td><code>RhythmVerseViewModel</code></td>
+</tr>
+<tr>
+<td><code>EncoreView</code></td>
+<td><code>EncoreViewModel</code></td>
+</tr>
+<tr>
+<td><code>SettingsView</code></td>
+<td><code>SettingsViewModel</code></td>
+</tr>
+<tr>
+<td><code>DesktopEntryView</code></td>
+<td><code>DesktopEntryViewModel</code></td>
+</tr>
+<tr>
+<td><code>VolumeView</code></td>
+<td><code>VolumeViewModel</code></td>
+</tr>
+<tr>
+<td><code>VirtualControllerView</code></td>
+<td><code>VirtualControllerViewModel</code></td>
+</tr>
+<tr>
+<td><code>VirtualTouchPadView</code></td>
+<td><code>VirtualTouchPadViewModel</code></td>
+</tr>
+<tr>
+<td><code>VirtualKeyboardView</code></td>
+<td><code>VirtualKeyboardViewModel</code></td>
+</tr>
+<tr>
+<td><code>SharedDownloadCardsView</code></td>
+<td>Reusable download card component (no dedicated VM)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="controls-charthubcontrols">Controls (<code>ChartHub/Controls/</code>)<a class="headerlink" href="#controls-charthubcontrols" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SongInfoControl</code></td>
+<td>Song metadata display card</td>
+</tr>
+<tr>
+<td><code>SongRatingControl</code></td>
+<td>Song difficulty/rating display</td>
+</tr>
+<tr>
+<td><code>StarRatingControl</code></td>
+<td>Interactive star rating widget</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="song-ingestion-pipeline">Song Ingestion Pipeline<a class="headerlink" href="#song-ingestion-pipeline" title="Permanent link">&para;</a></h2>
+<p>Song ingestion is orchestrated by <code>SongIngestionStateMachine</code> and persisted by <code>SongIngestionCatalogService</code>.</p>
+<p><strong>Stage sequence:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Queued → Downloading → Downloaded → InstallQueued → Staging → Installing → Installed
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>                                                                          ↘ Failed
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Queued</code></td>
+<td>Job created, waiting for worker</td>
+</tr>
+<tr>
+<td><code>Downloading</code></td>
+<td>File being fetched from source URL</td>
+</tr>
+<tr>
+<td><code>Downloaded</code></td>
+<td>File on disk, awaiting install queue slot</td>
+</tr>
+<tr>
+<td><code>InstallQueued</code></td>
+<td>Queued for staging/conversion</td>
+</tr>
+<tr>
+<td><code>Staging</code></td>
+<td>Archive extracted, chart files prepared</td>
+</tr>
+<tr>
+<td><code>Installing</code></td>
+<td>Conversion complete, copying to Clone Hero library</td>
+</tr>
+<tr>
+<td><code>Installed</code></td>
+<td>Song is in the library, ready to play</td>
+</tr>
+<tr>
+<td><code>Failed</code></td>
+<td>Terminal failure — <code>error</code> field contains reason</td>
+</tr>
+</tbody>
+</table>
+<p><code>SongIngestionCatalogService</code> records each attempt, associated assets, and the manifest file path. <code>LibraryCatalogService</code> holds the final installed song identity keyed by <code>(source, source_id)</code>.</p>
+<p>Setting <code>drum_gen_requested: true</code> on job creation automatically enqueues an AI drum transcription job (via <code>ChartHub.TranscriptionRunner</code>) after the <code>Installed</code> stage.</p>
+<hr />
+<h2 id="configuration-and-secrets">Configuration and Secrets<a class="headerlink" href="#configuration-and-secrets" title="Permanent link">&para;</a></h2>
+<p>Configuration lives in <code>ChartHub/Configuration/</code>.</p>
+<h3 id="interfaces">Interfaces<a class="headerlink" href="#interfaces" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Interface</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IAppConfigStore</code></td>
+<td>Read/write app configuration</td>
+</tr>
+<tr>
+<td><code>ISecretStore</code></td>
+<td>Secure secret storage (tokens, API keys)</td>
+</tr>
+<tr>
+<td><code>ISettingsOrchestrator</code></td>
+<td>Coordinates read/write with validation and migration</td>
+</tr>
+<tr>
+<td><code>IConfigValidator</code></td>
+<td>Validates config state on load</td>
+</tr>
+</tbody>
+</table>
+<h3 id="stores">Stores<a class="headerlink" href="#stores" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th>Platform</th>
+<th>Backend</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>JsonAppConfigStore</code></td>
+<td>Both</td>
+<td><code>appsettings.json</code> + user secrets</td>
+</tr>
+<tr>
+<td><code>EncryptedFileSecretStore</code></td>
+<td>Desktop</td>
+<td>Encrypted file on disk</td>
+</tr>
+<tr>
+<td><code>AndroidKeystoreSecretStore</code></td>
+<td>Android (<code>#if ANDROID</code>)</td>
+<td>Android Keystore</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Config models:</strong> <code>AppConfigRoot</code>, <code>RuntimeAppConfig</code>, <code>GoogleAuthConfig</code>, <code>RhythmVerseSource</code>, <code>EncoreUiStateConfig</code></p>
+<p><strong>Secret key constants:</strong> <code>SecretKeys.cs</code> — names for OAuth tokens and API keys.</p>
+<p><strong>Migration:</strong> <code>SettingsMigrationService</code> runs on first boot after an upgrade to move legacy secrets to current format. Runs async on Android, synchronously-blocked on desktop.</p>
+<hr />
+<h2 id="dependency-injection">Dependency Injection<a class="headerlink" href="#dependency-injection" title="Permanent link">&para;</a></h2>
+<p>DI is configured in <code>ChartHub/Utilities/AppBootstrapper.cs</code>. All registrations are singletons unless noted.</p>
+<h3 id="configuration-persistence">Configuration &amp; Persistence<a class="headerlink" href="#configuration-persistence" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>IConfiguration           ← appsettings.json + user secrets
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>IAppConfigStore          → JsonAppConfigStore
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>ISecretStore             → EncryptedFileSecretStore (desktop)
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                         → AndroidKeystoreSecretStore (Android)
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>IConfigValidator         → DefaultConfigValidator
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>ISettingsOrchestrator    → SettingsOrchestrator
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>SettingsMigrationService
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>AppGlobalSettings        (singleton)
+</code></pre></div>
+<h3 id="platform-specific-services">Platform-Specific Services<a class="headerlink" href="#platform-specific-services" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>#if ANDROID:
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  IOrientationService          → AndroidOrientationService
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  IVolumeHardwareButtonSource  → AndroidVolumeHardwareButtonSource
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  IGoogleAuthProvider          → AndroidGoogleAuthProvider
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>#else:
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  IOrientationService          → NullOrientationService
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>  IVolumeHardwareButtonSource  → NoOpVolumeHardwareButtonSource
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  IGoogleAuthProvider          → DesktopGoogleAuthProvider
+</code></pre></div>
+<h3 id="core-services">Core Services<a class="headerlink" href="#core-services" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>EncoreApiService             (singleton)
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>SharedDownloadQueue          (singleton)
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>LibraryCatalogService        (singleton, SQLite-backed)
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>IChartHubServerApiClient  → ChartHubServerApiClient (singleton)
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>IStatusBarService         → StatusBarService (singleton)
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>IInputWebSocketService    → InputWebSocketService (transient)
+</code></pre></div>
+<h3 id="viewmodels">ViewModels<a class="headerlink" href="#viewmodels" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>DownloadViewModel
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>CloneHeroViewModel
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>DesktopEntryViewModel
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>VolumeViewModel
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>SettingsViewModel
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>RhythmVerseViewModel
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>EncoreViewModel
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>VirtualControllerViewModel
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>VirtualTouchPadViewModel
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>VirtualKeyboardViewModel
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>MainViewModel          ← composed from all child VMs above
+</code></pre></div>
+<hr />
+<h2 id="platform-specific-code">Platform-Specific Code<a class="headerlink" href="#platform-specific-code" title="Permanent link">&para;</a></h2>
+<p>All Android-specific code and usings must be guarded with <code>#if ANDROID</code>.</p>
+<p><strong>Android-only entry points:</strong></p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ChartHub/Android/MainActivity.cs</code></td>
+<td>Android main activity for Avalonia host</td>
+</tr>
+<tr>
+<td><code>ChartHub/Android/AndroidApp.cs</code></td>
+<td>Android app lifecycle</td>
+</tr>
+<tr>
+<td><code>ChartHub/Android/GoogleSignInActivity.cs</code></td>
+<td>Google OAuth activity</td>
+</tr>
+<tr>
+<td><code>ChartHub/Android/AndroidVolumeHardwareButtonSource.cs</code></td>
+<td>Hardware volume key events</td>
+</tr>
+<tr>
+<td><code>ChartHub/Android/AndroidManifest.xml</code></td>
+<td>Permissions and activity declarations</td>
+</tr>
+</tbody>
+</table>
+<p>Desktop builds exclude the entire <code>Android/</code> folder at compile time.</p>
+<hr />
+<h2 id="build-and-quality-gates">Build and Quality Gates<a class="headerlink" href="#build-and-quality-gates" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Target frameworks</td>
+<td><code>net10.0</code> (desktop), <code>net10.0-android</code></td>
+</tr>
+<tr>
+<td>.NET SDK</td>
+<td><code>10.0.100</code> (global.json, <code>latestFeature</code> roll-forward)</td>
+</tr>
+<tr>
+<td>Nullable</td>
+<td><code>enable</code> — strict null checks enforced</td>
+</tr>
+<tr>
+<td><code>TreatWarningsAsErrors</code></td>
+<td><code>true</code> — warnings block build</td>
+</tr>
+<tr>
+<td><code>AnalysisLevel</code></td>
+<td><code>latest-recommended</code></td>
+</tr>
+<tr>
+<td><code>EnforceCodeStyleInBuild</code></td>
+<td><code>true</code> — code style violations are errors</td>
+</tr>
+<tr>
+<td>Banned APIs</td>
+<td><code>BannedSymbols.txt</code> enforced via analyzer</td>
+</tr>
+<tr>
+<td><code>AllowUnsafeBlocks</code></td>
+<td><code>true</code> (SkiaSharp graphics interop only)</td>
+</tr>
+</tbody>
+</table>
+<p>Run before merging any change:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>dotnet format ChartHub.sln --verify-no-changes --severity error --no-restore
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>dotnet build ChartHub.sln --configuration Release --no-restore
+</code></pre></div>
+<hr />
+<h2 id="boundary-enforcement-and-tests">Boundary Enforcement and Tests<a class="headerlink" href="#boundary-enforcement-and-tests" title="Permanent link">&para;</a></h2>
+<p>Architecture boundaries are enforced by two tests in <code>ChartHub.Tests/ArchitectureBoundariesTests.cs</code>:</p>
+<ul>
+<li><code>Services_And_Configuration_DoNotDependOn_ViewLayer</code> — scans all <code>.cs</code> files in <code>Services/</code> and <code>Configuration/</code>; fails if any file imports <code>ChartHub.Views</code> or <code>ChartHub.Controls</code></li>
+<li><code>ViewModels_DoNotDependOn_ViewsOrControls</code> — same scan over <code>ViewModels/</code>; fails if any file imports <code>ChartHub.Views</code> or <code>ChartHub.Controls</code></li>
+</ul>
+<p>Tests use trait <code>[Trait("Category", "Unit")]</code>. Additional integration-style tests are tagged <code>IntegrationLite</code>. All layers have test coverage — 28 test files covering ViewModels, services, config, parsing, state machines, and utilities.</p>
+<hr />
+<h2 id="async-and-error-handling-rules">Async and Error Handling Rules<a class="headerlink" href="#async-and-error-handling-rules" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Use async end-to-end for all IO paths.</li>
+<li><code>.Result</code> and <code>.Wait()</code> are <strong>forbidden</strong>.</li>
+<li><code>async void</code> is allowed only for UI event handlers.</li>
+<li>Handle failure paths explicitly with meaningful error context.</li>
+<li>Avoid catch-all <code>catch (Exception)</code> unless justified.</li>
+</ul>
+<hr />
+<h2 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">&para;</a></h2>
+<p>See <a href="../contributing/">Contributing</a> for the full contribution workflow and definition of done. Rules enforced on agents are in <a href=".governance/AGENTS.md"><code>.governance/AGENTS.md</code></a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../../self-hosting/backup-api/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Backup API">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Backup API
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../contributing/" class="md-footer__link md-footer__link--next" aria-label="Next: Contributing">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Contributing
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/calahilstudios/charthub" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.footer", "search.highlight", "search.suggest", "content.code.copy", "content.action.edit"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
