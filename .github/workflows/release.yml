@@ -699,6 +699,14 @@ jobs:
             exit 1
           fi
           echo "staged_image_ref=$EXPECTED_IMAGE_REF" >> "$GITHUB_OUTPUT"
+          printf '%s' "$EXPECTED_IMAGE_REF" > /tmp/staged-image-ref.txt
+
+      - name: Upload staged image ref
+        uses: actions/upload-artifact@v4
+        with:
+          name: staged-image-ref
+          path: /tmp/staged-image-ref.txt
+          retention-days: 1
 
       - name: Clean up
         if: always()
@@ -750,11 +758,17 @@ jobs:
           EFFECTIVE_PORT="${SSH_PORT:-22}"
           ssh-keyscan -p "$EFFECTIVE_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
+      - name: Download staged image ref
+        uses: actions/download-artifact@v4
+        with:
+          name: staged-image-ref
+          path: /tmp/staged-ref
+
       - name: Verify promotion digest from staging
         env:
           EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-backup-api@${{ needs.build-api-image.outputs.image_digest }}
-          STAGED_IMAGE_REF: ${{ needs.deploy-staging.outputs.staged_image_ref }}
         run: |
+          STAGED_IMAGE_REF="$(cat /tmp/staged-ref/staged-image-ref.txt)"
           if [[ -z "$STAGED_IMAGE_REF" ]]; then
             echo "Staging image reference is missing"
             exit 1
@@ -1640,18 +1654,31 @@ jobs:
           SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
-          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
-            if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
-               sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
-              sudo systemctl restart charthub-server.service
-              sudo systemctl --no-pager --full status charthub-server.service || true
-            else
-              # Kiosk mode: service is masked; kill the running process so the X session
-              # exits and LightDM restarts it via start-kiosk-session.sh with the new binary.
-              pkill -f 'ChartHub.Server' || true
-              echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
+          # Retry up to 3 times: the SSH connection can be lost if the service restart
+          # briefly disrupts the network or causes the SSH session to be dropped.
+          for attempt in 1 2 3; do
+            ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" \
+              -o BatchMode=yes -o ConnectTimeout=30 \
+              -o ServerAliveInterval=10 -o ServerAliveCountMax=6 \
+              "${SSH_USER}@${SSH_HOST}" "
+              if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
+                 sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
+                sudo systemctl restart charthub-server.service
+                sudo systemctl --no-pager --full status charthub-server.service || true
+              else
+                # Kiosk mode: service is masked; kill the running process so the X session
+                # exits and LightDM restarts it via start-kiosk-session.sh with the new binary.
+                pkill -f 'ChartHub.Server' || true
+                echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
+              fi
+            " && break
+            if [[ "$attempt" == "3" ]]; then
+              echo "Restart failed after 3 attempts"
+              exit 1
             fi
-          "
+            echo "Attempt $attempt failed (exit $?), retrying in 10s..."
+            sleep 10
+          done
 
       - name: Verify health
         env:
