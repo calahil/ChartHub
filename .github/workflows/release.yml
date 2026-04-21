@@ -1653,6 +1653,30 @@ jobs:
             rm -f /tmp/charthub-server.service
           "
 
+      - name: Wait for SSH connectivity after daemon-reload
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          # daemon-reload on the physical kiosk device can briefly disrupt the Tailscale
+          # route. Probe until SSH connectivity is confirmed before attempting the restart.
+          for i in $(seq 1 24); do
+            if ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" \
+              -o BatchMode=yes -o ConnectTimeout=10 \
+              "${SSH_USER}@${SSH_HOST}" "echo ssh-ok" 2>/dev/null; then
+              echo "SSH connectivity confirmed after $i probe(s)"
+              break
+            fi
+            if [[ "$i" == "24" ]]; then
+              echo "::error::SSH unreachable 120s after daemon-reload - Tailscale or host issue"
+              exit 1
+            fi
+            echo "Probe $i: not yet reachable, waiting 5s..."
+            sleep 5
+          done
+
       - name: Restart server service
         env:
           SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
