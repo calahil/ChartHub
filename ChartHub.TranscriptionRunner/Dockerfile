@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir basic-pitch==0.3.6
+RUN pip install --no-cache-dir basic-pitch==0.4.0
 
 RUN groupadd --gid 1000 runner && useradd --uid 1000 --gid 1000 --create-home runner
 # /config and /data are the bind-mount points; symlink so the app finds its standard path
