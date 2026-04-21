@@ -36,17 +36,17 @@ public sealed class InstallConcurrencyLimiterTests : IDisposable
         await _sut.WaitAsync(CancellationToken.None);
         await _sut.WaitAsync(CancellationToken.None);
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         Task third = _sut.WaitAsync(cts.Token);
 
         // Should not complete immediately since both slots are taken.
         await Task.Delay(50);
         Assert.False(third.IsCompleted, "Third acquire should be blocked while two slots are taken.");
 
-        // Release one slot — third should proceed.
+        // Release one slot — third should proceed within a generous window.
         _sut.Release();
-        await Task.Delay(50);
-        Assert.True(third.IsCompleted, "Third acquire should have proceeded after a slot was released.");
+        await third.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(third.IsCompletedSuccessfully, "Third acquire should have proceeded after a slot was released.");
 
         _sut.Release();
         _sut.Release();
