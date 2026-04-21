@@ -1325,14 +1325,19 @@
 <p>The Hud window is fullscreen with no decorations and a dark background.</p>
 <ul>
 <li><strong>Top strip</strong> (64px, opaque) — spans the full width:</li>
-<li>Left: the connected Android device's hostname</li>
+<li>Left: the connected Android device's display name</li>
 <li>Right: a green/red indicator dot (green = Input WebSocket open, red = none)</li>
 <li><strong>Main area</strong> — the ChartHub logo centered in the remaining space below the strip</li>
 </ul>
 <p>When no Android device is connected, the left side of the top strip is empty and the dot is red.</p>
 <hr />
 <h2 id="device-name">Device Name<a class="headerlink" href="#device-name" title="Permanent link">&para;</a></h2>
-<p>The Android app sends its device hostname when opening an Input WebSocket connection via the <code>X-Device-Name</code> HTTP header on the upgrade request. ChartHub Server reads this name, tracks it in <code>InputConnectionTracker</code>, and broadcasts it to the Hud via the SSE status stream.</p>
+<p>The Android app sends a display name when opening Presence and Input WebSocket connections via the <code>X-Device-Name</code> HTTP header. The name source is:</p>
+<ol>
+<li>Android user-assigned device name, when available.</li>
+<li><code>Manufacturer Model</code> fallback when no user-assigned name is available.</li>
+</ol>
+<p>ChartHub Server normalizes this value (trim, collapse whitespace, remove control chars, cap length), tracks it in <code>InputConnectionTracker</code>, and broadcasts it to the Hud via the SSE status stream.</p>
 <p>Only one Input WebSocket connection is permitted at a time (globally across all three endpoints — controller, touchpad, keyboard). A second connection attempt while one is active is rejected immediately.</p>
 <hr />
 <h2 id="lifecycle">Lifecycle<a class="headerlink" href="#lifecycle" title="Permanent link">&para;</a></h2>
