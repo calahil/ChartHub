@@ -27,8 +27,10 @@ source "$(dirname "$0")/../merges/.env"
 REPO="calahil/ChartHub"
 ALL_ENVIRONMENTS=(dev staging production)
 ALL_SERVER_ENVIRONMENTS=(server-dev server-staging server-production)
+ALL_RUNNER_ENVIRONMENTS=(runner-dev runner-staging runner-production)
 TARGET_ENVIRONMENTS=()
 TARGET_SERVER_ENVIRONMENTS=()
+TARGET_RUNNER_ENVIRONMENTS=()
 ENV_FILE=""
 DRY_RUN=false
 INFISICAL_PROJECT="${INFISICAL_PROJECT_ID:-}"
@@ -43,6 +45,9 @@ declare -A INFISICAL_ENV_MAP=(
   [server-dev]="server-dev"
   [server-staging]="server-staging"
   [server-production]="server-production"
+  [runner-dev]="runner-dev"
+  [runner-staging]="runner-staging"
+  [runner-production]="runner-production"
 )
 
 # The complete set of secrets each GitHub BackupApi environment needs.
@@ -83,10 +88,23 @@ SERVER_SECRETS=(
   CHARTHUB_SERVER_CLONEHERO_PATH
   CHARTHUB_SERVER_DB_PATH
   CHARTHUB_SERVER_LOGS_PATH
+  CHARTHUB_RUNNER_MANAGEMENT_API_KEY
   SERVER_DEPLOY_SSH_HOST
   SERVER_DEPLOY_SSH_USER
   SERVER_DEPLOY_SSH_PRIVATE_KEY
   SERVER_DEPLOY_SSH_PORT
+)
+
+# The complete set of secrets each GitHub Transcription Runner environment needs.
+RUNNER_SECRETS=(
+  CHARTHUB_RUNNER_SERVER_URL
+  CHARTHUB_RUNNER_MANAGEMENT_API_KEY
+  CHARTHUB_RUNNER_NAME
+  CHARTHUB_RUNNER_CONCURRENCY
+  RUNNER_DEPLOY_SSH_HOST
+  RUNNER_DEPLOY_SSH_USER
+  RUNNER_DEPLOY_SSH_PRIVATE_KEY
+  RUNNER_DEPLOY_SSH_PORT
 )
 
 # Repository-level secrets (not scoped to any environment).
@@ -258,6 +276,8 @@ while [[ $# -gt 0 ]]; do
       # Route to correct list based on env name prefix
       if [[ "$2" == server-* ]]; then
         TARGET_SERVER_ENVIRONMENTS+=("$2")
+      elif [[ "$2" == runner-* ]]; then
+        TARGET_RUNNER_ENVIRONMENTS+=("$2")
       else
         TARGET_ENVIRONMENTS+=("$2")
       fi
@@ -274,19 +294,24 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ${#TARGET_ENVIRONMENTS[@]} -eq 0 && ${#TARGET_SERVER_ENVIRONMENTS[@]} -eq 0 ]]; then
+if [[ ${#TARGET_ENVIRONMENTS[@]} -eq 0 && ${#TARGET_SERVER_ENVIRONMENTS[@]} -eq 0 && ${#TARGET_RUNNER_ENVIRONMENTS[@]} -eq 0 ]]; then
   TARGET_ENVIRONMENTS=("${ALL_ENVIRONMENTS[@]}")
   TARGET_SERVER_ENVIRONMENTS=("${ALL_SERVER_ENVIRONMENTS[@]}")
+  TARGET_RUNNER_ENVIRONMENTS=("${ALL_RUNNER_ENVIRONMENTS[@]}")
 fi
 
 # Validate requested environments
 for env in "${TARGET_ENVIRONMENTS[@]}"; do
   [[ " ${ALL_ENVIRONMENTS[*]} " == *" ${env} "* ]] || \
-    fail "Unknown environment '${env}'. Valid values: ${ALL_ENVIRONMENTS[*]} ${ALL_SERVER_ENVIRONMENTS[*]}"
+    fail "Unknown environment '${env}'. Valid values: ${ALL_ENVIRONMENTS[*]} ${ALL_SERVER_ENVIRONMENTS[*]} ${ALL_RUNNER_ENVIRONMENTS[*]}"
 done
 for env in "${TARGET_SERVER_ENVIRONMENTS[@]}"; do
   [[ " ${ALL_SERVER_ENVIRONMENTS[*]} " == *" ${env} "* ]] || \
-    fail "Unknown environment '${env}'. Valid values: ${ALL_ENVIRONMENTS[*]} ${ALL_SERVER_ENVIRONMENTS[*]}"
+    fail "Unknown environment '${env}'. Valid values: ${ALL_ENVIRONMENTS[*]} ${ALL_SERVER_ENVIRONMENTS[*]} ${ALL_RUNNER_ENVIRONMENTS[*]}"
+done
+for env in "${TARGET_RUNNER_ENVIRONMENTS[@]}"; do
+  [[ " ${ALL_RUNNER_ENVIRONMENTS[*]} " == *" ${env} "* ]] || \
+    fail "Unknown environment '${env}'. Valid values: ${ALL_ENVIRONMENTS[*]} ${ALL_SERVER_ENVIRONMENTS[*]} ${ALL_RUNNER_ENVIRONMENTS[*]}"
 done
 
 command -v gh >/dev/null 2>&1 || fail "gh CLI not found. Install from https://cli.github.com"
@@ -303,8 +328,10 @@ if [[ -n "$ENV_FILE" ]]; then
   for github_env in "${TARGET_SERVER_ENVIRONMENTS[@]}"; do
     push_to_github_environment "$github_env" SERVER_SECRETS
   done
+  for github_env in "${TARGET_RUNNER_ENVIRONMENTS[@]}"; do
+    push_to_github_environment "$github_env" RUNNER_SECRETS
+  done
 else
-  # Infisical mode: repo secrets sourced from 'dev' (build-time, not deployment-specific)
   load_from_infisical "dev"
   push_to_github_repo REPO_SECRETS
   # Per-environment secrets
@@ -317,6 +344,11 @@ else
     infisical_env="${INFISICAL_ENV_MAP[$github_env]}"
     load_from_infisical "$infisical_env"
     push_to_github_environment "$github_env" SERVER_SECRETS
+  done
+  for github_env in "${TARGET_RUNNER_ENVIRONMENTS[@]}"; do
+    infisical_env="${INFISICAL_ENV_MAP[$github_env]}"
+    load_from_infisical "$infisical_env"
+    push_to_github_environment "$github_env" RUNNER_SECRETS
   done
 fi
 
