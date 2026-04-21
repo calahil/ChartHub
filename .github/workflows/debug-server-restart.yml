@@ -57,8 +57,11 @@ jobs:
           ssh -v -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
             if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
                sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
-              nohup sudo systemctl restart charthub-server.service >/tmp/charthub-restart.log 2>&1 &
-              echo 'Systemd mode: restart triggered asynchronously'
+              # systemd-run --no-block schedules the restart as a transient unit outside
+              # the SSH session cgroup, preventing systemd from killing the SSH process
+              # when it tears down the restarting service's scope.
+              sudo systemd-run --no-block systemctl restart charthub-server.service
+              echo 'Systemd mode: restart scheduled via systemd-run'
             else
               pkill -f 'ChartHub.Server' || true
               echo 'Kiosk mode: sent SIGTERM to ChartHub.Server'
