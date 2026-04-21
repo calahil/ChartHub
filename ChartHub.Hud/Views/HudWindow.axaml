@@ -9,21 +9,39 @@
         Background="#FF0F0F0F"
         Title="ChartHub">
 
-    <!-- Root grid: 64px status strip on top, logo fills remaining space -->
-    <Grid RowDefinitions="64,*">
+    <!-- Root grid: 64px status strip on top, logo fills remaining space, 28px version strip at bottom -->
+    <Grid RowDefinitions="64,*,28">
 
         <!-- Top strip -->
         <Border Grid.Row="0"
                 Background="#FF1A1A1A">
             <Grid ColumnDefinitions="*,Auto">
 
-                <!-- Device hostname (left) -->
-                <TextBlock Grid.Column="0"
-                           Text="{Binding DeviceName}"
-                           Foreground="#FFCCCCCC"
-                           FontSize="20"
-                           VerticalAlignment="Center"
-                           Margin="24,0" />
+                <!-- Device name (hostname + email) -->
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center"
+                            Margin="24,0">
+                    <TextBlock Text="{Binding DeviceName}"
+                               Foreground="#FFCCCCCC"
+                               FontSize="20"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text=" ("
+                               Foreground="#FF7BA7E0"
+                               FontSize="20"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding UserEmail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Text="{Binding UserEmail}"
+                               Foreground="#FF7BA7E0"
+                               FontSize="20"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding UserEmail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Text=")"
+                               Foreground="#FF7BA7E0"
+                               FontSize="20"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding UserEmail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
 
                 <!-- Connection indicator dot (right) -->
                 <Ellipse Grid.Column="1"
@@ -44,6 +62,15 @@
                HorizontalAlignment="Center"
                VerticalAlignment="Center"
                Stretch="Uniform" />
+
+        <!-- Version strip (bottom-left) -->
+        <TextBlock Grid.Row="2"
+                   Text="{Binding Version}"
+                   Foreground="#FF666666"
+                   FontSize="11"
+                   VerticalAlignment="Center"
+                   Margin="16,0"
+                   IsVisible="{Binding Version, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
     </Grid>
 

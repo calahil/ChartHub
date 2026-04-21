@@ -24,7 +24,10 @@ public static partial class HudStatusEndpoints
 
     private static async Task<IResult> StreamHudStatusAsync(
         HttpContext context,
-        IInputConnectionTracker tracker,
+        IPresenceTracker presenceTracker,
+        IUinputGamepadService gamepad,
+        IUinputMouseService mouse,
+        IUinputKeyboardService keyboard,
         CancellationToken cancellationToken)
     {
         if (!IsLoopbackCaller(context))
@@ -35,11 +38,19 @@ public static partial class HudStatusEndpoints
         context.Response.Headers.Append("Content-Type", "text/event-stream");
         context.Response.Headers.Append("Cache-Control", "no-cache");
 
+        bool uinputAvailable = gamepad.IsSupported && mouse.IsSupported && keyboard.IsSupported;
+
         try
         {
-            await foreach (HudStatusUpdate update in tracker.WatchAsync(cancellationToken).ConfigureAwait(false))
+            await foreach (PresenceUpdate update in presenceTracker.WatchAsync(cancellationToken).ConfigureAwait(false))
             {
-                HudStatusPayload payload = new() { ConnectedDeviceCount = update.ConnectedDeviceCount, DeviceName = update.DeviceName };
+                HudStatusPayload payload = new()
+                {
+                    IsPresent = update.IsPresent,
+                    DeviceName = update.DeviceName,
+                    UserEmail = update.UserEmail,
+                    UinputAvailable = uinputAvailable,
+                };
                 await context.Response.WriteAsync("event: hud-status\n", cancellationToken).ConfigureAwait(false);
                 await context.Response.WriteAsync($"data: {JsonSerializer.Serialize(payload)}\n\n", cancellationToken).ConfigureAwait(false);
                 await context.Response.Body.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -61,7 +72,10 @@ public static partial class HudStatusEndpoints
 
     private sealed class HudStatusPayload
     {
-        public int ConnectedDeviceCount { get; init; }
+        public bool IsPresent { get; init; }
         public string? DeviceName { get; init; }
+        public string? UserEmail { get; init; }
+        public bool UinputAvailable { get; init; }
     }
 }
+

@@ -420,6 +420,14 @@ if [[ -f "$GREETER_CONF" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 22. Install ChartHub Plymouth boot splash
+#     Runs install-plymouth-theme.sh which handles asset generation,
+#     theme registration, GRUB patching, and initramfs rebuild.
+# ---------------------------------------------------------------------------
+echo "==> Installing ChartHub Plymouth boot splash..."
+bash "${SCRIPT_DIR}/install-plymouth-theme.sh"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

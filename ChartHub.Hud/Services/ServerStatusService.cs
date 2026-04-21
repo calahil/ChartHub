@@ -146,18 +146,36 @@ public sealed class ServerStatusService : IDisposable
         try
         {
             using var doc = JsonDocument.Parse(json);
-            if (doc.RootElement.TryGetProperty("connectedDeviceCount", out JsonElement countEl)
-                && countEl.TryGetInt32(out int count))
-            {
-                string? deviceName = null;
-                if (doc.RootElement.TryGetProperty("deviceName", out JsonElement nameEl)
-                    && nameEl.ValueKind == JsonValueKind.String)
-                {
-                    deviceName = nameEl.GetString();
-                }
+            JsonElement root = doc.RootElement;
 
-                return new HudStatus(count, deviceName);
+            if (!root.TryGetProperty("isPresent", out JsonElement isPresentEl))
+            {
+                return null;
             }
+
+            bool isPresent = isPresentEl.GetBoolean();
+
+            string? deviceName = null;
+            if (root.TryGetProperty("deviceName", out JsonElement nameEl)
+                && nameEl.ValueKind == JsonValueKind.String)
+            {
+                deviceName = nameEl.GetString();
+            }
+
+            string? userEmail = null;
+            if (root.TryGetProperty("userEmail", out JsonElement emailEl)
+                && emailEl.ValueKind == JsonValueKind.String)
+            {
+                userEmail = emailEl.GetString();
+            }
+
+            bool uinputAvailable = true;
+            if (root.TryGetProperty("uinputAvailable", out JsonElement uinputEl))
+            {
+                uinputAvailable = uinputEl.GetBoolean();
+            }
+
+            return new HudStatus(isPresent, deviceName, userEmail, uinputAvailable);
         }
         catch (JsonException)
         {
@@ -168,4 +186,4 @@ public sealed class ServerStatusService : IDisposable
     }
 }
 
-public readonly record struct HudStatus(int ConnectedDeviceCount, string? DeviceName);
+public readonly record struct HudStatus(bool IsPresent, string? DeviceName, string? UserEmail, bool UinputAvailable);

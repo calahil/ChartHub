@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=ChartHub
+Description=ChartHub kiosk boot splash — Catppuccin Macchiato
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/charthub
+ScriptFile=/usr/share/plymouth/themes/charthub/charthub.script

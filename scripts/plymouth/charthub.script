@@ -1,0 +1,73 @@
+// ============================================================
+//  ChartHub Plymouth Boot Splash
+//  Theme:  Catppuccin Macchiato
+//  Colors:
+//    Background  #24273A  (Macchiato Base)
+//    Bar track   #363A4F  (Macchiato Surface0)
+//    Highlight   #C6A0F6  (Macchiato Mauve)
+// ============================================================
+
+// ── Solid background ─────────────────────────────────────────
+// #24273A → rgb(36/255, 39/255, 58/255)
+Window.SetBackgroundTopColor   (0.141, 0.153, 0.227);
+Window.SetBackgroundBottomColor(0.141, 0.153, 0.227);
+
+// ── Logo (centered, 300 px wide, processed during install) ───
+logo_image  = Image("logo.png");
+logo_sprite = Sprite(logo_image);
+
+screen_w = Window.GetWidth();
+screen_h = Window.GetHeight();
+logo_w   = logo_image.GetWidth();
+logo_h   = logo_image.GetHeight();
+
+logo_x = Math.Int((screen_w - logo_w) / 2);
+// Shift logo slightly above centre to leave room for the bar below
+logo_y = Math.Int((screen_h - logo_h) / 2) - Math.Int(logo_h * 0.07);
+
+logo_sprite.SetX(logo_x);
+logo_sprite.SetY(logo_y);
+logo_sprite.SetZ(10);
+
+// ── Progress bar track (pill, same width as logo) ────────────
+track_image  = Image("track.png");
+track_sprite = Sprite(track_image);
+
+bar_w = track_image.GetWidth();
+bar_h = track_image.GetHeight();
+
+// Horizontally centred; sits 20 px below the logo
+bar_x = Math.Int((screen_w - bar_w) / 2);
+bar_y = logo_y + logo_h + 20;
+
+track_sprite.SetX(bar_x);
+track_sprite.SetY(bar_y);
+track_sprite.SetZ(11);
+
+// ── Sliding highlight (faded pill, narrower than track) ───────
+highlight_image  = Image("highlight.png");
+highlight_sprite = Sprite(highlight_image);
+hi_w = highlight_image.GetWidth();
+
+// Vertically centre the highlight on the track
+highlight_sprite.SetY(bar_y + Math.Int((bar_h - highlight_image.GetHeight()) / 2));
+highlight_sprite.SetZ(12);
+
+// ── Animation ─────────────────────────────────────────────────
+// The highlight slides from just off the left edge of the bar
+// to just off the right edge, then wraps. The gradient fade on
+// the highlight PNG means it blends cleanly at both ends.
+
+frame = 0;
+// Total travel distance: bar width + highlight width (slides fully on and off)
+cycle = bar_w + hi_w;
+// Speed: 3 px per refresh tick (~60 Hz → ~2.3 s per full cycle)
+speed = 3;
+
+fun refresh_callback() {
+    frame++;
+    offset = Math.Int(frame * speed) % cycle - hi_w;
+    highlight_sprite.SetX(bar_x + offset);
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);

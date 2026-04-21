@@ -1,4 +1,6 @@
 #if ANDROID
+using System.Net;
+
 using Android.App;
 using Android.Content.PM;
 using Android.OS;
@@ -8,6 +10,7 @@ using Avalonia;
 using Avalonia.Android;
 
 using ChartHub.Services;
+using ChartHub.Utilities;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -42,6 +45,23 @@ public class MainActivity : AvaloniaMainActivity
     {
         base.OnResume();
         Current = this;
+
+        IPresenceWebSocketService? svc = App.ServiceProvider?.GetService<IPresenceWebSocketService>();
+        AppGlobalSettings? settings = App.ServiceProvider?.GetService<AppGlobalSettings>();
+        if (svc != null && settings != null && !string.IsNullOrWhiteSpace(settings.ServerApiAuthToken))
+        {
+            _ = svc.ConnectAsync(settings.ServerApiBaseUrl, settings.ServerApiAuthToken, Dns.GetHostName());
+        }
+    }
+
+    protected override void OnPause()
+    {
+        base.OnPause();
+        IPresenceWebSocketService? svc = App.ServiceProvider?.GetService<IPresenceWebSocketService>();
+        if (svc != null)
+        {
+            _ = svc.DisconnectAsync();
+        }
     }
 
     protected override void OnDestroy()

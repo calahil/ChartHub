@@ -144,6 +144,7 @@ public static class AppBootstrapper
         services.AddSingleton<IOrientationService, NullOrientationService>();
 #endif
         services.AddTransient<IInputWebSocketService, InputWebSocketService>();
+        services.AddSingleton<IPresenceWebSocketService, PresenceWebSocketService>();
         services.AddSingleton<EncoreApiService>();
         services.AddSingleton<SharedDownloadQueue>();
         services.AddSingleton(_ => new LibraryCatalogService(Path.Combine(configDir, "library-catalog.db")));
