@@ -1135,11 +1135,14 @@ jobs:
           SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          # Fire the restart asynchronously so SSH disconnects immediately rather than
+          # waiting for the service to fully stop/start (which can take 20-30s and
+          # causes the SSH session to be dropped). The health check step confirms startup.
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
             if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
                sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
-              sudo systemctl restart charthub-server.service
-              sudo systemctl --no-pager --full status charthub-server.service || true
+              nohup sudo systemctl restart charthub-server.service >/tmp/charthub-restart.log 2>&1 &
+              echo 'Systemd mode: restart triggered asynchronously'
             else
               # Kiosk mode: service is masked; kill the running process so the X session
               # exits and LightDM restarts it via start-kiosk-session.sh with the new binary.
@@ -1395,11 +1398,14 @@ jobs:
           SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          # Fire the restart asynchronously so SSH disconnects immediately rather than
+          # waiting for the service to fully stop/start (which can take 20-30s and
+          # causes the SSH session to be dropped). The health check step confirms startup.
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
             if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
                sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
-              sudo systemctl restart charthub-server.service
-              sudo systemctl --no-pager --full status charthub-server.service || true
+              nohup sudo systemctl restart charthub-server.service >/tmp/charthub-restart.log 2>&1 &
+              echo 'Systemd mode: restart triggered asynchronously'
             else
               # Kiosk mode: service is masked; kill the running process so the X session
               # exits and LightDM restarts it via start-kiosk-session.sh with the new binary.
@@ -1654,31 +1660,21 @@ jobs:
           SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
-          # Retry up to 3 times: the SSH connection can be lost if the service restart
-          # briefly disrupts the network or causes the SSH session to be dropped.
-          for attempt in 1 2 3; do
-            ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" \
-              -o BatchMode=yes -o ConnectTimeout=30 \
-              -o ServerAliveInterval=10 -o ServerAliveCountMax=6 \
-              "${SSH_USER}@${SSH_HOST}" "
-              if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
-                 sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
-                sudo systemctl restart charthub-server.service
-                sudo systemctl --no-pager --full status charthub-server.service || true
-              else
-                # Kiosk mode: service is masked; kill the running process so the X session
-                # exits and LightDM restarts it via start-kiosk-session.sh with the new binary.
-                pkill -f 'ChartHub.Server' || true
-                echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
-              fi
-            " && break
-            if [[ "$attempt" == "3" ]]; then
-              echo "Restart failed after 3 attempts"
-              exit 1
+          # Fire the restart asynchronously so SSH disconnects immediately rather than
+          # waiting for the service to fully stop/start (which can take 20-30s and
+          # causes the SSH session to be dropped). The health check step confirms startup.
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
+               sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
+              nohup sudo systemctl restart charthub-server.service >/tmp/charthub-restart.log 2>&1 &
+              echo 'Systemd mode: restart triggered asynchronously'
+            else
+              # Kiosk mode: service is masked; kill the running process so the X session
+              # exits and LightDM restarts it via start-kiosk-session.sh with the new binary.
+              pkill -f 'ChartHub.Server' || true
+              echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
             fi
-            echo "Attempt $attempt failed (exit $?), retrying in 10s..."
-            sleep 10
-          done
+          "
 
       - name: Verify health
         env:
