@@ -1488,10 +1488,6 @@ jobs:
           mkdir -p "$EFFECTIVE_LOGS"
           mkdir -p "$EFFECTIVE_DATA"
           mkdir -p "$EFFECTIVE_MUSIC"
-          chmod 777 "$EFFECTIVE_LOGS"
-          chmod 777 "$EFFECTIVE_DATA"
-          chmod 777 "$EFFECTIVE_DB"
-          chmod 777 "$EFFECTIVE_MUSIC"
 
       - name: Write runtime environment file
         env:
