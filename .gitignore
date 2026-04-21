@@ -393,3 +393,4 @@ ChartHub.BackupApi/cache
 dev-data/
 merges/
 /site/
+scripts/delete-workflow-runs.sh
