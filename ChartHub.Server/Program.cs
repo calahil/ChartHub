@@ -204,6 +204,7 @@ app.MapVolumeEndpoints();
 app.MapInputEndpoints();
 app.MapPresenceEndpoints();
 app.MapHudStatusEndpoints();
+app.MapHudVolumeEndpoints();
 app.MapRunnerManagementEndpoints();
 app.MapRunnerProtocolEndpoints();
 app.MapTranscriptionEndpoints();

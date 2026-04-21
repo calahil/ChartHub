@@ -22,7 +22,8 @@ public sealed class App(int serverPort) : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             ServerStatusService statusService = new(_serverPort);
-            HudViewModel viewModel = new(statusService);
+            ServerVolumeService volumeService = new(_serverPort);
+            HudViewModel viewModel = new(statusService, volumeService);
             HudWindow window = new() { DataContext = viewModel };
 
             desktop.MainWindow = window;
@@ -30,6 +31,7 @@ public sealed class App(int serverPort) : Application
             desktop.Exit += (_, _) =>
             {
                 viewModel.Dispose();
+                volumeService.Dispose();
                 statusService.Dispose();
             };
         }

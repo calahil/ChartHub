@@ -53,6 +53,7 @@ public sealed partial class VolumeService(ILogger<VolumeService> logger) : IVolu
         {
             UpdatedAtUtc = DateTimeOffset.UtcNow,
             Master = master,
+            SupportsMasterVolume = string.IsNullOrWhiteSpace(masterSupportMessage),
             Sessions = sessions,
             SupportsPerApplicationSessions = supportsPerApplicationSessions,
             SessionSupportMessage = sessionSupportMessage,

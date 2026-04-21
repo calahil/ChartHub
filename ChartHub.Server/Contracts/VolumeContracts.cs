@@ -8,6 +8,8 @@ public sealed class VolumeStateResponse
 
     public required VolumeMasterStateResponse Master { get; init; }
 
+    public bool SupportsMasterVolume { get; init; }
+
     public IReadOnlyList<VolumeSessionResponse> Sessions { get; init; } = [];
 
     public bool SupportsPerApplicationSessions { get; init; }

@@ -57,11 +57,67 @@
         <!-- Logo centered in remaining space -->
         <Image Grid.Row="1"
                Source="avares://ChartHub.Hud/Resources/logo-1024.png"
-               Width="512"
-               Height="512"
+               Width="{Binding LogoSize}"
+               Height="{Binding LogoSize}"
                HorizontalAlignment="Center"
                VerticalAlignment="Center"
                Stretch="Uniform" />
+
+        <!-- Bottom-right volume widget (always visible) -->
+        <Border Grid.RowSpan="3"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+            Margin="0,0,28,28"
+                Background="#CC1A1A1A"
+            BorderBrush="#553A3A3A"
+            BorderThickness="1"
+            CornerRadius="14"
+            Padding="14,12"
+                Opacity="{Binding VolumeWidgetOpacity}">
+            <StackPanel Spacing="6"
+                        HorizontalAlignment="Center">
+                <TextBlock Text="VOL"
+                           Foreground="#FFCCCCCC"
+                   FontSize="10"
+                   FontWeight="SemiBold"
+                           HorizontalAlignment="Center" />
+
+            <Border Background="#33202020"
+                CornerRadius="6"
+                Padding="6,2"
+                HorizontalAlignment="Center"
+                IsVisible="{Binding IsMuted}">
+                <TextBlock Text="MUTE"
+                       Foreground="{Binding VolumeValueBrush}"
+                       FontSize="9"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center" />
+            </Border>
+
+            <Border Width="20"
+                        Height="{Binding VolumeBarHeight}"
+                        Background="{Binding VolumeTrackDisplayBrush}"
+                BorderBrush="#44404040"
+                BorderThickness="1"
+                CornerRadius="10"
+                        Padding="2"
+                        HorizontalAlignment="Center">
+                    <Grid>
+                        <Border Height="{Binding VolumeFillHeight}"
+                                Background="{Binding VolumeValueBrush}"
+                                CornerRadius="6"
+                                VerticalAlignment="Bottom"
+                                HorizontalAlignment="Stretch" />
+                    </Grid>
+                </Border>
+
+                <TextBlock Text="{Binding VolumeLabel}"
+                           Foreground="{Binding VolumeValueBrush}"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+        </Border>
 
         <!-- Version strip (bottom-left) -->
         <TextBlock Grid.Row="2"
