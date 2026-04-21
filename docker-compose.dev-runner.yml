@@ -1,0 +1,62 @@
+# Local development compose for the transcription runner.
+#
+# Prerequisites:
+#   1. Start the ChartHub Server locally:
+#        dotnet run --project ChartHub.Server/ChartHub.Server.csproj --no-launch-profile
+#      It will listen on http://localhost:5000 by default.
+#
+#   2. Build the runner image (first time or after Dockerfile changes):
+#        docker build -f ChartHub.TranscriptionRunner/Dockerfile -t charthub-runner-dev .
+#
+# Usage:
+#   docker compose -f docker-compose.dev-runner.yml up
+#
+# The runner container will register itself against the local server on first start
+# using the dev API key from appsettings.Development.json, then enter run mode.
+# Set LOCAL_RUNNER_SERVER_URL in .env or the shell when localhost is not reachable
+# from the container on your machine.
+#
+# To reset registration (force re-register):
+#   docker compose -f docker-compose.dev-runner.yml down -v
+
+services:
+  transcription-runner:
+    image: charthub-runner-dev
+    container_name: charthub-dev-runner-local
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - runner_config:/config
+      - runner_data:/data
+    environment:
+      - CHARTHUB_SERVER_URL=${LOCAL_RUNNER_SERVER_URL:-http://10.0.0.7:5180}
+      - CHARTHUB_RUNNER_API_KEY=changeme
+      - CHARTHUB_RUNNER_NAME=local-dev-runner
+      - CHARTHUB_RUNNER_CONCURRENCY=1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ ! -f /config/config.json ]; then
+          echo "No config.json found — registering with server..."
+          TOKEN=$(wget -qO- --post-data='{"ttlMinutes":10}' \
+            --header='Content-Type: application/json' \
+            --header="X-Runner-Api-Key: $${CHARTHUB_RUNNER_API_KEY}" \
+            "$${CHARTHUB_SERVER_URL}/api/v1/runners/registration-tokens" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin).get('plainToken', ''))")
+          if [ -z "$$TOKEN" ]; then
+            echo "ERROR: Failed to obtain registration token. Is the server running at $${CHARTHUB_SERVER_URL}?"
+            exit 1
+          fi
+          echo "Got token — registering runner..."
+          ./ChartHub.TranscriptionRunner register \
+            --server "$${CHARTHUB_SERVER_URL}" \
+            --token "$$TOKEN" \
+            --name "$${CHARTHUB_RUNNER_NAME}" \
+            --concurrency "$${CHARTHUB_RUNNER_CONCURRENCY}"
+        fi
+        echo "Starting runner..."
+        exec ./ChartHub.TranscriptionRunner run
+
+volumes:
+  runner_config:
+  runner_data:

@@ -54,6 +54,36 @@
             "group": "build"
         },
         {
+            "label": "build-transcription-runner",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "build",
+                "${workspaceFolder}/ChartHub.TranscriptionRunner/ChartHub.TranscriptionRunner.csproj"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "build"
+        },
+        {
+            "label": "register-local-dev-runner",
+            "command": "bash",
+            "type": "shell",
+            "args": [
+                "-lc",
+                "set -euo pipefail; export HOME=\"${workspaceFolder}/dev-data\"; LOCAL_SERVER_URL=\"${LOCAL_RUNNER_SERVER_URL:-http://10.0.0.7:5180}\"; CONFIG_PATH=\"$HOME/.charthub-runner/config.json\"; PAYLOAD=\"{\\\"ttlMinutes\\\":15}\"; mkdir -p \"$HOME\"; if [[ -f \"${workspaceFolder}/.env.local\" ]]; then set -a; . \"${workspaceFolder}/.env.local\"; set +a; LOCAL_SERVER_URL=\"${LOCAL_RUNNER_SERVER_URL:-$LOCAL_SERVER_URL}\"; fi; if [[ -f \"$CONFIG_PATH\" ]]; then echo \"Runner config already exists\"; exit 0; fi; TOKEN=\"\"; for i in $(seq 1 30); do RESPONSE=$(curl -fsS -X POST -H \"X-Runner-Api-Key: a5c4f05d39705837a865d9cca107137ed0bc79dde61d45fc1a6a8e9803983e9a\" -H \"Content-Type: application/json\" --data \"$PAYLOAD\" \"$LOCAL_SERVER_URL/api/v1/runners/registration-tokens\" 2>/dev/null || true); if [[ -n \"$RESPONSE\" ]]; then TOKEN=$(printf '%s' \"$RESPONSE\" | python3 -c \"import json,sys; print(json.load(sys.stdin).get(\\\"plainToken\\\", \\\"\\\"))\"); if [[ -n \"$TOKEN\" ]]; then break; fi; fi; echo \"Waiting for local server before registering runner at $LOCAL_SERVER_URL...\"; sleep 2; done; if [[ -z \"$TOKEN\" ]]; then echo \"Failed to obtain local registration token from $LOCAL_SERVER_URL\"; exit 1; fi; dotnet run --project \"${workspaceFolder}/ChartHub.TranscriptionRunner/ChartHub.TranscriptionRunner.csproj\" -- register --server \"$LOCAL_SERVER_URL\" --token \"$TOKEN\" --name local-dev-runner --concurrency 1"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "prepare-local-dev-runner",
+            "dependsOn": [
+                "build-transcription-runner",
+                "register-local-dev-runner"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        },
+        {
             "label": "run-desktop",
             "command": "dotnet",
             "type": "shell",
