@@ -29,14 +29,35 @@ public static class RunnerManagementEndpoints
         // Accepts either:
         //   - Authorization: Bearer <user-jwt>   (interactive user session)
         //   - X-Runner-Api-Key: <static-key>     (CI / automation — never expires)
-        // This endpoint is registered OUTSIDE the RequireAuthorization group so the JWT
-        // middleware does not short-circuit unauthenticated API-key requests with 401.
+        // Registered outside the RequireAuthorization group and marked AllowAnonymous.
+        // Auth is checked manually inside the handler to avoid JWT middleware challenges
+        // on unauthenticated API-key requests before the endpoint is reached.
         app.MapPost("/api/v1/runners/registration-tokens", (
             HttpContext ctx,
             [FromBody] IssueRunnerRegistrationTokenRequest request,
             ITranscriptionRunnerRegistry registry,
             IOptions<RunnerOptions> runnerOptions) =>
         {
+            bool isAuthenticatedUser = ctx.User.Identity?.IsAuthenticated == true;
+
+            if (!isAuthenticatedUser)
+            {
+                string configuredKey = runnerOptions.Value.ManagementApiKey;
+
+                if (string.IsNullOrWhiteSpace(configuredKey))
+                {
+                    return Results.Json(new { error = "Runner management API key is not configured on this server." },
+                        statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                if (!ctx.Request.Headers.TryGetValue(ApiKeyHeader, out Microsoft.Extensions.Primitives.StringValues providedKey)
+                    || !string.Equals(providedKey, configuredKey, StringComparison.Ordinal))
+                {
+                    return Results.Json(new { error = $"Provide a valid user JWT or {ApiKeyHeader} header." },
+                        statusCode: StatusCodes.Status401Unauthorized);
+                }
+            }
+
             int ttlMinutes = Math.Clamp(request.TtlMinutes, 1, 60);
             RunnerRegistrationTokenResponse token = registry.IssueRegistrationToken(TimeSpan.FromMinutes(ttlMinutes));
             return Results.Ok(token);
@@ -44,34 +65,7 @@ public static class RunnerManagementEndpoints
         .WithTags("Runners")
         .WithName("IssueRunnerRegistrationToken")
         .WithSummary("Issue a one-time runner registration token. Accepts user JWT or X-Runner-Api-Key header.")
-        .AllowAnonymous()
-        .AddEndpointFilter(async (ctx, next) =>
-        {
-            // Allow through if the request already carries a valid user JWT.
-            if (ctx.HttpContext.User.Identity?.IsAuthenticated == true)
-            {
-                return await next(ctx);
-            }
-
-            // Fall back to static API key.
-            IOptions<RunnerOptions> runnerOptions = ctx.HttpContext.RequestServices.GetRequiredService<IOptions<RunnerOptions>>();
-            string configuredKey = runnerOptions.Value.ManagementApiKey;
-
-            if (string.IsNullOrWhiteSpace(configuredKey))
-            {
-                return Results.Json(new { error = "Runner management API key is not configured on this server." },
-                    statusCode: StatusCodes.Status403Forbidden);
-            }
-
-            if (!ctx.HttpContext.Request.Headers.TryGetValue(ApiKeyHeader, out Microsoft.Extensions.Primitives.StringValues providedKey)
-                || !string.Equals(providedKey, configuredKey, StringComparison.Ordinal))
-            {
-                return Results.Json(new { error = $"Provide a valid user JWT or {ApiKeyHeader} header." },
-                    statusCode: StatusCodes.Status401Unauthorized);
-            }
-
-            return await next(ctx);
-        });
+        .AllowAnonymous();
 
         // GET /api/v1/runners
         group.MapGet("/", (ITranscriptionRunnerRegistry registry) =>
