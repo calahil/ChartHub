@@ -1,0 +1,9 @@
+services:
+  transcription-runner:
+    image: ${RUNNER_IMAGE}
+    container_name: ${RUNNER_CONTAINER_NAME:-charthub-runner}
+    restart: unless-stopped
+    volumes:
+      - ${RUNNER_CONFIG_PATH:-/srv/appdata/charthub-runner/config}:/config
+      - ${RUNNER_DATA_PATH:-/srv/appdata/charthub-runner/data}:/data
+    command: ["run"]

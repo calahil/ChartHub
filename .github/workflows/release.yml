@@ -247,6 +247,78 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/charthub-backup-api:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/charthub-backup-api:buildcache,mode=max
 
+  build-runner-image:
+    name: Build and push Transcription Runner image
+    runs-on: ubuntu-latest
+    needs: [classify, validate]
+    outputs:
+      image_digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: tags
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
+          CHANNEL: ${{ needs.classify.outputs.release_channel }}
+          IMAGE_TAG: ${{ needs.classify.outputs.image_tag }}
+          IMAGE_TAG_MINOR: ${{ needs.classify.outputs.image_tag_minor }}
+        run: |
+          BASE="ghcr.io/${REPO_OWNER}/charthub-transcription-runner"
+          if [[ "$CHANNEL" == "dev" ]]; then
+            {
+              echo "tags<<EOF"
+              echo "${BASE}:${IMAGE_TAG}"
+              echo "${BASE}:dev-latest"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$CHANNEL" == "rc" ]]; then
+            {
+              echo "tags<<EOF"
+              echo "${BASE}:${IMAGE_TAG}"
+              echo "${BASE}:rc-latest"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          {
+            echo "tags<<EOF"
+            echo "${BASE}:${IMAGE_TAG}"
+            echo "${BASE}:${IMAGE_TAG_MINOR}"
+            echo "${BASE}:latest"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ChartHub.TranscriptionRunner/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.title=ChartHub Transcription Runner
+            org.opencontainers.image.vendor=Calahil Studios
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.classify.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/charthub-transcription-runner:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/charthub-transcription-runner:buildcache,mode=max
+
   build-server-bundle:
     name: Publish ChartHub.Server (linux-x64)
     if: needs.classify.outputs.release_channel == 'dev' || needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
@@ -1016,6 +1088,7 @@ jobs:
           SERVER_CLONEHERO_PATH: ${{ secrets.CHARTHUB_SERVER_CLONEHERO_PATH }}
           SERVER_DB_PATH: ${{ secrets.CHARTHUB_SERVER_DB_PATH }}
           SERVER_LOGS_PATH: ${{ secrets.CHARTHUB_SERVER_LOGS_PATH }}
+          RUNNER_MANAGEMENT_API_KEY: ${{ secrets.CHARTHUB_RUNNER_MANAGEMENT_API_KEY }}
         run: |
           EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
@@ -1046,6 +1119,7 @@ jobs:
             echo "CHARTHUB_SERVER_PORT=${EFFECTIVE_PORT}"
             echo "Hud__ExecutablePath=${INSTALL_ROOT}/current/ChartHub.Hud"
             echo "Hud__ServerPort=${EFFECTIVE_PORT}"
+            echo "Runner__ManagementApiKey=${RUNNER_MANAGEMENT_API_KEY}"
           } > "$LOCAL_ENV_FILE"
 
           # Parse JSON array secrets (e.g. ["email@domain.com","other@domain.com"])
@@ -1277,6 +1351,7 @@ jobs:
           SERVER_DB_PATH: ${{ secrets.CHARTHUB_SERVER_DB_PATH }}
           SERVER_LOGS_PATH: ${{ secrets.CHARTHUB_SERVER_LOGS_PATH }}
         run: |
+          RUNNER_MANAGEMENT_API_KEY: ${{ secrets.CHARTHUB_RUNNER_MANAGEMENT_API_KEY }}
           EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
           EFFECTIVE_CONFIG="${SERVER_CONFIG_PATH:-/srv/appdata/charthub/config}"
@@ -1307,6 +1382,7 @@ jobs:
             echo "Hud__ExecutablePath=${INSTALL_ROOT}/current/ChartHub.Hud"
             echo "Hud__ServerPort=${EFFECTIVE_PORT}"
           } > "$LOCAL_ENV_FILE"
+            echo "Runner__ManagementApiKey=${RUNNER_MANAGEMENT_API_KEY}"
 
           auth_allowed_index=0
           while IFS= read -r item; do
@@ -1498,6 +1574,7 @@ jobs:
           SERVER_DB_PATH: ${{ secrets.CHARTHUB_SERVER_DB_PATH }}
           SERVER_LOGS_PATH: ${{ secrets.CHARTHUB_SERVER_LOGS_PATH }}
         run: |
+          RUNNER_MANAGEMENT_API_KEY: ${{ secrets.CHARTHUB_RUNNER_MANAGEMENT_API_KEY }}
           EFFECTIVE_PORT="${CHARTHUB_SERVER_PORT:-5180}"
           EFFECTIVE_CONFIG="${SERVER_CONFIG_PATH:-/srv/appdata/charthub/config}"
           INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
@@ -1527,6 +1604,7 @@ jobs:
             echo "Hud__ExecutablePath=${INSTALL_ROOT}/current/ChartHub.Hud"
             echo "Hud__ServerPort=${EFFECTIVE_PORT}"
           } > "$LOCAL_ENV_FILE"
+            echo "Runner__ManagementApiKey=${RUNNER_MANAGEMENT_API_KEY}"
 
           auth_allowed_index=0
           while IFS= read -r item; do
@@ -1612,3 +1690,462 @@ jobs:
             echo "- Active release: /srv/appdata/charthub/current"
             echo "- Time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-runner-dev:
+    name: Deploy Transcription Runner to dev
+    if: needs.classify.outputs.release_channel == 'dev'
+    runs-on: ubuntu-latest
+    needs: [classify, build-runner-image]
+    environment: runner-dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.RUNNER_DEPLOY_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p "$EFFECTIVE_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Log in to GHCR on host
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          printf '%s\n' "$GH_TOKEN" | ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker login ghcr.io -u '${GH_ACTOR}' --password-stdin"
+
+      - name: Write and transfer env file
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+          RUNNER_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-transcription-runner:${{ needs.classify.outputs.image_tag }}
+          RUNNER_CONTAINER_NAME: charthub-dev-runner
+        run: |
+          printenv RUNNER_IMAGE          | xargs -I{} printf 'RUNNER_IMAGE=%s\n' "{}" > .env.deploy
+          printenv RUNNER_CONTAINER_NAME | xargs -I{} printf 'RUNNER_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_PORT" -o BatchMode=yes \
+            docker-compose.runner.yml .env.deploy "${SSH_USER}@${SSH_HOST}:/tmp/"
+          rm -f .env.deploy
+
+      - name: Pull image
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker compose -f /tmp/docker-compose.runner.yml --project-name charthub-dev-runner --env-file /tmp/.env.deploy pull"
+
+      - name: Register runner if not already registered
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+          RUNNER_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-transcription-runner:${{ needs.classify.outputs.image_tag }}
+          RUNNER_SERVER_URL: ${{ secrets.CHARTHUB_RUNNER_SERVER_URL }}
+          RUNNER_API_KEY: ${{ secrets.CHARTHUB_RUNNER_MANAGEMENT_API_KEY }}
+          RUNNER_NAME: ${{ secrets.CHARTHUB_RUNNER_NAME }}
+          RUNNER_CONCURRENCY: ${{ secrets.CHARTHUB_RUNNER_CONCURRENCY }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONCURRENCY="${RUNNER_CONCURRENCY:-1}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "mkdir -p /srv/appdata/charthub-runner/config"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "if [[ ! -f /srv/appdata/charthub-runner/config/config.json ]]; then
+              TOKEN=\$(curl -sf -X POST -H 'X-Runner-Api-Key: ${RUNNER_API_KEY}' -H 'Content-Type: application/json' '${RUNNER_SERVER_URL}/api/v1/runners/registration-tokens' | grep -o '\"token\":\"[^\"]*\"' | cut -d'\"' -f4)
+              if [[ -z \"\$TOKEN\" ]]; then echo 'Failed to obtain registration token'; exit 1; fi
+              docker run --rm -v /srv/appdata/charthub-runner/config:/config \
+                '${RUNNER_IMAGE}' register \
+                --server '${RUNNER_SERVER_URL}' \
+                --token \"\$TOKEN\" \
+                --name '${RUNNER_NAME}' \
+                --concurrency '${EFFECTIVE_CONCURRENCY}'
+            fi"
+
+      - name: Deploy
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker compose -f /tmp/docker-compose.runner.yml --project-name charthub-dev-runner --env-file /tmp/.env.deploy up -d --no-build"
+
+      - name: Verify running
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          for i in $(seq 1 12); do
+            STATE=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "docker inspect charthub-dev-runner --format '{{.State.Status}}' 2>/dev/null || echo missing")
+            if [[ "$STATE" == "running" ]]; then
+              echo "Runner container is running"
+              break
+            fi
+            if [[ "$i" == "12" ]]; then
+              echo "Runner container failed to reach running state (state: ${STATE})"
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "docker compose --project-name charthub-dev-runner logs --tail 100 || true"
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Clean up
+        if: always()
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "rm -f /tmp/.env.deploy /tmp/docker-compose.runner.yml" || true
+          rm -f ~/.ssh/deploy_key
+
+  deploy-runner-staging:
+    name: Deploy Transcription Runner to staging
+    if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
+    runs-on: ubuntu-latest
+    needs: [classify, build-runner-image]
+    outputs:
+      staged_image_ref: ${{ steps.capture-staged-image.outputs.staged_image_ref }}
+    environment: runner-staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.RUNNER_DEPLOY_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p "$EFFECTIVE_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Log in to GHCR on host
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          printf '%s\n' "$GH_TOKEN" | ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker login ghcr.io -u '${GH_ACTOR}' --password-stdin"
+
+      - name: Write and transfer env file
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+          RUNNER_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-transcription-runner@${{ needs.build-runner-image.outputs.image_digest }}
+          RUNNER_CONTAINER_NAME: charthub-staging-runner
+        run: |
+          printenv RUNNER_IMAGE          | xargs -I{} printf 'RUNNER_IMAGE=%s\n' "{}" > .env.deploy
+          printenv RUNNER_CONTAINER_NAME | xargs -I{} printf 'RUNNER_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_PORT" -o BatchMode=yes \
+            docker-compose.runner.yml .env.deploy "${SSH_USER}@${SSH_HOST}:/tmp/"
+          rm -f .env.deploy
+
+      - name: Pull image
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker compose -f /tmp/docker-compose.runner.yml --project-name charthub-staging-runner --env-file /tmp/.env.deploy pull"
+
+      - name: Register runner if not already registered
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+          RUNNER_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-transcription-runner@${{ needs.build-runner-image.outputs.image_digest }}
+          RUNNER_SERVER_URL: ${{ secrets.CHARTHUB_RUNNER_SERVER_URL }}
+          RUNNER_API_KEY: ${{ secrets.CHARTHUB_RUNNER_MANAGEMENT_API_KEY }}
+          RUNNER_NAME: ${{ secrets.CHARTHUB_RUNNER_NAME }}
+          RUNNER_CONCURRENCY: ${{ secrets.CHARTHUB_RUNNER_CONCURRENCY }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONCURRENCY="${RUNNER_CONCURRENCY:-1}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "mkdir -p /srv/appdata/charthub-runner/config"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "if [[ ! -f /srv/appdata/charthub-runner/config/config.json ]]; then
+              TOKEN=\$(curl -sf -X POST -H 'X-Runner-Api-Key: ${RUNNER_API_KEY}' -H 'Content-Type: application/json' '${RUNNER_SERVER_URL}/api/v1/runners/registration-tokens' | grep -o '\"token\":\"[^\"]*\"' | cut -d'\"' -f4)
+              if [[ -z \"\$TOKEN\" ]]; then echo 'Failed to obtain registration token'; exit 1; fi
+              docker run --rm -v /srv/appdata/charthub-runner/config:/config \
+                '${RUNNER_IMAGE}' register \
+                --server '${RUNNER_SERVER_URL}' \
+                --token \"\$TOKEN\" \
+                --name '${RUNNER_NAME}' \
+                --concurrency '${EFFECTIVE_CONCURRENCY}'
+            fi"
+
+      - name: Deploy
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker compose -f /tmp/docker-compose.runner.yml --project-name charthub-staging-runner --env-file /tmp/.env.deploy up -d --no-build"
+
+      - name: Verify running
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          for i in $(seq 1 12); do
+            STATE=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "docker inspect charthub-staging-runner --format '{{.State.Status}}' 2>/dev/null || echo missing")
+            if [[ "$STATE" == "running" ]]; then
+              echo "Runner container is running"
+              break
+            fi
+            if [[ "$i" == "12" ]]; then
+              echo "Runner container failed to reach running state (state: ${STATE})"
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "docker compose --project-name charthub-staging-runner logs --tail 100 || true"
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Capture staged image ref
+        id: capture-staged-image
+        env:
+          EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-transcription-runner@${{ needs.build-runner-image.outputs.image_digest }}
+        run: |
+          echo "staged_image_ref=$EXPECTED_IMAGE_REF" >> "$GITHUB_OUTPUT"
+          printf '%s' "$EXPECTED_IMAGE_REF" > /tmp/staged-runner-image-ref.txt
+
+      - name: Upload staged image ref
+        uses: actions/upload-artifact@v4
+        with:
+          name: staged-runner-image-ref
+          path: /tmp/staged-runner-image-ref.txt
+          retention-days: 1
+
+      - name: Clean up
+        if: always()
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "rm -f /tmp/.env.deploy /tmp/docker-compose.runner.yml" || true
+          rm -f ~/.ssh/deploy_key
+
+  deploy-runner-production:
+    name: Deploy Transcription Runner to production
+    if: needs.classify.outputs.release_channel == 'stable'
+    runs-on: ubuntu-latest
+    needs: [classify, build-runner-image, deploy-runner-staging]
+    environment: runner-production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.RUNNER_DEPLOY_SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p "$EFFECTIVE_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Download staged image ref
+        uses: actions/download-artifact@v4
+        with:
+          name: staged-runner-image-ref
+          path: /tmp/staged-ref
+
+      - name: Verify promotion digest from staging
+        env:
+          EXPECTED_IMAGE_REF: ghcr.io/${{ github.repository_owner }}/charthub-transcription-runner@${{ needs.build-runner-image.outputs.image_digest }}
+        run: |
+          STAGED_IMAGE_REF="$(cat /tmp/staged-ref/staged-runner-image-ref.txt)"
+          if [[ -z "$STAGED_IMAGE_REF" ]]; then
+            echo "Staging image reference is missing"
+            exit 1
+          fi
+          if [[ "$STAGED_IMAGE_REF" != "$EXPECTED_IMAGE_REF" ]]; then
+            echo "Production blocked: staging image does not match expected digest"
+            echo "Expected: $EXPECTED_IMAGE_REF"
+            echo "Staged:   $STAGED_IMAGE_REF"
+            exit 1
+          fi
+
+      - name: Log in to GHCR on host
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          printf '%s\n' "$GH_TOKEN" | ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker login ghcr.io -u '${GH_ACTOR}' --password-stdin"
+
+      - name: Write and transfer env file
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+          RUNNER_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-transcription-runner@${{ needs.build-runner-image.outputs.image_digest }}
+          RUNNER_CONTAINER_NAME: charthub-prod-runner
+        run: |
+          printenv RUNNER_IMAGE          | xargs -I{} printf 'RUNNER_IMAGE=%s\n' "{}" > .env.deploy
+          printenv RUNNER_CONTAINER_NAME | xargs -I{} printf 'RUNNER_CONTAINER_NAME=%s\n' "{}" >> .env.deploy
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_PORT" -o BatchMode=yes \
+            docker-compose.runner.yml .env.deploy "${SSH_USER}@${SSH_HOST}:/tmp/"
+          rm -f .env.deploy
+
+      - name: Pull image
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker compose -f /tmp/docker-compose.runner.yml --project-name charthub-prod-runner --env-file /tmp/.env.deploy pull"
+
+      - name: Register runner if not already registered
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+          RUNNER_IMAGE: ghcr.io/${{ github.repository_owner }}/charthub-transcription-runner@${{ needs.build-runner-image.outputs.image_digest }}
+          RUNNER_SERVER_URL: ${{ secrets.CHARTHUB_RUNNER_SERVER_URL }}
+          RUNNER_API_KEY: ${{ secrets.CHARTHUB_RUNNER_MANAGEMENT_API_KEY }}
+          RUNNER_NAME: ${{ secrets.CHARTHUB_RUNNER_NAME }}
+          RUNNER_CONCURRENCY: ${{ secrets.CHARTHUB_RUNNER_CONCURRENCY }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          EFFECTIVE_CONCURRENCY="${RUNNER_CONCURRENCY:-1}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "mkdir -p /srv/appdata/charthub-runner/config"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "if [[ ! -f /srv/appdata/charthub-runner/config/config.json ]]; then
+              TOKEN=\$(curl -sf -X POST -H 'X-Runner-Api-Key: ${RUNNER_API_KEY}' -H 'Content-Type: application/json' '${RUNNER_SERVER_URL}/api/v1/runners/registration-tokens' | grep -o '\"token\":\"[^\"]*\"' | cut -d'\"' -f4)
+              if [[ -z \"\$TOKEN\" ]]; then echo 'Failed to obtain registration token'; exit 1; fi
+              docker run --rm -v /srv/appdata/charthub-runner/config:/config \
+                '${RUNNER_IMAGE}' register \
+                --server '${RUNNER_SERVER_URL}' \
+                --token \"\$TOKEN\" \
+                --name '${RUNNER_NAME}' \
+                --concurrency '${EFFECTIVE_CONCURRENCY}'
+            fi"
+
+      - name: Deploy
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "docker compose -f /tmp/docker-compose.runner.yml --project-name charthub-prod-runner --env-file /tmp/.env.deploy up -d --no-build"
+
+      - name: Verify running
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          for i in $(seq 1 12); do
+            STATE=$(ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "docker inspect charthub-prod-runner --format '{{.State.Status}}' 2>/dev/null || echo missing")
+            if [[ "$STATE" == "running" ]]; then
+              echo "Runner container is running"
+              break
+            fi
+            if [[ "$i" == "12" ]]; then
+              echo "Runner container failed to reach running state (state: ${STATE})"
+              ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+                "docker compose --project-name charthub-prod-runner logs --tail 100 || true"
+              exit 1
+            fi
+            sleep 5
+          done
+
+      - name: Write deployment summary
+        env:
+          VERSION: ${{ needs.classify.outputs.version }}
+          DIGEST: ${{ needs.build-runner-image.outputs.image_digest }}
+        run: |
+          {
+            echo "## Production deployment complete (Transcription Runner)"
+            echo "- Version: ${VERSION}"
+            echo "- Image digest: ${DIGEST}"
+            echo "- Time: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Clean up
+        if: always()
+        env:
+          SSH_HOST: ${{ secrets.RUNNER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.RUNNER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.RUNNER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+            "rm -f /tmp/.env.deploy /tmp/docker-compose.runner.yml" || true
+          rm -f ~/.ssh/deploy_key

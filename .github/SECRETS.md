@@ -104,6 +104,69 @@ These paths are now fixed in workflow/systemd configuration:
 - ChartHub data root: `/srv/appdata/charthub/data`
 - Clone Hero root: `/srv/appdata/charthub/music`
 
+## Transcription Runner Secrets (Docker Compose deploy)
+
+The runner communicates with ChartHub.Server over the local LAN — no Tailscale
+is required for runtime traffic. Tailscale is still used by CI to SSH into the
+runner machine for deployment.
+
+### SSH deployment secrets (environment-level)
+
+Required for all three runner environments (`runner-dev`, `runner-staging`, `runner-production`).
+
+- `RUNNER_DEPLOY_SSH_HOST` — Tailscale IP of the runner machine
+- `RUNNER_DEPLOY_SSH_USER` — SSH user on the runner machine (must have Docker access)
+- `RUNNER_DEPLOY_SSH_PRIVATE_KEY` — PEM-encoded private key (ed25519 or RSA); corresponding public key must be in `~/.ssh/authorized_keys` on the runner machine
+- `RUNNER_DEPLOY_SSH_PORT` — optional; SSH port, defaults to `22`
+
+### Runner runtime secrets (environment-level)
+
+- `CHARTHUB_RUNNER_SERVER_URL` — LAN URL of ChartHub.Server (e.g. `http://192.168.1.x:5180`)
+- `CHARTHUB_RUNNER_MANAGEMENT_API_KEY` — Static secret for calling `POST /api/v1/runners/registration-tokens`. Never expires. Generate once with `openssl rand -hex 32` and set it in both this GitHub secret and `Runner__ManagementApiKey` in the server's env file.
+- `CHARTHUB_RUNNER_NAME` — Human-readable name for this runner instance
+- `CHARTHUB_RUNNER_CONCURRENCY` — optional; max concurrent jobs, defaults to `1`
+
+### GitHub Environments
+
+| Environment | Triggered on |
+|---|---|
+| `runner-dev` | `dev` channel |
+| `runner-staging` | `rc` or `stable` channel |
+| `runner-production` | `stable` channel only |
+
+### Host paths (fixed)
+
+- Config (config.json): `/srv/appdata/charthub-runner/config`
+- Temp data: `/srv/appdata/charthub-runner/data`
+
+Mounted into the container at `/config` and `/data` respectively. The container symlinks `/config` to `~/.charthub-runner` so the app works identically inside or outside Docker.
+
+### First-time registration
+
+Registration is idempotent — CI checks for `/srv/appdata/charthub-runner/config/config.json` before
+attempting to register. If the file is absent, CI issues a one-time registration token from the server
+and runs `register` inside a throwaway container.
+
+#### How to obtain `CHARTHUB_RUNNER_MANAGEMENT_API_KEY`
+
+Generate a random secret (at least 32 characters) and set it once:
+
+```bash
+openssl rand -hex 32
+```
+
+This value must be set in **two places**:
+
+1. As the `CHARTHUB_RUNNER_MANAGEMENT_API_KEY` GitHub secret in each runner environment (`runner-dev`, `runner-staging`, `runner-production`).
+2. As `Runner__ManagementApiKey` in the server's runtime env file (written by the `deploy-server-*` CI jobs via `CHARTHUB_RUNNER_MANAGEMENT_API_KEY` in each server environment).
+
+The key never expires. CI passes it as `X-Runner-Api-Key: <key>` when calling
+`POST /api/v1/runners/registration-tokens`. Once `config.json` exists on the runner machine,
+the secret is no longer consulted by the deploy job.
+
+> **Note:** Rotating the key requires updating both the server env and the GitHub secret simultaneously,
+> then redeploying the server and re-registering any active runner machines.
+
 ## Validation checklist
 
 - `TAILSCALE_AUTHKEY` exists as a repository secret.
@@ -116,4 +179,9 @@ These paths are now fixed in workflow/systemd configuration:
 - SSH secrets (`SERVER_DEPLOY_SSH_HOST`, `SERVER_DEPLOY_SSH_USER`, `SERVER_DEPLOY_SSH_PRIVATE_KEY`) are set in each server environment.
 - The SSH public key is present in `authorized_keys` on the server for the deploy user.
 - `CHARTHUB_SERVER_CHARTHUB_PORT` is set in each environment if not using default 5180.
+- `runner-dev`, `runner-staging`, and `runner-production` GitHub Environments exist.
+- SSH secrets (`RUNNER_DEPLOY_SSH_HOST`, `RUNNER_DEPLOY_SSH_USER`, `RUNNER_DEPLOY_SSH_PRIVATE_KEY`) are set in each runner environment.
+- The runner SSH public key is present in `authorized_keys` on the runner machine for the deploy user.
+- `CHARTHUB_RUNNER_SERVER_URL`, `CHARTHUB_RUNNER_MANAGEMENT_API_KEY`, and `CHARTHUB_RUNNER_NAME` are set in each runner environment.
+- `CHARTHUB_RUNNER_MANAGEMENT_API_KEY` is also set in each **server** environment (`server-dev`, `server-staging`, `server-production`) so the server can write `Runner__ManagementApiKey` to its env file.
 
