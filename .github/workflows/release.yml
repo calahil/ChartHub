@@ -1695,7 +1695,7 @@ jobs:
     name: Deploy Transcription Runner to dev
     if: needs.classify.outputs.release_channel == 'dev'
     runs-on: ubuntu-latest
-    needs: [classify, build-runner-image]
+    needs: [classify, build-runner-image, deploy-server-dev]
     environment: runner-dev
     steps:
       - uses: actions/checkout@v4
@@ -1831,7 +1831,7 @@ jobs:
     name: Deploy Transcription Runner to staging
     if: needs.classify.outputs.release_channel == 'rc' || needs.classify.outputs.release_channel == 'stable'
     runs-on: ubuntu-latest
-    needs: [classify, build-runner-image]
+    needs: [classify, build-runner-image, deploy-server-staging]
     outputs:
       staged_image_ref: ${{ steps.capture-staged-image.outputs.staged_image_ref }}
     environment: runner-staging
@@ -1984,7 +1984,7 @@ jobs:
     name: Deploy Transcription Runner to production
     if: needs.classify.outputs.release_channel == 'stable'
     runs-on: ubuntu-latest
-    needs: [classify, build-runner-image, deploy-runner-staging]
+    needs: [classify, build-runner-image, deploy-runner-staging, deploy-server-production]
     environment: runner-production
     steps:
       - uses: actions/checkout@v4
