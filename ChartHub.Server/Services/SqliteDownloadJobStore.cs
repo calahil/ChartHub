@@ -25,7 +25,7 @@ public interface IDownloadJobStore
 
     void UpdateProgress(Guid jobId, string stage, double progressPercent);
 
-    void MarkDownloaded(Guid jobId, string downloadedPath);
+    void SetDownloadedArtifact(Guid jobId, string downloadedPath, string fileType);
 
     void UpdateFileType(Guid jobId, string fileType);
 
@@ -353,7 +353,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
         Mutate(jobId, stage, progressPercent, null, clearPaths: false, cancelRequested: null);
     }
 
-    public void MarkDownloaded(Guid jobId, string downloadedPath)
+    public void SetDownloadedArtifact(Guid jobId, string downloadedPath, string fileType)
     {
         lock (_syncLock)
         {
@@ -363,6 +363,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                 UPDATE download_jobs
                 SET
                     downloaded_path = $downloadedPath,
+                    file_type = $fileType,
+                    error = NULL,
                     stage = 'Downloaded',
                     progress_percent = 100,
                     updated_at_utc = $updatedAtUtc
@@ -370,6 +372,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                 """;
             command.Parameters.AddWithValue("$jobId", jobId.ToString("D"));
             command.Parameters.AddWithValue("$downloadedPath", downloadedPath);
+            command.Parameters.AddWithValue("$fileType", fileType);
             command.Parameters.AddWithValue("$updatedAtUtc", DateTimeOffset.UtcNow.ToString("O"));
             command.ExecuteNonQuery();
         }

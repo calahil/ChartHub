@@ -213,7 +213,7 @@ public sealed class NestedInstallPathMigrationServiceTests
         public bool IsCancelRequested(Guid jobId) => throw new NotSupportedException();
         public DownloadJobResponse? TryClaimNextQueuedJob() => throw new NotSupportedException();
         public void UpdateProgress(Guid jobId, string stage, double progressPercent) => throw new NotSupportedException();
-        public void MarkDownloaded(Guid jobId, string downloadedPath) => throw new NotSupportedException();
+        public void SetDownloadedArtifact(Guid jobId, string downloadedPath, string fileType) => throw new NotSupportedException();
         public void UpdateFileType(Guid jobId, string fileType) => throw new NotSupportedException();
         public IReadOnlyList<DownloadJobResponse> ListDownloadedWithoutFileType() => throw new NotSupportedException();
         public void MarkStaged(Guid jobId, string stagedPath) => throw new NotSupportedException();

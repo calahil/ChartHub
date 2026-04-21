@@ -526,7 +526,7 @@ public sealed class CloneHeroEndpointsIntegrationTests
             }
         }
 
-        public void MarkDownloaded(Guid jobId, string downloadedPath)
+        public void SetDownloadedArtifact(Guid jobId, string downloadedPath, string fileType)
         {
             if (_jobs.TryGetValue(jobId, out DownloadJobResponse? existing))
             {
@@ -542,7 +542,14 @@ public sealed class CloneHeroEndpointsIntegrationTests
                     DownloadedPath = downloadedPath,
                     StagedPath = existing.StagedPath,
                     InstalledPath = existing.InstalledPath,
+                    InstalledRelativePath = existing.InstalledRelativePath,
+                    Artist = existing.Artist,
+                    Title = existing.Title,
+                    Charter = existing.Charter,
+                    SourceMd5 = existing.SourceMd5,
+                    SourceChartHash = existing.SourceChartHash,
                     Error = existing.Error,
+                    FileType = fileType,
                     CreatedAtUtc = existing.CreatedAtUtc,
                     UpdatedAtUtc = DateTimeOffset.UtcNow,
                 };
@@ -574,7 +581,7 @@ public sealed class CloneHeroEndpointsIntegrationTests
                     Error = existing.Error,
                     FileType = fileType,
                     CreatedAtUtc = existing.CreatedAtUtc,
-                    UpdatedAtUtc = existing.UpdatedAtUtc,
+                    UpdatedAtUtc = DateTimeOffset.UtcNow,
                 };
             }
         }

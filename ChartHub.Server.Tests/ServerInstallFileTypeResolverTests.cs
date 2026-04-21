@@ -31,6 +31,44 @@ public sealed class ServerInstallFileTypeResolverTests
     }
 
     [Fact]
+    public async Task ResolveAsyncSngSignatureReturnsSng()
+    {
+        using TemporaryFile temp = new(".bin");
+        await File.WriteAllBytesAsync(temp.Path, Encoding.UTF8.GetBytes("SNGPKG\u0001"));
+
+        ServerInstallFileTypeResolver sut = new();
+        ServerInstallFileType result = await sut.ResolveAsync(temp.Path);
+
+        Assert.Equal(ServerInstallFileType.Sng, result);
+    }
+
+    [Fact]
+    public async Task ClassifyAsyncConPayloadCanonicalizesToRb3ConExtension()
+    {
+        using TemporaryFile temp = new(".con");
+        await File.WriteAllBytesAsync(temp.Path, Encoding.UTF8.GetBytes("CON "));
+
+        ServerInstallFileTypeResolver sut = new();
+        ServerArtifactClassification result = await sut.ClassifyAsync(temp.Path);
+
+        Assert.Equal(ServerInstallFileType.Con, result.FileType);
+        Assert.Equal(".rb3con", result.CanonicalExtension);
+    }
+
+    [Fact]
+    public async Task ClassifyAsyncSngPayloadCanonicalizesToSngExtension()
+    {
+        using TemporaryFile temp = new(".download");
+        await File.WriteAllBytesAsync(temp.Path, Encoding.UTF8.GetBytes("SNGPKG\u0001"));
+
+        ServerInstallFileTypeResolver sut = new();
+        ServerArtifactClassification result = await sut.ClassifyAsync(temp.Path);
+
+        Assert.Equal(ServerInstallFileType.Sng, result.FileType);
+        Assert.Equal(".sng", result.CanonicalExtension);
+    }
+
+    [Fact]
     public async Task ResolveAsyncBinWithHtmlPayloadReturnsUnknown()
     {
         using TemporaryFile temp = new(".bin");

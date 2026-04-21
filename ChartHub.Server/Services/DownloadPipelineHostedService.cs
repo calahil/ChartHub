@@ -8,12 +8,13 @@ using Microsoft.Extensions.Options;
 
 namespace ChartHub.Server.Services;
 
-public sealed class DownloadPipelineHostedService(
+public sealed partial class DownloadPipelineHostedService(
     IDownloadJobStore jobStore,
     IHttpClientFactory httpClientFactory,
     ISourceUrlResolver sourceUrlResolver,
     IGoogleDriveFolderArchiveService googleDriveFolderArchiveService,
     IServerInstallFileTypeResolver fileTypeResolver,
+    ILogger<DownloadPipelineHostedService> logger,
     IWebHostEnvironment environment,
     IOptions<ServerPathOptions> pathOptions,
     IOptions<DownloadsOptions> downloadOptions) : BackgroundService
@@ -23,8 +24,10 @@ public sealed class DownloadPipelineHostedService(
     private readonly ISourceUrlResolver _sourceUrlResolver = sourceUrlResolver;
     private readonly IGoogleDriveFolderArchiveService _googleDriveFolderArchiveService = googleDriveFolderArchiveService;
     private readonly IServerInstallFileTypeResolver _fileTypeResolver = fileTypeResolver;
+    private readonly ILogger<DownloadPipelineHostedService> _logger = logger;
     private readonly DownloadsOptions _downloadsOptions = downloadOptions.Value;
     private readonly string _downloadsDir = ServerContentPathResolver.Resolve(pathOptions.Value.DownloadsDir, environment.ContentRootPath);
+    private readonly string _contentRootPath = environment.ContentRootPath;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -66,13 +69,10 @@ public sealed class DownloadPipelineHostedService(
             ResolvedSourceUrl resolvedSource = await _sourceUrlResolver.ResolveAsync(job.SourceUrl, cancellationToken).ConfigureAwait(false);
 
             _jobStore.UpdateProgress(job.JobId, "Downloading", 10);
-            string downloadedPath = resolvedSource.IsGoogleDriveFolder
+            DownloadedArtifact artifact = resolvedSource.IsGoogleDriveFolder
                 ? await DownloadGoogleDriveFolderAsync(job, resolvedSource, cancellationToken).ConfigureAwait(false)
                 : await DownloadFileAsync(job, resolvedSource, cancellationToken).ConfigureAwait(false);
-            _jobStore.MarkDownloaded(job.JobId, downloadedPath);
-
-            ServerInstallFileType fileType = await _fileTypeResolver.ResolveAsync(downloadedPath, cancellationToken).ConfigureAwait(false);
-            _jobStore.UpdateFileType(job.JobId, fileType.ToString());
+            _jobStore.SetDownloadedArtifact(job.JobId, artifact.StoredPath, artifact.Classification.FileType.ToString());
         }
         catch (OperationCanceledException)
         {
@@ -84,7 +84,7 @@ public sealed class DownloadPipelineHostedService(
         }
     }
 
-    private async Task<string> DownloadFileAsync(DownloadJobResponse job, ResolvedSourceUrl resolvedSource, CancellationToken cancellationToken)
+    private async Task<DownloadedArtifact> DownloadFileAsync(DownloadJobResponse job, ResolvedSourceUrl resolvedSource, CancellationToken cancellationToken)
     {
         if (resolvedSource.DownloadUri is null)
         {
@@ -103,14 +103,12 @@ public sealed class DownloadPipelineHostedService(
 
         response.EnsureSuccessStatusCode();
 
-        string extension = ResolveDownloadExtension(sourceUri, resolvedSource.SuggestedName, response.Content.Headers);
-
         string safeBaseName = MakeSafeFileName(resolvedSource.SuggestedName ?? job.DisplayName);
         Directory.CreateDirectory(_downloadsDir);
-        string destinationPath = Path.Combine(_downloadsDir, $"{safeBaseName}-{job.JobId:D}{extension}");
+        string tempPath = Path.Combine(_downloadsDir, $"{safeBaseName}-{job.JobId:D}.download");
 
         await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        await using FileStream output = new(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
+        await using FileStream output = new(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
 
         long? totalBytes = response.Content.Headers.ContentLength;
         byte[] buffer = new byte[81920];
@@ -136,10 +134,10 @@ public sealed class DownloadPipelineHostedService(
             }
         }
 
-        return destinationPath;
+        return await FinalizeDownloadedArtifactAsync(job, tempPath, safeBaseName, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<string> DownloadGoogleDriveFolderAsync(DownloadJobResponse job, ResolvedSourceUrl resolvedSource, CancellationToken cancellationToken)
+    private async Task<DownloadedArtifact> DownloadGoogleDriveFolderAsync(DownloadJobResponse job, ResolvedSourceUrl resolvedSource, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(resolvedSource.GoogleDriveFolderId))
         {
@@ -156,7 +154,11 @@ public sealed class DownloadPipelineHostedService(
                 cancellationToken)
             .ConfigureAwait(false);
         _jobStore.UpdateProgress(job.JobId, "Downloading", 80);
-        return downloadedPath;
+        return await FinalizeDownloadedArtifactAsync(
+            job,
+            downloadedPath,
+            MakeSafeFileName(resolvedSource.SuggestedName ?? job.DisplayName),
+            cancellationToken).ConfigureAwait(false);
     }
 
     private void EnsureNotCancelled(Guid jobId)
@@ -183,7 +185,11 @@ public sealed class DownloadPipelineHostedService(
 
     private async Task BackfillFileTypesAsync(CancellationToken cancellationToken)
     {
-        IReadOnlyList<DownloadJobResponse> jobs = _jobStore.ListDownloadedWithoutFileType();
+        IReadOnlyList<DownloadJobResponse> jobs = _jobStore.List()
+            .Where(job => string.Equals(job.Stage, "Downloaded", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(job.DownloadedPath))
+            .ToList();
+
         foreach (DownloadJobResponse job in jobs)
         {
             if (cancellationToken.IsCancellationRequested || job.DownloadedPath is null)
@@ -193,14 +199,25 @@ public sealed class DownloadPipelineHostedService(
 
             try
             {
-                ServerInstallFileType fileType = await _fileTypeResolver
-                    .ResolveAsync(job.DownloadedPath, cancellationToken)
-                    .ConfigureAwait(false);
-                _jobStore.UpdateFileType(job.JobId, fileType.ToString());
+                string resolvedPath = ResolveArtifactPath(job.DownloadedPath);
+                string safeBaseName = Path.GetFileNameWithoutExtension(resolvedPath);
+                DownloadedArtifact artifact = await FinalizeDownloadedArtifactAsync(
+                    job,
+                    resolvedPath,
+                    safeBaseName,
+                    cancellationToken,
+                    deleteUnknownArtifact: false).ConfigureAwait(false);
+                _jobStore.SetDownloadedArtifact(job.JobId, artifact.StoredPath, artifact.Classification.FileType.ToString());
             }
             catch (OperationCanceledException)
             {
                 break;
+            }
+            catch (InvalidOperationException ex) when (string.Equals(ex.Message, UnknownFileTypeMessage, StringComparison.Ordinal))
+            {
+                DownloadPipelineLog.UnknownArtifactMarkedFailed(_logger, job.JobId, job.DownloadedPath);
+                _jobStore.UpdateFileType(job.JobId, ServerInstallFileType.Unknown.ToString());
+                _jobStore.MarkFailed(job.JobId, UnknownFileTypeMessage);
             }
             catch (Exception)
             {
@@ -209,78 +226,99 @@ public sealed class DownloadPipelineHostedService(
         }
     }
 
-    private static string ResolveDownloadExtension(Uri sourceUri, string? suggestedName, HttpContentHeaders contentHeaders)
+    private async Task<DownloadedArtifact> FinalizeDownloadedArtifactAsync(
+        DownloadJobResponse job,
+        string currentPath,
+        string safeBaseName,
+        CancellationToken cancellationToken,
+        bool deleteUnknownArtifact = true)
     {
-        string extension = Path.GetExtension(suggestedName ?? string.Empty);
-        if (!string.IsNullOrWhiteSpace(extension))
+        ServerArtifactClassification classification = await _fileTypeResolver.ClassifyAsync(currentPath, cancellationToken).ConfigureAwait(false);
+        if (!classification.IsKnown)
         {
-            return extension;
+            if (deleteUnknownArtifact)
+            {
+                TryDeleteFile(currentPath);
+            }
+
+            DownloadPipelineLog.UnknownArtifactSignature(_logger, job.JobId, currentPath);
+            throw new InvalidOperationException(UnknownFileTypeMessage);
         }
 
-        string contentDispositionName = contentHeaders.ContentDisposition?.FileNameStar
-            ?? contentHeaders.ContentDisposition?.FileName
-            ?? string.Empty;
-        contentDispositionName = contentDispositionName.Trim('"');
-        extension = Path.GetExtension(contentDispositionName);
-        if (!string.IsNullOrWhiteSpace(extension))
+        string canonicalPath = Path.Combine(
+            _downloadsDir,
+            $"{NormalizeBaseNameForJob(safeBaseName, job.JobId)}{classification.CanonicalExtension}");
+        string finalResolvedPath = currentPath;
+        if (!string.Equals(currentPath, canonicalPath, StringComparison.Ordinal))
         {
-            return extension;
+            Directory.CreateDirectory(Path.GetDirectoryName(canonicalPath)!);
+            File.Move(currentPath, canonicalPath, overwrite: true);
+            finalResolvedPath = canonicalPath;
+            DownloadPipelineLog.ArtifactRenamed(_logger, job.JobId, currentPath, canonicalPath, classification.FileType);
         }
 
-        extension = Path.GetExtension(sourceUri.AbsolutePath);
-        if (!string.IsNullOrWhiteSpace(extension))
-        {
-            return extension;
-        }
-
-        if (TryInferRhythmVerseExtension(sourceUri, out string inferredExtension))
-        {
-            return inferredExtension;
-        }
-
-        return ".bin";
+        string storedPath = FormatStoredArtifactPath(job.DownloadedPath, finalResolvedPath);
+        DownloadPipelineLog.ArtifactClassified(_logger, job.JobId, finalResolvedPath, classification.FileType, classification.CanonicalExtension);
+        return new DownloadedArtifact(storedPath, classification);
     }
 
-    private static bool TryInferRhythmVerseExtension(Uri sourceUri, out string extension)
+    private string ResolveArtifactPath(string configuredPath)
     {
-        extension = string.Empty;
-        if (!sourceUri.Host.Contains("rhythmverse.co", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        string tail = sourceUri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? string.Empty;
-        if (tail.EndsWith("_rb3con", StringComparison.OrdinalIgnoreCase))
-        {
-            extension = ".rb3con";
-            return true;
-        }
-
-        if (tail.EndsWith("_con", StringComparison.OrdinalIgnoreCase))
-        {
-            extension = ".con";
-            return true;
-        }
-
-        if (tail.EndsWith("_rar", StringComparison.OrdinalIgnoreCase))
-        {
-            extension = ".rar";
-            return true;
-        }
-
-        if (tail.EndsWith("_zip", StringComparison.OrdinalIgnoreCase))
-        {
-            extension = ".zip";
-            return true;
-        }
-
-        if (tail.EndsWith("_7z", StringComparison.OrdinalIgnoreCase))
-        {
-            extension = ".7z";
-            return true;
-        }
-
-        return false;
+        return ServerContentPathResolver.Resolve(configuredPath, _contentRootPath);
     }
 
+    private string FormatStoredArtifactPath(string? originalPath, string resolvedPath)
+    {
+        if (string.IsNullOrWhiteSpace(originalPath) || Path.IsPathRooted(originalPath))
+        {
+            return resolvedPath;
+        }
+
+        string relativePath = Path.GetRelativePath(_contentRootPath, resolvedPath);
+        return relativePath.Replace(Path.DirectorySeparatorChar, '/');
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static string NormalizeBaseNameForJob(string safeBaseName, Guid jobId)
+    {
+        string jobSuffix = $"-{jobId:D}";
+        if (safeBaseName.EndsWith(jobSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            return safeBaseName;
+        }
+
+        return $"{safeBaseName}{jobSuffix}";
+    }
+
+    private sealed record DownloadedArtifact(string StoredPath, ServerArtifactClassification Classification);
+
+    private const string UnknownFileTypeMessage = "Unknown Filetype";
+
+    private static partial class DownloadPipelineLog
+    {
+        [LoggerMessage(EventId = 2201, Level = LogLevel.Information, Message = "Download job {JobId} classified artifact '{ArtifactPath}' as {ArtifactType} with canonical extension '{CanonicalExtension}'.")]
+        public static partial void ArtifactClassified(ILogger logger, Guid jobId, string artifactPath, ServerInstallFileType artifactType, string canonicalExtension);
+
+        [LoggerMessage(EventId = 2202, Level = LogLevel.Information, Message = "Download job {JobId} renamed artifact from '{FromPath}' to '{ToPath}' after signature detection as {ArtifactType}.")]
+        public static partial void ArtifactRenamed(ILogger logger, Guid jobId, string fromPath, string toPath, ServerInstallFileType artifactType);
+
+        [LoggerMessage(EventId = 2203, Level = LogLevel.Warning, Message = "Download job {JobId} failed artifact signature validation for '{ArtifactPath}'.")]
+        public static partial void UnknownArtifactSignature(ILogger logger, Guid jobId, string artifactPath);
+
+        [LoggerMessage(EventId = 2204, Level = LogLevel.Warning, Message = "Legacy downloaded artifact for job {JobId} at '{ArtifactPath}' was marked failed due to unknown file type.")]
+        public static partial void UnknownArtifactMarkedFailed(ILogger logger, Guid jobId, string artifactPath);
+    }
 }

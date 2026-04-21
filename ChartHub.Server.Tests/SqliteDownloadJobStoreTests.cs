@@ -77,7 +77,7 @@ public sealed class SqliteDownloadJobStoreTests : IDisposable
     }
 
     [Fact]
-    public void MarkDownloadedSetsProgressTo100()
+    public void SetDownloadedArtifactSetsProgressTo100AndPersistsFileType()
     {
         SqliteDownloadJobStore sut = BuildStore();
         DownloadJobResponse created = sut.Create(new CreateDownloadJobRequest
@@ -88,12 +88,14 @@ public sealed class SqliteDownloadJobStoreTests : IDisposable
             SourceUrl = "https://example.com/track.zip",
         });
 
-        sut.MarkDownloaded(created.JobId, "/downloads/track.zip");
+        sut.SetDownloadedArtifact(created.JobId, "/downloads/track.rb3con", ServerInstallFileType.Con.ToString());
 
         Assert.True(sut.TryGet(created.JobId, out DownloadJobResponse? updated));
         Assert.NotNull(updated);
         Assert.Equal("Downloaded", updated!.Stage);
         Assert.Equal(100, updated.ProgressPercent);
+        Assert.Equal("/downloads/track.rb3con", updated.DownloadedPath);
+        Assert.Equal(ServerInstallFileType.Con.ToString(), updated.FileType);
     }
 
     [Fact]

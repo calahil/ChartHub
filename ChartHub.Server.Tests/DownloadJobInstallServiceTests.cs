@@ -334,6 +334,21 @@ public sealed class DownloadJobInstallServiceTests
         ServerInstallFileType type,
         CancellationToken cancelAfterCall = default) : IServerInstallFileTypeResolver
     {
+        public Task<ServerArtifactClassification> ClassifyAsync(string artifactPath, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            cancelAfterCall.ThrowIfCancellationRequested();
+            return Task.FromResult(new ServerArtifactClassification(type, type switch
+            {
+                ServerInstallFileType.Zip => ".zip",
+                ServerInstallFileType.Rar => ".rar",
+                ServerInstallFileType.SevenZip => ".7z",
+                ServerInstallFileType.Con => ".rb3con",
+                ServerInstallFileType.Sng => ".sng",
+                _ => string.Empty,
+            }));
+        }
+
         public Task<ServerInstallFileType> ResolveAsync(string artifactPath, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();

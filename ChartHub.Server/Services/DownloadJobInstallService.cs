@@ -103,6 +103,9 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
                     => await InstallArchiveAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
                 ServerInstallFileType.Con
                     => await InstallConAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
+                // TODO: Add SNG conversion/install pipeline support.
+                ServerInstallFileType.Sng
+                    => throw new InvalidOperationException("SNG install support is not implemented yet."),
                 _ => throw new InvalidOperationException("Unsupported install artifact format."),
             };
 
