@@ -1772,7 +1772,7 @@ jobs:
             "mkdir -p /srv/appdata/charthub-runner/config"
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
             "if [[ ! -f /srv/appdata/charthub-runner/config/config.json ]]; then
-              TOKEN=\$(curl -sf -X POST -H 'X-Runner-Api-Key: ${RUNNER_API_KEY}' -H 'Content-Type: application/json' '${RUNNER_SERVER_URL}/api/v1/runners/registration-tokens' | grep -o '\"token\":\"[^\"]*\"' | cut -d'\"' -f4)
+              TOKEN=\$(curl -sf -X POST -H 'X-Runner-Api-Key: ${RUNNER_API_KEY}' -H 'Content-Type: application/json' --data '{\"ttlMinutes\":15}' '${RUNNER_SERVER_URL}/api/v1/runners/registration-tokens' | grep -o '\"plainToken\":\"[^\"]*\"' | cut -d'\"' -f4)
               if [[ -z \"\$TOKEN\" ]]; then echo 'Failed to obtain registration token'; exit 1; fi
               docker run --rm -v /srv/appdata/charthub-runner/config:/config \
                 '${RUNNER_IMAGE}' register \
@@ -1910,7 +1910,7 @@ jobs:
             "mkdir -p /srv/appdata/charthub-runner/config"
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
             "if [[ ! -f /srv/appdata/charthub-runner/config/config.json ]]; then
-              TOKEN=\$(curl -sf -X POST -H 'X-Runner-Api-Key: ${RUNNER_API_KEY}' -H 'Content-Type: application/json' '${RUNNER_SERVER_URL}/api/v1/runners/registration-tokens' | grep -o '\"token\":\"[^\"]*\"' | cut -d'\"' -f4)
+              TOKEN=\$(curl -sf -X POST -H 'X-Runner-Api-Key: ${RUNNER_API_KEY}' -H 'Content-Type: application/json' --data '{\"ttlMinutes\":15}' '${RUNNER_SERVER_URL}/api/v1/runners/registration-tokens' | grep -o '\"plainToken\":\"[^\"]*\"' | cut -d'\"' -f4)
               if [[ -z \"\$TOKEN\" ]]; then echo 'Failed to obtain registration token'; exit 1; fi
               docker run --rm -v /srv/appdata/charthub-runner/config:/config \
                 '${RUNNER_IMAGE}' register \
@@ -2083,7 +2083,7 @@ jobs:
             "mkdir -p /srv/appdata/charthub-runner/config"
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
             "if [[ ! -f /srv/appdata/charthub-runner/config/config.json ]]; then
-              TOKEN=\$(curl -sf -X POST -H 'X-Runner-Api-Key: ${RUNNER_API_KEY}' -H 'Content-Type: application/json' '${RUNNER_SERVER_URL}/api/v1/runners/registration-tokens' | grep -o '\"token\":\"[^\"]*\"' | cut -d'\"' -f4)
+              TOKEN=\$(curl -sf -X POST -H 'X-Runner-Api-Key: ${RUNNER_API_KEY}' -H 'Content-Type: application/json' --data '{\"ttlMinutes\":15}' '${RUNNER_SERVER_URL}/api/v1/runners/registration-tokens' | grep -o '\"plainToken\":\"[^\"]*\"' | cut -d'\"' -f4)
               if [[ -z \"\$TOKEN\" ]]; then echo 'Failed to obtain registration token'; exit 1; fi
               docker run --rm -v /srv/appdata/charthub-runner/config:/config \
                 '${RUNNER_IMAGE}' register \
