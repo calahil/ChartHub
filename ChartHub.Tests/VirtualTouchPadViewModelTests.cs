@@ -15,7 +15,7 @@ public sealed class VirtualTouchPadViewModelTests
     [Fact]
     public void Constructor_InitialisesDisconnectedStatusAndCommands()
     {
-        using VirtualTouchPadViewModel sut = new(null, new FakeInputWebSocketService(), new FakeOrientationService());
+        using VirtualTouchPadViewModel sut = new(null, new FakeInputWebSocketService(), new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         Assert.False(sut.IsConnected);
         Assert.NotEmpty(sut.StatusMessage);
@@ -29,7 +29,7 @@ public sealed class VirtualTouchPadViewModelTests
     public void Activate_RequestsLandscapeOrientation()
     {
         FakeOrientationService orientation = new();
-        using VirtualTouchPadViewModel sut = new(null, new FakeInputWebSocketService(), orientation);
+        using VirtualTouchPadViewModel sut = new(null, new FakeInputWebSocketService(), orientation, new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
 
@@ -40,7 +40,7 @@ public sealed class VirtualTouchPadViewModelTests
     public void Deactivate_SetsIsConnectedFalseAndRestoresOrientation()
     {
         FakeOrientationService orientation = new();
-        using VirtualTouchPadViewModel sut = new(null, new FakeInputWebSocketService(), orientation);
+        using VirtualTouchPadViewModel sut = new(null, new FakeInputWebSocketService(), orientation, new FakeDeviceDisplayNameProvider());
 
         sut.Deactivate();
 
@@ -52,7 +52,7 @@ public sealed class VirtualTouchPadViewModelTests
     public void OnTouchPadDelta_WhenNotConnected_DoesNotSendToWebSocket()
     {
         FakeInputWebSocketService ws = new();
-        using VirtualTouchPadViewModel sut = new(null, ws, new FakeOrientationService());
+        using VirtualTouchPadViewModel sut = new(null, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         sut.OnTouchPadDelta(10, 5);
 
@@ -64,11 +64,12 @@ public sealed class VirtualTouchPadViewModelTests
     {
         FakeInputWebSocketService ws = new();
         using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token");
-        using VirtualTouchPadViewModel sut = new(settings, ws, new FakeOrientationService());
+        using VirtualTouchPadViewModel sut = new(settings, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider("Pixel 8"));
 
         sut.Activate();
         bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
         Assert.True(connected);
+        Assert.Equal("Pixel 8", ws.LastDeviceName);
 
         ws.SentMessages.Clear();
         sut.OnTouchPadDelta(2, 3);
@@ -84,7 +85,7 @@ public sealed class VirtualTouchPadViewModelTests
     {
         FakeInputWebSocketService ws = new();
         using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token");
-        using VirtualTouchPadViewModel sut = new(settings, ws, new FakeOrientationService());
+        using VirtualTouchPadViewModel sut = new(settings, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
         bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
@@ -101,7 +102,7 @@ public sealed class VirtualTouchPadViewModelTests
     {
         FakeInputWebSocketService ws = new();
         using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token", mouseSpeedMultiplier: 2.0);
-        using VirtualTouchPadViewModel sut = new(settings, ws, new FakeOrientationService());
+        using VirtualTouchPadViewModel sut = new(settings, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
         bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
@@ -121,7 +122,7 @@ public sealed class VirtualTouchPadViewModelTests
     {
         FakeInputWebSocketService ws = new();
         using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token");
-        using VirtualTouchPadViewModel sut = new(settings, ws, new FakeOrientationService());
+        using VirtualTouchPadViewModel sut = new(settings, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
         bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
@@ -139,7 +140,7 @@ public sealed class VirtualTouchPadViewModelTests
     public void PressMouseButtonCommand_WhenNotConnected_DoesNotSend()
     {
         FakeInputWebSocketService ws = new();
-        using VirtualTouchPadViewModel sut = new(null, ws, new FakeOrientationService());
+        using VirtualTouchPadViewModel sut = new(null, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         sut.PressMouseButtonCommand.Execute("left");
 
@@ -178,11 +179,13 @@ public sealed class VirtualTouchPadViewModelTests
     private sealed class FakeInputWebSocketService : IInputWebSocketService
     {
         public bool IsConnected { get; private set; }
+        public string? LastDeviceName { get; private set; }
         public List<string> SentMessages { get; } = [];
 
         public Task ConnectAsync(string baseUrl, string bearerToken, string path, string deviceName, CancellationToken cancellationToken = default)
         {
             IsConnected = true;
+            LastDeviceName = deviceName;
             return Task.CompletedTask;
         }
 
@@ -199,6 +202,11 @@ public sealed class VirtualTouchPadViewModelTests
         }
 
         public void Dispose() { }
+    }
+
+    private sealed class FakeDeviceDisplayNameProvider(string deviceName = "Test Android") : IDeviceDisplayNameProvider
+    {
+        public string GetDisplayName() => deviceName;
     }
 
     private sealed class FakeSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator

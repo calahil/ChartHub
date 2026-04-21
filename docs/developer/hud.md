@@ -29,7 +29,7 @@ ChartHub Hud is a separate Avalonia application (`ChartHub.Hud/`) that communica
 The Hud window is fullscreen with no decorations and a dark background.
 
 - **Top strip** (64px, opaque) — spans the full width:
-  - Left: the connected Android device's hostname
+  - Left: the connected Android device's display name
   - Right: a green/red indicator dot (green = Input WebSocket open, red = none)
 - **Main area** — the ChartHub logo centered in the remaining space below the strip
 
@@ -39,7 +39,12 @@ When no Android device is connected, the left side of the top strip is empty and
 
 ## Device Name
 
-The Android app sends its device hostname when opening an Input WebSocket connection via the `X-Device-Name` HTTP header on the upgrade request. ChartHub Server reads this name, tracks it in `InputConnectionTracker`, and broadcasts it to the Hud via the SSE status stream.
+The Android app sends a display name when opening Presence and Input WebSocket connections via the `X-Device-Name` HTTP header. The name source is:
+
+1. Android user-assigned device name, when available.
+2. `Manufacturer Model` fallback when no user-assigned name is available.
+
+ChartHub Server normalizes this value (trim, collapse whitespace, remove control chars, cap length), tracks it in `InputConnectionTracker`, and broadcasts it to the Hud via the SSE status stream.
 
 Only one Input WebSocket connection is permitted at a time (globally across all three endpoints — controller, touchpad, keyboard). A second connection attempt while one is active is rejected immediately.
 

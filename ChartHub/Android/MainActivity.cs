@@ -1,6 +1,4 @@
 #if ANDROID
-using System.Net;
-
 using Android.App;
 using Android.Content.PM;
 using Android.OS;
@@ -48,9 +46,11 @@ public class MainActivity : AvaloniaMainActivity
 
         IPresenceWebSocketService? svc = App.ServiceProvider?.GetService<IPresenceWebSocketService>();
         AppGlobalSettings? settings = App.ServiceProvider?.GetService<AppGlobalSettings>();
+        IDeviceDisplayNameProvider? deviceNameProvider = App.ServiceProvider?.GetService<IDeviceDisplayNameProvider>();
         if (svc != null && settings != null && !string.IsNullOrWhiteSpace(settings.ServerApiAuthToken))
         {
-            _ = svc.ConnectAsync(settings.ServerApiBaseUrl, settings.ServerApiAuthToken, Dns.GetHostName());
+            string deviceName = deviceNameProvider?.GetDisplayName() ?? "unknown-device";
+            _ = svc.ConnectAsync(settings.ServerApiBaseUrl, settings.ServerApiAuthToken, deviceName);
         }
     }
 

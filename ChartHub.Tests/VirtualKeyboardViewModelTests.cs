@@ -15,7 +15,7 @@ public sealed class VirtualKeyboardViewModelTests
     [Fact]
     public void Constructor_InitialisesDisconnectedStatusAndCommands()
     {
-        using VirtualKeyboardViewModel sut = new(null, new FakeInputWebSocketService());
+        using VirtualKeyboardViewModel sut = new(null, new FakeInputWebSocketService(), new FakeDeviceDisplayNameProvider());
 
         Assert.False(sut.IsConnected);
         Assert.NotEmpty(sut.StatusMessage);
@@ -31,11 +31,12 @@ public sealed class VirtualKeyboardViewModelTests
     {
         FakeInputWebSocketService ws = new();
         using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token");
-        using VirtualKeyboardViewModel sut = new(settings, ws);
+        using VirtualKeyboardViewModel sut = new(settings, ws, new FakeDeviceDisplayNameProvider("Pixel 8"));
 
         sut.Activate();
         bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
         Assert.True(connected);
+        Assert.Equal("Pixel 8", ws.LastDeviceName);
 
         sut.Deactivate();
 
@@ -47,7 +48,7 @@ public sealed class VirtualKeyboardViewModelTests
     public void InputBuffer_WhenNotConnected_DoesNotSendCharsToWebSocket()
     {
         FakeInputWebSocketService ws = new();
-        using VirtualKeyboardViewModel sut = new(null, ws);
+        using VirtualKeyboardViewModel sut = new(null, ws, new FakeDeviceDisplayNameProvider());
 
         sut.InputBuffer = "hello";
 
@@ -59,7 +60,7 @@ public sealed class VirtualKeyboardViewModelTests
     {
         FakeInputWebSocketService ws = new();
         using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token");
-        using VirtualKeyboardViewModel sut = new(settings, ws);
+        using VirtualKeyboardViewModel sut = new(settings, ws, new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
         bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
@@ -80,7 +81,7 @@ public sealed class VirtualKeyboardViewModelTests
     {
         FakeInputWebSocketService ws = new();
         using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token");
-        using VirtualKeyboardViewModel sut = new(settings, ws);
+        using VirtualKeyboardViewModel sut = new(settings, ws, new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
         bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
@@ -100,7 +101,7 @@ public sealed class VirtualKeyboardViewModelTests
     public void SendEnterCommand_WhenNotConnected_DoesNotSendToWebSocket()
     {
         FakeInputWebSocketService ws = new();
-        using VirtualKeyboardViewModel sut = new(null, ws);
+        using VirtualKeyboardViewModel sut = new(null, ws, new FakeDeviceDisplayNameProvider());
 
         sut.SendEnterCommand.Execute(null);
 
@@ -112,7 +113,7 @@ public sealed class VirtualKeyboardViewModelTests
     {
         FakeInputWebSocketService ws = new();
         using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token");
-        using VirtualKeyboardViewModel sut = new(settings, ws);
+        using VirtualKeyboardViewModel sut = new(settings, ws, new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
         bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
@@ -131,7 +132,7 @@ public sealed class VirtualKeyboardViewModelTests
     public void Activate_WithEmptyBaseUrl_DoesNotConnect()
     {
         FakeInputWebSocketService ws = new();
-        using VirtualKeyboardViewModel sut = new(null, ws);
+        using VirtualKeyboardViewModel sut = new(null, ws, new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
 
@@ -161,12 +162,14 @@ public sealed class VirtualKeyboardViewModelTests
     {
         public bool IsConnected { get; private set; }
         public int ConnectCallCount { get; private set; }
+        public string? LastDeviceName { get; private set; }
         public List<string> SentMessages { get; } = [];
 
         public Task ConnectAsync(string baseUrl, string bearerToken, string path, string deviceName, CancellationToken cancellationToken = default)
         {
             IsConnected = true;
             ConnectCallCount++;
+            LastDeviceName = deviceName;
             return Task.CompletedTask;
         }
 
@@ -183,6 +186,11 @@ public sealed class VirtualKeyboardViewModelTests
         }
 
         public void Dispose() { }
+    }
+
+    private sealed class FakeDeviceDisplayNameProvider(string deviceName = "Test Android") : IDeviceDisplayNameProvider
+    {
+        public string GetDisplayName() => deviceName;
     }
 
     private sealed class FakeSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator

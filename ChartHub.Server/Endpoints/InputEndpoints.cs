@@ -58,7 +58,7 @@ public static partial class InputEndpoints
             return;
         }
 
-        string deviceName = context.Request.Headers["X-Device-Name"].FirstOrDefault() ?? "unknown";
+        string deviceName = DeviceNameNormalizer.Normalize(context.Request.Headers["X-Device-Name"].FirstOrDefault());
 
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
 
@@ -116,7 +116,7 @@ public static partial class InputEndpoints
             return;
         }
 
-        string deviceName = context.Request.Headers["X-Device-Name"].FirstOrDefault() ?? "unknown";
+        string deviceName = DeviceNameNormalizer.Normalize(context.Request.Headers["X-Device-Name"].FirstOrDefault());
 
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
 
@@ -174,7 +174,7 @@ public static partial class InputEndpoints
             return;
         }
 
-        string deviceName = context.Request.Headers["X-Device-Name"].FirstOrDefault() ?? "unknown";
+        string deviceName = DeviceNameNormalizer.Normalize(context.Request.Headers["X-Device-Name"].FirstOrDefault());
 
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
 

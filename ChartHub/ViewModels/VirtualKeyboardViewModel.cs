@@ -20,6 +20,7 @@ public sealed class VirtualKeyboardViewModel : INotifyPropertyChanged, IDisposab
 
     private readonly AppGlobalSettings? _globalSettings;
     private readonly IInputWebSocketService _webSocketService;
+    private readonly IDeviceDisplayNameProvider _deviceDisplayNameProvider;
     private bool _isConnected;
     private string _statusMessage = string.Empty;
     private string _inputBuffer = string.Empty;
@@ -77,14 +78,16 @@ public sealed class VirtualKeyboardViewModel : INotifyPropertyChanged, IDisposab
     public IRelayCommand SendEscapeCommand { get; }
     public IRelayCommand SendTabCommand { get; }
 
-    public VirtualKeyboardViewModel() : this(null, new InputWebSocketService()) { }
+    public VirtualKeyboardViewModel() : this(null, new InputWebSocketService(), new DeviceDisplayNameProvider()) { }
 
     public VirtualKeyboardViewModel(
         AppGlobalSettings? globalSettings,
-        IInputWebSocketService webSocketService)
+        IInputWebSocketService webSocketService,
+        IDeviceDisplayNameProvider deviceDisplayNameProvider)
     {
         _globalSettings = globalSettings;
         _webSocketService = webSocketService;
+        _deviceDisplayNameProvider = deviceDisplayNameProvider;
         _statusMessage = UiLocalization.Get("Input.Keyboard.Status.Disconnected");
 
         ActivateCommand = new RelayCommand(Activate);
@@ -142,7 +145,8 @@ public sealed class VirtualKeyboardViewModel : INotifyPropertyChanged, IDisposab
 
         try
         {
-            await _webSocketService.ConnectAsync(baseUrl, token, "api/v1/input/keyboard/ws", System.Net.Dns.GetHostName()).ConfigureAwait(false);
+            string deviceName = _deviceDisplayNameProvider.GetDisplayName();
+            await _webSocketService.ConnectAsync(baseUrl, token, "api/v1/input/keyboard/ws", deviceName).ConfigureAwait(false);
             IsConnected = true;
             StatusMessage = UiLocalization.Get("Input.Keyboard.Status.Connected");
         }

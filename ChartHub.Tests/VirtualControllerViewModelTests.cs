@@ -15,7 +15,7 @@ public sealed class VirtualControllerViewModelTests
     [Fact]
     public void Constructor_InitialisesDisconnectedStatusAndCommands()
     {
-        using VirtualControllerViewModel sut = new(null, new FakeInputWebSocketService(), new FakeOrientationService());
+        using VirtualControllerViewModel sut = new(null, new FakeInputWebSocketService(), new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         Assert.False(sut.IsConnected);
         Assert.NotEmpty(sut.StatusMessage);
@@ -30,7 +30,7 @@ public sealed class VirtualControllerViewModelTests
     public void Activate_RequestsLandscapeOrientation()
     {
         FakeOrientationService orientation = new();
-        using VirtualControllerViewModel sut = new(null, new FakeInputWebSocketService(), orientation);
+        using VirtualControllerViewModel sut = new(null, new FakeInputWebSocketService(), orientation, new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
 
@@ -41,7 +41,7 @@ public sealed class VirtualControllerViewModelTests
     public void Deactivate_SetsIsConnectedFalseAndRestoresOrientation()
     {
         FakeOrientationService orientation = new();
-        using VirtualControllerViewModel sut = new(null, new FakeInputWebSocketService(), orientation);
+        using VirtualControllerViewModel sut = new(null, new FakeInputWebSocketService(), orientation, new FakeDeviceDisplayNameProvider());
 
         sut.Deactivate();
 
@@ -53,7 +53,7 @@ public sealed class VirtualControllerViewModelTests
     public void PressButtonCommand_WhenNotConnected_DoesNotSendToWebSocket()
     {
         FakeInputWebSocketService ws = new();
-        using VirtualControllerViewModel sut = new(null, ws, new FakeOrientationService());
+        using VirtualControllerViewModel sut = new(null, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         sut.PressButtonCommand.Execute("a");
 
@@ -64,7 +64,7 @@ public sealed class VirtualControllerViewModelTests
     public void ReleaseButtonCommand_WhenNotConnected_DoesNotSendToWebSocket()
     {
         FakeInputWebSocketService ws = new();
-        using VirtualControllerViewModel sut = new(null, ws, new FakeOrientationService());
+        using VirtualControllerViewModel sut = new(null, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         sut.ReleaseButtonCommand.Execute("b");
 
@@ -75,7 +75,7 @@ public sealed class VirtualControllerViewModelTests
     public void SetDPadCommand_WhenNotConnected_DoesNotSendToWebSocket()
     {
         FakeInputWebSocketService ws = new();
-        using VirtualControllerViewModel sut = new(null, ws, new FakeOrientationService());
+        using VirtualControllerViewModel sut = new(null, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         sut.SetDPadCommand.Execute("0,-1");
 
@@ -87,20 +87,21 @@ public sealed class VirtualControllerViewModelTests
     {
         FakeInputWebSocketService ws = new();
         using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token");
-        using VirtualControllerViewModel sut = new(settings, ws, new FakeOrientationService());
+        using VirtualControllerViewModel sut = new(settings, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider("Pixel 8"));
 
         sut.Activate();
         bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
 
         Assert.True(connected);
         Assert.True(ws.ConnectCallCount >= 1);
+        Assert.Equal("Pixel 8", ws.LastDeviceName);
     }
 
     [Fact]
     public void Activate_WithEmptyBaseUrl_DoesNotConnect()
     {
         FakeInputWebSocketService ws = new();
-        using VirtualControllerViewModel sut = new(null, ws, new FakeOrientationService());
+        using VirtualControllerViewModel sut = new(null, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
 
@@ -113,7 +114,7 @@ public sealed class VirtualControllerViewModelTests
     {
         FakeInputWebSocketService ws = new();
         using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token");
-        using VirtualControllerViewModel sut = new(settings, ws, new FakeOrientationService());
+        using VirtualControllerViewModel sut = new(settings, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
         bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
@@ -132,7 +133,7 @@ public sealed class VirtualControllerViewModelTests
     {
         FakeInputWebSocketService ws = new();
         using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token");
-        using VirtualControllerViewModel sut = new(settings, ws, new FakeOrientationService());
+        using VirtualControllerViewModel sut = new(settings, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
 
         sut.Activate();
         bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
@@ -178,12 +179,14 @@ public sealed class VirtualControllerViewModelTests
     {
         public bool IsConnected { get; private set; }
         public int ConnectCallCount { get; private set; }
+        public string? LastDeviceName { get; private set; }
         public List<string> SentMessages { get; } = [];
 
         public Task ConnectAsync(string baseUrl, string bearerToken, string path, string deviceName, CancellationToken cancellationToken = default)
         {
             IsConnected = true;
             ConnectCallCount++;
+            LastDeviceName = deviceName;
             return Task.CompletedTask;
         }
 
@@ -200,6 +203,11 @@ public sealed class VirtualControllerViewModelTests
         }
 
         public void Dispose() { }
+    }
+
+    private sealed class FakeDeviceDisplayNameProvider(string deviceName = "Test Android") : IDeviceDisplayNameProvider
+    {
+        public string GetDisplayName() => deviceName;
     }
 
     private sealed class FakeSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator

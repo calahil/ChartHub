@@ -15,6 +15,7 @@ public sealed class VirtualTouchPadViewModel : INotifyPropertyChanged, IDisposab
     private readonly AppGlobalSettings? _globalSettings;
     private readonly IInputWebSocketService _webSocketService;
     private readonly IOrientationService _orientationService;
+    private readonly IDeviceDisplayNameProvider _deviceDisplayNameProvider;
     private bool _isConnected;
     private string _statusMessage = string.Empty;
     private bool _disposed;
@@ -51,16 +52,18 @@ public sealed class VirtualTouchPadViewModel : INotifyPropertyChanged, IDisposab
     public IRelayCommand<string?> PressMouseButtonCommand { get; }
     public IRelayCommand<string?> ReleaseMouseButtonCommand { get; }
 
-    public VirtualTouchPadViewModel() : this(null, new InputWebSocketService(), new NullOrientationService()) { }
+    public VirtualTouchPadViewModel() : this(null, new InputWebSocketService(), new NullOrientationService(), new DeviceDisplayNameProvider()) { }
 
     public VirtualTouchPadViewModel(
         AppGlobalSettings? globalSettings,
         IInputWebSocketService webSocketService,
-        IOrientationService orientationService)
+        IOrientationService orientationService,
+        IDeviceDisplayNameProvider deviceDisplayNameProvider)
     {
         _globalSettings = globalSettings;
         _webSocketService = webSocketService;
         _orientationService = orientationService;
+        _deviceDisplayNameProvider = deviceDisplayNameProvider;
         _statusMessage = UiLocalization.Get("Input.Touchpad.Status.Disconnected");
 
         ActivateCommand = new RelayCommand(Activate);
@@ -119,7 +122,8 @@ public sealed class VirtualTouchPadViewModel : INotifyPropertyChanged, IDisposab
 
         try
         {
-            await _webSocketService.ConnectAsync(baseUrl, token, "api/v1/input/touchpad/ws", System.Net.Dns.GetHostName()).ConfigureAwait(false);
+            string deviceName = _deviceDisplayNameProvider.GetDisplayName();
+            await _webSocketService.ConnectAsync(baseUrl, token, "api/v1/input/touchpad/ws", deviceName).ConfigureAwait(false);
             IsConnected = true;
             StatusMessage = UiLocalization.Get("Input.Touchpad.Status.Connected");
         }

@@ -37,8 +37,7 @@ public static partial class PresenceEndpoints
             ?? context.User.FindFirstValue("email")
             ?? string.Empty;
 
-        string deviceName = context.Request.Headers["X-Device-Name"].FirstOrDefault()
-            ?? System.Net.Dns.GetHostName();
+        string deviceName = DeviceNameNormalizer.Normalize(context.Request.Headers["X-Device-Name"].FirstOrDefault());
 
         using WebSocket ws = await context.WebSockets.AcceptWebSocketAsync();
 

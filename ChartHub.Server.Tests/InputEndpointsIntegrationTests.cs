@@ -202,6 +202,49 @@ public sealed class InputEndpointsIntegrationTests
         Assert.Equal(WebSocketState.Closed, ws.State);
     }
 
+    [Fact]
+    public async Task ConnectionsWithEquivalentNormalizedNamesAreAccepted()
+    {
+        await using TestAppFixture fixture = await TestAppFixture.CreateAsync();
+        WebSocketClient wsClient1 = fixture.CreateWebSocketClient("  Pixel\t8  ");
+        WebSocketClient wsClient2 = fixture.CreateWebSocketClient("Pixel 8");
+
+        using WebSocket ws1 = await wsClient1.ConnectAsync(
+            new Uri("ws://localhost/api/v1/input/controller/ws"), CancellationToken.None);
+
+        using WebSocket ws2 = await wsClient2.ConnectAsync(
+            new Uri("ws://localhost/api/v1/input/touchpad/ws"), CancellationToken.None);
+
+        await Task.Delay(100);
+
+        Assert.Equal(WebSocketState.Open, ws2.State);
+
+        await ws2.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
+        await ws1.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ConnectionsWithDifferentNormalizedNamesAreRejected()
+    {
+        await using TestAppFixture fixture = await TestAppFixture.CreateAsync();
+        WebSocketClient wsClient1 = fixture.CreateWebSocketClient("Pixel 8");
+        WebSocketClient wsClient2 = fixture.CreateWebSocketClient("Galaxy S24");
+
+        using WebSocket ws1 = await wsClient1.ConnectAsync(
+            new Uri("ws://localhost/api/v1/input/controller/ws"), CancellationToken.None);
+
+        using WebSocket ws2 = await wsClient2.ConnectAsync(
+            new Uri("ws://localhost/api/v1/input/touchpad/ws"), CancellationToken.None);
+
+        byte[] buffer = new byte[128];
+        WebSocketReceiveResult result = await ws2.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+
+        Assert.Equal(WebSocketMessageType.Close, result.MessageType);
+        Assert.Equal(WebSocketState.CloseReceived, ws2.State);
+
+        await ws1.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -226,12 +269,16 @@ public sealed class InputEndpointsIntegrationTests
 
         public HttpClient Client { get; }
 
-        public WebSocketClient CreateWebSocketClient()
+        public WebSocketClient CreateWebSocketClient(string? deviceName = null)
         {
             WebSocketClient wsClient = _app.GetTestServer().CreateWebSocketClient();
             wsClient.ConfigureRequest = req =>
             {
                 req.Headers["Authorization"] = "Test";
+                if (!string.IsNullOrWhiteSpace(deviceName))
+                {
+                    req.Headers["X-Device-Name"] = deviceName;
+                }
             };
             return wsClient;
         }

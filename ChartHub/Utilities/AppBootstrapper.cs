@@ -145,6 +145,7 @@ public static class AppBootstrapper
 #endif
         services.AddTransient<IInputWebSocketService, InputWebSocketService>();
         services.AddSingleton<IPresenceWebSocketService, PresenceWebSocketService>();
+        services.AddSingleton<IDeviceDisplayNameProvider, DeviceDisplayNameProvider>();
         services.AddSingleton<EncoreApiService>();
         services.AddSingleton<SharedDownloadQueue>();
         services.AddSingleton(_ => new LibraryCatalogService(Path.Combine(configDir, "library-catalog.db")));
@@ -183,16 +184,19 @@ public static class AppBootstrapper
             new VirtualControllerViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
                 serviceProvider.GetRequiredService<IInputWebSocketService>(),
-                serviceProvider.GetRequiredService<IOrientationService>()));
+                serviceProvider.GetRequiredService<IOrientationService>(),
+                serviceProvider.GetRequiredService<IDeviceDisplayNameProvider>()));
         services.AddSingleton<VirtualTouchPadViewModel>(serviceProvider =>
             new VirtualTouchPadViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
                 serviceProvider.GetRequiredService<IInputWebSocketService>(),
-                serviceProvider.GetRequiredService<IOrientationService>()));
+                serviceProvider.GetRequiredService<IOrientationService>(),
+                serviceProvider.GetRequiredService<IDeviceDisplayNameProvider>()));
         services.AddSingleton<VirtualKeyboardViewModel>(serviceProvider =>
             new VirtualKeyboardViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
-                serviceProvider.GetRequiredService<IInputWebSocketService>()));
+                serviceProvider.GetRequiredService<IInputWebSocketService>(),
+                serviceProvider.GetRequiredService<IDeviceDisplayNameProvider>()));
         services.AddSingleton<MainViewModel>(serviceProvider =>
             new MainViewModel(
                 serviceProvider.GetRequiredService<RhythmVerseViewModel>(),
