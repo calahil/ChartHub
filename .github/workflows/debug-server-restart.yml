@@ -45,7 +45,36 @@ jobs:
           SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
-          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "echo ssh-ok"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            echo \"ssh-ok, running as: \$(whoami), uid: \$(id -u)\"
+            echo \"service user: \$(systemctl show charthub-server.service --property=User --value 2>/dev/null || echo unknown)\"
+            echo \"KillUserProcesses: \$(loginctl show-session -p KillProcesses 2>/dev/null || grep -i killuserprocesses /etc/systemd/logind.conf 2>/dev/null || echo not-found)\"
+          "
+
+      - name: Probe - sudo systemctl is-active (no restart)
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            sudo systemctl is-active --quiet charthub-server.service 2>/dev/null && echo 'is-active: yes' || echo 'is-active: no'
+            sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null && echo 'is-enabled: yes' || echo 'is-enabled: no'
+            echo 'sudo-query-done'
+          "
+
+      - name: Probe - sudo systemd-run no-block echo (no restart)
+        env:
+          SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
+          SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+        run: |
+          EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
+          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+            sudo systemd-run --no-block echo systemd-run-ok
+            echo 'systemd-run-done'
+          "
 
       - name: Restart server service (verbose)
         env:
