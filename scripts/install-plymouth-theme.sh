@@ -139,7 +139,15 @@ update-alternatives --install \
     100
 
 echo "==> Setting charthub as the default Plymouth theme..."
-plymouth-set-default-theme charthub
+# Write plymouthd.conf directly — more reliable than calling
+# plymouth-set-default-theme, which is in /usr/sbin and may not be in PATH
+# during a root setup script on Ubuntu Server.
+mkdir -p /etc/plymouth
+cat > /etc/plymouth/plymouthd.conf <<'PLYMOUTH_CONF_EOF'
+[Daemon]
+Theme=charthub
+ShowDelay=0
+PLYMOUTH_CONF_EOF
 
 # ---------------------------------------------------------------------------
 # 9. Ensure GRUB passes 'quiet splash' so Plymouth is actually displayed.
