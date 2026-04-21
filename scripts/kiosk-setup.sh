@@ -200,6 +200,16 @@ apt-get install -y \
     lightdm-gtk-greeter \
     openbox
 
+# Ensure LightDM is selected as the display manager in non-interactive installs.
+echo "==> Ensuring LightDM is the default display manager..."
+mkdir -p /etc/X11
+printf '/usr/sbin/lightdm\n' > /etc/X11/default-display-manager
+if [[ -d /run/systemd/system ]]; then
+    systemctl enable lightdm
+else
+    systemctl --root / enable lightdm
+fi
+
 # ---------------------------------------------------------------------------
 # 8. Install audio stack
 #    PulseAudio is required by Unity/SDL2 games and USB audio devices.
@@ -267,7 +277,11 @@ apt-mark manual \
 # ---------------------------------------------------------------------------
 echo "==> Installing Tailscale..."
 curl -fsSL https://tailscale.com/install.sh | sh
-systemctl --root / enable tailscaled
+if [[ -d /run/systemd/system ]]; then
+    systemctl enable tailscaled
+else
+    systemctl --root / enable tailscaled
+fi
 
 # ---------------------------------------------------------------------------
 # 14. Final autoremove pass
@@ -355,8 +369,13 @@ Group=gamer
 WantedBy=multi-user.target
 SERVICE_EOF
 chmod 0644 /etc/systemd/system/charthub-server.service
-systemctl --root / daemon-reload 2>/dev/null || true
-systemctl --root / enable charthub-server.service
+if [[ -d /run/systemd/system ]]; then
+    systemctl daemon-reload
+    systemctl enable charthub-server.service
+else
+    systemctl --root / daemon-reload 2>/dev/null || true
+    systemctl --root / enable charthub-server.service
+fi
 echo "    NOTE: Start will fail until CI deploys the binary — this is expected."
 
 # ---------------------------------------------------------------------------

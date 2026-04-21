@@ -46,6 +46,7 @@ fi
 echo "==> Installing plymouth and imagemagick..."
 apt-get install -y \
     plymouth \
+    plymouth-theme-script \
     plymouth-themes \
     imagemagick
 
@@ -138,6 +139,9 @@ update-alternatives --install \
     "${THEME_DIR}/charthub.plymouth" \
     100
 
+# Force-select this theme alternative to avoid stale default selection.
+update-alternatives --set default.plymouth "${THEME_DIR}/charthub.plymouth"
+
 echo "==> Setting charthub as the default Plymouth theme..."
 # Write plymouthd.conf directly — more reliable than calling
 # plymouth-set-default-theme, which is in /usr/sbin and may not be in PATH
@@ -192,7 +196,7 @@ fi
 #     This is required for the splash to appear during early boot.
 # ---------------------------------------------------------------------------
 echo "==> Rebuilding initramfs (this may take a moment)..."
-update-initramfs -u
+update-initramfs -u -k all
 
 echo ""
 echo "==> ChartHub Plymouth theme installed and activated."
