@@ -1684,10 +1684,10 @@ jobs:
           SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
-          # Fire the restart asynchronously so SSH disconnects immediately rather than
-          # waiting for the service to fully stop/start (which can take 20-30s and
-          # causes the SSH session to be dropped). The health check step confirms startup.
-          ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
+          # -v: verbose SSH debug output to diagnose why this step fails with exit 255
+          # on the physical production device while the probe step above succeeds.
+          # Remove -v once root cause is identified.
+          ssh -v -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
             if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
                sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
               nohup sudo systemctl restart charthub-server.service >/tmp/charthub-restart.log 2>&1 &
