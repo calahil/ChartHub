@@ -16,6 +16,10 @@ RUN dotnet publish "ChartHub.TranscriptionRunner/ChartHub.TranscriptionRunner.cs
 FROM python:3.11-slim AS final
 WORKDIR /app
 
+# The slim base image may not include ICU. Enable invariant mode so .NET
+# tools (register/run CLI) can start reliably across hosts.
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
