@@ -65,9 +65,66 @@ echo "  vX.Y.Z-rc.N"
 echo "  vX.Y.Z-dev.N"
 echo
 
+git fetch --tags origin
+
 if [[ -z "$tag_name" ]]; then
   if [[ "$delete_mode" == true ]]; then
-    read -r -p "Enter git tag to delete: " tag_name
+    # Build list of matching tags from remote
+    mapfile -t available_tags < <(git ls-remote --tags origin 'refs/tags/v*' \
+      | awk '{print $2}' | sed 's|refs/tags/||' | grep -v '\^{}' \
+      | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+|-dev\.[0-9]+)?$' \
+      | sort -Vr)
+
+    if [[ ${#available_tags[@]} -eq 0 ]]; then
+      echo "No matching tags found on origin."
+      exit 1
+    fi
+
+    while true; do
+      echo "Tags on origin:"
+      for i in "${!available_tags[@]}"; do
+        printf "  %d) %s\n" "$((i+1))" "${available_tags[$i]}"
+      done
+      echo
+      read -r -p "Enter number to delete (q to quit): " selection
+      [[ "$selection" =~ ^[Qq]$ ]] && echo "Aborted." && exit 0
+
+      if [[ "$selection" =~ ^[0-9]+$ ]] && (( selection >= 1 && selection <= ${#available_tags[@]} )); then
+        tag_name="${available_tags[$((selection-1))]}"
+
+        # Check local existence
+        tag_exists_locally=false
+        tag_exists_remote=false
+        git rev-parse -q --verify "refs/tags/$tag_name" >/dev/null 2>&1 && tag_exists_locally=true
+        git ls-remote --tags origin "refs/tags/$tag_name" | grep -q . && tag_exists_remote=true
+
+        delete_action="Delete tag '$tag_name'"
+        [[ "$tag_exists_locally" == true && "$tag_exists_remote" == true ]] && delete_action="$delete_action (locally and on origin)"
+        [[ "$tag_exists_locally" == true && "$tag_exists_remote" == false ]] && delete_action="$delete_action (locally)"
+        [[ "$tag_exists_locally" == false && "$tag_exists_remote" == true ]] && delete_action="$delete_action (on origin)"
+
+        read -r -p "$delete_action? [y/N]: " confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+          [[ "$tag_exists_locally" == true ]] && git tag -d "$tag_name"
+          [[ "$tag_exists_remote" == true ]] && git push origin --delete "$tag_name"
+          echo "Deleted tag '$tag_name'."
+          echo
+          # Refresh list
+          mapfile -t available_tags < <(git ls-remote --tags origin 'refs/tags/v*' \
+            | awk '{print $2}' | sed 's|refs/tags/||' | grep -v '\^{}' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+|-dev\.[0-9]+)?$' \
+            | sort -Vr)
+          [[ ${#available_tags[@]} -eq 0 ]] && echo "No more tags." && exit 0
+        else
+          echo "Skipped."
+          echo
+        fi
+        tag_name=""
+      else
+        echo "Invalid selection."
+        echo
+      fi
+    done
   else
     read -r -p "Enter git tag to publish: " tag_name
   fi
@@ -84,8 +141,6 @@ if [[ ! "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+|-dev\.[0-9]+)?$ ]]; 
   echo "Invalid tag '$tag_name'. Expected vX.Y.Z, vX.Y.Z-rc.N, or vX.Y.Z-dev.N."
   exit 1
 fi
-
-git fetch --tags origin
 
 tag_exists_locally=false
 tag_exists_remote=false
