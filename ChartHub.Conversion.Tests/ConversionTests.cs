@@ -124,6 +124,107 @@ public sealed class StfsReaderTests
     }
 }
 
+/// <summary>
+/// Integration tests that exercise the hash-table bounds fallback using a fan-made CON
+/// whose group-2+ hash tables contain garbage next-block pointers (common output of
+/// C3 CON Tools / Le Fluffie / RB3Maker).
+/// </summary>
+/// <remarks>
+/// The file is skipped if the binary asset is absent (CI without merge assets).
+/// </remarks>
+public sealed class FanMadeConTests
+{
+    private static readonly string SuburbsConPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../merges/The Suburbs-1e613af8-e156-491a-b4a4-9a3a04ff3093.rb3con"));
+
+    [Fact]
+    public void GetAllFiles_FanMadeCon_ContainsExpectedEntries()
+    {
+        if (!File.Exists(SuburbsConPath))
+        {
+            return;
+        }
+
+        using var reader = StfsReader.Open(SuburbsConPath);
+        var paths = reader.GetAllFiles().Select(f => f.VirtualPath).ToList();
+
+        Assert.Contains(paths, p => p.EndsWith("songs.dta", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(paths, p => p.EndsWith(".mid", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(paths, p => p.EndsWith(".mogg", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ReadFile_FanMadeCon_DtaContainsExpectedSongId()
+    {
+        if (!File.Exists(SuburbsConPath))
+        {
+            return;
+        }
+
+        using var reader = StfsReader.Open(SuburbsConPath);
+        byte[]? dta = FindDtaAnyPath(reader);
+
+        Assert.NotNull(dta);
+        string text = System.Text.Encoding.Latin1.GetString(dta!);
+        Assert.Contains("arcadefire", text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ReadFile_FanMadeCon_MidiStartsWithMThd()
+    {
+        if (!File.Exists(SuburbsConPath))
+        {
+            return;
+        }
+
+        using var reader = StfsReader.Open(SuburbsConPath);
+        (string VirtualPath, StfsEntry Entry) midEntry = reader.GetAllFiles()
+            .FirstOrDefault(f => f.VirtualPath.EndsWith(".mid", StringComparison.OrdinalIgnoreCase));
+
+        Assert.NotNull(midEntry.Entry);
+        byte[] midi = reader.ReadEntry(midEntry.Entry);
+
+        Assert.True(midi.Length >= 14, "MIDI data too short.");
+        Assert.Equal(0x4D, midi[0]); // 'M'
+        Assert.Equal(0x54, midi[1]); // 'T'
+        Assert.Equal(0x68, midi[2]); // 'h'
+        Assert.Equal(0x64, midi[3]); // 'd'
+    }
+
+    [Fact]
+    public void ReadFile_FanMadeCon_MoggStartsWithMoggMagic()
+    {
+        if (!File.Exists(SuburbsConPath))
+        {
+            return;
+        }
+
+        using var reader = StfsReader.Open(SuburbsConPath);
+        (string VirtualPath, StfsEntry Entry) moggEntry = reader.GetAllFiles()
+            .FirstOrDefault(f => f.VirtualPath.EndsWith(".mogg", StringComparison.OrdinalIgnoreCase));
+
+        Assert.NotNull(moggEntry.Entry);
+        byte[] mogg = reader.ReadEntry(moggEntry.Entry);
+
+        Assert.True(mogg.Length > 16, "MOGG data too short.");
+        Assert.Equal(0x0A, mogg[0]);
+    }
+
+    private static byte[]? FindDtaAnyPath(StfsReader reader)
+    {
+        foreach ((string path, _) in reader.GetAllFiles())
+        {
+            if (path.EndsWith("songs.dta", StringComparison.OrdinalIgnoreCase))
+            {
+                return reader.ReadFile(path);
+            }
+        }
+
+        return null;
+    }
+}
+
 /// <summary>Unit tests for <see cref="DtaParser"/>.</summary>
 public sealed class DtaParserTests
 {

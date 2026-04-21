@@ -11,6 +11,14 @@ internal sealed class StfsEntry
     public int FileSize { get; init; }
 
     /// <summary>
+    /// When true, blocks are laid out sequentially (first, first+1, first+2, …).
+    /// Corresponds to bit 6 (0x40) of the directory-entry flags byte.
+    /// Fan-made tools (C3 CON Tools, Le Fluffie, RB3Maker) do not set this flag,
+    /// but new Onyx packages and official DLC do.
+    /// </summary>
+    public bool IsConsecutive { get; init; }
+
+    /// <summary>
     /// Index of the parent directory entry. -1 = root.
     /// STFS encodes parent as <c>parentIndex * 256</c>; we store the decoded index.
     /// </summary>
@@ -35,6 +43,15 @@ internal sealed class StfsEntry
 ///   <item><term>[21–23]</term><description>Next block index (big-endian); 0xFFFFFF = last block</description></item>
 /// </list>
 /// </para>
+/// <para>
+/// Fan-made CON files (produced by C3 CON Tools, Le Fluffie, RB3Maker, etc.) often
+/// have valid SHA-1 bytes but garbage status/next-block values in hash tables beyond
+/// group 0 or 1. When a resolved next-block pointer would seek past the end of the
+/// stream, <see cref="GetNextBlock"/> silently falls back to the sequential n+1 address,
+/// matching the behaviour of Onyx for the <c>fe_Consecutive</c> fast path.
+/// Files that set the consecutive flag (bit 6 of the directory-entry flags byte) skip
+/// hash-table traversal entirely.
+/// </para>
 /// </remarks>
 internal sealed class StfsReader : IDisposable
 {
@@ -47,15 +64,17 @@ internal sealed class StfsReader : IDisposable
     private const int LastBlock = 0xFFFFFF;
 
     private readonly Stream _stream;
+    private readonly long _streamLength;
     private readonly int _headerSize;
     private readonly int _fileTableFirstBlock;
     private readonly int _fileTableBlockCount;
     private List<StfsEntry>? _entries;
     private bool _disposed;
 
-    private StfsReader(Stream stream, int headerSize, int fileTableFirstBlock, int fileTableBlockCount)
+    private StfsReader(Stream stream, long streamLength, int headerSize, int fileTableFirstBlock, int fileTableBlockCount)
     {
         _stream = stream;
+        _streamLength = streamLength;
         _headerSize = headerSize;
         _fileTableFirstBlock = fileTableFirstBlock;
         _fileTableBlockCount = fileTableBlockCount;
@@ -99,7 +118,8 @@ internal sealed class StfsReader : IDisposable
         int fileTableBlockCount = header[0x37C] | (header[0x37D] << 8);
         int fileTableFirstBlock = header[0x37E] | (header[0x37F] << 8) | (header[0x380] << 16);
 
-        var reader = new StfsReader(stream, headerSize, fileTableFirstBlock, fileTableBlockCount);
+        long streamLength = stream.Length;
+        var reader = new StfsReader(stream, streamLength, headerSize, fileTableFirstBlock, fileTableBlockCount);
         reader.ParseEntries();
         return reader;
     }
@@ -125,6 +145,11 @@ internal sealed class StfsReader : IDisposable
             string name = Encoding.ASCII.GetString(dirData, offset, nameLen);
             bool isDir = (flags & FlagIsDirectory) != 0;
 
+            // Bit 6 (0x40) = consecutive: blocks are laid out sequentially (firstBlock, firstBlock+1, …).
+            // Onyx sets this on files it creates; most fan tools do not, but blocks may still be
+            // contiguous in practice — see GetNextBlock for the bounds-fallback that handles this.
+            bool isConsecutive = (flags & 0x40) != 0;
+
             // first_block: bytes [0x2F–0x31], little-endian 24-bit
             int firstBlock = dirData[offset + 0x2F]
                 | (dirData[offset + 0x30] << 8)
@@ -144,6 +169,7 @@ internal sealed class StfsReader : IDisposable
             {
                 Name = name,
                 IsDirectory = isDir,
+                IsConsecutive = isConsecutive,
                 FirstBlock = firstBlock,
                 FileSize = fileSize,
                 ParentIndex = parentIndex,
@@ -182,7 +208,7 @@ internal sealed class StfsReader : IDisposable
     public byte[] ReadEntry(StfsEntry entry)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return ReadFile(entry.FirstBlock, entry.FileSize);
+        return ReadFile(entry.FirstBlock, entry.FileSize, entry.IsConsecutive);
     }
 
     /// <summary>Reads the content of a file entry by its virtual path (case-insensitive).</summary>
@@ -232,7 +258,11 @@ internal sealed class StfsReader : IDisposable
     /// Reads <paramref name="maxBytes"/> bytes starting from <paramref name="firstBlock"/>,
     /// following the block chain encoded in the level-0 hash tables.
     /// </summary>
-    private byte[] ReadFile(int firstBlock, int maxBytes)
+    /// <param name="consecutive">
+    /// When <see langword="true"/> (the directory-entry consecutive flag is set), blocks are
+    /// known to be contiguous and hash-table traversal is skipped entirely.
+    /// </param>
+    private byte[] ReadFile(int firstBlock, int maxBytes, bool consecutive = false)
     {
         if (maxBytes <= 0)
         {
@@ -253,7 +283,9 @@ internal sealed class StfsReader : IDisposable
 
             if (i < numBlocks - 1)
             {
-                current = GetNextBlock(current);
+                // Fast path: consecutive flag means blocks are n, n+1, n+2, …
+                // (matches Onyx's fe_Consecutive optimisation).
+                current = consecutive ? current + 1 : GetNextBlock(current);
             }
         }
 
@@ -261,8 +293,14 @@ internal sealed class StfsReader : IDisposable
     }
 
     /// <summary>
-    /// Returns the next logical block in the chain for block N.
+    /// Returns the next logical block in the chain for block N by reading the level-0 hash table.
     /// </summary>
+    /// <remarks>
+    /// Fan-made CON files (C3 CON Tools, Le Fluffie, RB3Maker, etc.) sometimes have valid SHA-1
+    /// bytes but garbage status/next-block values in hash tables beyond group 0 or 1.  When the
+    /// resolved next block would place us past the physical end of the stream we treat blocks as
+    /// sequential (n+1), which is always correct for these contiguous fan packs.
+    /// </remarks>
     private int GetNextBlock(int n)
     {
         int group = n / HashEntriesPerGroup;
@@ -279,6 +317,19 @@ internal sealed class StfsReader : IDisposable
         if (status == 0x00 && next == 0)
         {
             return n + 1;
+        }
+
+        // Validate that the next block's data offset is within the stream.
+        // Fan-made tools can write garbage next-block pointers (e.g. multi-million block numbers)
+        // in group 2+ hash tables while blocks are still physically contiguous.  Fall back to n+1
+        // so we continue reading the actual contiguous data rather than seeking past EOF.
+        if (next != LastBlock)
+        {
+            long nextDataOffset = BlockFileOffset(next);
+            if (nextDataOffset + BlockSize > _streamLength)
+            {
+                return n + 1;
+            }
         }
 
         return next; // 0xFFFFFF = last block
