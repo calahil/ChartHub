@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
@@ -147,6 +148,43 @@ public sealed class VirtualTouchPadViewModelTests
         Assert.Empty(ws.SentMessages);
     }
 
+    [Fact]
+    public async Task OnTouchPadDelta_WhenRapidBurst_CoalescesMessagesAndPreservesTotalMovement()
+    {
+        FakeInputWebSocketService ws = new() { SendDelay = TimeSpan.FromMilliseconds(15) };
+        using AppGlobalSettings settings = CreateSettings("http://localhost:5000", "token", mouseSpeedMultiplier: 1.0);
+        using VirtualTouchPadViewModel sut = new(settings, ws, new FakeOrientationService(), new FakeDeviceDisplayNameProvider());
+
+        sut.Activate();
+        bool connected = SpinWait.SpinUntil(() => sut.IsConnected, TimeSpan.FromSeconds(5));
+        Assert.True(connected);
+
+        ws.SentMessages.Clear();
+        for (int i = 0; i < 40; i++)
+        {
+            sut.OnTouchPadDelta(1, -1);
+        }
+
+        bool received = SpinWait.SpinUntil(() => ws.SentMessages.Count > 0, TimeSpan.FromSeconds(5));
+        Assert.True(received);
+
+        // Allow any in-flight coalesced send to complete so totals are stable.
+        await Task.Delay(120);
+
+        int totalDx = 0;
+        int totalDy = 0;
+        foreach (string payload in ws.SentMessages)
+        {
+            var node = JsonNode.Parse(payload);
+            totalDx += node?["dx"]?.GetValue<int>() ?? 0;
+            totalDy += node?["dy"]?.GetValue<int>() ?? 0;
+        }
+
+        Assert.Equal(40, totalDx);
+        Assert.Equal(-40, totalDy);
+        Assert.True(ws.SentMessages.Count < 40);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static AppGlobalSettings CreateSettings(string baseUrl, string token, double mouseSpeedMultiplier = 4.0)
@@ -181,6 +219,7 @@ public sealed class VirtualTouchPadViewModelTests
         public bool IsConnected { get; private set; }
         public string? LastDeviceName { get; private set; }
         public List<string> SentMessages { get; } = [];
+        public TimeSpan SendDelay { get; init; }
 
         public Task ConnectAsync(string baseUrl, string bearerToken, string path, string deviceName, CancellationToken cancellationToken = default)
         {
@@ -189,10 +228,14 @@ public sealed class VirtualTouchPadViewModelTests
             return Task.CompletedTask;
         }
 
-        public Task SendAsync<T>(T message, CancellationToken cancellationToken = default)
+        public async Task SendAsync<T>(T message, CancellationToken cancellationToken = default)
         {
+            if (SendDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(SendDelay, cancellationToken);
+            }
+
             SentMessages.Add(JsonSerializer.Serialize(message));
-            return Task.CompletedTask;
         }
 
         public Task DisconnectAsync()

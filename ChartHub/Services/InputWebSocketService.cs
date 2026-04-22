@@ -7,6 +7,7 @@ public sealed class InputWebSocketService : IInputWebSocketService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    private readonly SemaphoreSlim _wsGate = new(1, 1);
     private ClientWebSocket? _ws;
     private bool _disposed;
 
@@ -14,55 +15,80 @@ public sealed class InputWebSocketService : IInputWebSocketService
 
     public async Task ConnectAsync(string baseUrl, string bearerToken, string path, string deviceName, CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
-        _ws?.Dispose();
-        _ws = new ClientWebSocket();
-
-        if (!string.IsNullOrWhiteSpace(bearerToken))
+        await _wsGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            _ws.Options.SetRequestHeader("Authorization", $"Bearer {bearerToken}");
-        }
+            ObjectDisposedException.ThrowIf(_disposed, this);
 
-        if (!string.IsNullOrWhiteSpace(deviceName))
+            _ws?.Dispose();
+
+            ClientWebSocket next = new();
+            if (!string.IsNullOrWhiteSpace(bearerToken))
+            {
+                next.Options.SetRequestHeader("Authorization", $"Bearer {bearerToken}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(deviceName))
+            {
+                next.Options.SetRequestHeader("X-Device-Name", deviceName);
+            }
+
+            Uri wsUri = BuildWebSocketUri(baseUrl, path);
+            await next.ConnectAsync(wsUri, cancellationToken).ConfigureAwait(false);
+            _ws = next;
+        }
+        finally
         {
-            _ws.Options.SetRequestHeader("X-Device-Name", deviceName);
+            _wsGate.Release();
         }
-
-        Uri wsUri = BuildWebSocketUri(baseUrl, path);
-        await _ws.ConnectAsync(wsUri, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task SendAsync<T>(T message, CancellationToken cancellationToken = default)
     {
-        if (_ws is null || _ws.State != WebSocketState.Open)
+        await _wsGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            return;
-        }
+            if (_ws is null || _ws.State != WebSocketState.Open)
+            {
+                return;
+            }
 
-        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(message, JsonOptions);
-        await _ws.SendAsync(
-            new ArraySegment<byte>(bytes),
-            WebSocketMessageType.Text,
-            endOfMessage: true,
-            cancellationToken).ConfigureAwait(false);
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(message, JsonOptions);
+            await _ws.SendAsync(
+                new ArraySegment<byte>(bytes),
+                WebSocketMessageType.Text,
+                endOfMessage: true,
+                cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _wsGate.Release();
+        }
     }
 
     public async Task DisconnectAsync()
     {
-        if (_ws is null || _ws.State != WebSocketState.Open)
-        {
-            return;
-        }
-
+        await _wsGate.WaitAsync(CancellationToken.None).ConfigureAwait(false);
         try
         {
-            await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "client disconnected", CancellationToken.None)
-                .ConfigureAwait(false);
+            if (_ws is null || _ws.State != WebSocketState.Open)
+            {
+                return;
+            }
+
+            try
+            {
+                await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "client disconnected", CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+            catch (WebSocketException)
+            {
+                // Connection may have already been terminated.
+            }
         }
-        catch (WebSocketException)
+        finally
         {
-            // Connection may have already been terminated.
+            _wsGate.Release();
         }
     }
 
@@ -74,8 +100,18 @@ public sealed class InputWebSocketService : IInputWebSocketService
         }
 
         _disposed = true;
-        _ws?.Dispose();
-        _ws = null;
+
+        _wsGate.Wait();
+        try
+        {
+            _ws?.Dispose();
+            _ws = null;
+        }
+        finally
+        {
+            _wsGate.Release();
+            _wsGate.Dispose();
+        }
     }
 
     private static Uri BuildWebSocketUri(string baseUrl, string path)

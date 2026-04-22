@@ -18,6 +18,9 @@ public sealed class VirtualTouchPadViewModel : INotifyPropertyChanged, IDisposab
     private readonly IDeviceDisplayNameProvider _deviceDisplayNameProvider;
     private bool _isConnected;
     private string _statusMessage = string.Empty;
+    private int _pendingMoveDx;
+    private int _pendingMoveDy;
+    private int _moveDrainScheduled;
     private bool _disposed;
 
     public InputPageStrings PageStrings { get; } = new();
@@ -106,7 +109,45 @@ public sealed class VirtualTouchPadViewModel : INotifyPropertyChanged, IDisposab
             return;
         }
 
-        ObserveBackgroundTask(SendMoveAsync(scaledDx, scaledDy), "Touchpad move");
+        Interlocked.Add(ref _pendingMoveDx, scaledDx);
+        Interlocked.Add(ref _pendingMoveDy, scaledDy);
+
+        // Keep at most one active drain task; it coalesces bursts into fewer moves.
+        if (Interlocked.CompareExchange(ref _moveDrainScheduled, 1, 0) == 0)
+        {
+            ObserveBackgroundTask(DrainPendingMovesAsync(), "Touchpad move");
+        }
+    }
+
+    private async Task DrainPendingMovesAsync()
+    {
+        try
+        {
+            while (IsConnected)
+            {
+                int dx = Interlocked.Exchange(ref _pendingMoveDx, 0);
+                int dy = Interlocked.Exchange(ref _pendingMoveDy, 0);
+
+                if (dx == 0 && dy == 0)
+                {
+                    return;
+                }
+
+                await SendMoveAsync(dx, dy).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _moveDrainScheduled, 0);
+
+            // If new deltas arrived after we reset the guard, schedule one more drain.
+            if (IsConnected
+                && (Volatile.Read(ref _pendingMoveDx) != 0 || Volatile.Read(ref _pendingMoveDy) != 0)
+                && Interlocked.CompareExchange(ref _moveDrainScheduled, 1, 0) == 0)
+            {
+                ObserveBackgroundTask(DrainPendingMovesAsync(), "Touchpad move");
+            }
+        }
     }
 
     private async Task ConnectAsync()

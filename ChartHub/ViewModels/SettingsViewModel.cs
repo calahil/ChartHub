@@ -1010,7 +1010,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         IsTestingServerConnection = true;
         try
         {
-            await _serverApiClient.GetHealthAsync(ServerApiBaseUrl).ConfigureAwait(false);
+            await _serverApiClient.GetHealthAsync(ServerApiBaseUrl);
             StatusMessage = UiLocalization.Get("Settings.ServerConnectionSucceeded");
         }
         catch (Exception ex)
@@ -1043,7 +1043,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         IsAuthenticating = true;
         try
         {
-            await _authSessionService.SignInAsync().ConfigureAwait(false);
+            await _authSessionService.SignInAsync();
             RaiseServerStateChanged();
         }
         catch (Exception ex)
@@ -1072,7 +1072,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         IsResettingAuth = true;
         try
         {
-            await _authSessionService.SignOutAsync().ConfigureAwait(false);
+            await _authSessionService.SignOutAsync();
             StatusMessage = UiLocalization.Get("Settings.AuthResetSucceeded");
             RaiseServerStateChanged();
         }
