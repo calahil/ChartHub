@@ -2,9 +2,12 @@ using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
+using ChartHub.Configuration.Interfaces;
+using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
+using ChartHub.Utilities;
 using ChartHub.ViewModels;
 
 namespace ChartHub.Tests;
@@ -67,6 +70,39 @@ public class MainViewModelTests
 
         sut.GoDesktopEntryCommand.Execute(null);
 
+        Assert.Equal(4, sut.SelectedMainTabIndex);
+    }
+
+    [Fact]
+    public void AuthServerBaseUrl_Setter_PersistsToGlobalSettings()
+    {
+        using AppGlobalSettings settings = CreateSettings("https://initial.example");
+        MainViewModel sut = CreateMainViewModel(isAndroid: false, globalSettings: settings);
+
+        sut.AuthServerBaseUrl = "  https://updated.example:5001  ";
+
+        Assert.Equal("https://updated.example:5001", sut.AuthServerBaseUrl);
+        Assert.Equal("https://updated.example:5001", settings.ServerApiBaseUrl);
+    }
+
+    [Fact]
+    public async Task GoDesktopEntryCommand_TriggersRefreshWhenTabOpened()
+    {
+        using AppGlobalSettings settings = CreateSettings("http://127.0.0.1:5001", "token");
+        var desktopEntryClient = new FakeDesktopEntryApiClient
+        {
+            Entries = [new ChartHubServerDesktopEntryResponse("entry-1", "App", "Running", 12, null)],
+        };
+        using var desktopEntryViewModel = new DesktopEntryViewModel(settings, desktopEntryClient, uiInvoke: InvokeInline);
+        MainViewModel sut = CreateMainViewModel(isAndroid: true, globalSettings: settings, desktopEntryViewModel: desktopEntryViewModel);
+
+        await WaitForConditionAsync(() => desktopEntryClient.ListCallCount > 0, TimeSpan.FromSeconds(2));
+        int initialListCallCount = desktopEntryClient.ListCallCount;
+
+        sut.GoDesktopEntryCommand.Execute(null);
+
+        bool refreshed = await WaitForConditionAsync(() => desktopEntryClient.ListCallCount > initialListCallCount, TimeSpan.FromSeconds(2));
+        Assert.True(refreshed);
         Assert.Equal(4, sut.SelectedMainTabIndex);
     }
 
@@ -153,7 +189,11 @@ public class MainViewModelTests
         Assert.False(sut.IsInputAccordionExpanded);
     }
 
-    private static MainViewModel CreateMainViewModel(bool isAndroid, SharedDownloadQueue? sharedDownloadQueue = null)
+    private static MainViewModel CreateMainViewModel(
+        bool isAndroid,
+        SharedDownloadQueue? sharedDownloadQueue = null,
+        AppGlobalSettings? globalSettings = null,
+        DesktopEntryViewModel? desktopEntryViewModel = null)
     {
         ConstructorInfo? constructor = typeof(MainViewModel).GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic,
@@ -173,12 +213,15 @@ public class MainViewModelTests
                 typeof(Action<Action>),
                 typeof(bool),
                 typeof(IStatusBarService),
+                typeof(IAuthSessionService),
+                typeof(AppGlobalSettings),
             ],
             modifiers: null);
 
         Assert.NotNull(constructor);
 
         SharedDownloadQueue queue = sharedDownloadQueue ?? new SharedDownloadQueue();
+        AppGlobalSettings settings = globalSettings ?? CreateSettings(string.Empty);
 
         return (MainViewModel)constructor.Invoke([
             CreateUninitialized<RhythmVerseViewModel>(),
@@ -186,7 +229,7 @@ public class MainViewModelTests
             queue,
             CreateUninitialized<DownloadViewModel>(),
             CreateUninitialized<CloneHeroViewModel>(),
-            CreateUninitialized<DesktopEntryViewModel>(),
+            desktopEntryViewModel ?? new DesktopEntryViewModel(settings, new FakeDesktopEntryApiClient(), uiInvoke: InvokeInline),
             CreateUninitialized<VolumeViewModel>(),
             CreateUninitialized<SettingsViewModel>(),
             null,
@@ -195,11 +238,117 @@ public class MainViewModelTests
             (Action<Action>)(action => action()),
             isAndroid,
             null,
+            null,
+            settings,
         ]);
+    }
+
+    private static AppGlobalSettings CreateSettings(string baseUrl, string token = "")
+    {
+        var orchestrator = new FakeSettingsOrchestrator(new AppConfigRoot
+        {
+            Runtime = new RuntimeAppConfig
+            {
+                ServerApiBaseUrl = baseUrl,
+                ServerApiAuthToken = token,
+            },
+        });
+
+        return new AppGlobalSettings(orchestrator);
+    }
+
+    private static Task InvokeInline(Action action)
+    {
+        action();
+        return Task.CompletedTask;
+    }
+
+    private static async Task<bool> WaitForConditionAsync(Func<bool> predicate, TimeSpan timeout)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.Add(timeout);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (predicate())
+            {
+                return true;
+            }
+
+            await Task.Delay(20);
+        }
+
+        return predicate();
     }
 
     private static T CreateUninitialized<T>() where T : class
     {
         return (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
+    }
+
+    private sealed class FakeSettingsOrchestrator(AppConfigRoot current) : ISettingsOrchestrator
+    {
+        public AppConfigRoot Current { get; private set; } = current;
+
+        public event Action<AppConfigRoot>? SettingsChanged;
+
+        public Task<ConfigValidationResult> UpdateAsync(Action<AppConfigRoot> update, CancellationToken cancellationToken = default)
+        {
+            update(Current);
+            SettingsChanged?.Invoke(Current);
+            return Task.FromResult(ConfigValidationResult.Success);
+        }
+
+        public Task ReloadAsync(CancellationToken cancellationToken = default)
+        {
+            SettingsChanged?.Invoke(Current);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeDesktopEntryApiClient : IChartHubServerApiClient
+    {
+        public IReadOnlyList<ChartHubServerDesktopEntryResponse> Entries { get; set; } = [];
+        public int ListCallCount { get; private set; }
+
+        public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(string baseUrl, string googleIdToken, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<ChartHubServerDownloadJobResponse> CreateDownloadJobAsync(string baseUrl, string bearerToken, ChartHubServerCreateDownloadJobRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<ChartHubServerJobLogEntry>> GetJobLogsAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<ChartHubServerDesktopEntryResponse>> ListDesktopEntriesAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+        {
+            ListCallCount++;
+            return Task.FromResult(Entries);
+        }
+
+        public Task<ChartHubServerDesktopEntryActionResponse> ExecuteDesktopEntryAsync(string baseUrl, string bearerToken, string entryId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<ChartHubServerDesktopEntryActionResponse> KillDesktopEntryAsync(string baseUrl, string bearerToken, string entryId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task RefreshDesktopEntryCatalogAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public async IAsyncEnumerable<IReadOnlyList<ChartHubServerDesktopEntryResponse>> StreamDesktopEntriesAsync(string baseUrl, string bearerToken, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            yield break;
+        }
     }
 }

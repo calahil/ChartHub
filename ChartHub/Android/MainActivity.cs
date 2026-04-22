@@ -28,6 +28,9 @@ public class MainActivity : AvaloniaMainActivity
     /// </summary>
     public static MainActivity? Current { get; private set; }
 
+    private IAuthSessionService? _authSessionService;
+    private EventHandler? _authSessionStateChangedHandler;
+
     protected override void OnCreate(Bundle? savedInstanceState)
     {
         base.OnCreate(savedInstanceState);
@@ -37,6 +40,13 @@ public class MainActivity : AvaloniaMainActivity
         {
             Window?.SetDecorFitsSystemWindows(true);
         }
+
+        _authSessionService = App.ServiceProvider?.GetService<IAuthSessionService>();
+        if (_authSessionService is not null)
+        {
+            _authSessionStateChangedHandler = (_, _) => EnsurePresenceConnectionForCurrentAuthState();
+            _authSessionService.SessionStateChanged += _authSessionStateChangedHandler;
+        }
     }
 
     protected override void OnResume()
@@ -44,14 +54,7 @@ public class MainActivity : AvaloniaMainActivity
         base.OnResume();
         Current = this;
 
-        IPresenceWebSocketService? svc = App.ServiceProvider?.GetService<IPresenceWebSocketService>();
-        AppGlobalSettings? settings = App.ServiceProvider?.GetService<AppGlobalSettings>();
-        IDeviceDisplayNameProvider? deviceNameProvider = App.ServiceProvider?.GetService<IDeviceDisplayNameProvider>();
-        if (svc != null && settings != null && !string.IsNullOrWhiteSpace(settings.ServerApiAuthToken))
-        {
-            string deviceName = deviceNameProvider?.GetDisplayName() ?? "unknown-device";
-            _ = svc.ConnectAsync(settings.ServerApiBaseUrl, settings.ServerApiAuthToken, deviceName);
-        }
+        EnsurePresenceConnectionForCurrentAuthState();
     }
 
     protected override void OnPause()
@@ -67,10 +70,41 @@ public class MainActivity : AvaloniaMainActivity
     protected override void OnDestroy()
     {
         base.OnDestroy();
+
+        if (_authSessionService is not null && _authSessionStateChangedHandler is not null)
+        {
+            _authSessionService.SessionStateChanged -= _authSessionStateChangedHandler;
+            _authSessionStateChangedHandler = null;
+        }
+
         if (Current == this)
         {
             Current = null;
         }
+    }
+
+    private void EnsurePresenceConnectionForCurrentAuthState()
+    {
+        IPresenceWebSocketService? svc = App.ServiceProvider?.GetService<IPresenceWebSocketService>();
+        AppGlobalSettings? settings = App.ServiceProvider?.GetService<AppGlobalSettings>();
+        IDeviceDisplayNameProvider? deviceNameProvider = App.ServiceProvider?.GetService<IDeviceDisplayNameProvider>();
+        IAuthSessionService? authSessionService = _authSessionService ?? App.ServiceProvider?.GetService<IAuthSessionService>();
+
+        if (svc is null || settings is null)
+        {
+            return;
+        }
+
+        if (authSessionService?.CurrentState == AuthSessionState.Authenticated
+            && !string.IsNullOrWhiteSpace(settings.ServerApiBaseUrl)
+            && !string.IsNullOrWhiteSpace(authSessionService.CurrentAccessToken))
+        {
+            string deviceName = deviceNameProvider?.GetDisplayName() ?? "unknown-device";
+            _ = svc.ConnectAsync(settings.ServerApiBaseUrl, authSessionService.CurrentAccessToken!, deviceName);
+            return;
+        }
+
+        _ = svc.DisconnectAsync();
     }
 
     public override bool OnKeyDown(Keycode keyCode, KeyEvent? e)

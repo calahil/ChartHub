@@ -30,6 +30,9 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
 {
     private readonly ISettingsOrchestrator _settingsOrchestrator;
     private readonly SemaphoreSlim _updateLock = new(1, 1);
+    private readonly object _snapshotLock = new();
+    private string _serverApiAuthToken = string.Empty;
+    private string _serverApiBaseUrl = string.Empty;
 
     private RuntimeAppConfig Runtime => _settingsOrchestrator.Current.Runtime;
 
@@ -41,14 +44,44 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
 
     public string ServerApiAuthToken
     {
-        get => Runtime.ServerApiAuthToken;
-        set => QueueConfigUpdate(config => config.Runtime.ServerApiAuthToken = value);
+        get
+        {
+            lock (_snapshotLock)
+            {
+                return _serverApiAuthToken;
+            }
+        }
+        set
+        {
+            string normalized = value ?? string.Empty;
+            lock (_snapshotLock)
+            {
+                _serverApiAuthToken = normalized;
+            }
+
+            QueueConfigUpdate(config => config.Runtime.ServerApiAuthToken = normalized);
+        }
     }
 
     public string ServerApiBaseUrl
     {
-        get => Runtime.ServerApiBaseUrl ?? string.Empty;
-        set => QueueConfigUpdate(config => config.Runtime.ServerApiBaseUrl = value?.Trim() ?? string.Empty);
+        get
+        {
+            lock (_snapshotLock)
+            {
+                return _serverApiBaseUrl;
+            }
+        }
+        set
+        {
+            string normalized = value?.Trim() ?? string.Empty;
+            lock (_snapshotLock)
+            {
+                _serverApiBaseUrl = normalized;
+            }
+
+            QueueConfigUpdate(config => config.Runtime.ServerApiBaseUrl = normalized);
+        }
     }
 
     public bool InstallLogExpanded
@@ -84,13 +117,24 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
     public AppGlobalSettings(ISettingsOrchestrator settingsOrchestrator)
     {
         _settingsOrchestrator = settingsOrchestrator;
+        SyncSnapshotFromRuntime();
         _settingsOrchestrator.SettingsChanged += OnSettingsChanged;
         EnsureDefaults();
     }
 
     private void OnSettingsChanged(AppConfigRoot _)
     {
+        SyncSnapshotFromRuntime();
         Dispatcher.UIThread.Post(RaiseAllSettingsChanged);
+    }
+
+    private void SyncSnapshotFromRuntime()
+    {
+        lock (_snapshotLock)
+        {
+            _serverApiAuthToken = Runtime.ServerApiAuthToken ?? string.Empty;
+            _serverApiBaseUrl = Runtime.ServerApiBaseUrl?.Trim() ?? string.Empty;
+        }
     }
 
     private void EnsureDefaults()
@@ -99,6 +143,10 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         string uiCulture = string.IsNullOrWhiteSpace(Runtime.UiCulture) ? "en-US" : Runtime.UiCulture.Trim();
         Runtime.ServerApiBaseUrl = serverApiBaseUrl;
         Runtime.UiCulture = uiCulture;
+        lock (_snapshotLock)
+        {
+            _serverApiBaseUrl = serverApiBaseUrl;
+        }
 
         QueueConfigUpdate(config =>
         {

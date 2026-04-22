@@ -9,50 +9,60 @@ namespace ChartHub.Tests;
 public class AppGlobalSettingsTests
 {
     [Fact]
-    public async Task Constructor_WhenServerTokenMissing_GeneratesAndPersistsToken()
+    public void ServerApiAuthToken_Setter_IsImmediatelyVisibleBeforeAsyncPersistence()
     {
         AppConfigRoot config = new()
         {
             Runtime = new RuntimeAppConfig
             {
-                ServerApiAuthToken = string.Empty,
+                ServerApiAuthToken = "old-token",
             },
         };
 
         var orchestrator = new BlockingSettingsOrchestrator(config);
         using var settings = new AppGlobalSettings(orchestrator);
 
-        Assert.False(string.IsNullOrWhiteSpace(settings.ServerApiAuthToken));
+        settings.ServerApiAuthToken = "new-token";
 
-        orchestrator.ReleasePendingUpdate();
-
-        bool initialized = await WaitForConditionAsync(
-            () => orchestrator.UpdateCount > 0
-                && !string.IsNullOrWhiteSpace(orchestrator.Current.Runtime.ServerApiAuthToken),
-            TimeSpan.FromSeconds(2));
-
-        Assert.True(initialized);
+        Assert.Equal("new-token", settings.ServerApiAuthToken);
+        Assert.Equal("old-token", orchestrator.Current.Runtime.ServerApiAuthToken);
     }
 
     [Fact]
-    public async Task Constructor_WhenSyncTokenMissing_GeneratesTokenAndPersists()
+    public async Task ServerApiAuthToken_Setter_PersistsAfterAsyncUpdateReleases()
     {
         using var temp = new TemporaryDirectoryFixture("app-global-settings-token");
         AppConfigRoot config = CreateConfig(temp.RootPath);
-        config.Runtime.ServerApiAuthToken = string.Empty;
+        config.Runtime.ServerApiAuthToken = "old-token";
 
         var orchestrator = new BlockingSettingsOrchestrator(config);
         using var settings = new AppGlobalSettings(orchestrator);
 
-        Assert.False(string.IsNullOrWhiteSpace(settings.ServerApiAuthToken));
+        settings.ServerApiAuthToken = "new-token";
 
         orchestrator.ReleasePendingUpdate();
 
         bool persisted = await WaitForConditionAsync(
             () => orchestrator.UpdateCount > 0
-                && !string.IsNullOrWhiteSpace(orchestrator.Current.Runtime.ServerApiAuthToken),
+                && string.Equals(orchestrator.Current.Runtime.ServerApiAuthToken, "new-token", StringComparison.Ordinal),
             TimeSpan.FromSeconds(2));
+
         Assert.True(persisted);
+    }
+
+    [Fact]
+    public void ServerApiBaseUrl_Setter_TrimsAndIsImmediatelyVisibleBeforeAsyncPersistence()
+    {
+        using var temp = new TemporaryDirectoryFixture("app-global-settings-base-url");
+        AppConfigRoot config = CreateConfig(temp.RootPath);
+
+        var orchestrator = new BlockingSettingsOrchestrator(config);
+        using var settings = new AppGlobalSettings(orchestrator);
+
+        settings.ServerApiBaseUrl = "  https://example.test:5001  ";
+
+        Assert.Equal("https://example.test:5001", settings.ServerApiBaseUrl);
+        Assert.Equal("https://localhost:5001", orchestrator.Current.Runtime.ServerApiBaseUrl);
     }
 
     private static AppConfigRoot CreateConfig(string rootPath)

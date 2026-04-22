@@ -707,6 +707,11 @@ public class MainViewModel : INotifyPropertyChanged
 
         SelectedMainTabIndex = tabIndex;
 
+        if (tabIndex == 4)
+        {
+            ObserveBackgroundTask(_desktopEntryViewModel.RefreshCommand.ExecuteAsync(null), "DesktopEntry refresh on tab open");
+        }
+
         if (IsCompanionMode)
         {
             IsAndroidFlyoutFiltersMode = false;

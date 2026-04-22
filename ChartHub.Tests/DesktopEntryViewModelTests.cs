@@ -1,4 +1,5 @@
 using System.Net;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
 using ChartHub.Configuration.Interfaces;
@@ -66,6 +67,44 @@ public sealed class DesktopEntryViewModelTests
             Assert.True(configured);
             Assert.Empty(sut.Entries);
             Assert.False(sut.IsBusy);
+        }
+        finally
+        {
+            sut.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task AuthenticatedSessionAfterStartup_RefreshesUsingUpdatedSettingsImmediately()
+    {
+        using var temp = new TemporaryDirectoryFixture("desktop-entry-auth-after-startup");
+        using AppGlobalSettings settings = CreateSettings(temp.RootPath, string.Empty, string.Empty);
+
+        var fakeClient = new FakeChartHubServerApiClient
+        {
+            Entries = [new ChartHubServerDesktopEntryResponse("entry-1", "App", "Running", 77, null)],
+        };
+        var authSessionService = new FakeAuthSessionService();
+
+        var sut = new DesktopEntryViewModel(settings, authSessionService, fakeClient, InvokeInline);
+        try
+        {
+            bool initialConfigure = await WaitForConditionAsync(
+                () => string.Equals(sut.StatusMessage, UiLocalization.Get("DesktopEntry.ConfigureLoad"), StringComparison.Ordinal),
+                TimeSpan.FromSeconds(2));
+            Assert.True(initialConfigure);
+
+            settings.ServerApiBaseUrl = "http://127.0.0.1:5001";
+            settings.ServerApiAuthToken = "fresh-token";
+            authSessionService.SetAuthenticated();
+
+            bool loaded = await WaitForConditionAsync(
+                () => sut.Entries.Count == 1 && fakeClient.ListCallCount >= 1,
+                TimeSpan.FromSeconds(2));
+
+            Assert.True(loaded);
+            Assert.Equal("App", sut.Entries[0].Name);
+            Assert.Equal(UiLocalization.Get("DesktopEntry.ListRefreshed"), sut.StatusMessage);
         }
         finally
         {
@@ -470,6 +509,36 @@ public sealed class DesktopEntryViewModelTests
         {
             SettingsChanged?.Invoke(Current);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeAuthSessionService : IAuthSessionService
+    {
+        public AuthSessionState CurrentState { get; private set; } = AuthSessionState.Unauthenticated;
+
+        public string? SignedInEmail => "user@example.test";
+
+        public string? CurrentAccessToken => CurrentState == AuthSessionState.Authenticated ? "fresh-token" : null;
+
+        public event EventHandler? SessionStateChanged;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public Task AttemptSilentRestoreAsync() => Task.CompletedTask;
+
+        public Task SignInAsync() => Task.CompletedTask;
+
+        public Task SignOutAsync() => Task.CompletedTask;
+
+        public bool IsTokenValidLocally() => CurrentState == AuthSessionState.Authenticated;
+
+        public Task AttemptSilentRefreshAsync() => Task.CompletedTask;
+
+        public void SetAuthenticated()
+        {
+            CurrentState = AuthSessionState.Authenticated;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentState)));
+            SessionStateChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 

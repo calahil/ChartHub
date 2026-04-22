@@ -242,6 +242,9 @@ public sealed class AuthSessionService : IAuthSessionService, IDisposable
                 Logger.LogError("Auth", "Google token rejected by server", ex);
             }).ConfigureAwait(false);
             CurrentState = AuthSessionState.Unauthenticated;
+            throw new InvalidOperationException(
+                "Google sign-in token was rejected by ChartHub Server. Verify Google OAuth client IDs are aligned between app and server.",
+                ex);
         }
         catch (ChartHubServerApiException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
         {
@@ -250,6 +253,9 @@ public sealed class AuthSessionService : IAuthSessionService, IDisposable
                 Logger.LogError("Auth", "Email not allowlisted in ChartHub Server", ex);
             }).ConfigureAwait(false);
             CurrentState = AuthSessionState.Unauthenticated;
+            throw new InvalidOperationException(
+                "Your Google account is not allowlisted by this ChartHub Server.",
+                ex);
         }
         catch (ChartHubServerApiException ex) when (ex.StatusCode == HttpStatusCode.ServiceUnavailable)
         {
@@ -258,6 +264,25 @@ public sealed class AuthSessionService : IAuthSessionService, IDisposable
                 Logger.LogError("Auth", "ChartHub Server could not reach Google validation service", ex);
             }).ConfigureAwait(false);
             CurrentState = AuthSessionState.Unauthenticated;
+            throw new InvalidOperationException(
+                "ChartHub Server could not validate Google credentials right now. Try again shortly.",
+                ex);
+        }
+        catch (ChartHubServerApiException ex)
+        {
+            await _uiInvoke(() =>
+            {
+                Logger.LogError("Auth", "Server token exchange failed", ex);
+            }).ConfigureAwait(false);
+            CurrentState = AuthSessionState.Unauthenticated;
+
+            string serverMessage = string.IsNullOrWhiteSpace(ex.Message)
+                ? "Unknown server error"
+                : ex.Message;
+
+            throw new InvalidOperationException(
+                $"ChartHub Server token exchange failed: {serverMessage}",
+                ex);
         }
         catch (Exception ex)
         {
@@ -266,6 +291,7 @@ public sealed class AuthSessionService : IAuthSessionService, IDisposable
                 Logger.LogError("Auth", "Sign-in failed", ex);
             }).ConfigureAwait(false);
             CurrentState = AuthSessionState.Unauthenticated;
+            throw;
         }
     }
 
