@@ -180,9 +180,15 @@ public static class AppBootstrapper
                 serviceProvider.GetRequiredService<IConfiguration>(),
                 serviceProvider.GetRequiredService<LibraryCatalogService>(),
                 serviceProvider.GetRequiredService<SharedDownloadQueue>(),
-                serviceProvider.GetRequiredService<ISettingsOrchestrator>(),
+                serviceProvider.GetRequiredService<AppGlobalSettings>(),
                 serviceProvider.GetRequiredService<IChartHubServerApiClient>()));
-        services.AddSingleton<EncoreViewModel>();
+        services.AddSingleton<EncoreViewModel>(serviceProvider =>
+            new EncoreViewModel(
+                serviceProvider.GetRequiredService<EncoreApiService>(),
+                serviceProvider.GetRequiredService<IChartHubServerApiClient>(),
+                serviceProvider.GetRequiredService<AppGlobalSettings>(),
+                serviceProvider.GetRequiredService<ISettingsOrchestrator>(),
+                serviceProvider.GetRequiredService<SharedDownloadQueue>()));
         services.AddSingleton<VirtualControllerViewModel>(serviceProvider =>
             new VirtualControllerViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),

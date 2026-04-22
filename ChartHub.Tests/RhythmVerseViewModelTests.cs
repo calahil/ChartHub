@@ -9,6 +9,7 @@ using ChartHub.Configuration.Models;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
+using ChartHub.Utilities;
 using ChartHub.ViewModels;
 
 using Microsoft.Extensions.Configuration;
@@ -152,11 +153,12 @@ public class RhythmVerseViewModelTests
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
         var sharedQueue = new SharedDownloadQueue();
         var serverApi = new CapturingChartHubServerApiClient();
+        var settingsOrchestrator = new ConnectedSettingsOrchestrator();
         RhythmVerseViewModel sut = CreateViewModelForPaging(
             CreateApiClientWithPagedHandler(),
             catalog,
             sharedQueue,
-            new ConnectedSettingsOrchestrator(),
+            new AppGlobalSettings(settingsOrchestrator),
             serverApi);
 
         var first = new ViewSong
@@ -195,11 +197,12 @@ public class RhythmVerseViewModelTests
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
         var sharedQueue = new SharedDownloadQueue();
         var serverApi = new CapturingChartHubServerApiClient();
+        var settingsOrchestrator = new ConnectedSettingsOrchestrator();
         RhythmVerseViewModel sut = CreateViewModelForPaging(
             CreateApiClientWithPagedHandler(),
             catalog,
             sharedQueue,
-            new ConnectedSettingsOrchestrator(),
+            new AppGlobalSettings(settingsOrchestrator),
             serverApi);
 
         sut.SelectedFile = new ViewSong
@@ -228,11 +231,12 @@ public class RhythmVerseViewModelTests
         LibraryCatalogService catalog,
         SharedDownloadQueue sharedQueue)
     {
+        var settingsOrchestrator = new FakeSettingsOrchestrator();
         return CreateViewModelForPaging(
             apiClient,
             catalog,
             sharedQueue,
-            new FakeSettingsOrchestrator(),
+            new AppGlobalSettings(settingsOrchestrator),
             new FakeChartHubServerApiClient());
     }
 
@@ -240,7 +244,7 @@ public class RhythmVerseViewModelTests
         ApiClientService apiClient,
         LibraryCatalogService catalog,
         SharedDownloadQueue sharedQueue,
-        ISettingsOrchestrator settingsOrchestrator,
+        AppGlobalSettings globalSettings,
         IChartHubServerApiClient serverApiClient)
     {
         ConstructorInfo? constructor = typeof(RhythmVerseViewModel).GetConstructor(
@@ -250,7 +254,7 @@ public class RhythmVerseViewModelTests
                 typeof(ApiClientService),
                 typeof(LibraryCatalogService),
                 typeof(SharedDownloadQueue),
-                typeof(ISettingsOrchestrator),
+                typeof(AppGlobalSettings),
                 typeof(IChartHubServerApiClient),
                 typeof(bool),
                 typeof(Func<Action, Task>),
@@ -263,7 +267,7 @@ public class RhythmVerseViewModelTests
             apiClient,
             catalog,
             sharedQueue,
-            settingsOrchestrator,
+            globalSettings,
             serverApiClient,
             false,
             (Func<Action, Task>)(action => { action(); return Task.CompletedTask; }),

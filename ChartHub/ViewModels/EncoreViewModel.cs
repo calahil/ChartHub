@@ -22,6 +22,7 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     public bool IsCompanionMode => OperatingSystem.IsAndroid();
     public bool IsDesktopMode => !OperatingSystem.IsAndroid();
     private readonly EncoreApiService _apiService;
+    private readonly AppGlobalSettings _globalSettings;
     private readonly IChartHubServerApiClient _serverApiClient;
     private readonly ISettingsOrchestrator _settingsOrchestrator;
     private readonly Func<Action, Task> _uiInvoke;
@@ -392,6 +393,7 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     public EncoreViewModel(
         EncoreApiService apiService,
         IChartHubServerApiClient serverApiClient,
+        AppGlobalSettings globalSettings,
         ISettingsOrchestrator settingsOrchestrator,
         SharedDownloadQueue sharedDownloadQueue,
         Func<Action, Task>? uiInvoke = null,
@@ -399,6 +401,7 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
     {
         _apiService = apiService;
         _serverApiClient = serverApiClient;
+        _globalSettings = globalSettings;
         _settingsOrchestrator = settingsOrchestrator;
         _uiInvoke = uiInvoke ?? (async action => await Dispatcher.UIThread.InvokeAsync(action));
 
@@ -794,8 +797,8 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
 
     private bool TryGetServerConnection(out string baseUrl, out string bearerToken)
     {
-        baseUrl = NormalizeApiBaseUrl(_settingsOrchestrator.Current.Runtime.ServerApiBaseUrl);
-        bearerToken = _settingsOrchestrator.Current.Runtime.ServerApiAuthToken?.Trim() ?? string.Empty;
+        baseUrl = NormalizeApiBaseUrl(_globalSettings.ServerApiBaseUrl);
+        bearerToken = _globalSettings.ServerApiAuthToken?.Trim() ?? string.Empty;
         return !string.IsNullOrWhiteSpace(baseUrl) && !string.IsNullOrWhiteSpace(bearerToken);
     }
 

@@ -55,6 +55,7 @@ public class InstrumentItem : INotifyPropertyChanged
 
 public class RhythmVerseViewModel : INotifyPropertyChanged
 {
+    private readonly AppGlobalSettings _globalSettings;
     public bool IsCompanionMode => OperatingSystem.IsAndroid();
     public bool IsDesktopMode => !OperatingSystem.IsAndroid();
 
@@ -85,7 +86,6 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
     public ICommand ShowDownloadsPaneCommand { get; }
 
     private readonly IChartHubServerApiClient _serverApiClient;
-    private readonly ISettingsOrchestrator _settingsOrchestrator;
     private readonly LibraryCatalogService _libraryCatalog;
     private readonly SemaphoreSlim _loadDataGate = new(1, 1);
     private int _loadMoreGate;
@@ -327,13 +327,13 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         IConfiguration configuration,
         LibraryCatalogService libraryCatalog,
         SharedDownloadQueue sharedDownloadQueue,
-        ISettingsOrchestrator settingsOrchestrator,
+        AppGlobalSettings globalSettings,
         IChartHubServerApiClient serverApiClient)
         : this(
             new ApiClientService(configuration),
             libraryCatalog,
             sharedDownloadQueue,
-            settingsOrchestrator,
+            globalSettings,
             serverApiClient,
             loadInitialData: true,
             uiInvoke: async action => await Dispatcher.UIThread.InvokeAsync(action))
@@ -344,14 +344,14 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
         ApiClientService apiClient,
         LibraryCatalogService libraryCatalog,
         SharedDownloadQueue sharedDownloadQueue,
-        ISettingsOrchestrator settingsOrchestrator,
+        AppGlobalSettings globalSettings,
         IChartHubServerApiClient serverApiClient,
         bool loadInitialData,
         Func<Action, Task> uiInvoke)
     {
         _uiInvoke = uiInvoke;
         _libraryCatalog = libraryCatalog;
-        _settingsOrchestrator = settingsOrchestrator;
+        _globalSettings = globalSettings;
         _serverApiClient = serverApiClient;
         PageStrings = new RhythmVersePageStrings();
         _apiClient = apiClient;
@@ -673,9 +673,9 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
 
     private bool TryGetServerConnection(out string baseUrl, out string bearerToken)
     {
-        string? configuredBaseUrl = _settingsOrchestrator.Current.Runtime.ServerApiBaseUrl;
+        string? configuredBaseUrl = _globalSettings.ServerApiBaseUrl;
         baseUrl = NormalizeApiBaseUrl(configuredBaseUrl);
-        bearerToken = _settingsOrchestrator.Current.Runtime.ServerApiAuthToken?.Trim() ?? string.Empty;
+        bearerToken = _globalSettings.ServerApiAuthToken?.Trim() ?? string.Empty;
         return !string.IsNullOrWhiteSpace(baseUrl) && !string.IsNullOrWhiteSpace(bearerToken);
     }
 

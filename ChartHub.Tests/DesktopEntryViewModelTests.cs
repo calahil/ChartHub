@@ -1,5 +1,5 @@
-using System.Net;
 using System.ComponentModel;
+using System.Net;
 using System.Runtime.CompilerServices;
 
 using ChartHub.Configuration.Interfaces;

@@ -8,6 +8,7 @@ using ChartHub.Controls;
 using ChartHub.Models;
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
+using ChartHub.Utilities;
 using ChartHub.ViewModels;
 
 namespace ChartHub.Tests;
@@ -15,6 +16,9 @@ namespace ChartHub.Tests;
 [Trait(ChartHub.Tests.TestInfrastructure.TestCategories.Category, ChartHub.Tests.TestInfrastructure.TestCategories.Unit)]
 public class EncoreViewModelTests
 {
+    private static AppGlobalSettings CreateSettings(ISettingsOrchestrator? orchestrator = null)
+        => new(orchestrator ?? new NoOpSettingsOrchestrator());
+
     [Fact]
     public async Task RefreshAsync_WithAdvancedFields_UsesAdvancedEndpoint()
     {
@@ -27,7 +31,9 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue())
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), settings, settingsOrchestrator, new SharedDownloadQueue())
         {
             AdvancedName = "Song",
             AdvancedAlbum = "Album",
@@ -54,7 +60,9 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), settings, settingsOrchestrator, new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -84,7 +92,9 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), settings, settingsOrchestrator, new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -107,7 +117,9 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), settings, settingsOrchestrator, new SharedDownloadQueue());
 
         await sut.RefreshAsync();
         EncoreSong song = Assert.Single(sut.DataItems);
@@ -130,7 +142,9 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), settings, settingsOrchestrator, new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -167,7 +181,9 @@ public class EncoreViewModelTests
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
         var serverApi = new CapturingChartHubServerApiClient();
-        var sut = new EncoreViewModel(api, serverApi, new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
+        var sut = new EncoreViewModel(api, serverApi, settings, settingsOrchestrator, new SharedDownloadQueue());
 
         await sut.RefreshAsync();
         EncoreSong song = Assert.Single(sut.DataItems);
@@ -209,7 +225,9 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), settings, settingsOrchestrator, new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -231,7 +249,9 @@ public class EncoreViewModelTests
         };
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
-        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), new NoOpSettingsOrchestrator(), new SharedDownloadQueue());
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
+        var sut = new EncoreViewModel(api, new NoOpChartHubServerApiClient(), settings, settingsOrchestrator, new SharedDownloadQueue());
 
         await sut.RefreshAsync();
 
@@ -252,10 +272,13 @@ public class EncoreViewModelTests
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
         var sharedQueue = new SharedDownloadQueue();
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
         var sut = new EncoreViewModel(
             api,
             new NoOpChartHubServerApiClient(),
-            new NoOpSettingsOrchestrator(),
+            settings,
+            settingsOrchestrator,
             sharedQueue,
             action =>
             {
@@ -285,10 +308,13 @@ public class EncoreViewModelTests
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
         var sharedQueue = new SharedDownloadQueue();
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
         var sut = new EncoreViewModel(
             api,
             new NoOpChartHubServerApiClient(),
-            new NoOpSettingsOrchestrator(),
+            settings,
+            settingsOrchestrator,
             sharedQueue,
             action =>
             {
@@ -317,10 +343,13 @@ public class EncoreViewModelTests
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
         var sharedQueue = new SharedDownloadQueue();
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
         var sut = new EncoreViewModel(
             api,
             new NoOpChartHubServerApiClient(),
-            new NoOpSettingsOrchestrator(),
+            settings,
+            settingsOrchestrator,
             sharedQueue,
             action =>
             {
@@ -355,10 +384,13 @@ public class EncoreViewModelTests
 
         EncoreApiService api = CreateApiService(catalog, httpClient);
         var sharedQueue = new SharedDownloadQueue();
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
         var sut = new EncoreViewModel(
             api,
             new NoOpChartHubServerApiClient(),
-            new NoOpSettingsOrchestrator(),
+            settings,
+            settingsOrchestrator,
             sharedQueue,
             action =>
             {
@@ -387,10 +419,13 @@ public class EncoreViewModelTests
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
 
         EncoreApiService apiService = CreateApiServiceWithPagedHandler();
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
         var sut = new EncoreViewModel(
             apiService,
             new NoOpChartHubServerApiClient(),
-            new NoOpSettingsOrchestrator(),
+            settings,
+            settingsOrchestrator,
             new SharedDownloadQueue(),
             uiInvoke: action => { action(); return Task.CompletedTask; },
             loadInitialData: false);
@@ -413,10 +448,13 @@ public class EncoreViewModelTests
         var catalog = new LibraryCatalogService(Path.Combine(temp.RootPath, "library-catalog.db"));
 
         EncoreApiService apiService = CreateApiServiceWithPagedHandler(delayMs: 40);
+        var settingsOrchestrator = new NoOpSettingsOrchestrator();
+        using AppGlobalSettings settings = CreateSettings(settingsOrchestrator);
         var sut = new EncoreViewModel(
             apiService,
             new NoOpChartHubServerApiClient(),
-            new NoOpSettingsOrchestrator(),
+            settings,
+            settingsOrchestrator,
             new SharedDownloadQueue(),
             uiInvoke: action => { action(); return Task.CompletedTask; },
             loadInitialData: false);
