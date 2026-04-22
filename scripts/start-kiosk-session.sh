@@ -54,7 +54,9 @@ log_line "openbox pid=${OPENBOX_PID}"
 # 5. Start ChartHub.Server for kiosk mode
 # ---------------------------------------------------------------------------
 KIOSK_ENV_FILE="/srv/appdata/charthub/active/kiosk.env"
+SERVER_ENV_FILE="/srv/appdata/charthub/active/config/charthub-server.env"
 SERVER_BINARY="/srv/appdata/charthub/active/current/ChartHub.Server"
+ACTIVE_ROOT="/srv/appdata/charthub/active"
 
 if [[ -f "$KIOSK_ENV_FILE" ]]; then
     # shellcheck disable=SC1090
@@ -65,6 +67,28 @@ SERVER_BINARY="${CHARTHUB_SERVER:-$SERVER_BINARY}"
 
 SERVER_PID=""
 
+if [[ -f "$SERVER_ENV_FILE" ]]; then
+    # Export all key=value pairs from the environment file for the server process.
+    set -a
+    # shellcheck disable=SC1090
+    source "$SERVER_ENV_FILE"
+    set +a
+    log_line "loaded server env: $SERVER_ENV_FILE"
+else
+    log_line "server env file not found: $SERVER_ENV_FILE"
+fi
+
+# Ensure kiosk-safe defaults even if env file is missing/incomplete.
+export ServerPaths__ConfigRoot="${ServerPaths__ConfigRoot:-${ACTIVE_ROOT}/config}"
+export ServerPaths__ChartHubRoot="${ServerPaths__ChartHubRoot:-${ACTIVE_ROOT}/data}"
+export ServerPaths__DownloadsDir="${ServerPaths__DownloadsDir:-${ACTIVE_ROOT}/data/downloads}"
+export ServerPaths__StagingDir="${ServerPaths__StagingDir:-${ACTIVE_ROOT}/data/staging}"
+export ServerPaths__CloneHeroRoot="${ServerPaths__CloneHeroRoot:-${ACTIVE_ROOT}/music}"
+export ServerPaths__SqliteDbPath="${ServerPaths__SqliteDbPath:-${ACTIVE_ROOT}/db/charthub.db}"
+export ServerLogging__LogDirectory="${ServerLogging__LogDirectory:-${ACTIVE_ROOT}/logs}"
+log_line "effective config root: ${ServerPaths__ConfigRoot}"
+log_line "effective sqlite path: ${ServerPaths__SqliteDbPath}"
+
 if [[ ! -x "$SERVER_BINARY" ]]; then
     log_line "server binary missing or not executable: $SERVER_BINARY"
     # Keep the session alive so LightDM does not loop; operator can SSH in and
@@ -73,10 +97,16 @@ if [[ ! -x "$SERVER_BINARY" ]]; then
     exit 0
 fi
 
-log_line "launching server: $SERVER_BINARY"
-"$SERVER_BINARY" >> "$SERVER_LOG" 2>&1 &
-SERVER_PID=$!
-log_line "server pid=${SERVER_PID}"
+start_server() {
+    server_dir="$(dirname "$SERVER_BINARY")"
+    log_line "launching server: $SERVER_BINARY"
+    (
+        cd "$server_dir"
+        ./"$(basename "$SERVER_BINARY")"
+    ) >> "$SERVER_LOG" 2>&1 &
+    SERVER_PID=$!
+    log_line "server pid=${SERVER_PID}"
+}
 
 cleanup() {
     log_line "cleanup: stopping server pid=${SERVER_PID:-none} openbox pid=${OPENBOX_PID}"
@@ -88,17 +118,15 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-# If either process exits, end the session so LightDM can relaunch it.
-wait -n "$SERVER_PID" "$OPENBOX_PID"
-wait_status=$?
+# Keep kiosk session stable: if server exits, log and restart it while
+# Openbox is still alive. This avoids LightDM login-loop churn.
+while kill -0 "$OPENBOX_PID" 2>/dev/null; do
+    start_server
+    wait "$SERVER_PID"
+    server_status=$?
+    log_line "server exited with status ${server_status}; restarting in 2s"
+    sleep 2
+done
 
-if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-    log_line "server exited; ending kiosk session"
-fi
-
-if ! kill -0 "$OPENBOX_PID" 2>/dev/null; then
-    log_line "openbox exited; ending kiosk session"
-fi
-
-log_line "kiosk session exiting with wait status ${wait_status}"
+log_line "openbox exited; ending kiosk session"
 exit 0
