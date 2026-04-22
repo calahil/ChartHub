@@ -1183,7 +1183,9 @@ jobs:
           EFFECTIVE_CONFIG="${CONFIG_PATH:-/srv/appdata/charthub/config}"
           INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
           scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
-            .github/systemd/charthub-server.service "${SSH_USER}@${SSH_HOST}:/tmp/charthub-server.service"
+            .github/systemd/charthub-server.service \
+            scripts/start-kiosk-session.sh \
+            "${SSH_USER}@${SSH_HOST}:/tmp/"
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
             # Write kiosk env inside the install root — the deploy user already owns this
             # directory so no sudo is required. start-kiosk-session.sh sources this file
@@ -1191,12 +1193,13 @@ jobs:
             printf 'CHARTHUB_SERVER=%s/current/ChartHub.Server\\n' \"${INSTALL_ROOT}\" \
               > \"${INSTALL_ROOT}/kiosk.env\"
             touch "${INSTALL_ROOT}/kiosk-mode"
+            sudo install -m 755 /tmp/start-kiosk-session.sh /usr/local/bin/start-charthub-kiosk
             # Install systemd unit. kiosk-setup.sh pre-installs and enables this unit;
             # overwriting it here keeps the file in sync with the deployed version.
             sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service 2>/dev/null || true
             sudo systemctl daemon-reload || true
             sudo systemctl disable charthub-server.service 2>/dev/null || true
-            rm -f /tmp/charthub-server.service
+            rm -f /tmp/charthub-server.service /tmp/start-kiosk-session.sh
           "
 
       - name: Restart server service
@@ -1450,7 +1453,9 @@ jobs:
           EFFECTIVE_CONFIG="${CONFIG_PATH:-/srv/appdata/charthub/config}"
           INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
           scp -i ~/.ssh/deploy_key -P "$EFFECTIVE_SSH_PORT" -o BatchMode=yes \
-            .github/systemd/charthub-server.service "${SSH_USER}@${SSH_HOST}:/tmp/charthub-server.service"
+            .github/systemd/charthub-server.service \
+            scripts/start-kiosk-session.sh \
+            "${SSH_USER}@${SSH_HOST}:/tmp/"
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
             # Write kiosk env inside the install root — the deploy user already owns this
             # directory so no sudo is required. start-kiosk-session.sh sources this file
@@ -1458,12 +1463,13 @@ jobs:
             printf 'CHARTHUB_SERVER=%s/current/ChartHub.Server\\n' \"${INSTALL_ROOT}\" \
               > \"${INSTALL_ROOT}/kiosk.env\"
             touch "${INSTALL_ROOT}/kiosk-mode"
+            sudo install -m 755 /tmp/start-kiosk-session.sh /usr/local/bin/start-charthub-kiosk
             # Install systemd unit. kiosk-setup.sh pre-installs and enables this unit;
             # overwriting it here keeps the file in sync with the deployed version.
             sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service 2>/dev/null || true
             sudo systemctl daemon-reload || true
             sudo systemctl disable charthub-server.service 2>/dev/null || true
-            rm -f /tmp/charthub-server.service
+            rm -f /tmp/charthub-server.service /tmp/start-kiosk-session.sh
           "
 
       - name: Restart server service
@@ -1663,6 +1669,7 @@ jobs:
           printf 'CHARTHUB_SERVER=%s/current/ChartHub.Server\n' "${INSTALL_ROOT}" \
             > "${INSTALL_ROOT}/kiosk.env"
           touch "${INSTALL_ROOT}/kiosk-mode"
+          sudo install -m 755 scripts/start-kiosk-session.sh /usr/local/bin/start-charthub-kiosk
           sudo install -m 644 .github/systemd/charthub-server.service \
             /etc/systemd/system/charthub-server.service
           sudo systemctl daemon-reload
