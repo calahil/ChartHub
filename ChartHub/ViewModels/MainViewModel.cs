@@ -49,9 +49,37 @@ public class MainViewModel : INotifyPropertyChanged
         ? "Authenticating..."
         : "Sign in is required to use ChartHub Server features.";
 
+    public string AuthServerBaseUrl
+    {
+        get => _authServerBaseUrl;
+        set
+        {
+            string normalized = value?.Trim() ?? string.Empty;
+            if (string.Equals(_authServerBaseUrl, normalized, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _authServerBaseUrl = normalized;
+            if (_globalSettings is not null)
+            {
+                _globalSettings.ServerApiBaseUrl = normalized;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_authError))
+            {
+                _authError = null;
+                OnPropertyChanged(nameof(AuthErrorMessage));
+            }
+
+            OnPropertyChanged();
+        }
+    }
+
     public string? AuthErrorMessage => _authError;
 
     private string? _authError;
+    private string _authServerBaseUrl = string.Empty;
 
     private RhythmVerseViewModel _rhythmVerseViewModel = null!;
     private EncoreViewModel _encoreViewModel = null!;
@@ -513,6 +541,19 @@ public class MainViewModel : INotifyPropertyChanged
     {
         _authSessionService = authSessionService;
         _globalSettings = globalSettings;
+        _authServerBaseUrl = _globalSettings?.ServerApiBaseUrl?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(_authServerBaseUrl))
+        {
+            string defaultServerBaseUrl = GetFirstRunServerBaseUrlDefault(isAndroid);
+            if (!string.IsNullOrWhiteSpace(defaultServerBaseUrl))
+            {
+                _authServerBaseUrl = defaultServerBaseUrl;
+                if (_globalSettings is not null)
+                {
+                    _globalSettings.ServerApiBaseUrl = defaultServerBaseUrl;
+                }
+            }
+        }
         _rhythmVerseViewModel = rhythmVerseViewModel;
         _encoreViewModel = encoreViewModel;
         _isAndroidMode = isAndroid;
@@ -726,6 +767,17 @@ public class MainViewModel : INotifyPropertyChanged
                 return;
             }
 
+            if (string.IsNullOrWhiteSpace(AuthServerBaseUrl))
+            {
+                throw new InvalidOperationException(
+                    "Set the ChartHub Server URL before signing in.");
+            }
+
+            if (_globalSettings is not null)
+            {
+                _globalSettings.ServerApiBaseUrl = AuthServerBaseUrl;
+            }
+
             await _authSessionService.SignInAsync().ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -745,6 +797,45 @@ public class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(AuthOverlayMessage));
         OnPropertyChanged(nameof(AuthErrorMessage));
     }
+
+    private static string GetFirstRunServerBaseUrlDefault(bool isAndroid)
+    {
+        if (!isAndroid)
+        {
+            return string.Empty;
+        }
+
+#if ANDROID
+        if (IsLikelyAndroidEmulator())
+        {
+            return "https://10.0.2.2:5001";
+        }
+#endif
+
+        return string.Empty;
+    }
+
+#if ANDROID
+    private static bool IsLikelyAndroidEmulator()
+    {
+        string fingerprint = global::Android.OS.Build.Fingerprint ?? string.Empty;
+        string model = global::Android.OS.Build.Model ?? string.Empty;
+        string brand = global::Android.OS.Build.Brand ?? string.Empty;
+        string device = global::Android.OS.Build.Device ?? string.Empty;
+        string product = global::Android.OS.Build.Product ?? string.Empty;
+
+        return
+            fingerprint.Contains("generic", StringComparison.OrdinalIgnoreCase)
+            || fingerprint.Contains("emulator", StringComparison.OrdinalIgnoreCase)
+            || model.Contains("Emulator", StringComparison.OrdinalIgnoreCase)
+            || model.Contains("Android SDK built for", StringComparison.OrdinalIgnoreCase)
+            || (brand.Contains("generic", StringComparison.OrdinalIgnoreCase)
+                && device.Contains("generic", StringComparison.OrdinalIgnoreCase))
+            || product.Contains("sdk", StringComparison.OrdinalIgnoreCase)
+            || product.Contains("emulator", StringComparison.OrdinalIgnoreCase)
+            || product.Contains("simulator", StringComparison.OrdinalIgnoreCase);
+    }
+#endif
 
     private static void ObserveBackgroundTask(Task task, string context)
     {

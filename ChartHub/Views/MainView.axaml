@@ -597,6 +597,12 @@
                     <TextBlock Text="{Binding AuthOverlayMessage}"
                            TextWrapping="Wrap"
                            Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                      <StackPanel Spacing="6">
+                       <TextBlock Text="ChartHub Server URL"
+                           FontWeight="SemiBold" />
+                       <TextBox Text="{Binding AuthServerBaseUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             PlaceholderText="https://your-server:5001" />
+                      </StackPanel>
                     <TextBlock Text="{Binding AuthErrorMessage}"
                            TextWrapping="Wrap"
                            Foreground="{StaticResource SemanticError}"

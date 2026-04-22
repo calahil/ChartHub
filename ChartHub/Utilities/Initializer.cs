@@ -7,8 +7,6 @@ using Avalonia.Threading;
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 
-using Microsoft.Extensions.Configuration;
-
 namespace ChartHub.Utilities;
 
 public class Initializer
@@ -31,7 +29,6 @@ public class Initializer
 public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
 {
     private readonly ISettingsOrchestrator _settingsOrchestrator;
-    private readonly IConfiguration? _configuration;
     private readonly SemaphoreSlim _updateLock = new(1, 1);
 
     private RuntimeAppConfig Runtime => _settingsOrchestrator.Current.Runtime;
@@ -84,10 +81,9 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         set => QueueConfigUpdate(config => config.Runtime.LastSelectedMainTabIndex = Math.Max(0, value));
     }
 
-    public AppGlobalSettings(ISettingsOrchestrator settingsOrchestrator, IConfiguration? configuration = null)
+    public AppGlobalSettings(ISettingsOrchestrator settingsOrchestrator)
     {
         _settingsOrchestrator = settingsOrchestrator;
-        _configuration = configuration;
         _settingsOrchestrator.SettingsChanged += OnSettingsChanged;
         EnsureDefaults();
     }
@@ -100,14 +96,6 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
     private void EnsureDefaults()
     {
         string serverApiBaseUrl = Runtime.ServerApiBaseUrl?.Trim() ?? string.Empty;
-
-        // Seed from env var on first boot (when no URL is persisted yet).
-        // CHARTHUB_SERVER_BASE_URL allows per-environment deployment configuration.
-        if (string.IsNullOrWhiteSpace(serverApiBaseUrl))
-        {
-            serverApiBaseUrl = _configuration?["CHARTHUB_SERVER_BASE_URL"]?.Trim() ?? string.Empty;
-        }
-
         string uiCulture = string.IsNullOrWhiteSpace(Runtime.UiCulture) ? "en-US" : Runtime.UiCulture.Trim();
         Runtime.ServerApiBaseUrl = serverApiBaseUrl;
         Runtime.UiCulture = uiCulture;
