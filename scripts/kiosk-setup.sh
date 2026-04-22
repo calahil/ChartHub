@@ -340,11 +340,12 @@ ln -sfn /srv/appdata/charthub/prod /srv/appdata/charthub/active
 chown -R gamer:gamer /srv/appdata/charthub
 
 # ---------------------------------------------------------------------------
-# 17. Install and enable charthub-server.service
-#     The binary does not exist yet — CI provides it on first deploy.
-#     systemd will fail to start until the binary is deployed; that is expected.
+# 17. Install and mask charthub-server.service
+#     Kiosk mode launches ChartHub.Server from the LightDM session once X is
+#     ready. We still install the unit so deploys keep it in sync, but mask it
+#     on kiosk machines so systemd does not race the X session at boot.
 # ---------------------------------------------------------------------------
-echo "==> Installing charthub-server.service..."
+echo "==> Installing charthub-server.service (masked for kiosk mode)..."
 cat > /etc/systemd/system/charthub-server.service <<'SERVICE_EOF'
 [Unit]
 Description=ChartHub Server
@@ -371,12 +372,14 @@ SERVICE_EOF
 chmod 0644 /etc/systemd/system/charthub-server.service
 if [[ -d /run/systemd/system ]]; then
     systemctl daemon-reload
-    systemctl enable charthub-server.service
+    systemctl disable charthub-server.service 2>/dev/null || true
+    systemctl mask charthub-server.service
 else
     systemctl --root / daemon-reload 2>/dev/null || true
-    systemctl --root / enable charthub-server.service
+    systemctl --root / disable charthub-server.service 2>/dev/null || true
+    systemctl --root / mask charthub-server.service
 fi
-echo "    NOTE: Start will fail until CI deploys the binary — this is expected."
+echo "    NOTE: Kiosk mode starts ChartHub.Server from start-kiosk-session.sh."
 
 # ---------------------------------------------------------------------------
 # 18. udev rule: grant input group read/write access to /dev/uinput

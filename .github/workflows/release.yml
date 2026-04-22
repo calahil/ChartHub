@@ -1194,7 +1194,9 @@ jobs:
             # overwriting it here keeps the file in sync with the deployed version.
             sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service 2>/dev/null || true
             sudo systemctl daemon-reload || true
-            sudo systemctl enable charthub-server.service 2>/dev/null || true
+            if ! sudo systemctl is-enabled charthub-server.service 2>/dev/null | grep -qx masked; then
+              sudo systemctl enable charthub-server.service 2>/dev/null || true
+            fi
             rm -f /tmp/charthub-server.service
           "
 
@@ -1455,7 +1457,9 @@ jobs:
             # overwriting it here keeps the file in sync with the deployed version.
             sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service 2>/dev/null || true
             sudo systemctl daemon-reload || true
-            sudo systemctl enable charthub-server.service 2>/dev/null || true
+            if ! sudo systemctl is-enabled charthub-server.service 2>/dev/null | grep -qx masked; then
+              sudo systemctl enable charthub-server.service 2>/dev/null || true
+            fi
             rm -f /tmp/charthub-server.service
           "
 
@@ -1653,11 +1657,17 @@ jobs:
           sudo install -m 644 .github/systemd/charthub-server.service \
             /etc/systemd/system/charthub-server.service
           sudo systemctl daemon-reload
-          sudo systemctl enable charthub-server.service
+          if ! sudo systemctl is-enabled charthub-server.service 2>/dev/null | grep -qx masked; then
+            sudo systemctl enable charthub-server.service
+          fi
 
       - name: Restart server service
         run: |
-          sudo systemctl restart charthub-server.service
+          if sudo systemctl is-enabled charthub-server.service 2>/dev/null | grep -qx masked; then
+            pkill -f 'ChartHub.Server' || true
+          else
+            sudo systemctl restart charthub-server.service
+          fi
 
       - name: Verify health
         env:
