@@ -54,4 +54,7 @@ public sealed class RuntimeAppConfig
     [SettingEditor(SettingEditorKind.Number)]
     [SettingHotReloadable(true)]
     public double MouseSpeedMultiplier { get; set; } = 4.0;
+
+    [SettingHidden]
+    public int LastSelectedMainTabIndex { get; set; }
 }

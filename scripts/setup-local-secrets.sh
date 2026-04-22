@@ -266,6 +266,7 @@ set_effective "BACKUP_DOWNLOADS_HOST_PATH" "./ChartHub.BackupApi/cache/downloads
 set_effective "BACKUP_IMAGES_HOST_PATH" "./ChartHub.BackupApi/cache/images"
 set_effective "BACKUP_API_KEY" ""
 set_effective "CHARTHUB_SERVER_PORT" "5180"
+set_effective "CHARTHUB_SERVER_BASE_URL" ""
 set_effective "CHARTHUB_SERVER_JWT_SIGNING_KEY" ""
 set_effective "CHARTHUB_SERVER_JWT_ISSUER" "charthub-server"
 set_effective "CHARTHUB_SERVER_JWT_AUDIENCE" "charthub-clients"
@@ -342,6 +343,7 @@ BACKUP_API_KEY=${EFFECTIVE_VALUES[BACKUP_API_KEY]}
 
 # ChartHub.Server local settings
 CHARTHUB_SERVER_PORT=${EFFECTIVE_VALUES[CHARTHUB_SERVER_PORT]}
+CHARTHUB_SERVER_BASE_URL=${EFFECTIVE_VALUES[CHARTHUB_SERVER_BASE_URL]}
 CHARTHUB_SERVER_JWT_SIGNING_KEY=${EFFECTIVE_VALUES[CHARTHUB_SERVER_JWT_SIGNING_KEY]}
 CHARTHUB_SERVER_JWT_ISSUER=${EFFECTIVE_VALUES[CHARTHUB_SERVER_JWT_ISSUER]}
 CHARTHUB_SERVER_JWT_AUDIENCE=${EFFECTIVE_VALUES[CHARTHUB_SERVER_JWT_AUDIENCE]}
@@ -423,7 +425,10 @@ if [[ "$APPLY_USER_SECRETS" == true ]]; then
   set_user_secret "$BACKUP_API_PROJECT" "RhythmVerseSource:Token" "${EFFECTIVE_VALUES[RHYTHMVERSE_TOKEN]}"
   set_user_secret "$BACKUP_API_PROJECT" "ApiKey:Key" "${EFFECTIVE_VALUES[BACKUP_API_KEY]}"
 
-  chart_hub_server_base_url="http://127.0.0.1:${EFFECTIVE_VALUES[CHARTHUB_SERVER_PORT]}"
+  chart_hub_server_base_url="${EFFECTIVE_VALUES[CHARTHUB_SERVER_BASE_URL]}"
+  if [[ -z "$chart_hub_server_base_url" ]]; then
+    chart_hub_server_base_url="http://127.0.0.1:${EFFECTIVE_VALUES[CHARTHUB_SERVER_PORT]}"
+  fi
   set_user_secret "$CHART_HUB_PROJECT" "Runtime:ServerApiBaseUrl" "$chart_hub_server_base_url"
 
   log "User-secrets mapping applied for ChartHub, ChartHub.Server, and ChartHub.BackupApi"

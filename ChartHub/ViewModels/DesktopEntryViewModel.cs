@@ -16,6 +16,7 @@ namespace ChartHub.ViewModels;
 public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly AppGlobalSettings? _globalSettings;
+    private readonly IAuthSessionService? _authSessionService;
     private readonly IChartHubServerApiClient? _serverApiClient;
     private readonly Func<Action, Task> _uiInvoke;
     private readonly CancellationTokenSource _streamCts = new();
@@ -87,10 +88,12 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
 
     public DesktopEntryViewModel(
         AppGlobalSettings? globalSettings = null,
+        IAuthSessionService? authSessionService = null,
         IChartHubServerApiClient? serverApiClient = null,
         Func<Action, Task>? uiInvoke = null)
     {
         _globalSettings = globalSettings;
+        _authSessionService = authSessionService;
         _serverApiClient = serverApiClient;
         _uiInvoke = uiInvoke ?? (async action => await Dispatcher.UIThread.InvokeAsync(action));
 
@@ -98,7 +101,21 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
         _executeCommand = new AsyncRelayCommand<DesktopEntryCardItem?>(ExecuteAsync);
         _killCommand = new AsyncRelayCommand<DesktopEntryCardItem?>(KillAsync);
 
+        // Subscribe to auth state changes (if service available)
+        if (_authSessionService is not null)
+        {
+            _authSessionService.SessionStateChanged += OnAuthSessionStateChanged;
+        }
+
         ObserveBackgroundTask(InitializeAsync(), "DesktopEntry startup sync");
+    }
+
+    public DesktopEntryViewModel(
+        AppGlobalSettings? globalSettings,
+        IChartHubServerApiClient? serverApiClient,
+        Func<Action, Task>? uiInvoke = null)
+        : this(globalSettings, null, serverApiClient, uiInvoke)
+    {
     }
 
     private async Task InitializeAsync()
@@ -384,8 +401,23 @@ public sealed class DesktopEntryViewModel : INotifyPropertyChanged, IDisposable
         }, TaskContinuationOptions.OnlyOnFaulted);
     }
 
+    private void OnAuthSessionStateChanged(object? sender, EventArgs e)
+    {
+        // When auth session state changes, auto-refresh if authenticated
+        if (_authSessionService?.CurrentState == AuthSessionState.Authenticated)
+        {
+            ObserveBackgroundTask(RefreshAsync(), "DesktopEntry auto-refresh after auth");
+        }
+    }
+
     public void Dispose()
     {
+        // Unsubscribe from auth state changes
+        if (_authSessionService is not null)
+        {
+            _authSessionService.SessionStateChanged -= OnAuthSessionStateChanged;
+        }
+
         _streamCts.Cancel();
         _streamCts.Dispose();
     }

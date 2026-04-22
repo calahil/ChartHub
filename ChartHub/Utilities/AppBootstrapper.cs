@@ -150,6 +150,7 @@ public static class AppBootstrapper
         services.AddSingleton<SharedDownloadQueue>();
         services.AddSingleton(_ => new LibraryCatalogService(Path.Combine(configDir, "library-catalog.db")));
         services.AddSingleton<IChartHubServerApiClient, ChartHubServerApiClient>();
+        services.AddSingleton<IAuthSessionService, AuthSessionService>();
         services.AddSingleton<IStatusBarService, StatusBarService>();
         services.AddSingleton<DownloadViewModel>(serviceProvider =>
             new DownloadViewModel(
@@ -165,10 +166,12 @@ public static class AppBootstrapper
         services.AddSingleton<DesktopEntryViewModel>(serviceProvider =>
             new DesktopEntryViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
+                serviceProvider.GetRequiredService<IAuthSessionService>(),
                 serviceProvider.GetRequiredService<IChartHubServerApiClient>()));
         services.AddSingleton<VolumeViewModel>(serviceProvider =>
             new VolumeViewModel(
                 serviceProvider.GetRequiredService<AppGlobalSettings>(),
+                serviceProvider.GetRequiredService<IAuthSessionService>(),
                 serviceProvider.GetRequiredService<IChartHubServerApiClient>(),
                 serviceProvider.GetRequiredService<IVolumeHardwareButtonSource>()));
         services.AddSingleton<SettingsViewModel>();
@@ -209,7 +212,9 @@ public static class AppBootstrapper
                 serviceProvider.GetRequiredService<SettingsViewModel>(),
                 serviceProvider.GetRequiredService<VirtualControllerViewModel>(),
                 serviceProvider.GetRequiredService<VirtualTouchPadViewModel>(),
-                serviceProvider.GetRequiredService<VirtualKeyboardViewModel>()
+                serviceProvider.GetRequiredService<VirtualKeyboardViewModel>(),
+                serviceProvider.GetRequiredService<IAuthSessionService>(),
+                serviceProvider.GetRequiredService<AppGlobalSettings>()
             )
         );
         services.AddSingleton<Initializer>();

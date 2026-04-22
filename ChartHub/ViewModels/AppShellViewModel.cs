@@ -3,6 +3,8 @@ using System.Runtime.CompilerServices;
 
 using Avalonia;
 
+using ChartHub.Services;
+
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChartHub.ViewModels;
@@ -28,7 +30,9 @@ public class AppShellViewModel : INotifyPropertyChanged
     public AppShellViewModel(IServiceProvider serviceProvider)
     {
         _serviceProvider = serviceProvider;
-        CurrentViewModel = new SplashViewModel(HandlePostSplashAsync);
+        CurrentViewModel = new SplashViewModel(
+            _serviceProvider.GetRequiredService<IAuthSessionService>(),
+            HandlePostSplashAsync);
     }
 
     private Task HandlePostSplashAsync()

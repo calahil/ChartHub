@@ -16,6 +16,7 @@ namespace ChartHub.ViewModels;
 public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly AppGlobalSettings? _globalSettings;
+    private readonly IAuthSessionService? _authSessionService;
     public VolumePageStrings PageStrings { get; } = new();
     private readonly IChartHubServerApiClient? _serverApiClient;
     private readonly IVolumeHardwareButtonSource? _hardwareButtonSource;
@@ -202,11 +203,13 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
 
     public VolumeViewModel(
         AppGlobalSettings? globalSettings = null,
+        IAuthSessionService? authSessionService = null,
         IChartHubServerApiClient? serverApiClient = null,
         IVolumeHardwareButtonSource? hardwareButtonSource = null,
         Func<Action, Task>? uiInvoke = null)
     {
         _globalSettings = globalSettings;
+        _authSessionService = authSessionService;
         _serverApiClient = serverApiClient;
         _hardwareButtonSource = hardwareButtonSource;
         _uiInvoke = uiInvoke ?? (async action => await Dispatcher.UIThread.InvokeAsync(action));
@@ -225,7 +228,22 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
             _globalSettings.PropertyChanged += OnGlobalSettingsPropertyChanged;
         }
 
+        // Subscribe to auth state changes (if service available)
+        if (_authSessionService is not null)
+        {
+            _authSessionService.SessionStateChanged += OnAuthSessionStateChanged;
+        }
+
         ObserveBackgroundTask(InitializeAsync(), "Volume startup sync");
+    }
+
+    public VolumeViewModel(
+        AppGlobalSettings? globalSettings,
+        IChartHubServerApiClient? serverApiClient,
+        IVolumeHardwareButtonSource? hardwareButtonSource,
+        Func<Action, Task>? uiInvoke = null)
+        : this(globalSettings, null, serverApiClient, hardwareButtonSource, uiInvoke)
+    {
     }
 
     private async Task InitializeAsync()
@@ -490,6 +508,15 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
         }, TaskContinuationOptions.OnlyOnFaulted);
     }
 
+    private void OnAuthSessionStateChanged(object? sender, EventArgs e)
+    {
+        // When auth session state changes, auto-refresh if authenticated
+        if (_authSessionService?.CurrentState == AuthSessionState.Authenticated)
+        {
+            ObserveBackgroundTask(RefreshAsync(), "Volume auto-refresh after auth");
+        }
+    }
+
     public void Dispose()
     {
         if (_hardwareButtonSource is not null)
@@ -514,7 +541,6 @@ public sealed class VolumeViewModel : INotifyPropertyChanged, IDisposable
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }
 }
-
 public sealed class VolumeSessionCardItem : INotifyPropertyChanged
 {
     private string _name;

@@ -24,54 +24,6 @@
                        VerticalAlignment="Center"
                        Text="{Binding StatusMessage}" />
         </Grid>
-        <Border Grid.Row="1"
-                Margin="0,8,0,8"
-                Padding="10"
-                BorderThickness="1"
-                BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                Background="{StaticResource ThemeControlLowBrush}"
-            CornerRadius="8">
-            <StackPanel Spacing="8">
-                <TextBlock Text="{Binding PageStrings.AuthTitle}"
-                           FontSize="16"
-                           FontWeight="Bold" />
-
-                <Grid ColumnDefinitions="Auto,*"
-                                            RowDefinitions="Auto,Auto,Auto">
-                    <TextBlock Grid.Row="0"
-                               Grid.Column="0"
-                               Text="{Binding PageStrings.AuthStatusLabel}"
-                                                             Margin="0,0,10,6"
-                               FontWeight="SemiBold" />
-                    <TextBlock Grid.Row="0"
-                               Grid.Column="1"
-                                                             Margin="0,0,0,6"
-                               Text="{Binding ServerAuthenticationStatusMessage}"
-                               Foreground="{StaticResource ThemeForegroundLowBrush}" />
-
-                    <TextBlock Grid.Row="1"
-                               Grid.Column="1"
-                                                             Margin="0,0,0,6"
-                               Text="{Binding ServerAuthenticationErrorMessage}"
-                               Foreground="{StaticResource SemanticError}"
-                               IsVisible="{Binding HasServerAuthenticationError}" />
-
-                    <StackPanel Grid.Row="2"
-                                Grid.Column="1"
-                                Orientation="Horizontal"
-                                Spacing="8">
-                            <Button Content="{Binding PageStrings.AuthenticateGoogle}"
-                                    CornerRadius="10"
-                                Command="{Binding AuthenticateServerCommand}" />
-                        <TextBlock VerticalAlignment="Center"
-                                   Text="{Binding PageStrings.Working}"
-                                   Foreground="{StaticResource ThemeForegroundLowBrush}"
-                                   IsVisible="{Binding IsServerAuthenticationBusy}" />
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Border>
-
         <Border Grid.Row="2"
             Margin="0,8,0,0"
             Padding="8,6"

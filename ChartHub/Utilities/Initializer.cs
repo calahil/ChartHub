@@ -7,6 +7,8 @@ using Avalonia.Threading;
 using ChartHub.Configuration.Interfaces;
 using ChartHub.Configuration.Models;
 
+using Microsoft.Extensions.Configuration;
+
 namespace ChartHub.Utilities;
 
 public class Initializer
@@ -29,6 +31,7 @@ public class Initializer
 public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
 {
     private readonly ISettingsOrchestrator _settingsOrchestrator;
+    private readonly IConfiguration? _configuration;
     private readonly SemaphoreSlim _updateLock = new(1, 1);
 
     private RuntimeAppConfig Runtime => _settingsOrchestrator.Current.Runtime;
@@ -75,9 +78,16 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         set => QueueConfigUpdate(config => config.Runtime.MouseSpeedMultiplier = Math.Max(0.1, value));
     }
 
-    public AppGlobalSettings(ISettingsOrchestrator settingsOrchestrator)
+    public int LastSelectedMainTabIndex
+    {
+        get => Runtime.LastSelectedMainTabIndex;
+        set => QueueConfigUpdate(config => config.Runtime.LastSelectedMainTabIndex = Math.Max(0, value));
+    }
+
+    public AppGlobalSettings(ISettingsOrchestrator settingsOrchestrator, IConfiguration? configuration = null)
     {
         _settingsOrchestrator = settingsOrchestrator;
+        _configuration = configuration;
         _settingsOrchestrator.SettingsChanged += OnSettingsChanged;
         EnsureDefaults();
     }
@@ -89,28 +99,24 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
 
     private void EnsureDefaults()
     {
-        string serverApiAuthToken = string.IsNullOrWhiteSpace(Runtime.ServerApiAuthToken)
-            ? GenerateSyncApiToken()
-            : Runtime.ServerApiAuthToken;
         string serverApiBaseUrl = Runtime.ServerApiBaseUrl?.Trim() ?? string.Empty;
+
+        // Seed from env var on first boot (when no URL is persisted yet).
+        // CHARTHUB_SERVER_BASE_URL allows per-environment deployment configuration.
+        if (string.IsNullOrWhiteSpace(serverApiBaseUrl))
+        {
+            serverApiBaseUrl = _configuration?["CHARTHUB_SERVER_BASE_URL"]?.Trim() ?? string.Empty;
+        }
+
         string uiCulture = string.IsNullOrWhiteSpace(Runtime.UiCulture) ? "en-US" : Runtime.UiCulture.Trim();
-        Runtime.ServerApiAuthToken = serverApiAuthToken;
         Runtime.ServerApiBaseUrl = serverApiBaseUrl;
         Runtime.UiCulture = uiCulture;
 
         QueueConfigUpdate(config =>
         {
-            config.Runtime.ServerApiAuthToken = serverApiAuthToken;
             config.Runtime.ServerApiBaseUrl = serverApiBaseUrl;
             config.Runtime.UiCulture = uiCulture;
         });
-    }
-
-    private static string GenerateSyncApiToken()
-    {
-        Span<byte> bytes = stackalloc byte[32];
-        RandomNumberGenerator.Fill(bytes);
-        return Convert.ToHexString(bytes);
     }
 
 

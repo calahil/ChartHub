@@ -16,6 +16,8 @@ namespace ChartHub.ViewModels;
 public class MainViewModel : INotifyPropertyChanged
 {
     private readonly bool _isAndroidMode;
+    private readonly IAuthSessionService? _authSessionService;
+    private readonly AppGlobalSettings? _globalSettings;
     private readonly IStatusBarService _statusBarService = new StatusBarService();
     private string _statusBarMessage = string.Empty;
 
@@ -34,6 +36,22 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     public bool HasStatusBarMessage => !string.IsNullOrEmpty(StatusBarMessage);
+
+    public bool IsAuthenticated => _authSessionService?.CurrentState == AuthSessionState.Authenticated;
+
+    public bool IsAuthenticating => _authSessionService?.CurrentState == AuthSessionState.Authenticating;
+
+    public bool ShowAuthOverlay => !IsAuthenticated;
+
+    public string AuthButtonText => IsAuthenticated ? "Sign Out" : "Sign In";
+
+    public string AuthOverlayMessage => IsAuthenticating
+        ? "Authenticating..."
+        : "Sign in is required to use ChartHub Server features.";
+
+    public string? AuthErrorMessage => _authError;
+
+    private string? _authError;
 
     private RhythmVerseViewModel _rhythmVerseViewModel = null!;
     private EncoreViewModel _encoreViewModel = null!;
@@ -216,6 +234,10 @@ public class MainViewModel : INotifyPropertyChanged
             }
 
             _selectedMainTabIndex = value;
+            if (_globalSettings is not null)
+            {
+                _globalSettings.LastSelectedMainTabIndex = value;
+            }
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsRhythmVerseTabActive));
             OnPropertyChanged(nameof(IsEncoreTabActive));
@@ -362,6 +384,8 @@ public class MainViewModel : INotifyPropertyChanged
 
     public IRelayCommand<DownloadFile?> ClearSharedDownloadCommand { get; }
 
+    public IAsyncRelayCommand AuthButtonCommand { get; }
+
     public bool IsSettingsTabVisible
     {
         get => _isSettingsTabVisible;
@@ -401,6 +425,7 @@ public class MainViewModel : INotifyPropertyChanged
         GoVirtualKeyboardCommand = new RelayCommand(() => NavigateToTab(9));
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
+        AuthButtonCommand = new AsyncRelayCommand(ExecuteAuthButtonAsync);
     }
 
     public MainViewModel(
@@ -411,7 +436,9 @@ public class MainViewModel : INotifyPropertyChanged
         CloneHeroViewModel cloneHeroViewModel,
         DesktopEntryViewModel desktopEntryViewModel,
         VolumeViewModel volumeViewModel,
-        SettingsViewModel settingsViewModel)
+        SettingsViewModel settingsViewModel,
+        IAuthSessionService authSessionService,
+        AppGlobalSettings globalSettings)
         : this(
             rhythmVerseViewModel,
             encoreViewModel,
@@ -426,7 +453,9 @@ public class MainViewModel : INotifyPropertyChanged
             virtualKeyboardViewModel: null,
             action => Dispatcher.UIThread.Post(action),
             OperatingSystem.IsAndroid(),
-            App.ServiceProvider?.GetService(typeof(IStatusBarService)) as IStatusBarService)
+            App.ServiceProvider?.GetService(typeof(IStatusBarService)) as IStatusBarService,
+            authSessionService,
+            globalSettings)
     {
     }
 
@@ -441,7 +470,9 @@ public class MainViewModel : INotifyPropertyChanged
         SettingsViewModel settingsViewModel,
         VirtualControllerViewModel? virtualControllerViewModel,
         VirtualTouchPadViewModel? virtualTouchPadViewModel,
-        VirtualKeyboardViewModel? virtualKeyboardViewModel)
+        VirtualKeyboardViewModel? virtualKeyboardViewModel,
+        IAuthSessionService authSessionService,
+        AppGlobalSettings globalSettings)
         : this(
             rhythmVerseViewModel,
             encoreViewModel,
@@ -456,7 +487,9 @@ public class MainViewModel : INotifyPropertyChanged
             virtualKeyboardViewModel,
             action => Dispatcher.UIThread.Post(action),
             OperatingSystem.IsAndroid(),
-            App.ServiceProvider?.GetService(typeof(IStatusBarService)) as IStatusBarService)
+            App.ServiceProvider?.GetService(typeof(IStatusBarService)) as IStatusBarService,
+            authSessionService,
+            globalSettings)
     {
     }
 
@@ -474,8 +507,12 @@ public class MainViewModel : INotifyPropertyChanged
         VirtualKeyboardViewModel? virtualKeyboardViewModel,
         Action<Action> postToUi,
         bool isAndroid,
-        IStatusBarService? statusBarService = null)
+        IStatusBarService? statusBarService = null,
+        IAuthSessionService? authSessionService = null,
+        AppGlobalSettings? globalSettings = null)
     {
+        _authSessionService = authSessionService;
+        _globalSettings = globalSettings;
         _rhythmVerseViewModel = rhythmVerseViewModel;
         _encoreViewModel = encoreViewModel;
         _isAndroidMode = isAndroid;
@@ -520,12 +557,22 @@ public class MainViewModel : INotifyPropertyChanged
         GoVirtualKeyboardCommand = new RelayCommand(() => NavigateToTab(9));
         CancelSharedDownloadCommand = new RelayCommand<DownloadFile?>(CancelSharedDownload);
         ClearSharedDownloadCommand = new RelayCommand<DownloadFile?>(ClearSharedDownload);
+        AuthButtonCommand = new AsyncRelayCommand(ExecuteAuthButtonAsync);
 
         _isCloneHeroTabVisible = true;
         _isDesktopEntryTabVisible = true;
         _isVolumeTabVisible = true;
         _isDownloadTabVisible = false;
         _isSettingsTabVisible = true;
+
+        // Restore last tab on subsequent launches (default remains RhythmVerse = 0).
+        int restoredTab = _globalSettings?.LastSelectedMainTabIndex ?? 0;
+        _selectedMainTabIndex = Math.Clamp(restoredTab, 0, 9);
+
+        if (_authSessionService is not null)
+        {
+            _authSessionService.SessionStateChanged += OnAuthSessionStateChanged;
+        }
 
         ObserveBackgroundTask(InitializeCloneHeroAsync(postToUi), "Clone Hero startup reconciliation");
 
@@ -659,6 +706,44 @@ public class MainViewModel : INotifyPropertyChanged
             return;
         }
 
+    }
+
+    private async Task ExecuteAuthButtonAsync()
+    {
+        if (_authSessionService is null)
+        {
+            return;
+        }
+
+        _authError = null;
+        OnPropertyChanged(nameof(AuthErrorMessage));
+
+        try
+        {
+            if (_authSessionService.CurrentState == AuthSessionState.Authenticated)
+            {
+                await _authSessionService.SignOutAsync().ConfigureAwait(false);
+                return;
+            }
+
+            await _authSessionService.SignInAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _authError = ex.Message;
+            OnPropertyChanged(nameof(AuthErrorMessage));
+        }
+    }
+
+    private void OnAuthSessionStateChanged(object? sender, EventArgs e)
+    {
+        _authError = null;
+        OnPropertyChanged(nameof(IsAuthenticated));
+        OnPropertyChanged(nameof(IsAuthenticating));
+        OnPropertyChanged(nameof(ShowAuthOverlay));
+        OnPropertyChanged(nameof(AuthButtonText));
+        OnPropertyChanged(nameof(AuthOverlayMessage));
+        OnPropertyChanged(nameof(AuthErrorMessage));
     }
 
     private static void ObserveBackgroundTask(Task task, string context)

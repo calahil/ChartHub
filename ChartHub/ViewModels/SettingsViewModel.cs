@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
-using System.Net;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -21,8 +20,6 @@ using ChartHub.Strings;
 using ChartHub.Utilities;
 
 using CommunityToolkit.Mvvm.Input;
-
-using Google.Apis.Auth.OAuth2;
 
 namespace ChartHub.ViewModels;
 
@@ -237,19 +234,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private readonly ISettingsOrchestrator _settings;
     public SettingsPageStrings PageStrings { get; } = new();
     private readonly ISecretStore _secretStore;
-    private readonly IGoogleAuthProvider _googleAuthProvider;
-    private readonly IChartHubServerApiClient _serverApiClient;
     private readonly Action<Action> _postToUi;
     private readonly bool _isAndroidPlatform;
-    private static readonly string[] ServerAuthenticationScopes = ["openid", "email", "profile"];
 
     private string _statusMessage = "";
     private bool _hasPendingRestartSettings;
     private bool _isSaving;
     private bool _showDeveloperSettings;
-    private bool _isServerAuthenticationBusy;
-    private string _serverAuthenticationStatusMessage = UiLocalization.Get("Settings.NotAuthenticated");
-    private string? _serverAuthenticationErrorMessage;
 
     public ObservableCollection<SettingsFieldViewModel> Fields { get; } = [];
     public ObservableCollection<SecretFieldViewModel> Secrets { get; } = [];
@@ -257,57 +248,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public AsyncRelayCommand SaveCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> SaveSecretCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> ClearSecretCommand { get; }
-    public IAsyncRelayCommand AuthenticateServerCommand { get; }
     public string SecretStorageBackend { get; }
-
-    public bool IsServerAuthenticationBusy
-    {
-        get => _isServerAuthenticationBusy;
-        private set
-        {
-            if (_isServerAuthenticationBusy == value)
-            {
-                return;
-            }
-
-            _isServerAuthenticationBusy = value;
-            OnPropertyChanged();
-            AuthenticateServerCommand.NotifyCanExecuteChanged();
-        }
-    }
-
-    public string ServerAuthenticationStatusMessage
-    {
-        get => _serverAuthenticationStatusMessage;
-        private set
-        {
-            if (_serverAuthenticationStatusMessage == value)
-            {
-                return;
-            }
-
-            _serverAuthenticationStatusMessage = value;
-            OnPropertyChanged();
-        }
-    }
-
-    public string? ServerAuthenticationErrorMessage
-    {
-        get => _serverAuthenticationErrorMessage;
-        private set
-        {
-            if (_serverAuthenticationErrorMessage == value)
-            {
-                return;
-            }
-
-            _serverAuthenticationErrorMessage = value;
-            OnPropertyChanged();
-            OnPropertyChanged(nameof(HasServerAuthenticationError));
-        }
-    }
-
-    public bool HasServerAuthenticationError => !string.IsNullOrWhiteSpace(ServerAuthenticationErrorMessage);
 
 #if DEBUG
     public bool IsDeveloperBuild => true;
@@ -374,25 +315,19 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     public SettingsViewModel(
         ISettingsOrchestrator settings,
-        ISecretStore secretStore,
-        IGoogleAuthProvider googleAuthProvider,
-        IChartHubServerApiClient serverApiClient)
-        : this(settings, secretStore, googleAuthProvider, serverApiClient, action => Dispatcher.UIThread.Post(action), null)
+        ISecretStore secretStore)
+        : this(settings, secretStore, action => Dispatcher.UIThread.Post(action), null)
     {
     }
 
     internal SettingsViewModel(
         ISettingsOrchestrator settings,
         ISecretStore secretStore,
-        IGoogleAuthProvider googleAuthProvider,
-        IChartHubServerApiClient serverApiClient,
         Action<Action> postToUi,
         bool? isAndroidPlatform)
     {
         _settings = settings;
         _secretStore = secretStore;
-        _googleAuthProvider = googleAuthProvider;
-        _serverApiClient = serverApiClient;
         _postToUi = postToUi;
         _isAndroidPlatform = isAndroidPlatform ?? OperatingSystem.IsAndroid();
         _showDeveloperSettings = false;
@@ -400,9 +335,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
         SaveSecretCommand = new AsyncRelayCommand<SecretFieldViewModel?>(SaveSecretAsync);
         ClearSecretCommand = new AsyncRelayCommand<SecretFieldViewModel?>(ClearSecretAsync);
-        AuthenticateServerCommand = new AsyncRelayCommand(AuthenticateServerAsync, CanAuthenticateServer);
         SecretStorageBackend = ResolveSecretStorageBackend(secretStore);
-        UpdateServerAuthenticationStatusFromCurrentSettings();
 
         RebuildFieldsFrom(_settings.Current);
         if (IsDeveloperBuild)
@@ -414,193 +347,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         if (IsDeveloperBuild)
         {
             _ = RefreshSecretStateAsync();
-        }
-    }
-
-    private bool CanAuthenticateServer() => !IsServerAuthenticationBusy;
-
-    private async Task AuthenticateServerAsync()
-    {
-        if (!CanAuthenticateServer())
-        {
-            return;
-        }
-
-        string baseUrl = ResolveServerApiBaseUrl();
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            await RunOnUiAsync(() =>
-            {
-                ServerAuthenticationErrorMessage = UiLocalization.Get("Settings.AuthBaseUrlRequired");
-                ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthNotConfigured");
-            }).ConfigureAwait(false);
-            return;
-        }
-
-        await RunOnUiAsync(() =>
-        {
-            IsServerAuthenticationBusy = true;
-            ServerAuthenticationErrorMessage = null;
-            ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthOpeningGoogleSignIn");
-        }).ConfigureAwait(false);
-
-        try
-        {
-            UserCredential credential = await _googleAuthProvider.AuthorizeInteractiveAsync(ServerAuthenticationScopes).ConfigureAwait(false);
-            ChartHubServerAuthExchangeResponse exchange = await ExchangeTokenWithRetryAsync(baseUrl, credential).ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(exchange.AccessToken))
-            {
-                throw new InvalidOperationException("ChartHub Server returned an empty access token.");
-            }
-
-            ConfigValidationResult result = await _settings.UpdateAsync(config =>
-            {
-                config.Runtime.ServerApiAuthToken = exchange.AccessToken;
-            }).ConfigureAwait(false);
-
-            if (!result.IsValid)
-            {
-                throw new InvalidOperationException("Failed to store ChartHub Server access token in settings.");
-            }
-
-            await RunOnUiAsync(() =>
-            {
-                ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthSucceeded");
-            }).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            string errorMessage = BuildServerAuthenticationErrorMessage(ex);
-            await RunOnUiAsync(() =>
-            {
-                ServerAuthenticationErrorMessage = errorMessage;
-                ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthFailed");
-            }).ConfigureAwait(false);
-            Logger.LogError("Auth", "ChartHub Server authentication failed", ex);
-        }
-        finally
-        {
-            await RunOnUiAsync(() =>
-            {
-                IsServerAuthenticationBusy = false;
-            }).ConfigureAwait(false);
-        }
-    }
-
-    private async Task<ChartHubServerAuthExchangeResponse> ExchangeTokenWithRetryAsync(string baseUrl, UserCredential credential)
-    {
-        string googleIdToken = GetGoogleIdTokenOrThrow(credential);
-        await RunOnUiAsync(() =>
-        {
-            ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthExchangingGoogleToken");
-        }).ConfigureAwait(false);
-
-        try
-        {
-            return await _serverApiClient.ExchangeGoogleTokenAsync(baseUrl, googleIdToken).ConfigureAwait(false);
-        }
-        catch (ChartHubServerApiException ex) when (IsInvalidGoogleIdTokenError(ex))
-        {
-            await RunOnUiAsync(() =>
-            {
-                ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthTokenExpired");
-            }).ConfigureAwait(false);
-            await _googleAuthProvider.SignOutAsync(credential).ConfigureAwait(false);
-
-            UserCredential refreshedCredential = await _googleAuthProvider
-                .AuthorizeInteractiveAsync(ServerAuthenticationScopes)
-                .ConfigureAwait(false);
-            string refreshedGoogleIdToken = GetGoogleIdTokenOrThrow(refreshedCredential);
-
-            await RunOnUiAsync(() =>
-            {
-                ServerAuthenticationStatusMessage = UiLocalization.Get("Settings.AuthRetryExchange");
-            }).ConfigureAwait(false);
-            return await _serverApiClient.ExchangeGoogleTokenAsync(baseUrl, refreshedGoogleIdToken).ConfigureAwait(false);
-        }
-    }
-
-    private Task RunOnUiAsync(Action action)
-    {
-        var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _postToUi(() =>
-        {
-            try
-            {
-                action();
-                tcs.TrySetResult(null);
-            }
-            catch (Exception ex)
-            {
-                tcs.TrySetException(ex);
-            }
-        });
-
-        return tcs.Task;
-    }
-
-    private static string GetGoogleIdTokenOrThrow(UserCredential credential)
-    {
-        string? googleIdToken = credential.Token.IdToken;
-        if (string.IsNullOrWhiteSpace(googleIdToken))
-        {
-            throw new InvalidOperationException("Google sign-in succeeded but did not return an ID token.");
-        }
-
-        return googleIdToken;
-    }
-
-    private static bool IsInvalidGoogleIdTokenError(ChartHubServerApiException exception)
-    {
-        return exception.StatusCode == HttpStatusCode.BadRequest
-            && string.Equals(exception.ErrorCode, "invalid_google_id_token", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string BuildServerAuthenticationErrorMessage(Exception exception)
-    {
-        if (exception is ChartHubServerApiException apiException)
-        {
-            if (IsInvalidGoogleIdTokenError(apiException))
-            {
-                return "Google sign-in token was rejected by ChartHub Server. Sign in again and verify server audience configuration.";
-            }
-
-            if (apiException.StatusCode == HttpStatusCode.Forbidden)
-            {
-                return "Your Google account is not allowlisted in ChartHub Server Auth:AllowedEmails.";
-            }
-
-            if (apiException.StatusCode == HttpStatusCode.ServiceUnavailable)
-            {
-                return "ChartHub Server could not reach Google token validation service. Try again shortly.";
-            }
-        }
-
-        return exception.Message;
-    }
-
-    private string ResolveServerApiBaseUrl()
-    {
-        SettingsFieldViewModel? baseUrlField = Fields.FirstOrDefault(field =>
-            string.Equals(field.Key, "Runtime.ServerApiBaseUrl", StringComparison.Ordinal));
-        if (!string.IsNullOrWhiteSpace(baseUrlField?.StringValue))
-        {
-            return baseUrlField.StringValue.Trim();
-        }
-
-        return _settings.Current.Runtime.ServerApiBaseUrl?.Trim() ?? string.Empty;
-    }
-
-    private void UpdateServerAuthenticationStatusFromCurrentSettings()
-    {
-        bool hasToken = !string.IsNullOrWhiteSpace(_settings.Current.Runtime.ServerApiAuthToken);
-        ServerAuthenticationStatusMessage = hasToken
-            ? UiLocalization.Get("Settings.AuthTokenConfigured")
-            : UiLocalization.Get("Settings.NotAuthenticated");
-
-        if (!hasToken)
-        {
-            ServerAuthenticationErrorMessage = null;
         }
     }
 
@@ -624,7 +370,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         _postToUi(() =>
         {
             RebuildFieldsFrom(config);
-            UpdateServerAuthenticationStatusFromCurrentSettings();
         });
     }
 

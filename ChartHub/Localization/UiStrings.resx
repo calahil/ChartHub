@@ -233,16 +233,6 @@
   <data name="Settings.SecretClearButton" xml:space="preserve"><value>Clear</value></data>
   <data name="Settings.StorageStored" xml:space="preserve"><value>Stored</value></data>
   <data name="Settings.StorageNotSet" xml:space="preserve"><value>Not set</value></data>
-  <data name="Settings.NotAuthenticated" xml:space="preserve"><value>Not authenticated with ChartHub Server.</value></data>
-  <data name="Settings.AuthNotConfigured" xml:space="preserve"><value>ChartHub Server authentication is not configured.</value></data>
-  <data name="Settings.AuthBaseUrlRequired" xml:space="preserve"><value>Set Runtime.ServerApiBaseUrl before authenticating.</value></data>
-  <data name="Settings.AuthOpeningGoogleSignIn" xml:space="preserve"><value>Opening Google sign-in...</value></data>
-  <data name="Settings.AuthSucceeded" xml:space="preserve"><value>ChartHub Server authentication succeeded.</value></data>
-  <data name="Settings.AuthFailed" xml:space="preserve"><value>ChartHub Server authentication failed.</value></data>
-  <data name="Settings.AuthExchangingGoogleToken" xml:space="preserve"><value>Exchanging Google token with ChartHub Server...</value></data>
-  <data name="Settings.AuthTokenExpired" xml:space="preserve"><value>Google token expired. Re-authenticating...</value></data>
-  <data name="Settings.AuthRetryExchange" xml:space="preserve"><value>Retrying token exchange with ChartHub Server...</value></data>
-  <data name="Settings.AuthTokenConfigured" xml:space="preserve"><value>ChartHub Server token is configured.</value></data>
   <data name="Settings.ValidationFailed" xml:space="preserve"><value>Settings validation failed. Review highlighted fields.</value></data>
   <data name="Settings.SavedReloaded" xml:space="preserve"><value>Settings saved and reloaded from current configuration.</value></data>
   <data name="Settings.Saved" xml:space="preserve"><value>Settings saved.</value></data>
