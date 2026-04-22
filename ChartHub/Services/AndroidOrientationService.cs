@@ -15,7 +15,7 @@ public sealed class AndroidOrientationService : IOrientationService
         {
             activity.RunOnUiThread(() =>
             {
-                activity.RequestedOrientation = ScreenOrientation.Landscape;
+                activity.RequestedOrientation = ScreenOrientation.SensorLandscape;
             });
         }
     }
