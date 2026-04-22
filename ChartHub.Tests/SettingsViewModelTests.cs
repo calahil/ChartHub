@@ -20,7 +20,7 @@ public class SettingsViewModelTests
         using var temp = new TemporaryDirectoryFixture("settings-vm-fields");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
-        await secrets.SetAsync(SecretKeys.GoogleRefreshToken, "stored-refresh-token");
+        await secrets.SetAsync(SecretKeys.GoogleDesktopClientSecret, "stored-desktop-secret");
 
         using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets);
         await Task.Yield();
@@ -37,7 +37,7 @@ public class SettingsViewModelTests
         Assert.DoesNotContain(sut.Fields, f => f.Key == "Runtime.UseMockData");
         Assert.DoesNotContain(sut.Fields, f => f.Key == "GoogleAuth.DesktopClientId");
 
-        int expectedSecretCount = sut.IsDeveloperBuild ? 3 : 0;
+        int expectedSecretCount = sut.IsDeveloperBuild ? 1 : 0;
         Assert.Equal(expectedSecretCount, sut.Secrets.Count);
     }
 

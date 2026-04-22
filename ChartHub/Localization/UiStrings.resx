@@ -225,7 +225,7 @@
   <data name="Settings.RestartBanner" xml:space="preserve"><value>Some settings still require an app restart to take full effect after they are saved.</value></data>
   <data name="Settings.DeveloperSettingsLabel" xml:space="preserve"><value>Developer Settings</value></data>
   <data name="Settings.SecretsTitle" xml:space="preserve"><value>Secrets</value></data>
-  <data name="Settings.SecretsDescription" xml:space="preserve"><value>Secret values are stored in secure storage and never written to appsettings.json.</value></data>
+  <data name="Settings.SecretsDescription" xml:space="preserve"><value>Secret values are stored in secure storage and never shown after save. Values coming from appsettings/user-secrets are used at runtime but will not appear as stored here.</value></data>
   <data name="Settings.ProviderConfiguration" xml:space="preserve"><value>Provider Configuration</value></data>
   <data name="Settings.SecretValuePlaceholder" xml:space="preserve"><value>Enter new value</value></data>
   <data name="Settings.SecretSaveButton" xml:space="preserve"><value>Save</value></data>

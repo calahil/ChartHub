@@ -597,18 +597,6 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             Key = SecretKeys.GoogleDesktopClientSecret,
             Description = UiLocalization.Get("Settings.Secret.GoogleDesktopClientSecretDescription"),
         });
-        Secrets.Add(new SecretFieldViewModel
-        {
-            Label = UiLocalization.Get("Settings.Secret.GoogleRefreshTokenLabel"),
-            Key = SecretKeys.GoogleRefreshToken,
-            Description = UiLocalization.Get("Settings.Secret.GoogleRefreshTokenDescription"),
-        });
-        Secrets.Add(new SecretFieldViewModel
-        {
-            Label = UiLocalization.Get("Settings.Secret.GoogleAccessTokenLabel"),
-            Key = SecretKeys.GoogleAccessToken,
-            Description = UiLocalization.Get("Settings.Secret.GoogleAccessTokenDescription"),
-        });
     }
 
     private async Task RefreshSecretStateAsync()
