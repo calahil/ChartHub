@@ -1212,11 +1212,20 @@ jobs:
 
           # Kiosk is the only supported server mode. Require marker and restart
           # the session-owned server process.
+          set +e
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
             test -f "${INSTALL_ROOT}/kiosk-mode"
             pkill -f 'ChartHub.Server' || true
             echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
           "
+          ssh_status=$?
+          set -e
+          if [[ "$ssh_status" != "0" && "$ssh_status" != "255" ]]; then
+            exit "$ssh_status"
+          fi
+          if [[ "$ssh_status" == "255" ]]; then
+            echo 'SSH disconnected during kiosk restart; continuing to health verification'
+          fi
 
       - name: Verify health
         env:
@@ -1470,11 +1479,20 @@ jobs:
 
           # Kiosk is the only supported server mode. Require marker and restart
           # the session-owned server process.
+          set +e
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
             test -f "${INSTALL_ROOT}/kiosk-mode"
             pkill -f 'ChartHub.Server' || true
             echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
           "
+          ssh_status=$?
+          set -e
+          if [[ "$ssh_status" != "0" && "$ssh_status" != "255" ]]; then
+            exit "$ssh_status"
+          fi
+          if [[ "$ssh_status" == "255" ]]; then
+            echo 'SSH disconnected during kiosk restart; continuing to health verification'
+          fi
 
       - name: Verify health
         env:
