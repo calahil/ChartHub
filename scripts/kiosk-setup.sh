@@ -40,6 +40,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SESSION_SCRIPT="/usr/local/bin/start-charthub-kiosk"
 SESSION_DESKTOP="/usr/share/xsessions/charthub-kiosk.desktop"
 LIGHTDM_CONF="/etc/lightdm/lightdm.conf.d/99-charthub-kiosk.conf"
+KIOSK_MODE_FILE="/srv/appdata/charthub/active/kiosk-mode"
 
 # ---------------------------------------------------------------------------
 # 1. Verify running as root
@@ -340,12 +341,13 @@ ln -sfn /srv/appdata/charthub/prod /srv/appdata/charthub/active
 chown -R gamer:gamer /srv/appdata/charthub
 
 # ---------------------------------------------------------------------------
-# 17. Install and mask charthub-server.service
+# 17. Install and disable charthub-server.service
 #     Kiosk mode launches ChartHub.Server from the LightDM session once X is
-#     ready. We still install the unit so deploys keep it in sync, but mask it
-#     on kiosk machines so systemd does not race the X session at boot.
+#     ready. We still install the unit so deploys keep it in sync, but disable
+#     it on kiosk machines and write an explicit kiosk-mode marker file so CI
+#     and restart flows can preserve this behavior.
 # ---------------------------------------------------------------------------
-echo "==> Installing charthub-server.service (masked for kiosk mode)..."
+echo "==> Installing charthub-server.service (disabled for kiosk mode)..."
 cat > /etc/systemd/system/charthub-server.service <<'SERVICE_EOF'
 [Unit]
 Description=ChartHub Server
@@ -373,12 +375,14 @@ chmod 0644 /etc/systemd/system/charthub-server.service
 if [[ -d /run/systemd/system ]]; then
     systemctl daemon-reload
     systemctl disable charthub-server.service 2>/dev/null || true
-    systemctl mask charthub-server.service
 else
     systemctl --root / daemon-reload 2>/dev/null || true
     systemctl --root / disable charthub-server.service 2>/dev/null || true
-    systemctl --root / mask charthub-server.service
 fi
+
+touch "$KIOSK_MODE_FILE"
+chown gamer:gamer "$KIOSK_MODE_FILE"
+
 echo "    NOTE: Kiosk mode starts ChartHub.Server from start-kiosk-session.sh."
 
 # ---------------------------------------------------------------------------
