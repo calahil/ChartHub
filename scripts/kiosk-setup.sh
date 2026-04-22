@@ -297,9 +297,14 @@ apt-get clean
 echo "==> Creating 'gamer' user..."
 groupadd -f autologin
 groupadd -f nopasswdlogin
+REQUIRED_GAMER_GROUPS=(sudo autologin nopasswdlogin audio video input bluetooth plugdev dialout)
+REQUIRED_GAMER_GROUPS_CSV="$(IFS=,; echo "${REQUIRED_GAMER_GROUPS[*]}")"
 if ! id gamer &>/dev/null; then
-    useradd -m -s /bin/bash -G sudo,autologin,nopasswdlogin,audio,video,input,bluetooth,plugdev,dialout gamer
+    useradd -m -s /bin/bash -G "${REQUIRED_GAMER_GROUPS_CSV}" gamer
     passwd -l gamer
+else
+    # Ensure reruns keep gamer in every required supplementary group.
+    usermod -aG "${REQUIRED_GAMER_GROUPS_CSV}" gamer
 fi
 mkdir -p /home/gamer/.ssh
 chown gamer:gamer /home/gamer/.ssh
