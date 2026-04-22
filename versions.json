@@ -65,11 +65,16 @@
     "aliases": []
   },
   {
-    "version": "v0.1.1-dev.8",
-    "title": "v0.1.1-dev.8",
+    "version": "v0.1.1-rc.1",
+    "title": "v0.1.1-rc.1",
     "aliases": [
       "latest"
     ]
+  },
+  {
+    "version": "v0.1.1-dev.8",
+    "title": "v0.1.1-dev.8",
+    "aliases": []
   },
   {
     "version": "v0.1.1-dev.7",
