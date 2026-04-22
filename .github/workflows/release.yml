@@ -1190,13 +1190,12 @@ jobs:
             # to know which binary to run. Safe to write on non-kiosk machines too.
             printf 'CHARTHUB_SERVER=%s/current/ChartHub.Server\\n' \"${INSTALL_ROOT}\" \
               > \"${INSTALL_ROOT}/kiosk.env\"
+            touch "${INSTALL_ROOT}/kiosk-mode"
             # Install systemd unit. kiosk-setup.sh pre-installs and enables this unit;
             # overwriting it here keeps the file in sync with the deployed version.
             sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service 2>/dev/null || true
             sudo systemctl daemon-reload || true
-            if [ ! -f "${INSTALL_ROOT}/kiosk-mode" ]; then
-              sudo systemctl enable charthub-server.service 2>/dev/null || true
-            fi
+            sudo systemctl disable charthub-server.service 2>/dev/null || true
             rm -f /tmp/charthub-server.service
           "
 
@@ -1205,22 +1204,18 @@ jobs:
           SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
           SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
           SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
-          # systemd-run --no-block schedules the restart as a transient unit outside
-          # the SSH session's cgroup. Without this, systemd kills the SSH process when
-          # it tears down the service scope, causing exit-signal / SSH exit 255.
+          EFFECTIVE_CONFIG="${CONFIG_PATH:-/srv/appdata/charthub/config}"
+          INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
+
+          # Kiosk is the only supported server mode. Require marker and restart
+          # the session-owned server process.
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
-            if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
-               sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
-              sudo systemd-run --no-block systemctl restart charthub-server.service
-              echo 'Systemd mode: restart scheduled via systemd-run'
-            else
-              # Kiosk mode: service is not enabled; kill the running process so the X session
-              # exits and LightDM restarts it via start-kiosk-session.sh with the new binary.
-              pkill -f 'ChartHub.Server' || true
-              echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
-            fi
+            test -f "${INSTALL_ROOT}/kiosk-mode"
+            pkill -f 'ChartHub.Server' || true
+            echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
           "
 
       - name: Verify health
@@ -1453,13 +1448,12 @@ jobs:
             # to know which binary to run. Safe to write on non-kiosk machines too.
             printf 'CHARTHUB_SERVER=%s/current/ChartHub.Server\\n' \"${INSTALL_ROOT}\" \
               > \"${INSTALL_ROOT}/kiosk.env\"
+            touch "${INSTALL_ROOT}/kiosk-mode"
             # Install systemd unit. kiosk-setup.sh pre-installs and enables this unit;
             # overwriting it here keeps the file in sync with the deployed version.
             sudo install -m 644 /tmp/charthub-server.service /etc/systemd/system/charthub-server.service 2>/dev/null || true
             sudo systemctl daemon-reload || true
-            if [ ! -f "${INSTALL_ROOT}/kiosk-mode" ]; then
-              sudo systemctl enable charthub-server.service 2>/dev/null || true
-            fi
+            sudo systemctl disable charthub-server.service 2>/dev/null || true
             rm -f /tmp/charthub-server.service
           "
 
@@ -1468,22 +1462,18 @@ jobs:
           SSH_HOST: ${{ secrets.SERVER_DEPLOY_SSH_HOST }}
           SSH_USER: ${{ secrets.SERVER_DEPLOY_SSH_USER }}
           SSH_PORT: ${{ secrets.SERVER_DEPLOY_SSH_PORT }}
+          CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
         run: |
           EFFECTIVE_SSH_PORT="${SSH_PORT:-22}"
-          # systemd-run --no-block schedules the restart as a transient unit outside
-          # the SSH session's cgroup. Without this, systemd kills the SSH process when
-          # it tears down the service scope, causing exit-signal / SSH exit 255.
+          EFFECTIVE_CONFIG="${CONFIG_PATH:-/srv/appdata/charthub/config}"
+          INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
+
+          # Kiosk is the only supported server mode. Require marker and restart
+          # the session-owned server process.
           ssh -i ~/.ssh/deploy_key -p "$EFFECTIVE_SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" "
-            if sudo systemctl is-active --quiet charthub-server.service 2>/dev/null || \
-               sudo systemctl is-enabled --quiet charthub-server.service 2>/dev/null; then
-              sudo systemd-run --no-block systemctl restart charthub-server.service
-              echo 'Systemd mode: restart scheduled via systemd-run'
-            else
-              # Kiosk mode: service is masked; kill the running process so the X session
-              # exits and LightDM restarts it via start-kiosk-session.sh with the new binary.
-              pkill -f 'ChartHub.Server' || true
-              echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
-            fi
+            test -f "${INSTALL_ROOT}/kiosk-mode"
+            pkill -f 'ChartHub.Server' || true
+            echo 'Kiosk mode: sent SIGTERM to ChartHub.Server (LightDM will restart the session)'
           "
 
       - name: Verify health
@@ -1654,22 +1644,19 @@ jobs:
           INSTALL_ROOT="$(dirname "$EFFECTIVE_CONFIG")"
           printf 'CHARTHUB_SERVER=%s/current/ChartHub.Server\n' "${INSTALL_ROOT}" \
             > "${INSTALL_ROOT}/kiosk.env"
+          touch "${INSTALL_ROOT}/kiosk-mode"
           sudo install -m 644 .github/systemd/charthub-server.service \
             /etc/systemd/system/charthub-server.service
           sudo systemctl daemon-reload
-          if [ ! -f "${INSTALL_ROOT}/kiosk-mode" ]; then
-            sudo systemctl enable charthub-server.service
-          fi
+          sudo systemctl disable charthub-server.service 2>/dev/null || true
 
       - name: Restart server service
         env:
           CONFIG_PATH: ${{ secrets.CHARTHUB_SERVER_CONFIG_PATH }}
         run: |
-          if [ -f "$(dirname "${CONFIG_PATH:-/srv/appdata/charthub/config}")/kiosk-mode" ]; then
-            pkill -f 'ChartHub.Server' || true
-          else
-            sudo systemctl restart charthub-server.service
-          fi
+          INSTALL_ROOT="$(dirname "${CONFIG_PATH:-/srv/appdata/charthub/config}")"
+          test -f "${INSTALL_ROOT}/kiosk-mode"
+          pkill -f 'ChartHub.Server' || true
 
       - name: Verify health
         env:

@@ -61,6 +61,17 @@ This project uses strict MVVM.
 
 - All Android-specific code and usings must be guarded with `#if ANDROID`.
 
+## Kiosk Runtime Constant
+
+ChartHub.Server and ChartHub.Hud are kiosk-mode software. Agents must not treat runtime mode as configurable.
+
+Required behavior:
+1. Kiosk session owns runtime process lifecycle.
+2. Deploy/restart paths must preserve kiosk flow.
+3. Do not add runtime-mode toggles (env vars, secrets, flags) to switch between kiosk/systemd models.
+
+If there is any conflict, `.governance/AGENTS.md` remains authoritative.
+
 ## Hard Rules
 
 Agents MUST NOT:

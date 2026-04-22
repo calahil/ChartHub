@@ -63,6 +63,20 @@ A change is not complete unless all of the following are true:
 
 - All Android-specific code and usings must be guarded with `#if ANDROID`.
 
+## Kiosk Runtime Policy (Authoritative)
+
+ChartHub.Server + ChartHub.Hud are kiosk-mode software by design.
+
+Agents must treat the kiosk runtime model as a constant, not a toggle:
+
+1. Runtime ownership is the LightDM/Openbox kiosk session (`start-kiosk-session.sh`).
+2. Deploy/restart logic must use session-owned restart behavior (for example `pkill` to let the session relaunch), not systemd service restarts as the primary runtime path.
+3. Do not introduce environment-variable, secret, or branch-based toggles that switch between kiosk-mode and systemd-mode for ChartHub.Server/Hud.
+4. Do not reintroduce systemd service enable/restart flow for kiosk hosts.
+5. `kiosk-mode` marker behavior is required and must be preserved by setup and release workflows.
+
+Any change that attempts to reintroduce non-kiosk runtime control requires explicit user approval and a documented justification in the final summary.
+
 ## Required Agent Behavior
 
 When making code changes, agents must:
