@@ -22,6 +22,8 @@ public static class RunnerProtocolEndpoints
     /// How long HMAC-signed audio download URLs remain valid.
     /// </summary>
     private static readonly TimeSpan AudioUrlTtl = TimeSpan.FromMinutes(30);
+    private const int MaxClaimWaitMs = 60_000;
+    private const int ClaimPollSliceMs = 1_000;
 
     public static RouteGroupBuilder MapRunnerProtocolEndpoints(this IEndpointRouteBuilder app)
     {
@@ -92,15 +94,49 @@ public static class RunnerProtocolEndpoints
         .WithName("RunnerHeartbeat")
         .WithSummary("Update runner online status and active job count.");
 
-        authedGroup.MapPost("/jobs/claim", (
+        authedGroup.MapPost("/jobs/claim", async (
             HttpContext ctx,
-            ITranscriptionJobStore jobStore) =>
+            [FromQuery] int? waitMs,
+            ITranscriptionJobStore jobStore,
+            CancellationToken cancellationToken) =>
         {
-            TranscriptionJob? job = jobStore.TryClaimNext(ctx.GetRunnerId());
-            return job is null ? Results.NoContent() : Results.Ok(MapJobResponse(job));
+            int requestedWaitMs = Math.Clamp(waitMs ?? 0, 0, MaxClaimWaitMs);
+            if (requestedWaitMs <= 0)
+            {
+                TranscriptionJob? immediateJob = jobStore.TryClaimNext(ctx.GetRunnerId());
+                return immediateJob is null ? Results.NoContent() : Results.Ok(MapJobResponse(immediateJob));
+            }
+
+            DateTimeOffset deadline = DateTimeOffset.UtcNow.AddMilliseconds(requestedWaitMs);
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                TranscriptionJob? job = jobStore.TryClaimNext(ctx.GetRunnerId());
+                if (job is not null)
+                {
+                    return Results.Ok(MapJobResponse(job));
+                }
+
+                TimeSpan remaining = deadline - DateTimeOffset.UtcNow;
+                if (remaining <= TimeSpan.Zero)
+                {
+                    break;
+                }
+
+                int delayMs = (int)Math.Min(remaining.TotalMilliseconds, ClaimPollSliceMs);
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(delayMs), cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+
+            return Results.NoContent();
         })
         .WithName("ClaimNextTranscriptionJob")
-        .WithSummary("Claim the next pending transcription job.");
+        .WithSummary("Claim the next pending transcription job. Optional waitMs enables long-poll behavior.");
 
         authedGroup.MapPost("/jobs/{jobId}/processing", (
             string jobId,

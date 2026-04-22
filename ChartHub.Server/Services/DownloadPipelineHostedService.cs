@@ -108,29 +108,31 @@ public sealed partial class DownloadPipelineHostedService(
         string tempPath = Path.Combine(_downloadsDir, $"{safeBaseName}-{job.JobId:D}.download");
 
         await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        await using FileStream output = new(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-
-        long? totalBytes = response.Content.Headers.ContentLength;
-        byte[] buffer = new byte[81920];
-        long written = 0;
-        while (true)
         {
-            EnsureNotCancelled(job.JobId);
+            await using FileStream output = new(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
 
-            int read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false);
-            if (read == 0)
+            long? totalBytes = response.Content.Headers.ContentLength;
+            byte[] buffer = new byte[81920];
+            long written = 0;
+            while (true)
             {
-                break;
-            }
+                EnsureNotCancelled(job.JobId);
 
-            await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-            written += read;
+                int read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false);
+                if (read == 0)
+                {
+                    break;
+                }
 
-            if (totalBytes is > 0)
-            {
-                double ratio = Math.Clamp((double)written / totalBytes.Value, 0d, 1d);
-                double progress = 10 + (ratio * 70);
-                _jobStore.UpdateProgress(job.JobId, "Downloading", progress);
+                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                written += read;
+
+                if (totalBytes is > 0)
+                {
+                    double ratio = Math.Clamp((double)written / totalBytes.Value, 0d, 1d);
+                    double progress = 10 + (ratio * 70);
+                    _jobStore.UpdateProgress(job.JobId, "Downloading", progress);
+                }
             }
         }
 

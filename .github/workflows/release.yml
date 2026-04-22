@@ -1544,7 +1544,7 @@ jobs:
     name: Deploy ChartHub Server bundle to production
     if: needs.classify.outputs.release_channel == 'stable'
     runs-on: [self-hosted, production-kiosk]
-    needs: [classify, build-server-bundle]
+    needs: [classify, build-server-bundle, deploy-server-staging]
     environment: server-production
     steps:
       - uses: actions/checkout@v4

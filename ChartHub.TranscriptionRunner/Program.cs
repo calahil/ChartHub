@@ -160,7 +160,7 @@ namespace ChartHub.TranscriptionRunner
     public interface IRunnerClient
     {
         Task SendHeartbeatAsync(int activeCount, CancellationToken ct);
-        Task<ClaimedJob?> ClaimNextJobAsync(CancellationToken ct);
+        Task<ClaimedJob?> ClaimNextJobAsync(TimeSpan? waitTimeout, CancellationToken ct);
         Task MarkProcessingAsync(string jobId, CancellationToken ct);
         Task<string> GetAudioSignedUrlAsync(string jobId, CancellationToken ct);
         Task<byte[]> DownloadAudioAsync(string url, CancellationToken ct);
@@ -193,9 +193,16 @@ namespace ChartHub.TranscriptionRunner
                 .ConfigureAwait(false);
         }
 
-        public async Task<ClaimedJob?> ClaimNextJobAsync(CancellationToken ct)
+        public async Task<ClaimedJob?> ClaimNextJobAsync(TimeSpan? waitTimeout, CancellationToken ct)
         {
-            HttpResponseMessage resp = await _http.PostAsync("api/v1/runner/jobs/claim", content: null, ct)
+            string path = "api/v1/runner/jobs/claim";
+            if (waitTimeout is { } configuredWait && configuredWait > TimeSpan.Zero)
+            {
+                int waitMs = (int)Math.Clamp(configuredWait.TotalMilliseconds, 1, 60_000);
+                path = $"{path}?waitMs={waitMs}";
+            }
+
+            HttpResponseMessage resp = await _http.PostAsync(path, content: null, ct)
                 .ConfigureAwait(false);
 
             if (resp.StatusCode == System.Net.HttpStatusCode.NoContent)
@@ -271,8 +278,18 @@ namespace ChartHub.TranscriptionRunner
         private readonly RunnerConfig _cfg;
         private readonly ILogger<RunnerWorker> _logger;
 
-        private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
-        private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan IdleBackoffMin = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan IdleBackoffMax = TimeSpan.FromSeconds(60);
+        private static readonly TimeSpan ErrorBackoffMin = TimeSpan.FromSeconds(10);
+        private static readonly TimeSpan ErrorBackoffMax = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan ClaimLongPollTimeout = TimeSpan.FromSeconds(45);
+        private static readonly TimeSpan BusyHeartbeatInterval = TimeSpan.FromSeconds(25);
+        private static readonly TimeSpan IdleHeartbeatInterval = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan MaxBurstDelay = TimeSpan.FromSeconds(1);
+
+        private const int BurstFastClaimsAfterJob = 3;
+        private const double BackoffJitterRatio = 0.20;
+        private const int ClaimErrorWarnEvery = 10;
 
         public RunnerWorker(IRunnerClient client, RunnerConfig cfg, ILogger<RunnerWorker> logger)
         {
@@ -287,14 +304,26 @@ namespace ChartHub.TranscriptionRunner
 
             DateTimeOffset lastHeartbeat = DateTimeOffset.MinValue;
             int activeJobs = 0;
+            int previousActiveJobs = -1;
+            int idleNoJobStreak = 0;
+            int claimErrorStreak = 0;
+            int burstClaimsRemaining = 0;
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (DateTimeOffset.UtcNow - lastHeartbeat >= HeartbeatInterval)
+                int activeSnapshot = Volatile.Read(ref activeJobs);
+                if (activeSnapshot != previousActiveJobs)
+                {
+                    previousActiveJobs = activeSnapshot;
+                    lastHeartbeat = DateTimeOffset.MinValue;
+                }
+
+                TimeSpan heartbeatInterval = activeSnapshot > 0 ? BusyHeartbeatInterval : IdleHeartbeatInterval;
+                if (DateTimeOffset.UtcNow - lastHeartbeat >= heartbeatInterval)
                 {
                     try
                     {
-                        await _client.SendHeartbeatAsync(activeJobs, stoppingToken).ConfigureAwait(false);
+                        await _client.SendHeartbeatAsync(activeSnapshot, stoppingToken).ConfigureAwait(false);
                         lastHeartbeat = DateTimeOffset.UtcNow;
                     }
                     catch (Exception ex)
@@ -303,16 +332,29 @@ namespace ChartHub.TranscriptionRunner
                     }
                 }
 
-                if (activeJobs < _cfg.MaxConcurrency)
+                if (activeSnapshot < _cfg.MaxConcurrency)
                 {
                     ClaimedJob? job = null;
                     try
                     {
-                        job = await _client.ClaimNextJobAsync(stoppingToken).ConfigureAwait(false);
+                        job = await _client.ClaimNextJobAsync(ClaimLongPollTimeout, stoppingToken).ConfigureAwait(false);
+                        claimErrorStreak = 0;
                     }
                     catch (Exception ex)
                     {
-                        RunnerLog.ClaimFailed(_logger, ex);
+                        claimErrorStreak++;
+                        TimeSpan claimErrorDelay = ComputeBackoffWithJitter(claimErrorStreak, ErrorBackoffMin, ErrorBackoffMax);
+                        if (claimErrorStreak == 1 || claimErrorStreak % ClaimErrorWarnEvery == 0)
+                        {
+                            RunnerLog.ClaimFailed(_logger, claimErrorStreak, claimErrorDelay.TotalMilliseconds, ex);
+                        }
+                        else
+                        {
+                            RunnerLog.ClaimFailedDebug(_logger, claimErrorStreak, claimErrorDelay.TotalMilliseconds);
+                        }
+
+                        await Task.Delay(claimErrorDelay, stoppingToken).ConfigureAwait(false);
+                        continue;
                     }
 
                     if (job is not null)
@@ -330,14 +372,41 @@ namespace ChartHub.TranscriptionRunner
                             }
                         }, stoppingToken);
 
+                        idleNoJobStreak = 0;
+                        burstClaimsRemaining = BurstFastClaimsAfterJob;
                         continue;
                     }
+
+                    idleNoJobStreak++;
+                    if (burstClaimsRemaining > 0)
+                    {
+                        burstClaimsRemaining--;
+                        var burstDelay = TimeSpan.FromMilliseconds(Random.Shared.NextInt64(0, (long)MaxBurstDelay.TotalMilliseconds + 1));
+                        await Task.Delay(burstDelay, stoppingToken).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    TimeSpan idleDelay = ComputeBackoffWithJitter(idleNoJobStreak, IdleBackoffMin, IdleBackoffMax);
+                    RunnerLog.IdleBackoff(_logger, idleNoJobStreak, idleDelay.TotalMilliseconds);
+                    await Task.Delay(idleDelay, stoppingToken).ConfigureAwait(false);
+                    continue;
                 }
 
-                await Task.Delay(PollInterval, stoppingToken).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken).ConfigureAwait(false);
             }
 
             RunnerLog.ShuttingDown(_logger);
+        }
+
+        private static TimeSpan ComputeBackoffWithJitter(int streak, TimeSpan minDelay, TimeSpan maxDelay)
+        {
+            int exponent = Math.Max(0, streak - 1);
+            double delayMs = minDelay.TotalMilliseconds * Math.Pow(2, exponent);
+            delayMs = Math.Min(delayMs, maxDelay.TotalMilliseconds);
+
+            double jitterScale = 1 + ((Random.Shared.NextDouble() * 2 - 1) * BackoffJitterRatio);
+            double jitteredDelay = Math.Clamp(delayMs * jitterScale, minDelay.TotalMilliseconds, maxDelay.TotalMilliseconds);
+            return TimeSpan.FromMilliseconds(jitteredDelay);
         }
 
         private async Task ProcessJobAsync(ClaimedJob job, CancellationToken ct)
@@ -455,8 +524,14 @@ namespace ChartHub.TranscriptionRunner
         [LoggerMessage(Level = LogLevel.Warning, Message = "Heartbeat failed.")]
         public static partial void HeartbeatFailed(ILogger logger, Exception exception);
 
-        [LoggerMessage(Level = LogLevel.Warning, Message = "Claim failed.")]
-        public static partial void ClaimFailed(ILogger logger, Exception exception);
+        [LoggerMessage(Level = LogLevel.Warning, Message = "Claim failed (streak={Streak}, retryDelayMs={RetryDelayMs}).")]
+        public static partial void ClaimFailed(ILogger logger, int streak, double retryDelayMs, Exception exception);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Claim failure streak={Streak}; backing off for {RetryDelayMs}ms.")]
+        public static partial void ClaimFailedDebug(ILogger logger, int streak, double retryDelayMs);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "No jobs available (streak={Streak}); next claim in {DelayMs}ms.")]
+        public static partial void IdleBackoff(ILogger logger, int streak, double delayMs);
 
         [LoggerMessage(Level = LogLevel.Information, Message = "Processing job {JobId} ({Aggressiveness})")]
         public static partial void ProcessingJob(ILogger logger, string jobId, string aggressiveness);
