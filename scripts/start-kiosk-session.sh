@@ -122,8 +122,11 @@ trap cleanup EXIT INT TERM
 # Openbox is still alive. This avoids LightDM login-loop churn.
 while kill -0 "$OPENBOX_PID" 2>/dev/null; do
     start_server
-    wait "$SERVER_PID"
-    server_status=$?
+    if wait "$SERVER_PID"; then
+        server_status=0
+    else
+        server_status=$?
+    fi
     log_line "server exited with status ${server_status}; restarting in 2s"
     sleep 2
 done
