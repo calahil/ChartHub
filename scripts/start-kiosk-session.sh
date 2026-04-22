@@ -44,7 +44,14 @@ log_line() {
 log_line "kiosk session starting"
 
 # ---------------------------------------------------------------------------
-# 4. Start ChartHub.Server for kiosk mode
+# 4. Run Openbox as the window manager first
+# ---------------------------------------------------------------------------
+openbox &
+OPENBOX_PID=$!
+log_line "openbox pid=${OPENBOX_PID}"
+
+# ---------------------------------------------------------------------------
+# 5. Start ChartHub.Server for kiosk mode
 # ---------------------------------------------------------------------------
 KIOSK_ENV_FILE="/srv/appdata/charthub/active/kiosk.env"
 SERVER_BINARY="/srv/appdata/charthub/active/current/ChartHub.Server"
@@ -56,10 +63,14 @@ fi
 
 SERVER_BINARY="${CHARTHUB_SERVER:-$SERVER_BINARY}"
 
+SERVER_PID=""
+
 if [[ ! -x "$SERVER_BINARY" ]]; then
     log_line "server binary missing or not executable: $SERVER_BINARY"
-    echo "ERROR: ChartHub.Server is missing or not executable: $SERVER_BINARY" >&2
-    exit 1
+    # Keep the session alive so LightDM does not loop; operator can SSH in and
+    # repair deployment paths without fighting relogin churn.
+    wait "$OPENBOX_PID"
+    exit 0
 fi
 
 log_line "launching server: $SERVER_BINARY"
@@ -67,16 +78,12 @@ log_line "launching server: $SERVER_BINARY"
 SERVER_PID=$!
 log_line "server pid=${SERVER_PID}"
 
-# ---------------------------------------------------------------------------
-# 5. Run Openbox as the window manager
-# ---------------------------------------------------------------------------
-openbox &
-OPENBOX_PID=$!
-log_line "openbox pid=${OPENBOX_PID}"
-
 cleanup() {
-    log_line "cleanup: stopping server pid=${SERVER_PID} openbox pid=${OPENBOX_PID}"
-    kill "$SERVER_PID" "$OPENBOX_PID" 2>/dev/null || true
+    log_line "cleanup: stopping server pid=${SERVER_PID:-none} openbox pid=${OPENBOX_PID}"
+    if [[ -n "${SERVER_PID}" ]]; then
+        kill "$SERVER_PID" 2>/dev/null || true
+    fi
+    kill "$OPENBOX_PID" 2>/dev/null || true
 }
 
 trap cleanup EXIT INT TERM

@@ -334,9 +334,17 @@ for ENV in prod staging dev; do
     done
 done
 
-# 'active' points at prod by default.
-# On the VM, CI will flip this symlink to 'dev' or 'staging' on each deploy.
-ln -sfn /srv/appdata/charthub/prod /srv/appdata/charthub/active
+# 'active' points at prod by default on first install.
+# On VM/dev/staging hosts, CI may repoint this symlink. Preserve any existing
+# active symlink on reruns so kiosk maintenance does not silently switch envs.
+if [[ -L /srv/appdata/charthub/active ]]; then
+    echo "==> Preserving existing active symlink: $(readlink /srv/appdata/charthub/active)"
+elif [[ -e /srv/appdata/charthub/active ]]; then
+    echo "WARNING: /srv/appdata/charthub/active exists but is not a symlink; leaving unchanged."
+else
+    echo "==> Creating default active symlink -> /srv/appdata/charthub/prod"
+    ln -sfn /srv/appdata/charthub/prod /srv/appdata/charthub/active
+fi
 
 chown -R gamer:gamer /srv/appdata/charthub
 
