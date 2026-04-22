@@ -14,46 +14,46 @@ public sealed class RuntimeAppConfig
     [SettingDisplay("Use Mock Data")]
     [SettingEditor(SettingEditorKind.Toggle)]
     [SettingHotReloadable(true)]
+    [SettingDeveloperOnly]
     public bool UseMockData { get; set; }
 
-    [SettingGroup("ChartHub Server")]
-    [SettingDisplay("Server API Bearer Token")]
-    [SettingEditor(SettingEditorKind.Text)]
-    [SettingHotReloadable(true)]
+    [SettingHidden]
     public string ServerApiAuthToken { get; set; } = string.Empty;
 
-    [SettingGroup("ChartHub Server")]
-    [SettingDisplay("Server Base URL")]
-    [SettingEditor(SettingEditorKind.Text)]
-    [SettingHotReloadable(true)]
+    [SettingHidden]
     public string ServerApiBaseUrl { get; set; } = string.Empty;
 
-    [SettingGroup("UI")]
-    [SettingDisplay("Expand Install Log By Default")]
-    [SettingEditor(SettingEditorKind.Toggle)]
-    [SettingHotReloadable(true)]
+    [SettingHidden]
     public bool InstallLogExpanded { get; set; } = true;
 
-    [SettingGroup("UI")]
-    [SettingDisplay("UI Culture")]
+    [SettingGroup("General")]
+    [SettingDisplay("UI Language")]
     [SettingDescription("Culture name used for localized UI text (example: en-US).")]
     [SettingEditor(SettingEditorKind.Text)]
     [SettingHotReloadable(false)]
     [SettingRequiresRestart]
     public string UiCulture { get; set; } = "en-US";
 
-    [SettingGroup("ChartHub Server")]
+    [SettingGroup("Input & Remote")]
     [SettingDisplay("Android Volume Buttons Control Server Volume")]
     [SettingEditor(SettingEditorKind.Toggle)]
     [SettingHotReloadable(true)]
+    [SettingPlatforms(SettingPlatformTargets.Android)]
     public bool AndroidVolumeButtonsControlServerVolume { get; set; }
 
-    [SettingGroup("Input")]
+    [SettingGroup("Input & Remote")]
     [SettingDisplay("Mouse Speed Multiplier")]
     [SettingDescription("Scales touchpad pointer deltas before sending to the server. Increase if the cursor moves too slowly.")]
     [SettingEditor(SettingEditorKind.Number)]
     [SettingHotReloadable(true)]
     public double MouseSpeedMultiplier { get; set; } = 4.0;
+
+    [SettingGroup("Input & Remote")]
+    [SettingDisplay("Device Display Name Override")]
+    [SettingDescription("Optional custom device name shown to ChartHub Server and the HUD. Leave blank to use the platform device name.")]
+    [SettingEditor(SettingEditorKind.Text)]
+    [SettingHotReloadable(true)]
+    public string DeviceDisplayNameOverride { get; set; } = string.Empty;
 
     [SettingHidden]
     public int LastSelectedMainTabIndex { get; set; }

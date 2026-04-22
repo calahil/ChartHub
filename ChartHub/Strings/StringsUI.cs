@@ -219,7 +219,6 @@ public class DesktopEntryPageStrings : StringsUI
 
 public class SettingsPageStrings : StringsUI
 {
-    public string SaveButton => UiLocalization.Get("Settings.SaveButton");
     public string AuthTitle => UiLocalization.Get("Settings.AuthTitle");
     public string AuthStatusLabel => UiLocalization.Get("Settings.AuthStatusLabel");
     public string AuthenticateGoogle => UiLocalization.Get("Settings.AuthenticateGoogle");
@@ -233,6 +232,15 @@ public class SettingsPageStrings : StringsUI
     public string SecretValuePlaceholder => UiLocalization.Get("Settings.SecretValuePlaceholder");
     public string SecretSaveButton => UiLocalization.Get("Settings.SecretSaveButton");
     public string SecretClearButton => UiLocalization.Get("Settings.SecretClearButton");
+    public string ServerSetupTitle => UiLocalization.Get("Settings.ServerSetupTitle");
+    public string ServerSetupDescription => UiLocalization.Get("Settings.ServerSetupDescription");
+    public string ServerBaseUrlLabel => UiLocalization.Get("Settings.ServerBaseUrlLabel");
+    public string ServerBaseUrlPlaceholder => UiLocalization.Get("Settings.ServerBaseUrlPlaceholder");
+    public string TestConnectionButton => UiLocalization.Get("Settings.TestConnectionButton");
+    public string ClearAuthButton => UiLocalization.Get("Settings.ClearAuthButton");
+    public string TokenDiagnosticLabel => UiLocalization.Get("Settings.TokenDiagnosticLabel");
+    public string TokenNotSet => UiLocalization.Get("Settings.TokenNotSet");
+    public string GeneralSettingsTitle => UiLocalization.Get("Settings.GeneralSettingsTitle");
 }
 
 public class VolumePageStrings : StringsUI

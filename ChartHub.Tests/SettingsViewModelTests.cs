@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Reflection;
 
 using ChartHub.Configuration.Interfaces;
@@ -5,6 +6,7 @@ using ChartHub.Configuration.Models;
 using ChartHub.Configuration.Secrets;
 using ChartHub.Services;
 using ChartHub.Tests.TestInfrastructure;
+using ChartHub.Utilities;
 using ChartHub.ViewModels;
 
 namespace ChartHub.Tests;
@@ -23,39 +25,77 @@ public class SettingsViewModelTests
         using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets);
         await Task.Yield();
 
-        Assert.Equal(10, sut.Fields.Count);
+        // Hidden fields (ServerApiAuthToken, ServerApiBaseUrl, InstallLogExpanded, LastSelectedMainTabIndex) must NOT appear.
+        // Developer-only fields (UseMockData, Google OAuth IDs) only appear when ShowDeveloperSettings is false -> excluded.
+        // Non-developer, non-hidden, non-platform-restricted fields on desktop: UiCulture, MouseSpeedMultiplier, DeviceDisplayNameOverride.
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.RhythmVerseSource" && field.IsDropdownEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.UseMockData" && field.IsToggleEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiAuthToken" && field.IsTextEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.ServerApiBaseUrl" && field.IsTextEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.UiCulture" && field.IsTextEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "Runtime.AndroidVolumeButtonsControlServerVolume" && field.IsToggleEditor);
         Assert.Contains(sut.Fields, field => field.Key == "Runtime.MouseSpeedMultiplier" && field.IsNumberEditor);
-        Assert.Contains(sut.Fields, field => field.Key == "GoogleAuth.AndroidClientId" && field.IsTextEditor);
+        Assert.Contains(sut.Fields, field => field.Key == "Runtime.DeviceDisplayNameOverride" && field.IsTextEditor);
+
+        // Developer fields should be absent when ShowDeveloperSettings=false
+        Assert.DoesNotContain(sut.Fields, f => f.Key == "Runtime.UseMockData");
+        Assert.DoesNotContain(sut.Fields, f => f.Key == "GoogleAuth.DesktopClientId");
 
         int expectedSecretCount = sut.IsDeveloperBuild ? 3 : 0;
         Assert.Equal(expectedSecretCount, sut.Secrets.Count);
     }
 
     [Fact]
-    public async Task SaveCommand_WithValidChanges_PersistsAndSetsSavedStatus()
+    public async Task Constructor_WithDeveloperSettingsOn_IncludesDeveloperOnlyFields()
     {
-        using var temp = new TemporaryDirectoryFixture("settings-vm-save");
+        using var temp = new TemporaryDirectoryFixture("settings-vm-dev");
         var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
         var secrets = new InMemorySecretStore();
 
         using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets);
         await Task.Yield();
 
-        SettingsFieldViewModel androidClientField = Assert.Single(sut.Fields, item => item.Key == "GoogleAuth.AndroidClientId");
-        androidClientField.StringValue = "android-client-updated";
+        sut.ShowDeveloperSettings = true;
 
-        Assert.True(sut.SaveCommand.CanExecute(null));
-        await sut.SaveCommand.ExecuteAsync(null);
+        Assert.Contains(sut.Fields, f => f.Key == "Runtime.UseMockData");
+        // Desktop platform: DesktopClientId visible; AndroidClientId excluded by platform filter
+        Assert.Contains(sut.Fields, f => f.Key == "GoogleAuth.DesktopClientId");
+        Assert.DoesNotContain(sut.Fields, f => f.Key == "GoogleAuth.AndroidClientId");
+    }
 
-        Assert.Equal(1, orchestrator.UpdateCallCount);
-        Assert.Equal("android-client-updated", orchestrator.Current.GoogleAuth.AndroidClientId);
-        Assert.Equal("Settings saved.", sut.StatusMessage);
+    [Fact]
+    public async Task FieldChange_PersistsImmediately_WithoutExplicitSave()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-immediate");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets);
+        await Task.Yield();
+
+        SettingsFieldViewModel mouseField = Assert.Single(sut.Fields, item => item.Key == "Runtime.MouseSpeedMultiplier");
+        mouseField.NumberValue = 8.0;
+
+        // Allow the async fire-and-forget persist task to run
+        await Task.Delay(100);
+
+        Assert.Equal(8.0, orchestrator.Current.Runtime.MouseSpeedMultiplier, precision: 5);
+        Assert.True(orchestrator.UpdateCallCount > 0);
+    }
+
+    [Fact]
+    public async Task ServerApiBaseUrl_SetDirectly_PersistsViaGlobalSettings()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-url");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+        var globalSettings = new AppGlobalSettings(orchestrator);
+
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, globalSettings: globalSettings);
+        await Task.Yield();
+
+        sut.ServerApiBaseUrl = "  https://new-server:5002  ";
+
+        await Task.Delay(50);
+
+        Assert.Equal("https://new-server:5002", sut.ServerApiBaseUrl);
+        Assert.Equal("https://new-server:5002", globalSettings.ServerApiBaseUrl);
     }
 
     [Fact]
@@ -91,6 +131,26 @@ public class SettingsViewModelTests
         Assert.Null(await secrets.GetAsync(SecretKeys.GoogleDesktopClientSecret));
     }
 
+    [Fact]
+    public async Task AuthStatusText_ReflectsSessionState()
+    {
+        using var temp = new TemporaryDirectoryFixture("settings-vm-auth");
+        var orchestrator = new FakeSettingsOrchestrator(CreateConfig(temp.RootPath));
+        var secrets = new InMemorySecretStore();
+        var fakeAuth = new FakeAuthSessionService();
+
+        using SettingsViewModel sut = CreateSettingsViewModel(orchestrator, secrets, authSession: fakeAuth);
+        await Task.Yield();
+
+        Assert.Equal("Checking saved session...", sut.AuthStatusText);
+
+        fakeAuth.SetState(AuthSessionState.Unauthenticated, null);
+        Assert.Equal("Signed out", sut.AuthStatusText);
+
+        fakeAuth.SetState(AuthSessionState.Authenticated, "user@example.com");
+        Assert.Equal("Signed in as user@example.com", sut.AuthStatusText);
+    }
+
     private static AppConfigRoot CreateConfig(string rootPath)
     {
         _ = rootPath;
@@ -114,14 +174,23 @@ public class SettingsViewModelTests
         ISettingsOrchestrator orchestrator,
         ISecretStore secrets,
         Action<Action>? postToUi = null,
-        bool? isAndroidPlatform = null)
+        bool? isAndroidPlatform = null,
+        AppGlobalSettings? globalSettings = null,
+        FakeAuthSessionService? authSession = null)
     {
+        AppGlobalSettings gs = globalSettings ?? new AppGlobalSettings(orchestrator);
+        FakeAuthSessionService auth = authSession ?? new FakeAuthSessionService();
+        var fakeApiClient = new FakeChartHubServerApiClient();
+
         ConstructorInfo? constructor = typeof(SettingsViewModel).GetConstructor(
             BindingFlags.Instance | BindingFlags.NonPublic,
             binder: null,
             [
                 typeof(ISettingsOrchestrator),
                 typeof(ISecretStore),
+                typeof(AppGlobalSettings),
+                typeof(IAuthSessionService),
+                typeof(IChartHubServerApiClient),
                 typeof(Action<Action>),
                 typeof(bool?),
             ],
@@ -132,6 +201,9 @@ public class SettingsViewModelTests
         return (SettingsViewModel)constructor.Invoke([
             orchestrator,
             secrets,
+            gs,
+            auth,
+            fakeApiClient,
             postToUi ?? (Action<Action>)(action => action()),
             isAndroidPlatform,
         ]);
@@ -193,5 +265,59 @@ public class SettingsViewModelTests
         {
             return Task.FromResult(_values.ContainsKey(key));
         }
+    }
+
+    private sealed class FakeAuthSessionService : IAuthSessionService
+    {
+        private AuthSessionState _state = AuthSessionState.Unknown;
+        private string? _email;
+
+        public AuthSessionState CurrentState => _state;
+        public string? SignedInEmail => _email;
+        public string? CurrentAccessToken => null;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public event EventHandler? SessionStateChanged;
+
+        public void SetState(AuthSessionState state, string? email)
+        {
+            _state = state;
+            _email = email;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentState)));
+            SessionStateChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public Task AttemptSilentRestoreAsync() => Task.CompletedTask;
+        public Task SignInAsync() => Task.CompletedTask;
+        public Task SignOutAsync() => Task.CompletedTask;
+        public bool IsTokenValidLocally() => _state == AuthSessionState.Authenticated;
+        public Task AttemptSilentRefreshAsync() => Task.CompletedTask;
+    }
+
+    private sealed class FakeChartHubServerApiClient : IChartHubServerApiClient
+    {
+        public Task<string> GetHealthAsync(string baseUrl, CancellationToken cancellationToken = default)
+            => Task.FromResult("ok");
+
+        public Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(string baseUrl, string googleIdToken, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChartHubServerAuthExchangeResponse("fake-token", DateTimeOffset.UtcNow.AddHours(1)));
+
+        public Task<ChartHubServerDownloadJobResponse> CreateDownloadJobAsync(string baseUrl, string bearerToken, ChartHubServerCreateDownloadJobRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<ChartHubServerDownloadJobResponse>> ListDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerDownloadJobResponse>>([]);
+
+        public IAsyncEnumerable<IReadOnlyList<ChartHubServerDownloadJobResponse>> StreamDownloadJobsAsync(string baseUrl, string bearerToken, CancellationToken cancellationToken = default)
+            => AsyncEnumerable.Empty<IReadOnlyList<ChartHubServerDownloadJobResponse>>();
+
+        public Task<IReadOnlyList<ChartHubServerJobLogEntry>> GetJobLogsAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<ChartHubServerJobLogEntry>>([]);
+
+        public Task<ChartHubServerDownloadJobResponse> RequestInstallDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task RequestCancelDownloadJobAsync(string baseUrl, string bearerToken, Guid jobId, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
     }
 }

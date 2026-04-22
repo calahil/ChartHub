@@ -174,7 +174,13 @@ public static class AppBootstrapper
                 serviceProvider.GetRequiredService<IAuthSessionService>(),
                 serviceProvider.GetRequiredService<IChartHubServerApiClient>(),
                 serviceProvider.GetRequiredService<IVolumeHardwareButtonSource>()));
-        services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton<SettingsViewModel>(serviceProvider =>
+            new SettingsViewModel(
+                serviceProvider.GetRequiredService<ISettingsOrchestrator>(),
+                serviceProvider.GetRequiredService<ISecretStore>(),
+                serviceProvider.GetRequiredService<AppGlobalSettings>(),
+                serviceProvider.GetRequiredService<IAuthSessionService>(),
+                serviceProvider.GetRequiredService<IChartHubServerApiClient>()));
         services.AddSingleton<RhythmVerseViewModel>(serviceProvider =>
             new RhythmVerseViewModel(
                 serviceProvider.GetRequiredService<IConfiguration>(),

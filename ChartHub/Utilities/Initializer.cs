@@ -108,6 +108,12 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         set => QueueConfigUpdate(config => config.Runtime.MouseSpeedMultiplier = Math.Max(0.1, value));
     }
 
+    public string DeviceDisplayNameOverride
+    {
+        get => Runtime.DeviceDisplayNameOverride ?? string.Empty;
+        set => QueueConfigUpdate(config => config.Runtime.DeviceDisplayNameOverride = value?.Trim() ?? string.Empty);
+    }
+
     public int LastSelectedMainTabIndex
     {
         get => Runtime.LastSelectedMainTabIndex;
@@ -196,6 +202,7 @@ public class AppGlobalSettings : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(UiCulture));
         OnPropertyChanged(nameof(AndroidVolumeButtonsControlServerVolume));
         OnPropertyChanged(nameof(MouseSpeedMultiplier));
+        OnPropertyChanged(nameof(DeviceDisplayNameOverride));
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

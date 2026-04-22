@@ -10,6 +10,11 @@ namespace ChartHub.Services;
 
 public interface IChartHubServerApiClient
 {
+    Task<string> GetHealthAsync(string baseUrl, CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Health probe is not supported by this API client implementation.");
+    }
+
     Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(string baseUrl, string googleIdToken, CancellationToken cancellationToken = default);
 
     Task<ChartHubServerDownloadJobResponse> CreateDownloadJobAsync(string baseUrl, string bearerToken, ChartHubServerCreateDownloadJobRequest request, CancellationToken cancellationToken = default);
@@ -283,6 +288,21 @@ public sealed class ChartHubServerApiClient : IChartHubServerApiClient
     public ChartHubServerApiClient(Func<HttpClient> createClient)
     {
         _createClient = createClient;
+    }
+
+    public async Task<string> GetHealthAsync(string baseUrl, CancellationToken cancellationToken = default)
+    {
+        using HttpRequestMessage request = BuildRequest(HttpMethod.Get, baseUrl, "/health", token: null);
+        using HttpResponseMessage response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
+        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw CreateRequestFailedException(response.StatusCode, response.ReasonPhrase, responseBody);
+        }
+
+        return string.IsNullOrWhiteSpace(responseBody)
+            ? "ok"
+            : responseBody;
     }
 
     public async Task<ChartHubServerAuthExchangeResponse> ExchangeGoogleTokenAsync(

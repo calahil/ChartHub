@@ -1,5 +1,7 @@
 using System.Text;
 
+using ChartHub.Utilities;
+
 #if ANDROID
 using Android.App;
 using Android.OS;
@@ -11,9 +13,25 @@ namespace ChartHub.Services;
 public sealed class DeviceDisplayNameProvider : IDeviceDisplayNameProvider
 {
     private const string UnknownDeviceName = "unknown-device";
+    private readonly AppGlobalSettings? _globalSettings;
+
+    public DeviceDisplayNameProvider()
+    {
+    }
+
+    public DeviceDisplayNameProvider(AppGlobalSettings globalSettings)
+    {
+        _globalSettings = globalSettings;
+    }
 
     public string GetDisplayName()
     {
+        string configuredOverride = _globalSettings?.DeviceDisplayNameOverride?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(configuredOverride))
+        {
+            return NormalizeDeviceName(configuredOverride, UnknownDeviceName);
+        }
+
 #if ANDROID
         string? userAssignedName = TryGetAndroidUserAssignedDeviceName();
         if (!string.IsNullOrWhiteSpace(userAssignedName))

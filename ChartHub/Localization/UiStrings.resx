@@ -217,13 +217,12 @@
 
   <data name="Settings.BrowseFolder" xml:space="preserve"><value>Browse Folder</value></data>
   <data name="Settings.BrowseFile" xml:space="preserve"><value>Browse File</value></data>
-  <data name="Settings.SaveButton" xml:space="preserve"><value>Save</value></data>
   <data name="Settings.AuthTitle" xml:space="preserve"><value>ChartHub Server Authentication</value></data>
   <data name="Settings.AuthStatusLabel" xml:space="preserve"><value>Status</value></data>
   <data name="Settings.AuthenticateGoogle" xml:space="preserve"><value>Authenticate With Google</value></data>
   <data name="Settings.Working" xml:space="preserve"><value>Working...</value></data>
-  <data name="Settings.ValidationBanner" xml:space="preserve"><value>Fix highlighted fields before saving.</value></data>
-  <data name="Settings.RestartBanner" xml:space="preserve"><value>Some changes are non-hot-reloadable and will be reloaded from configuration when you save.</value></data>
+  <data name="Settings.ValidationBanner" xml:space="preserve"><value>Fix highlighted fields before continuing.</value></data>
+  <data name="Settings.RestartBanner" xml:space="preserve"><value>Some settings still require an app restart to take full effect after they are saved.</value></data>
   <data name="Settings.DeveloperSettingsLabel" xml:space="preserve"><value>Developer Settings</value></data>
   <data name="Settings.SecretsTitle" xml:space="preserve"><value>Secrets</value></data>
   <data name="Settings.SecretsDescription" xml:space="preserve"><value>Secret values are stored in secure storage and never written to appsettings.json.</value></data>
@@ -234,9 +233,6 @@
   <data name="Settings.StorageStored" xml:space="preserve"><value>Stored</value></data>
   <data name="Settings.StorageNotSet" xml:space="preserve"><value>Not set</value></data>
   <data name="Settings.ValidationFailed" xml:space="preserve"><value>Settings validation failed. Review highlighted fields.</value></data>
-  <data name="Settings.SavedReloaded" xml:space="preserve"><value>Settings saved and reloaded from current configuration.</value></data>
-  <data name="Settings.Saved" xml:space="preserve"><value>Settings saved.</value></data>
-  <data name="Settings.SaveFailed" xml:space="preserve"><value>Settings save failed. See logs for details.</value></data>
   <data name="Settings.PathRequired" xml:space="preserve"><value>A path value is required.</value></data>
   <data name="Settings.PathMustBeLocal" xml:space="preserve"><value>Path must be a local filesystem path.</value></data>
   <data name="Settings.DirectoryExpected" xml:space="preserve"><value>Expected a directory path, but the path points to a file.</value></data>
@@ -247,6 +243,30 @@
   <data name="Settings.SecretSaveFailed" xml:space="preserve"><value>Failed to save secret: {0}</value></data>
   <data name="Settings.SecretCleared" xml:space="preserve"><value>Cleared secret: {0}</value></data>
   <data name="Settings.SecretClearFailed" xml:space="preserve"><value>Failed to clear secret: {0}</value></data>
+  <data name="Settings.ServerSetupTitle" xml:space="preserve"><value>Server Setup</value></data>
+  <data name="Settings.ServerSetupDescription" xml:space="preserve"><value>Configure the ChartHub Server URL, test connectivity, and manage the saved sign-in session.</value></data>
+  <data name="Settings.ServerBaseUrlLabel" xml:space="preserve"><value>Server Base URL</value></data>
+  <data name="Settings.ServerBaseUrlPlaceholder" xml:space="preserve"><value>https://your-server:5001</value></data>
+  <data name="Settings.TestConnectionButton" xml:space="preserve"><value>Test Connection</value></data>
+  <data name="Settings.ClearAuthButton" xml:space="preserve"><value>Clear Saved Session</value></data>
+  <data name="Settings.TokenDiagnosticLabel" xml:space="preserve"><value>Server API Bearer Token</value></data>
+  <data name="Settings.TokenNotSet" xml:space="preserve"><value>No token stored.</value></data>
+  <data name="Settings.GeneralSettingsTitle" xml:space="preserve"><value>Application Settings</value></data>
+  <data name="Settings.ServerBaseUrlSaved" xml:space="preserve"><value>Server base URL saved.</value></data>
+  <data name="Settings.FieldSaved" xml:space="preserve"><value>Saved: {0}</value></data>
+  <data name="Settings.FieldSavedRestartRequired" xml:space="preserve"><value>Saved: {0}. Restart the app for the change to fully apply.</value></data>
+  <data name="Settings.FieldSaveFailed" xml:space="preserve"><value>Failed to save: {0}</value></data>
+  <data name="Settings.ServerConnectionMissingUrl" xml:space="preserve"><value>Enter a server base URL first.</value></data>
+  <data name="Settings.ServerConnectionSucceeded" xml:space="preserve"><value>Server connection succeeded.</value></data>
+  <data name="Settings.ServerConnectionFailed" xml:space="preserve"><value>Server connection failed: {0}</value></data>
+  <data name="Settings.AuthSignedInAs" xml:space="preserve"><value>Signed in as {0}</value></data>
+  <data name="Settings.AuthSignedIn" xml:space="preserve"><value>Signed in</value></data>
+  <data name="Settings.AuthSignedOut" xml:space="preserve"><value>Signed out</value></data>
+  <data name="Settings.AuthExpired" xml:space="preserve"><value>Session expired</value></data>
+  <data name="Settings.AuthChecking" xml:space="preserve"><value>Checking saved session...</value></data>
+  <data name="Settings.AuthResetSucceeded" xml:space="preserve"><value>Saved auth session cleared.</value></data>
+  <data name="Settings.AuthResetFailed" xml:space="preserve"><value>Failed to clear saved auth session: {0}</value></data>
+  <data name="Settings.SignInFailed" xml:space="preserve"><value>Sign-in failed: {0}</value></data>
   <data name="Downloads.ActiveDownloads" xml:space="preserve"><value>Active Downloads</value></data>
 
   <data name="Main.Input" xml:space="preserve"><value>Input</value></data>

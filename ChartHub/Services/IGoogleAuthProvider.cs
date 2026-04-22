@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;  // used for JsonDocument only
 
 using ChartHub.Configuration.Interfaces;
+using ChartHub.Configuration.Secrets;
 
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Auth.OAuth2.Flows;
@@ -23,10 +24,11 @@ public interface IGoogleAuthProvider
     Task SignOutAsync(UserCredential? credential, CancellationToken cancellationToken = default);
 }
 
-public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISecretStore secretStore) : IGoogleAuthProvider
+public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISecretStore secretStore, ISettingsOrchestrator settingsOrchestrator) : IGoogleAuthProvider
 {
     private readonly IConfiguration _configuration = configuration;
     private readonly ISecretStore _secretStore = secretStore;
+    private readonly ISettingsOrchestrator _settingsOrchestrator = settingsOrchestrator;
     private readonly string _legacyCredentialStorePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.Personal),
         ".credentials/drive-dotnet-maui.json");
@@ -34,7 +36,7 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISec
 
     public async Task<UserCredential> AuthorizeInteractiveAsync(IEnumerable<string> scopes, CancellationToken cancellationToken = default)
     {
-        GoogleAuthorizationCodeFlow.Initializer initializer = BuildFlowInitializer(scopes);
+        GoogleAuthorizationCodeFlow.Initializer initializer = await BuildFlowInitializerAsync(scopes).ConfigureAwait(false);
         return await GoogleWebAuthorizationBroker.AuthorizeAsync(
             initializer,
             scopes,
@@ -73,7 +75,7 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISec
         DeleteLegacyCredentialStore();
     }
 
-    private GoogleAuthorizationCodeFlow.Initializer BuildFlowInitializer(IEnumerable<string> scopes)
+    private async Task<GoogleAuthorizationCodeFlow.Initializer> BuildFlowInitializerAsync(IEnumerable<string> scopes)
     {
         string? clientId = ResolveDesktopClientId();
         if (string.IsNullOrWhiteSpace(clientId))
@@ -88,7 +90,7 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISec
             ClientSecrets = new ClientSecrets
             {
                 ClientId = clientId,
-                ClientSecret = ResolveDesktopClientSecret(),
+                ClientSecret = await ResolveDesktopClientSecretAsync().ConfigureAwait(false),
             },
             Scopes = scopes,
         };
@@ -103,7 +105,7 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISec
         IEnumerable<string> scopes,
         CancellationToken cancellationToken)
     {
-        GoogleAuthorizationCodeFlow.Initializer initializer = BuildFlowInitializer(scopes);
+        GoogleAuthorizationCodeFlow.Initializer initializer = await BuildFlowInitializerAsync(scopes).ConfigureAwait(false);
         initializer.DataStore = CreateTokenDataStore();
         var flow = new GoogleAuthorizationCodeFlow(initializer);
 
@@ -136,7 +138,7 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISec
             return null;
         }
 
-        GoogleAuthorizationCodeFlow.Initializer legacyInitializer = BuildFlowInitializer(currentFlow.Scopes);
+        GoogleAuthorizationCodeFlow.Initializer legacyInitializer = await BuildFlowInitializerAsync(currentFlow.Scopes).ConfigureAwait(false);
         legacyInitializer.DataStore = new FileDataStore(_legacyCredentialStorePath, true);
         var legacyFlow = new GoogleAuthorizationCodeFlow(legacyInitializer);
         TokenResponse? legacyToken = await legacyFlow.LoadTokenAsync("user", cancellationToken).ConfigureAwait(false);
@@ -166,7 +168,8 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISec
 
     private string? ResolveDesktopClientId()
     {
-        return _configuration["GoogleDrive:desktop_client_id"]
+        return _settingsOrchestrator.Current.GoogleAuth.DesktopClientId
+            ?? _configuration["GoogleDrive:desktop_client_id"]
             ?? _configuration["GoogleDrive:DesktopClientId"]
             ?? Environment.GetEnvironmentVariable("GOOGLEDRIVE_DESKTOP_CLIENT_ID")
             ?? _configuration["GoogleDrive:client_id"]
@@ -174,9 +177,10 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISec
             ?? Environment.GetEnvironmentVariable("GOOGLEDRIVE_CLIENT_ID");
     }
 
-    private string? ResolveDesktopClientSecret()
+    private async Task<string?> ResolveDesktopClientSecretAsync()
     {
-        return _configuration["GoogleDrive:desktop_client_secret"]
+        return await _secretStore.GetAsync(SecretKeys.GoogleDesktopClientSecret).ConfigureAwait(false)
+            ?? _configuration["GoogleDrive:desktop_client_secret"]
             ?? _configuration["GoogleDrive:DesktopClientSecret"]
             ?? Environment.GetEnvironmentVariable("GOOGLEDRIVE_DESKTOP_CLIENT_SECRET")
             ?? _configuration["GoogleDrive:client_secret"]
@@ -189,10 +193,11 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISec
 /// Android Google auth provider using native Google Sign-In (Android OAuth client)
 /// without browser custom redirect URI handling.
 /// </summary>
-public sealed class AndroidGoogleAuthProvider(IConfiguration configuration, ISecretStore secretStore) : IGoogleAuthProvider
+public sealed class AndroidGoogleAuthProvider(IConfiguration configuration, ISecretStore secretStore, ISettingsOrchestrator settingsOrchestrator) : IGoogleAuthProvider
 {
     private readonly IConfiguration _configuration = configuration;
     private readonly ISecretStore _secretStore = secretStore;
+    private readonly ISettingsOrchestrator _settingsOrchestrator = settingsOrchestrator;
     private static readonly Uri DefaultAuthUri = new("https://accounts.google.com/o/oauth2/v2/auth");
     private static readonly Uri DefaultTokenUri = new("https://oauth2.googleapis.com/token");
     private const string DataStorePrefix = "google-oauth-android";
@@ -205,7 +210,8 @@ public sealed class AndroidGoogleAuthProvider(IConfiguration configuration, ISec
 
     // Android app client id (package + SHA-bound). Kept separate from exchange client id.
     private string? ResolveAndroidClientId() =>
-        _configuration["GoogleDrive:android_client_id"]
+        _settingsOrchestrator.Current.GoogleAuth.AndroidClientId
+        ?? _configuration["GoogleDrive:android_client_id"]
         ?? _configuration["GoogleDrive:AndroidClientId"]
         ?? Environment.GetEnvironmentVariable("GOOGLEDRIVE_ANDROID_CLIENT_ID")
         ?? FallbackAndroidClientId;

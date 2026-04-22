@@ -1,3 +1,6 @@
+using System.ComponentModel;
+
+using ChartHub.Services;
 using ChartHub.ViewModels;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -11,7 +14,7 @@ public class AuthFlowViewModelTests
     public async Task AppShellViewModel_AfterSplash_ShowsMainShell()
     {
         var mainViewModel = new MainViewModel();
-        var serviceProvider = new SingleServiceProvider(typeof(MainViewModel), mainViewModel);
+        IServiceProvider serviceProvider = BuildServiceProvider(mainViewModel);
         var sut = new AppShellViewModel(serviceProvider);
 
         SplashViewModel splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
@@ -25,7 +28,7 @@ public class AuthFlowViewModelTests
     public async Task AppShellViewModel_UsesProvidedMainViewModelInstance()
     {
         var mainViewModel = new MainViewModel();
-        var serviceProvider = new SingleServiceProvider(typeof(MainViewModel), mainViewModel);
+        IServiceProvider serviceProvider = BuildServiceProvider(mainViewModel);
         var sut = new AppShellViewModel(serviceProvider);
 
         SplashViewModel splash = Assert.IsType<SplashViewModel>(sut.CurrentViewModel);
@@ -34,15 +37,28 @@ public class AuthFlowViewModelTests
         Assert.Same(mainViewModel, sut.CurrentViewModel);
     }
 
-    private sealed class SingleServiceProvider(Type serviceType, object instance) : IServiceProvider
+    private static IServiceProvider BuildServiceProvider(MainViewModel mainViewModel)
     {
-        private readonly Type _serviceType = serviceType;
-        private readonly object _instance = instance;
-
-        public object? GetService(Type serviceType)
-        {
-            return serviceType == _serviceType ? _instance : null;
-        }
+        var services = new ServiceCollection();
+        services.AddSingleton(mainViewModel);
+        services.AddSingleton<IAuthSessionService, FakeAuthSessionService>();
+        return services.BuildServiceProvider();
     }
 
+    private sealed class FakeAuthSessionService : IAuthSessionService
+    {
+        public AuthSessionState CurrentState => AuthSessionState.Unauthenticated;
+        public string? SignedInEmail => null;
+        public string? CurrentAccessToken => null;
+#pragma warning disable CS0067
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public event EventHandler? SessionStateChanged;
+#pragma warning restore CS0067
+        public Task AttemptSilentRestoreAsync() => Task.CompletedTask;
+        public Task SignInAsync() => Task.CompletedTask;
+        public Task SignOutAsync() => Task.CompletedTask;
+        public bool IsTokenValidLocally() => false;
+        public Task AttemptSilentRefreshAsync() => Task.CompletedTask;
+    }
 }
+

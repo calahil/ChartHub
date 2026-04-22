@@ -39,6 +39,7 @@ public sealed class SettingsFieldViewModel : INotifyPropertyChanged
     public SettingEditorKind EditorKind { get; init; }
     public bool IsHotReloadable { get; init; }
     public bool RequiresRestart { get; init; }
+    public bool IsDeveloperOnly { get; init; }
 
     public object SectionRef { get; init; } = default!;
     public PropertyInfo Property { get; init; } = default!;
@@ -234,18 +235,26 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     private readonly ISettingsOrchestrator _settings;
     public SettingsPageStrings PageStrings { get; } = new();
     private readonly ISecretStore _secretStore;
+    private readonly AppGlobalSettings _globalSettings;
+    private readonly IAuthSessionService _authSessionService;
+    private readonly IChartHubServerApiClient _serverApiClient;
     private readonly Action<Action> _postToUi;
     private readonly bool _isAndroidPlatform;
+    private readonly SemaphoreSlim _fieldUpdateLock = new(1, 1);
 
-    private string _statusMessage = "";
+    private string _statusMessage = string.Empty;
     private bool _hasPendingRestartSettings;
-    private bool _isSaving;
     private bool _showDeveloperSettings;
+    private bool _isTestingServerConnection;
+    private bool _isAuthenticating;
+    private bool _isResettingAuth;
 
     public ObservableCollection<SettingsFieldViewModel> Fields { get; } = [];
     public ObservableCollection<SecretFieldViewModel> Secrets { get; } = [];
 
-    public AsyncRelayCommand SaveCommand { get; }
+    public IAsyncRelayCommand TestServerConnectionCommand { get; }
+    public IAsyncRelayCommand SignInCommand { get; }
+    public IAsyncRelayCommand ResetAuthSessionCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> SaveSecretCommand { get; }
     public IAsyncRelayCommand<SecretFieldViewModel?> ClearSecretCommand { get; }
     public string SecretStorageBackend { get; }
@@ -269,10 +278,99 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             _showDeveloperSettings = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsSecretsPanelVisible));
+            OnPropertyChanged(nameof(IsDeveloperDiagnosticsVisible));
+            RebuildFieldsFrom(_settings.Current);
         }
     }
 
     public bool IsSecretsPanelVisible => IsDeveloperBuild && ShowDeveloperSettings;
+
+    public bool IsDeveloperDiagnosticsVisible => IsDeveloperBuild && ShowDeveloperSettings;
+
+    public string ServerApiBaseUrl
+    {
+        get => _globalSettings.ServerApiBaseUrl;
+        set
+        {
+            string normalized = value?.Trim() ?? string.Empty;
+            if (string.Equals(_globalSettings.ServerApiBaseUrl, normalized, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _globalSettings.ServerApiBaseUrl = normalized;
+            StatusMessage = UiLocalization.Get("Settings.ServerBaseUrlSaved");
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(HasServerApiBaseUrl));
+        }
+    }
+
+    public bool HasServerApiBaseUrl => !string.IsNullOrWhiteSpace(ServerApiBaseUrl);
+
+    public string ServerApiAuthToken => _globalSettings.ServerApiAuthToken;
+
+    public bool HasServerApiAuthToken => !string.IsNullOrWhiteSpace(ServerApiAuthToken);
+
+    public bool HasNoServerApiAuthToken => !HasServerApiAuthToken;
+
+    public bool IsTestingServerConnection
+    {
+        get => _isTestingServerConnection;
+        private set
+        {
+            if (_isTestingServerConnection == value)
+            {
+                return;
+            }
+
+            _isTestingServerConnection = value;
+            OnPropertyChanged();
+            TestServerConnectionCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public bool IsAuthenticating
+    {
+        get => _isAuthenticating;
+        private set
+        {
+            if (_isAuthenticating == value)
+            {
+                return;
+            }
+
+            _isAuthenticating = value;
+            OnPropertyChanged();
+            SignInCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public bool IsResettingAuth
+    {
+        get => _isResettingAuth;
+        private set
+        {
+            if (_isResettingAuth == value)
+            {
+                return;
+            }
+
+            _isResettingAuth = value;
+            OnPropertyChanged();
+            ResetAuthSessionCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public string AuthStatusText => _authSessionService.CurrentState switch
+    {
+        AuthSessionState.Authenticated when !string.IsNullOrWhiteSpace(_authSessionService.SignedInEmail)
+            => UiLocalization.Format("Settings.AuthSignedInAs", _authSessionService.SignedInEmail),
+        AuthSessionState.Authenticated => UiLocalization.Get("Settings.AuthSignedIn"),
+        AuthSessionState.Authenticating => UiLocalization.Get("Settings.Working"),
+        AuthSessionState.Expired => UiLocalization.Get("Settings.AuthExpired"),
+        AuthSessionState.Unknown => UiLocalization.Get("Settings.AuthChecking"),
+        _ => UiLocalization.Get("Settings.AuthSignedOut"),
+    };
 
     public string StatusMessage
     {
@@ -315,24 +413,35 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
     public SettingsViewModel(
         ISettingsOrchestrator settings,
-        ISecretStore secretStore)
-        : this(settings, secretStore, action => Dispatcher.UIThread.Post(action), null)
+        ISecretStore secretStore,
+        AppGlobalSettings globalSettings,
+        IAuthSessionService authSessionService,
+        IChartHubServerApiClient serverApiClient)
+        : this(settings, secretStore, globalSettings, authSessionService, serverApiClient, action => Dispatcher.UIThread.Post(action), null)
     {
     }
 
     internal SettingsViewModel(
         ISettingsOrchestrator settings,
         ISecretStore secretStore,
+        AppGlobalSettings globalSettings,
+        IAuthSessionService authSessionService,
+        IChartHubServerApiClient serverApiClient,
         Action<Action> postToUi,
         bool? isAndroidPlatform)
     {
         _settings = settings;
         _secretStore = secretStore;
+        _globalSettings = globalSettings;
+        _authSessionService = authSessionService;
+        _serverApiClient = serverApiClient;
         _postToUi = postToUi;
         _isAndroidPlatform = isAndroidPlatform ?? OperatingSystem.IsAndroid();
         _showDeveloperSettings = false;
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
+        TestServerConnectionCommand = new AsyncRelayCommand(TestServerConnectionAsync, CanTestServerConnection);
+        SignInCommand = new AsyncRelayCommand(SignInAsync, CanSignIn);
+        ResetAuthSessionCommand = new AsyncRelayCommand(ResetAuthSessionAsync, CanResetAuthSession);
         SaveSecretCommand = new AsyncRelayCommand<SecretFieldViewModel?>(SaveSecretAsync);
         ClearSecretCommand = new AsyncRelayCommand<SecretFieldViewModel?>(ClearSecretAsync);
         SecretStorageBackend = ResolveSecretStorageBackend(secretStore);
@@ -344,6 +453,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
 
         _settings.SettingsChanged += OnSettingsChanged;
+        _globalSettings.PropertyChanged += OnGlobalSettingsPropertyChanged;
+        _authSessionService.PropertyChanged += OnAuthSessionPropertyChanged;
+        _authSessionService.SessionStateChanged += OnAuthSessionStateChanged;
         if (IsDeveloperBuild)
         {
             _ = RefreshSecretStateAsync();
@@ -370,7 +482,33 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         _postToUi(() =>
         {
             RebuildFieldsFrom(config);
+            RaiseServerStateChanged();
         });
+    }
+
+    private void OnGlobalSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(AppGlobalSettings.ServerApiBaseUrl)
+            or nameof(AppGlobalSettings.ServerApiAuthToken)
+            or nameof(AppGlobalSettings.DeviceDisplayNameOverride))
+        {
+            _postToUi(RaiseServerStateChanged);
+        }
+    }
+
+    private void OnAuthSessionPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(IAuthSessionService.CurrentState)
+            or nameof(IAuthSessionService.SignedInEmail)
+            or nameof(IAuthSessionService.CurrentAccessToken))
+        {
+            _postToUi(RaiseServerStateChanged);
+        }
+    }
+
+    private void OnAuthSessionStateChanged(object? sender, EventArgs e)
+    {
+        _postToUi(RaiseServerStateChanged);
     }
 
     private void RebuildFieldsFrom(AppConfigRoot config)
@@ -385,7 +523,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         AddSectionFields(fieldBuffer, config.GoogleAuth, "GoogleAuth");
 
         fieldBuffer = fieldBuffer
-            .OrderBy(f => f.Group, StringComparer.OrdinalIgnoreCase)
+            .Where(f => ShowDeveloperSettings || !f.IsDeveloperOnly)
+            .OrderBy(GetGroupOrder)
+            .ThenBy(f => f.Group, StringComparer.OrdinalIgnoreCase)
             .ThenBy(f => f.Label, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -403,7 +543,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             Fields.Add(field);
         }
 
-        HasPendingRestartSettings = Fields.Any(FieldRequiresReloadAfterSave);
+        HasPendingRestartSettings = Fields.Any(f => !f.IsHotReloadable);
         RefreshSaveState();
     }
 
@@ -424,6 +564,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
         RevalidateFieldLive(field);
         RefreshSaveState();
+
+        if (field.HasError || !FieldHasPendingChange(field))
+        {
+            return;
+        }
+
+        _ = PersistFieldChangeAsync(field);
     }
 
     private static void RevalidateFieldLive(SettingsFieldViewModel field)
@@ -505,6 +652,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
             SettingEditorKind editorKind = ResolveEditorKind(property);
             bool isHotReloadable = property.GetCustomAttribute<SettingHotReloadableAttribute>()?.IsHotReloadable ?? false;
             bool requiresRestart = property.GetCustomAttribute<SettingRequiresRestartAttribute>() is not null;
+            bool isDeveloperOnly = property.GetCustomAttribute<SettingDeveloperOnlyAttribute>() is not null;
             IReadOnlyList<string> options = ResolveOptions(property, editorKind);
 
             var field = new SettingsFieldViewModel
@@ -516,6 +664,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
                 EditorKind = editorKind,
                 IsHotReloadable = isHotReloadable,
                 RequiresRestart = requiresRestart,
+                IsDeveloperOnly = isDeveloperOnly,
                 SectionRef = section,
                 Property = property,
                 Options = options,
@@ -625,130 +774,66 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
-    private async Task SaveAsync()
+    private async Task PersistFieldChangeAsync(SettingsFieldViewModel field)
     {
-        if (!CanSave())
+        string? validationError = ValidateDraftField(field);
+        field.ErrorMessage = validationError ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(validationError))
         {
+            StatusMessage = UiLocalization.Get("Settings.ValidationFailed");
+            RefreshSaveState();
             return;
         }
 
-        var saveStopwatch = Stopwatch.StartNew();
-        Logger.LogInfo("Config", "Settings save started", new Dictionary<string, object?>
-        {
-            ["fieldCount"] = Fields.Count,
-        });
-
-        _isSaving = true;
-        RefreshSaveState();
+        await _fieldUpdateLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            foreach (SettingsFieldViewModel field in Fields)
+            if (!FieldHasPendingChange(field))
             {
-                field.ErrorMessage = string.Empty;
-            }
-
-            bool hasLocalValidationFailures = false;
-            foreach (SettingsFieldViewModel field in Fields)
-            {
-                string? validationError = ValidateDraftField(field);
-                if (string.IsNullOrWhiteSpace(validationError))
-                {
-                    continue;
-                }
-
-                field.ErrorMessage = validationError;
-                hasLocalValidationFailures = true;
-            }
-
-            if (hasLocalValidationFailures)
-            {
-                Logger.LogWarning("Config", "Settings validation failed before save", new Dictionary<string, object?>
-                {
-                    ["fieldKeys"] = string.Join(",", Fields.Where(f => f.HasError).Select(f => f.Key)),
-                    ["elapsedMs"] = saveStopwatch.ElapsedMilliseconds,
-                });
-                StatusMessage = UiLocalization.Get("Settings.ValidationFailed");
                 return;
             }
 
-            bool requiresReloadAfterSave = Fields.Any(FieldRequiresReloadAfterSave);
-
-            ConfigValidationResult result = await _settings.UpdateAsync(config =>
-            {
-                foreach (SettingsFieldViewModel field in Fields)
-                {
-                    ApplyField(config, field);
-                }
-            });
-
+            ConfigValidationResult result = await _settings.UpdateAsync(config => ApplyField(config, field)).ConfigureAwait(false);
             if (!result.IsValid)
             {
-                foreach (ConfigValidationFailure failure in result.Failures)
-                {
-                    SettingsFieldViewModel? field = Fields.FirstOrDefault(f => string.Equals(f.Key, failure.Key, StringComparison.Ordinal));
-                    if (field is not null)
-                    {
-                        field.ErrorMessage = failure.Message;
-                    }
-                }
-
-                Logger.LogWarning("Config", "Settings validation failed during save", new Dictionary<string, object?>
-                {
-                    ["fieldKeys"] = string.Join(",", result.Failures.Select(f => f.Key)),
-                    ["elapsedMs"] = saveStopwatch.ElapsedMilliseconds,
-                });
+                ConfigValidationFailure? failure = result.Failures.FirstOrDefault(f => string.Equals(f.Key, field.Key, StringComparison.Ordinal));
+                field.ErrorMessage = failure?.Message ?? UiLocalization.Get("Settings.ValidationFailed");
                 StatusMessage = UiLocalization.Get("Settings.ValidationFailed");
+                RefreshSaveState();
                 return;
             }
 
-            Logger.LogInfo("Config", "Settings save completed", new Dictionary<string, object?>
+            if (!field.IsHotReloadable)
             {
-                ["fieldCount"] = Fields.Count,
-                ["elapsedMs"] = saveStopwatch.ElapsedMilliseconds,
-            });
-
-            if (requiresReloadAfterSave)
-            {
-                await _settings.ReloadAsync();
-                StatusMessage = UiLocalization.Get("Settings.SavedReloaded");
+                await _settings.ReloadAsync().ConfigureAwait(false);
+                StatusMessage = UiLocalization.Format("Settings.FieldSavedRestartRequired", field.Label);
             }
             else
             {
-                StatusMessage = UiLocalization.Get("Settings.Saved");
+                StatusMessage = UiLocalization.Format("Settings.FieldSaved", field.Label);
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError("Config", "Settings save failed unexpectedly", ex, new Dictionary<string, object?>
+            Logger.LogError("Config", "Immediate field save failed unexpectedly", ex, new Dictionary<string, object?>
             {
-                ["fieldCount"] = Fields.Count,
-                ["elapsedMs"] = saveStopwatch.ElapsedMilliseconds,
+                ["fieldKey"] = field.Key,
+                ["label"] = field.Label,
             });
-            StatusMessage = UiLocalization.Get("Settings.SaveFailed");
+            StatusMessage = UiLocalization.Format("Settings.FieldSaveFailed", field.Label);
         }
         finally
         {
-            _isSaving = false;
             RefreshSaveState();
+            _fieldUpdateLock.Release();
         }
-    }
-
-    private bool CanSave()
-    {
-        return !_isSaving && !HasValidationErrors;
     }
 
     private void RefreshSaveState()
     {
-        HasPendingRestartSettings = Fields.Any(FieldRequiresReloadAfterSave);
+        HasPendingRestartSettings = false;
         OnPropertyChanged(nameof(HasValidationErrors));
         OnPropertyChanged(nameof(ValidationIssueSummaries));
-        SaveCommand.NotifyCanExecuteChanged();
-    }
-
-    private static bool FieldRequiresReloadAfterSave(SettingsFieldViewModel field)
-    {
-        return !field.IsHotReloadable && FieldHasPendingChange(field);
     }
 
     private static bool FieldHasPendingChange(SettingsFieldViewModel field)
@@ -906,8 +991,125 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
 
         if (field.Property.PropertyType == typeof(string))
         {
-            field.Property.SetValue(section, field.StringValue);
+            field.Property.SetValue(section, field.StringValue?.Trim() ?? string.Empty);
         }
+    }
+
+    private static int GetGroupOrder(SettingsFieldViewModel field)
+    {
+        return field.Group switch
+        {
+            "General" => 0,
+            "Input & Remote" => 1,
+            "Developer (Google OAuth)" => 2,
+            _ => 100,
+        };
+    }
+
+    private bool CanTestServerConnection()
+    {
+        return !IsTestingServerConnection && !string.IsNullOrWhiteSpace(ServerApiBaseUrl);
+    }
+
+    private async Task TestServerConnectionAsync()
+    {
+        if (!CanTestServerConnection())
+        {
+            StatusMessage = UiLocalization.Get("Settings.ServerConnectionMissingUrl");
+            return;
+        }
+
+        IsTestingServerConnection = true;
+        try
+        {
+            await _serverApiClient.GetHealthAsync(ServerApiBaseUrl).ConfigureAwait(false);
+            StatusMessage = UiLocalization.Get("Settings.ServerConnectionSucceeded");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Config", "Server connection test failed", ex, new Dictionary<string, object?>
+            {
+                ["baseUrl"] = ServerApiBaseUrl,
+            });
+            StatusMessage = UiLocalization.Format("Settings.ServerConnectionFailed", ex.Message);
+        }
+        finally
+        {
+            IsTestingServerConnection = false;
+        }
+    }
+
+    private bool CanSignIn()
+    {
+        return !IsAuthenticating && !string.IsNullOrWhiteSpace(ServerApiBaseUrl);
+    }
+
+    private async Task SignInAsync()
+    {
+        if (!CanSignIn())
+        {
+            StatusMessage = UiLocalization.Get("Settings.ServerConnectionMissingUrl");
+            return;
+        }
+
+        IsAuthenticating = true;
+        try
+        {
+            await _authSessionService.SignInAsync().ConfigureAwait(false);
+            RaiseServerStateChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Auth", "Interactive sign-in failed from settings", ex);
+            StatusMessage = UiLocalization.Format("Settings.SignInFailed", ex.Message);
+        }
+        finally
+        {
+            IsAuthenticating = false;
+        }
+    }
+
+    private bool CanResetAuthSession()
+    {
+        return !IsResettingAuth && (_authSessionService.CurrentState == AuthSessionState.Authenticated || HasServerApiAuthToken);
+    }
+
+    private async Task ResetAuthSessionAsync()
+    {
+        if (!CanResetAuthSession())
+        {
+            return;
+        }
+
+        IsResettingAuth = true;
+        try
+        {
+            await _authSessionService.SignOutAsync().ConfigureAwait(false);
+            StatusMessage = UiLocalization.Get("Settings.AuthResetSucceeded");
+            RaiseServerStateChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError("Auth", "Failed to clear saved auth session", ex);
+            StatusMessage = UiLocalization.Format("Settings.AuthResetFailed", ex.Message);
+        }
+        finally
+        {
+            IsResettingAuth = false;
+        }
+    }
+
+    private void RaiseServerStateChanged()
+    {
+        OnPropertyChanged(nameof(ServerApiBaseUrl));
+        OnPropertyChanged(nameof(HasServerApiBaseUrl));
+        OnPropertyChanged(nameof(ServerApiAuthToken));
+        OnPropertyChanged(nameof(HasServerApiAuthToken));
+        OnPropertyChanged(nameof(HasNoServerApiAuthToken));
+        OnPropertyChanged(nameof(AuthStatusText));
+        TestServerConnectionCommand.NotifyCanExecuteChanged();
+        SignInCommand.NotifyCanExecuteChanged();
+        ResetAuthSessionCommand.NotifyCanExecuteChanged();
     }
 
     private async Task SaveSecretAsync(SecretFieldViewModel? field)
@@ -980,9 +1182,14 @@ public sealed class SettingsViewModel : INotifyPropertyChanged, IDisposable
     public void Dispose()
     {
         _settings.SettingsChanged -= OnSettingsChanged;
+        _globalSettings.PropertyChanged -= OnGlobalSettingsPropertyChanged;
+        _authSessionService.PropertyChanged -= OnAuthSessionPropertyChanged;
+        _authSessionService.SessionStateChanged -= OnAuthSessionStateChanged;
         foreach (SettingsFieldViewModel field in Fields)
         {
             field.PropertyChanged -= OnFieldPropertyChanged;
         }
+
+        _fieldUpdateLock.Dispose();
     }
 }

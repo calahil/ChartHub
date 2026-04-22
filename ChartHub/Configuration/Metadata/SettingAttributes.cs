@@ -40,6 +40,11 @@ public sealed class SettingHiddenAttribute : Attribute
 {
 }
 
+[AttributeUsage(AttributeTargets.Property)]
+public sealed class SettingDeveloperOnlyAttribute : Attribute
+{
+}
+
 [Flags]
 public enum SettingPlatformTargets
 {
