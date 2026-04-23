@@ -10,6 +10,7 @@ public enum ServerInstallFileType
     SevenZip,
     Con,
     Sng,
+    EncryptedSng,
 }
 
 public sealed record ServerArtifactClassification(
@@ -72,6 +73,13 @@ public sealed class ServerInstallFileTypeResolver : IServerInstallFileTypeResolv
         if (HasSignature(fileSignature, read, SevenZipSignature))
         {
             return new ServerArtifactClassification(ServerInstallFileType.SevenZip, ".7z");
+        }
+
+        // Some official/encrypted SNG variants do not expose the standard SNGPKG header.
+        // Preserve the artifact as SNG so install can return a specific unsupported reason.
+        if (Path.GetExtension(artifactPath).Equals(".sng", StringComparison.OrdinalIgnoreCase))
+        {
+            return new ServerArtifactClassification(ServerInstallFileType.EncryptedSng, ".sng");
         }
 
         return Unknown();

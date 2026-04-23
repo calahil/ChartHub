@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using ChartHub.Conversion.Audio;
 using ChartHub.Conversion.Dta;
 using ChartHub.Conversion.Stfs;
@@ -501,6 +502,158 @@ public sealed class MoggExtractorTests
         }
     }
 
+
+        [Fact]
+        public async Task ExtractStemsAsync_Mogg0x0B_DecryptsAndExtractsStemsSuccessfully()
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                return;
+            }
+
+            string tempRoot = Path.Combine(Path.GetTempPath(), $"charthub-mogg-0x0b-test-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempRoot);
+
+            try
+            {
+                string outputDir = Path.Combine(tempRoot, "out");
+                Directory.CreateDirectory(outputDir);
+
+                string invocationLog = Path.Combine(tempRoot, "ffmpeg-invocations.log");
+                string fakeFfmpeg = CreateFakeFfmpegScript(tempRoot, invocationLog);
+
+                var extractor = new MoggExtractor(fakeFfmpeg);
+                DtaSongInfo songInfo = new()
+                {
+                    ShortName = "testtrack",
+                    Title = "Test Track",
+                    Artist = "Test Artist",
+                    TrackChannels = new Dictionary<string, IReadOnlyList<int>>
+                    {
+                        ["guitar"] = [0, 1],
+                    },
+                    TotalChannels = 2,
+                };
+
+                byte[] mogg0x0b = BuildSyntheticEncrypted0x0bMogg(channelCount: 2);
+
+                IReadOnlyDictionary<string, string> stems = await extractor.ExtractStemsAsync(mogg0x0b, songInfo, outputDir);
+
+                Assert.Contains("song", stems.Keys);
+                Assert.Contains("guitar", stems.Keys);
+            }
+            finally
+            {
+                if (Directory.Exists(tempRoot))
+                {
+                    Directory.Delete(tempRoot, recursive: true);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Builds a synthetic MOGG version 0x0B file. The OGG payload is a minimal valid-looking
+        /// buffer (OggS + vorbis identification header marker) encrypted with the known HMX RB1 key
+        /// and a test PUBLIC_KEY, using the same AES-ECB counter-mode scheme as MoggExtractor.
+        /// </summary>
+        private static byte[] BuildSyntheticEncrypted0x0bMogg(byte channelCount)
+        {
+            // 16-byte PUBLIC_KEY used for the test (seeds the AES counter).
+            byte[] publicKey =
+            [
+                0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
+            ];
+
+            // The same key that MoggExtractor.HmxPrivateKey0B uses.
+            byte[] hmxKey0B =
+            [
+                0x37, 0xB2, 0xE2, 0xB9, 0x1C, 0x74, 0xFA, 0x9E,
+                0x38, 0x81, 0x08, 0xEA, 0x36, 0x23, 0xDB, 0xE4,
+            ];
+
+            // Build a minimal raw OGG buffer (OggS sync + vorbis identification marker).
+            byte[] rawOgg = new byte[64];
+            rawOgg[0] = (byte)'O';
+            rawOgg[1] = (byte)'g';
+            rawOgg[2] = (byte)'g';
+            rawOgg[3] = (byte)'S';
+            int vorbisMarkerOffset = 16;
+            rawOgg[vorbisMarkerOffset] = 0x01;      // packet_type (identification header)
+            rawOgg[vorbisMarkerOffset + 1] = (byte)'v';
+            rawOgg[vorbisMarkerOffset + 2] = (byte)'o';
+            rawOgg[vorbisMarkerOffset + 3] = (byte)'r';
+            rawOgg[vorbisMarkerOffset + 4] = (byte)'b';
+            rawOgg[vorbisMarkerOffset + 5] = (byte)'i';
+            rawOgg[vorbisMarkerOffset + 6] = (byte)'s';
+            rawOgg[vorbisMarkerOffset + 11] = channelCount;
+
+            // Encrypt the raw OGG using AES-CTR (identical algorithm to MoggExtractor.DecryptMoggAesCtr).
+            byte[] encryptedOgg = AesCtrXor(rawOgg, hmxKey0B, publicKey);
+
+            // Build the 0x0B MOGG header:
+            // version(4) + oggOffset(4) + oggMapVersion(4) + bufferSize(4) + numPairs(4)
+            // + PUBLIC_KEY(16) + encrypted OGG data
+            // (numPairs = 0 so no seek table entries)
+            int numPairs = 0;
+            int headerSize = 20 + (numPairs * 8) + 16; // = 36
+            byte[] mogg = new byte[headerSize + encryptedOgg.Length];
+
+            // version = 0x0B LE
+            mogg[0] = 0x0B;
+            // oggOffset = headerSize LE
+            mogg[4] = (byte)(headerSize & 0xFF);
+            mogg[5] = (byte)((headerSize >> 8) & 0xFF);
+            mogg[6] = (byte)((headerSize >> 16) & 0xFF);
+            mogg[7] = (byte)((headerSize >> 24) & 0xFF);
+            // oggMapVersion = 0x10 LE
+            mogg[8] = 0x10;
+            // numPairs = 0
+            // PUBLIC_KEY at offset 20
+            Buffer.BlockCopy(publicKey, 0, mogg, 20, 16);
+            // encrypted OGG data
+            Buffer.BlockCopy(encryptedOgg, 0, mogg, headerSize, encryptedOgg.Length);
+
+            return mogg;
+        }
+
+        /// <summary>AES-ECB counter-mode XOR, matching the Harmonix MOGG scheme.</summary>
+        private static byte[] AesCtrXor(byte[] data, byte[] key, byte[] initialCounter)
+        {
+            byte[] counter = new byte[16];
+            Array.Copy(initialCounter, counter, 16);
+            byte[] keystream = new byte[16];
+            byte[] result = new byte[data.Length];
+
+            using var aes = Aes.Create();
+            aes.Key = key;
+            aes.Mode = CipherMode.ECB;
+            aes.Padding = PaddingMode.None;
+            using ICryptoTransform encryptor = aes.CreateEncryptor();
+
+            encryptor.TransformBlock(counter, 0, 16, keystream, 0);
+            int blockOffset = 0;
+
+            for (int i = 0; i < data.Length; i++)
+            {
+                if (blockOffset == 16)
+                {
+                    for (int j = 0; j < 16; j++)
+                    {
+                        counter[j]++;
+                        if (counter[j] != 0) { break; }
+                    }
+
+                    encryptor.TransformBlock(counter, 0, 16, keystream, 0);
+                    blockOffset = 0;
+                }
+
+                result[i] = (byte)(data[i] ^ keystream[blockOffset]);
+                blockOffset++;
+            }
+
+            return result;
+        }
     private static string CreateFakeFfmpegScript(string root, string invocationLog)
     {
         string scriptPath = Path.Combine(root, "fake-ffmpeg.sh");

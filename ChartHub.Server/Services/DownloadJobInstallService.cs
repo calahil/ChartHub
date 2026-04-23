@@ -106,6 +106,8 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
                 // TODO: Add SNG conversion/install pipeline support.
                 ServerInstallFileType.Sng
                     => throw new InvalidOperationException("SNG install support is not implemented yet."),
+                ServerInstallFileType.EncryptedSng
+                    => throw new InvalidOperationException("SNG artifact appears encrypted or uses an unsupported official variant."),
                 _ => throw new InvalidOperationException("Unsupported install artifact format."),
             };
 

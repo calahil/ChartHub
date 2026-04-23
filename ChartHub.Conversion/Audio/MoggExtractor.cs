@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 
 using ChartHub.Conversion.Dta;
 
@@ -35,10 +36,9 @@ internal sealed class MoggExtractor
         string outputDir,
         CancellationToken cancellationToken = default)
     {
-        // Write MOGG data to a temp file (stripping the 8-byte MOGG header to get raw OGG).
+        // Write MOGG data to a temp file, decrypting if needed to recover raw OGG bytes.
         string tempOgg = Path.Combine(outputDir, "__mogg_raw.ogg");
-        int oggOffset = ReadMoggOggOffset(moggBytes);
-        byte[] rawOggBytes = moggBytes[oggOffset..];
+        byte[] rawOggBytes = ExtractRawOggBytes(moggBytes);
         await File.WriteAllBytesAsync(tempOgg, rawOggBytes, cancellationToken)
             .ConfigureAwait(false);
 
@@ -89,6 +89,124 @@ internal sealed class MoggExtractor
     }
 
     /// <summary>Reads the OGG data offset from the 8-byte MOGG header.</summary>
+    // HMX private key for MOGG version 0x0B (Rock Band 1 / RB1 DLC).
+    // This is a well-known community-documented constant, identical across all 0x0B-encrypted MOGG files.
+    private static readonly byte[] HmxPrivateKey0B =
+    [
+        0x37, 0xB2, 0xE2, 0xB9, 0x1C, 0x74, 0xFA, 0x9E,
+        0x38, 0x81, 0x08, 0xEA, 0x36, 0x23, 0xDB, 0xE4,
+    ];
+
+    /// <summary>
+    /// Returns the raw, unencrypted OGG bytes from a MOGG file, decrypting if the version byte
+    /// indicates an encrypted variant.
+    /// </summary>
+    private static byte[] ExtractRawOggBytes(byte[] moggBytes)
+    {
+        if (moggBytes.Length < 4)
+        {
+            throw new InvalidDataException("MOGG file is too short to contain a version header.");
+        }
+
+        int version = moggBytes[0] | (moggBytes[1] << 8) | (moggBytes[2] << 16) | (moggBytes[3] << 24);
+
+        return version switch
+        {
+            0x0A => moggBytes[ReadMoggOggOffset(moggBytes)..],
+            0x0B => DecryptMogg0x0B(moggBytes),
+            _ => throw new NotSupportedException(
+                $"MOGG encryption version 0x{version:X2} is not supported. " +
+                "Only unencrypted (0x0A) and RB1-style encrypted (0x0B) MOGG files are handled."),
+        };
+    }
+
+    /// <summary>
+    /// Decrypts the OGG payload from a MOGG version 0x0B file.
+    /// Version 0x0B uses AES-ECB as a counter-mode stream cipher (the same scheme as RB1/RB1 DLC).
+    /// </summary>
+    /// <remarks>
+    /// Header layout for 0x0B:
+    ///   [0..3]   version (0x0B LE)
+    ///   [4..7]   OGG data offset (= header size) LE
+    ///   [8..11]  OGG map version LE
+    ///   [12..15] buffer size LE
+    ///   [16..19] seek-table entry count N LE
+    ///   [20..20+N*8-1] seek table (N × offset/value pairs, 8 bytes each)
+    ///   [20+N*8..20+N*8+15] PUBLIC_KEY (16 bytes, functions as the AES counter seed)
+    ///   [20+N*8+16..] OGG data (encrypted)
+    /// </remarks>
+    private static byte[] DecryptMogg0x0B(byte[] moggBytes)
+    {
+        if (moggBytes.Length < 20)
+        {
+            throw new InvalidDataException("0x0B MOGG file is too short to read the seek-table entry count.");
+        }
+
+        int numPairs = moggBytes[16] | (moggBytes[17] << 8) | (moggBytes[18] << 16) | (moggBytes[19] << 24);
+        int publicKeyOffset = 20 + (numPairs * 8);
+
+        if (moggBytes.Length < publicKeyOffset + 16)
+        {
+            throw new InvalidDataException(
+                "0x0B MOGG file is too short to contain the 16-byte PUBLIC_KEY after the seek table.");
+        }
+
+        byte[] publicKey = moggBytes[publicKeyOffset..(publicKeyOffset + 16)];
+        int oggDataStart = publicKeyOffset + 16;
+        byte[] encryptedOgg = moggBytes[oggDataStart..];
+
+        return DecryptMoggAesCtr(encryptedOgg, HmxPrivateKey0B, publicKey);
+    }
+
+    /// <summary>
+    /// AES-ECB counter-mode decryption as used by Harmonix MOGG files.
+    /// The <paramref name="initialCounter"/> seeds the 16-byte counter block (AES input).
+    /// After every 16 keystream bytes consumed, the counter is incremented little-endian and a new
+    /// 16-byte keystream block is generated. Data is XOR'd byte-by-byte against the keystream.
+    /// </summary>
+    private static byte[] DecryptMoggAesCtr(byte[] data, byte[] key, byte[] initialCounter)
+    {
+        byte[] counter = new byte[16];
+        Array.Copy(initialCounter, counter, 16);
+
+        byte[] keystream = new byte[16];
+        byte[] result = new byte[data.Length];
+
+    using var aes = Aes.Create();
+        aes.Key = key;
+        aes.Mode = CipherMode.ECB;
+        aes.Padding = PaddingMode.None;
+        using ICryptoTransform encryptor = aes.CreateEncryptor();
+
+        encryptor.TransformBlock(counter, 0, 16, keystream, 0);
+        int blockOffset = 0;
+
+        for (int i = 0; i < data.Length; i++)
+        {
+            if (blockOffset == 16)
+            {
+                // Increment counter little-endian (same carry logic as Harmonix MoggCrypt).
+                for (int j = 0; j < 16; j++)
+                {
+                    counter[j]++;
+                    if (counter[j] != 0)
+                    {
+                        break;
+                    }
+                }
+
+                encryptor.TransformBlock(counter, 0, 16, keystream, 0);
+                blockOffset = 0;
+            }
+
+            result[i] = (byte)(data[i] ^ keystream[blockOffset]);
+            blockOffset++;
+        }
+
+        return result;
+    }
+
+    /// <summary>Reads the OGG data offset from the MOGG header.</summary>
     private static int ReadMoggOggOffset(byte[] bytes)
     {
         if (bytes.Length < 8)

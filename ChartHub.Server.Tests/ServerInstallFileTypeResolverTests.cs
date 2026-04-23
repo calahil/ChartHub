@@ -69,6 +69,19 @@ public sealed class ServerInstallFileTypeResolverTests
     }
 
     [Fact]
+    public async Task ClassifyAsyncSngExtensionWithoutSngHeaderReturnsEncryptedSng()
+    {
+        using TemporaryFile temp = new(".sng");
+        await File.WriteAllBytesAsync(temp.Path, [0xFF, 0xDB, 0x97, 0x17, 0x1F, 0x93, 0x28, 0x38]);
+
+        ServerInstallFileTypeResolver sut = new();
+        ServerArtifactClassification result = await sut.ClassifyAsync(temp.Path);
+
+        Assert.Equal(ServerInstallFileType.EncryptedSng, result.FileType);
+        Assert.Equal(".sng", result.CanonicalExtension);
+    }
+
+    [Fact]
     public async Task ResolveAsyncBinWithHtmlPayloadReturnsUnknown()
     {
         using TemporaryFile temp = new(".bin");

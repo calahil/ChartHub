@@ -192,6 +192,23 @@ public sealed class DownloadJobInstallServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => sut.InstallJobAsync(job));
     }
 
+    [Fact]
+    public async Task InstallJobEncryptedSngThrowsExplicitUnsupportedVariantMessage()
+    {
+        using var env = new TempEnvironment();
+
+        string filePath = Path.Combine(env.DownloadsDir, "biology.sng");
+        await File.WriteAllBytesAsync(filePath, [0xFF, 0xDB, 0x97, 0x17, 0x1F, 0x93, 0x28, 0x38]);
+
+        DownloadJobInstallService sut = env.BuildService(
+            fileType: ServerInstallFileType.EncryptedSng);
+
+        DownloadJobResponse job = MakeJob(downloadedPath: filePath);
+
+        InvalidOperationException ex = await Assert.ThrowsAsync<InvalidOperationException>(() => sut.InstallJobAsync(job));
+        Assert.Equal("SNG artifact appears encrypted or uses an unsupported official variant.", ex.Message);
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // Cancellation
     // ──────────────────────────────────────────────────────────────────────────
@@ -345,6 +362,7 @@ public sealed class DownloadJobInstallServiceTests
                 ServerInstallFileType.SevenZip => ".7z",
                 ServerInstallFileType.Con => ".rb3con",
                 ServerInstallFileType.Sng => ".sng",
+                ServerInstallFileType.EncryptedSng => ".sng",
                 _ => string.Empty,
             }));
         }
