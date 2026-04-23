@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
+
 using ChartHub.Conversion.Audio;
 using ChartHub.Conversion.Dta;
+using ChartHub.Conversion.Sng;
 using ChartHub.Conversion.Stfs;
 
 namespace ChartHub.Conversion.Tests;
@@ -123,6 +125,249 @@ public sealed class StfsReaderTests
         }
 
         return null;
+    }
+}
+
+public sealed class ConversionServiceRoutingTests
+{
+    [Fact]
+    public async Task ConvertAsync_SngInput_ThrowsNotImplementedMessage()
+    {
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-sng-route-test-{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(outputRoot);
+
+            var service = new ConversionService();
+            NotSupportedException ex = await Assert.ThrowsAsync<NotSupportedException>(
+                () => service.ConvertAsync("/tmp/fake-input.sng", outputRoot));
+
+            Assert.Contains("SNG conversion is not implemented yet", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+}
+
+public sealed class SngPackageReaderTests
+{
+    private static readonly string SampleSngPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../merges/Arcade Fire - Creature Comfort (Debugmod12).sng"));
+
+    [Fact]
+    public void Read_InvalidMagic_ThrowsInvalidData()
+    {
+        byte[] bytes = System.Text.Encoding.ASCII.GetBytes("NOTSNGPKG");
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => SngPackageReader.Read(bytes));
+        Assert.Contains("SNGPKG", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Read_SyntheticContainer_ParsesFileTable()
+    {
+        byte[] bytes = BuildSyntheticSngPkg();
+        SngPackage pkg = SngPackageReader.Read(bytes);
+
+        Assert.Equal(1, pkg.Version);
+        Assert.Equal(3, pkg.Files.Count);
+        Assert.Equal("notes.chart", pkg.Files[0].Name);
+        Assert.Equal("album.jpg", pkg.Files[1].Name);
+        Assert.Equal("song.opus", pkg.Files[2].Name);
+        Assert.True(pkg.Files.All(f => f.Offset > 0));
+        Assert.True(pkg.Files.All(f => f.Length > 0));
+    }
+
+    [Fact]
+    public void Read_RealFixture_ParsesKnownFiles()
+    {
+        if (!File.Exists(SampleSngPath))
+        {
+            return;
+        }
+
+        SngPackage pkg = SngPackageReader.Read(SampleSngPath);
+        Assert.True(pkg.Files.Count >= 2);
+        Assert.Contains(pkg.Files, f => string.Equals(f.Name, "notes.chart", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(pkg.Files, f => string.Equals(f.Name, "song.opus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static byte[] BuildSyntheticSngPkg()
+    {
+        const int size = 512;
+        byte[] bytes = new byte[size];
+
+        // Magic + version
+        Array.Copy(System.Text.Encoding.ASCII.GetBytes("SNGPKG"), 0, bytes, 0, 6);
+        bytes[6] = 1;
+
+        int tablePos = 32;
+        tablePos = WriteEntry(bytes, tablePos, "notes.chart", 320, 50);
+        tablePos = WriteEntry(bytes, tablePos, "album.jpg", 370, 60);
+        _ = WriteEntry(bytes, tablePos, "song.opus", 430, 70);
+
+        return bytes;
+    }
+
+    private static int WriteEntry(byte[] bytes, int pos, string name, ulong offset, ulong length)
+    {
+        byte[] nameBytes = System.Text.Encoding.ASCII.GetBytes(name);
+        bytes[pos++] = (byte)nameBytes.Length;
+        Array.Copy(nameBytes, 0, bytes, pos, nameBytes.Length);
+        pos += nameBytes.Length;
+
+        WriteUInt64LE(bytes, pos, offset);
+        pos += 8;
+        WriteUInt64LE(bytes, pos, length);
+        pos += 8;
+
+        return pos;
+    }
+
+    private static void WriteUInt64LE(byte[] bytes, int pos, ulong value)
+    {
+        bytes[pos] = (byte)(value & 0xFF);
+        bytes[pos + 1] = (byte)((value >> 8) & 0xFF);
+        bytes[pos + 2] = (byte)((value >> 16) & 0xFF);
+        bytes[pos + 3] = (byte)((value >> 24) & 0xFF);
+        bytes[pos + 4] = (byte)((value >> 32) & 0xFF);
+        bytes[pos + 5] = (byte)((value >> 40) & 0xFF);
+        bytes[pos + 6] = (byte)((value >> 48) & 0xFF);
+        bytes[pos + 7] = (byte)((value >> 56) & 0xFF);
+    }
+}
+
+public sealed class SngMetadataExtractorTests
+{
+    [Fact]
+    public void Extract_WhenSongIniPresent_UsesEmbeddedValues()
+    {
+        string songIni = """
+            [song]
+            name = Creature Comfort
+            artist = Arcade Fire
+            charter = Debug Charter
+            """;
+
+        byte[] containerBytes = BuildSyntheticSngPkg(
+            [
+                ("notes.chart", System.Text.Encoding.ASCII.GetBytes("dummy chart")),
+                ("song.ini", System.Text.Encoding.UTF8.GetBytes(songIni)),
+            ]);
+
+        SngPackage package = SngPackageReader.Read(containerBytes);
+        Conversion.Models.ConversionMetadata metadata = SngMetadataExtractor.Extract(
+            package,
+            containerBytes,
+            "/tmp/arcade-fire.sng");
+
+        Assert.Equal("Creature Comfort", metadata.Title);
+        Assert.Equal("Arcade Fire", metadata.Artist);
+        Assert.Equal("Debug Charter", metadata.Charter);
+    }
+
+    [Fact]
+    public void Extract_WhenSongIniMissing_FallsBackToFilenameAndUnknowns()
+    {
+        byte[] containerBytes = BuildSyntheticSngPkg(
+            [
+                ("notes.chart", System.Text.Encoding.ASCII.GetBytes("dummy chart")),
+                ("song.opus", [0x11, 0x22, 0x33]),
+            ]);
+
+        SngPackage package = SngPackageReader.Read(containerBytes);
+        Conversion.Models.ConversionMetadata metadata = SngMetadataExtractor.Extract(
+            package,
+            containerBytes,
+            "/tmp/Arcade Fire - Creature Comfort.sng");
+
+        Assert.Equal("Arcade Fire - Creature Comfort", metadata.Title);
+        Assert.Equal("Unknown Artist", metadata.Artist);
+        Assert.Equal("Unknown Charter", metadata.Charter);
+    }
+
+    [Fact]
+    public void Extract_WhenSongIniIsNestedAndMixedCase_ParsesCaseInsensitively()
+    {
+        string songIni = """
+            [SONG]
+            NAME = Generator
+            ARTIST = Bad Religion
+            CHARTER = chartbot
+            """;
+
+        byte[] containerBytes = BuildSyntheticSngPkg(
+            [
+                ("songs/pack/song.ini", System.Text.Encoding.UTF8.GetBytes(songIni)),
+                ("song.opus", [0x01, 0x02, 0x03]),
+            ]);
+
+        SngPackage package = SngPackageReader.Read(containerBytes);
+        Conversion.Models.ConversionMetadata metadata = SngMetadataExtractor.Extract(
+            package,
+            containerBytes,
+            "/tmp/generator.sng");
+
+        Assert.Equal("Generator", metadata.Title);
+        Assert.Equal("Bad Religion", metadata.Artist);
+        Assert.Equal("chartbot", metadata.Charter);
+    }
+
+    private static byte[] BuildSyntheticSngPkg(IReadOnlyList<(string Name, byte[] Data)> files)
+    {
+        int tableSize = files.Sum(f => 1 + System.Text.Encoding.ASCII.GetByteCount(f.Name) + 16);
+        int dataStart = 64 + tableSize;
+        int dataLength = files.Sum(f => f.Data.Length);
+
+        byte[] bytes = new byte[dataStart + dataLength + 16];
+
+        Array.Copy(System.Text.Encoding.ASCII.GetBytes("SNGPKG"), 0, bytes, 0, 6);
+        bytes[6] = 1;
+
+        int tablePos = 64;
+        int currentOffset = dataStart;
+
+        foreach ((string name, byte[] data) in files)
+        {
+            tablePos = WriteEntry(bytes, tablePos, name, (ulong)currentOffset, (ulong)data.Length);
+            Buffer.BlockCopy(data, 0, bytes, currentOffset, data.Length);
+            currentOffset += data.Length;
+        }
+
+        return bytes;
+    }
+
+    private static int WriteEntry(byte[] bytes, int pos, string name, ulong offset, ulong length)
+    {
+        byte[] nameBytes = System.Text.Encoding.ASCII.GetBytes(name);
+        bytes[pos++] = (byte)nameBytes.Length;
+        Array.Copy(nameBytes, 0, bytes, pos, nameBytes.Length);
+        pos += nameBytes.Length;
+
+        WriteUInt64LE(bytes, pos, offset);
+        pos += 8;
+        WriteUInt64LE(bytes, pos, length);
+        pos += 8;
+
+        return pos;
+    }
+
+    private static void WriteUInt64LE(byte[] bytes, int pos, ulong value)
+    {
+        bytes[pos] = (byte)(value & 0xFF);
+        bytes[pos + 1] = (byte)((value >> 8) & 0xFF);
+        bytes[pos + 2] = (byte)((value >> 16) & 0xFF);
+        bytes[pos + 3] = (byte)((value >> 24) & 0xFF);
+        bytes[pos + 4] = (byte)((value >> 32) & 0xFF);
+        bytes[pos + 5] = (byte)((value >> 40) & 0xFF);
+        bytes[pos + 6] = (byte)((value >> 48) & 0xFF);
+        bytes[pos + 7] = (byte)((value >> 56) & 0xFF);
     }
 }
 

@@ -42,8 +42,23 @@ public sealed class ConversionService : IConversionService
         return extension switch
         {
             ".con" or ".rb3con" => await ConvertConAsync(sourcePath, outputRoot, cancellationToken).ConfigureAwait(false),
-            _ => throw new NotSupportedException($"Source file type '{extension}' is not supported. Expected .con or .rb3con."),
+            ".sng" => await ConvertSngAsync(sourcePath, outputRoot, cancellationToken).ConfigureAwait(false),
+            _ => throw new NotSupportedException($"Source file type '{extension}' is not supported. Expected .con, .rb3con, or .sng."),
         };
+    }
+
+    private static Task<ConversionResult> ConvertSngAsync(
+        string sourcePath,
+        string outputRoot,
+        CancellationToken cancellationToken)
+    {
+        _ = sourcePath;
+        _ = outputRoot;
+        _ = cancellationToken;
+
+        throw new NotSupportedException(
+            "SNG conversion is not implemented yet. "
+            + "M2 work item: add SNGPKG reader and wire extraction to the standard conversion pipeline.");
     }
 
     private async Task<ConversionResult> ConvertConAsync(
@@ -196,7 +211,6 @@ public sealed class ConversionService : IConversionService
         var extractor = new MoggExtractor(_options.FfmpegPath);
         var tried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var candidates = new List<(string Path, StfsEntry Entry)>();
-        var attemptLog = new List<string>();
 
         // Prefer the MOGG whose path matches the song's declared SongFilePath.
         if (!string.IsNullOrEmpty(songInfo.SongFilePath))
@@ -232,8 +246,6 @@ public sealed class ConversionService : IConversionService
                 try
                 {
                     byte[] moggBytes = stfs.ReadEntry(entry, forceConsecutive);
-                    int version = ReadLittleEndianInt32OrDefault(moggBytes);
-                    attemptLog.Add($"candidate='{path}', forceConsecutive={forceConsecutive}, len={moggBytes.Length}, version=0x{version:X8}");
                     await extractor.ExtractStemsAsync(moggBytes, songInfo, songDir, cancellationToken)
                         .ConfigureAwait(false);
                     return;
@@ -249,26 +261,9 @@ public sealed class ConversionService : IConversionService
             }
         }
 
-        string attempts = attemptLog.Count == 0
-            ? "no candidates"
-            : string.Join("; ", attemptLog);
-
         throw new InvalidDataException(
-            $"No MOGG audio file found inside the CON package. Attempts: {attempts}",
+            "No MOGG audio file found inside the CON package.",
             lastError);
-    }
-
-    private static int ReadLittleEndianInt32OrDefault(byte[] bytes)
-    {
-        if (bytes.Length < 4)
-        {
-            return 0;
-        }
-
-        return bytes[0]
-            | (bytes[1] << 8)
-            | (bytes[2] << 16)
-            | (bytes[3] << 24);
     }
 
     private static bool StartsWithMidiHeader(ReadOnlySpan<byte> bytes)

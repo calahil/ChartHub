@@ -39,6 +39,18 @@ Current validation status (local opt-in parity run):
 - `sng-biology`: passing under fixture policy
 - `rb3con-arcade-fire-pack`: passing
 
+Latest verification snapshot:
+
+- Oracle parity suite (`OracleParityComparisonTests`): green (4/4)
+- Temporary MOGG candidate diagnostics removed after unblock; robust fallback logic retained
+- Conversion routing guard: `.sng` route wired with explicit not-implemented exception + test coverage
+- SNGPKG reader: magic/version + file-table extraction implemented with synthetic + real fixture tests
+- SNG metadata extractor: parses embedded `song.ini` ([song] section) with filename/unknown fallbacks + focused unit coverage
+
+Next active slice:
+
+- Implement SNG MIDI extractor + RB→CH MIDI conversion reuse
+
 ## Opt-In Local Runs
 
 Parity runs are opt-in. Set this environment variable to enable parity tests locally:
@@ -92,12 +104,12 @@ Pre-requisites: M1 complete.
 
 - [x] SNG header detection (`SNGPKG` magic) in server intake
 - [x] Encrypted/official SNG variant detection and explicit install failure routing (`EncryptedSng`)
-- [ ] SNG reader (parse SNGPKG container: file table, file entries, file data blocks)
-- [ ] SNG metadata extractor (song.ini embedded in container or derived fields)
+- [x] SNG reader (parse SNGPKG container: file table, file entries, file data blocks)
+- [x] SNG metadata extractor (song.ini embedded in container or derived fields)
 - [ ] SNG MIDI extractor + RB→CH MIDI conversion reuse
 - [ ] SNG audio extractor (OGG stem files from container)
 - [ ] SNG album art extractor
-- [ ] `ConversionService.ConvertAsync` branch wired for `.sng`
+- [x] `ConversionService.ConvertAsync` branch wired for `.sng`
 - [ ] `DownloadJobInstallService.InstallSngAsync` (parallel to existing `InstallConAsync`)
 - [ ] Parity fixture(s) for supported SNG (e.g. fan-made Arcade Fire SNG added to `fixtures.yaml`)
 - [ ] Committed Onyx baselines for at least one SNG fixture
