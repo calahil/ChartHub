@@ -155,6 +155,10 @@ public sealed record ChartHubServerCreateDownloadJobRequest(
     string DisplayName,
     string SourceUrl);
 
+public sealed record ChartHubServerDownloadJobStatus(
+    string Code,
+    string Message);
+
 public sealed record ChartHubServerDownloadJobResponse(
     Guid JobId,
     string Source,
@@ -175,7 +179,8 @@ public sealed record ChartHubServerDownloadJobResponse(
     string? Charter = null,
     string? SourceMd5 = null,
     string? SourceChartHash = null,
-    string? FileType = null);
+    string? FileType = null,
+    IReadOnlyList<ChartHubServerDownloadJobStatus>? ConversionStatuses = null);
 
 public sealed record ChartHubServerCloneHeroSongResponse(
     string SongId,

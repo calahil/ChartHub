@@ -127,6 +127,11 @@
                                                     <TextBlock Text="{Binding CurrentState}"
                                                                FontSize="11"
                                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
+                                                    <TextBlock Text="{Binding ConversionWarningMessage}"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource SemanticWarning}"
+                                                               IsVisible="{Binding ConversionWarningMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                               TextWrapping="Wrap" />
                                                 </StackPanel>
                                                 <!-- Inline delete button -->
                                                 <Button Grid.Column="3"

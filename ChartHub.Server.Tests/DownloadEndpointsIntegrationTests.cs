@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 
+using ChartHub.Conversion.Models;
+
 using ChartHub.Server.Contracts;
 using ChartHub.Server.Endpoints;
 using ChartHub.Server.Options;
@@ -305,7 +307,34 @@ public sealed class DownloadEndpointsIntegrationTests
         Assert.Equal(inProgressStage, job!.Stage);
     }
 
-    private static DownloadJobResponse MakeJob(Guid id, string displayName, string stage = "Queued") =>
+    [Fact]
+    public async Task InstallJobCompletedPersistsConversionStatusesOnJobPayload()
+    {
+        var id = Guid.NewGuid();
+        var installService = new FakeDownloadJobInstallService
+        {
+            ResultStatuses =
+            [
+                new ConversionStatus(ConversionStatusCodes.AudioIncomplete, "Only backing audio was produced."),
+            ],
+        };
+
+        await using TestAppFixture fixture = await TestAppFixture.CreateAsync(
+            seed: store => store.Seed(MakeJob(id, "Status Song", stage: "Downloaded", downloadedPath: "/tmp/source.zip")),
+            installService: installService);
+
+        HttpResponseMessage queueResponse = await fixture.Client.PostAsync($"/api/v1/downloads/jobs/{id:D}/install", content: null);
+        Assert.Equal(HttpStatusCode.Accepted, queueResponse.StatusCode);
+
+        DownloadJobResponse completed = await WaitForInstalledAsync(fixture.Client, id, timeout: TimeSpan.FromSeconds(3));
+        Assert.Equal("Installed", completed.Stage);
+
+        DownloadJobStatus status = Assert.Single(completed.ConversionStatuses);
+        Assert.Equal(ConversionStatusCodes.AudioIncomplete, status.Code);
+        Assert.Equal("Only backing audio was produced.", status.Message);
+    }
+
+    private static DownloadJobResponse MakeJob(Guid id, string displayName, string stage = "Queued", string? downloadedPath = null) =>
         new()
         {
             JobId = id,
@@ -315,9 +344,30 @@ public sealed class DownloadEndpointsIntegrationTests
             SourceUrl = $"https://rhythmverse.co/download/{id:N}",
             Stage = stage,
             ProgressPercent = 0,
+            DownloadedPath = downloadedPath,
             CreatedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         };
+
+    private static async Task<DownloadJobResponse> WaitForInstalledAsync(HttpClient client, Guid jobId, TimeSpan timeout)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            HttpResponseMessage response = await client.GetAsync($"/api/v1/downloads/jobs/{jobId:D}");
+            response.EnsureSuccessStatusCode();
+
+            DownloadJobResponse? current = await response.Content.ReadFromJsonAsync<DownloadJobResponse>();
+            if (current is not null && string.Equals(current.Stage, "Installed", StringComparison.Ordinal))
+            {
+                return current;
+            }
+
+            await Task.Delay(50);
+        }
+
+        throw new TimeoutException($"Timed out waiting for job {jobId:D} to reach Installed stage.");
+    }
 
     private static void AssertEventStreamContentType(HttpResponseMessage response)
     {
@@ -348,6 +398,7 @@ public sealed class DownloadEndpointsIntegrationTests
         public static async Task<TestAppFixture> CreateAsync(
             Action<FakeDownloadJobStore>? seed = null,
             IJobLogSink? logSink = null,
+            IDownloadJobInstallService? installService = null,
             bool authenticatedClient = true)
         {
             var store = new FakeDownloadJobStore();
@@ -371,7 +422,7 @@ public sealed class DownloadEndpointsIntegrationTests
 
             builder.Services.AddAuthorization();
             builder.Services.AddSingleton<IDownloadJobStore>(store);
-            builder.Services.AddSingleton<IDownloadJobInstallService>(new FakeDownloadJobInstallService());
+            builder.Services.AddSingleton<IDownloadJobInstallService>(installService ?? new FakeDownloadJobInstallService());
             builder.Services.AddSingleton<IInstallConcurrencyLimiter, SemaphoreInstallConcurrencyLimiter>();
             builder.Services.AddSingleton<IJobLogSink>(logSink ?? new NullJobLogSink());
             builder.Services.AddSingleton<ICloneHeroLibraryService>(new NullCloneHeroLibraryService());
@@ -664,12 +715,15 @@ public sealed class DownloadEndpointsIntegrationTests
 
     private sealed class FakeDownloadJobInstallService : IDownloadJobInstallService
     {
+        public IReadOnlyList<ConversionStatus>? ResultStatuses { get; set; }
+
         public Task<DownloadJobInstallResult> InstallJobAsync(DownloadJobResponse job, CancellationToken cancellationToken = default)
             => Task.FromResult(new DownloadJobInstallResult(
                 "/tmp/staged",
                 "/tmp/installed",
                 "Artist/Title/Charter__rhythmverse",
-                new ServerSongMetadata("Artist", "Title", "Charter")));
+                new ServerSongMetadata("Artist", "Title", "Charter"),
+                ResultStatuses));
     }
 
     private sealed class NullCloneHeroLibraryService : ICloneHeroLibraryService

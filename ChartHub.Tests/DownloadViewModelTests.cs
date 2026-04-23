@@ -305,7 +305,11 @@ public class DownloadViewModelTests
                         "/tmp/installed/song-b",
                         null,
                         DateTimeOffset.UtcNow,
-                        DateTimeOffset.UtcNow),
+                        DateTimeOffset.UtcNow,
+                        ConversionStatuses:
+                        [
+                            new ChartHubServerDownloadJobStatus("audio-incomplete", "Only backing audio was produced."),
+                        ]),
                 ],
             ],
         };
@@ -328,6 +332,7 @@ public class DownloadViewModelTests
 
             Assert.True(cardUpdated);
             Assert.Equal(100, sharedQueue.Downloads[0].DownloadProgress);
+            Assert.Equal("Warning: Only backing audio was produced.", sharedQueue.Downloads[0].WarningMessage);
         }
         finally
         {
@@ -384,7 +389,11 @@ public class DownloadViewModelTests
                         DateTimeOffset.UtcNow,
                         DateTimeOffset.UtcNow,
                         Charter: "Test Charter",
-                        FileType: "Zip"),
+                        FileType: "Zip",
+                        ConversionStatuses:
+                        [
+                            new ChartHubServerDownloadJobStatus("audio-incomplete", "Only backing audio was produced."),
+                        ]),
                 ],
             ],
         };
@@ -409,6 +418,7 @@ public class DownloadViewModelTests
             Assert.Equal(IngestionState.Installing, sut.IngestionQueue[0].CurrentState);
             Assert.Equal("Test Charter", sut.IngestionQueue[0].Charter);
             Assert.Equal("Zip", sut.IngestionQueue[0].FileType);
+            Assert.Equal("Warning: Only backing audio was produced.", sut.IngestionQueue[0].ConversionWarningMessage);
             Assert.Equal(1, fakeClient.ListJobsCallCount);
         }
         finally

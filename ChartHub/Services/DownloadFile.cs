@@ -141,6 +141,22 @@ public class DownloadFile(string displayName, string filePath, string urlString,
         }
     }
 
+    private string? _warningMessage;
+    public string? WarningMessage
+    {
+        get => _warningMessage;
+        set
+        {
+            if (_warningMessage == value)
+            {
+                return;
+            }
+
+            _warningMessage = value;
+            OnPropertyChanged(nameof(WarningMessage));
+        }
+    }
+
     private long? _fileSize = fileSize;
     public long? FileSize
     {

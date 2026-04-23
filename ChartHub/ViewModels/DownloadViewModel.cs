@@ -545,6 +545,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         item.Artist = job.Artist;
         item.Title = job.Title;
         item.FileType = job.FileType;
+        item.ConversionWarningMessage = GetPrimaryConversionWarning(job);
     }
 
     private void ApplySharedDownloadJobs(IReadOnlyList<ChartHubServerDownloadJobResponse> jobs)
@@ -568,6 +569,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             card.DownloadProgress = Math.Clamp(job.ProgressPercent, 0, 100);
             card.Finished = IsTerminalServerStage(job.Stage);
             card.ErrorMessage = job.Error;
+            card.WarningMessage = GetPrimaryConversionWarning(job);
 
             if (!string.Equals(previousStage, job.Stage, StringComparison.OrdinalIgnoreCase))
             {
@@ -675,6 +677,17 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
             || string.Equals(stage, "Completed", StringComparison.OrdinalIgnoreCase)
             || string.Equals(stage, "Failed", StringComparison.OrdinalIgnoreCase)
             || string.Equals(stage, "Cancelled", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? GetPrimaryConversionWarning(ChartHubServerDownloadJobResponse job)
+    {
+        string? message = job.ConversionStatuses?
+            .Select(status => status.Message?.Trim())
+            .FirstOrDefault(text => !string.IsNullOrWhiteSpace(text));
+
+        return string.IsNullOrWhiteSpace(message)
+            ? null
+            : $"Warning: {message}";
     }
 
     private static void ObserveBackgroundTask(Task task, string context)

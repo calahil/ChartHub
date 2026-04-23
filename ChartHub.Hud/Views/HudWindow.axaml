@@ -4,7 +4,7 @@
         x:Class="ChartHub.Hud.Views.HudWindow"
         x:DataType="vm:HudViewModel"
         WindowState="FullScreen"
-        SystemDecorations="None"
+        WindowDecorations="None"
         Topmost="True"
         Background="#FF0F0F0F"
         Title="ChartHub">

@@ -90,7 +90,7 @@
                         <TextBlock Text="{Binding PageStrings.ServerBaseUrlLabel}"
                                    FontWeight="SemiBold" />
                         <TextBox Text="{Binding ServerApiBaseUrl, UpdateSourceTrigger=LostFocus}"
-                                 Watermark="{Binding PageStrings.ServerBaseUrlPlaceholder}" />
+                                 PlaceholderText="{Binding PageStrings.ServerBaseUrlPlaceholder}" />
 
                         <Border Padding="8,6"
                             CornerRadius="8"

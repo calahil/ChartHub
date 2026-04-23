@@ -74,8 +74,13 @@ public sealed class DownloadJobResponse
 
 public sealed class DownloadJobStatus
 {
+    /// <summary>
+    /// Stable machine-readable status code. Known values include:
+    /// - audio-incomplete: only backing audio was produced.
+    /// </summary>
     public required string Code { get; init; }
 
+    /// <summary>Human-readable detail for the status code.</summary>
     public required string Message { get; init; }
 }
 

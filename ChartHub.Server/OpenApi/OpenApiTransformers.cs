@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 using ChartHub.Server.Middleware;
 
 using Microsoft.AspNetCore.Authorization;
@@ -61,7 +63,65 @@ internal sealed class ChartHubDocumentTransformer : IOpenApiDocumentTransformer
             new OpenApiTag { Name = "Volume",         Description = "System volume control — read and adjust master volume and per-application audio sessions." },
         };
 
+        AddDownloadStatusExamples(document);
+
         return Task.CompletedTask;
+    }
+
+    private static void AddDownloadStatusExamples(OpenApiDocument document)
+    {
+        if (document.Components?.Schemas is null)
+        {
+            return;
+        }
+
+        JsonObject audioIncompleteStatusExample = new()
+        {
+            ["code"] = "audio-incomplete",
+            ["message"] = "Only backing audio was produced.",
+        };
+
+        if (document.Components.Schemas.TryGetValue("DownloadJobStatus", out IOpenApiSchema? statusSchema)
+            && statusSchema is OpenApiSchema concreteStatusSchema)
+        {
+            concreteStatusSchema.Example = audioIncompleteStatusExample.DeepClone();
+        }
+
+        if (document.Components.Schemas.TryGetValue("DownloadJobResponse", out IOpenApiSchema? jobSchema)
+            && jobSchema is OpenApiSchema concreteJobSchema)
+        {
+            if (concreteJobSchema.Properties?.TryGetValue("conversionStatuses", out IOpenApiSchema? conversionStatusesSchema) == true
+                && conversionStatusesSchema is OpenApiSchema concreteConversionStatusesSchema)
+            {
+                concreteConversionStatusesSchema.Example = new JsonArray
+                {
+                    audioIncompleteStatusExample.DeepClone(),
+                };
+            }
+
+            concreteJobSchema.Example = new JsonObject
+            {
+                ["jobId"] = "c4f4a4d8-3bbf-4f8c-a77d-d6458e8d2f49",
+                ["source"] = "rhythmverse",
+                ["sourceId"] = "rv-example",
+                ["displayName"] = "Example Song",
+                ["sourceUrl"] = "https://rhythmverse.co/song/example",
+                ["stage"] = "Installed",
+                ["progressPercent"] = 100,
+                ["installedPath"] = "/srv/charthub/songs/Artist/Example Song/Charter__rhythmverse",
+                ["installedRelativePath"] = "Artist/Example Song/Charter__rhythmverse",
+                ["artist"] = "Artist",
+                ["title"] = "Example Song",
+                ["charter"] = "Charter",
+                ["conversionStatuses"] = new JsonArray
+                {
+                    audioIncompleteStatusExample.DeepClone(),
+                },
+                ["drumGenRequested"] = false,
+                ["createdAtUtc"] = "2026-04-23T12:00:00Z",
+                ["updatedAtUtc"] = "2026-04-23T12:00:03Z",
+            };
+        }
     }
 }
 

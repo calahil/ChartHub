@@ -22,6 +22,7 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
     private bool _isJobLogExpanded;
     private bool _isLoadingLogs;
     private string? _fileType;
+    private string? _conversionWarningMessage;
 
     public long IngestionId { get; init; }
     public string Source { get; init; } = string.Empty;
@@ -32,6 +33,21 @@ public sealed class IngestionQueueItem : INotifyPropertyChanged
     public string? DesktopLibraryPath { get; init; }
 
     public ObservableCollection<ChartHubServerJobLogEntry> JobLogs { get; } = [];
+
+    public string? ConversionWarningMessage
+    {
+        get => _conversionWarningMessage;
+        set
+        {
+            if (_conversionWarningMessage == value)
+            {
+                return;
+            }
+
+            _conversionWarningMessage = value;
+            OnPropertyChanged();
+        }
+    }
 
     public string? FileType
     {
