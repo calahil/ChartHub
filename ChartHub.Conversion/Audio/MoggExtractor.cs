@@ -38,8 +38,11 @@ internal sealed class MoggExtractor
         // Write MOGG data to a temp file (stripping the 8-byte MOGG header to get raw OGG).
         string tempOgg = Path.Combine(outputDir, "__mogg_raw.ogg");
         int oggOffset = ReadMoggOggOffset(moggBytes);
-        await File.WriteAllBytesAsync(tempOgg, moggBytes[oggOffset..], cancellationToken)
+        byte[] rawOggBytes = moggBytes[oggOffset..];
+        await File.WriteAllBytesAsync(tempOgg, rawOggBytes, cancellationToken)
             .ConfigureAwait(false);
+
+        int? vorbisChannelCount = TryReadVorbisChannelCount(rawOggBytes);
 
         var stems = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -60,10 +63,18 @@ internal sealed class MoggExtractor
                     continue;
                 }
 
+                // Some fan-made packages have DTA channel mappings that exceed the actual
+                // Vorbis stream channel count. Skip those stems and keep conversion alive
+                // using the full backing track.
+                if (vorbisChannelCount.HasValue && channels.Any(channel => channel < 0 || channel >= vorbisChannelCount.Value))
+                {
+                    continue;
+                }
+
                 string stemFile = Path.Combine(outputDir, $"{NormaliseStemName(stem)}.ogg");
-                string filterGraph = BuildChannelFilter(channels, songInfo.TotalChannels);
+                string audioFilter = BuildChannelFilter(channels, songInfo.TotalChannels);
                 await RunFfmpegAsync(
-                    ["-y", "-i", tempOgg, "-filter_complex", filterGraph,
+                    ["-y", "-i", tempOgg, "-af", audioFilter,
                      "-c:a", "libvorbis", "-q:a", "6", stemFile],
                     cancellationToken).ConfigureAwait(false);
                 stems[stem] = stemFile;
@@ -87,13 +98,37 @@ internal sealed class MoggExtractor
 
         // Bytes [4–7]: OGG start offset, little-endian 32-bit.
         int offset = bytes[4] | (bytes[5] << 8) | (bytes[6] << 16) | (bytes[7] << 24);
-        if (offset < 8 || offset >= bytes.Length)
+        if (IsOggSyncAt(bytes, offset))
         {
-            // Fallback: RB2 MOGGs use version 0x0A with offset always 8
+            return offset;
+        }
+
+        // Common fallback for older containers.
+        if (IsOggSyncAt(bytes, 8))
+        {
             return 8;
         }
 
-        return offset;
+        // Some files carry a stale/incorrect offset in the header; recover by scanning.
+        for (int i = 0; i <= bytes.Length - 4; i++)
+        {
+            if (IsOggSyncAt(bytes, i))
+            {
+                return i;
+            }
+        }
+
+        throw new InvalidDataException("MOGG payload does not contain an OggS sync word.");
+    }
+
+    private static bool IsOggSyncAt(byte[] bytes, int offset)
+    {
+        return offset >= 0
+            && offset <= bytes.Length - 4
+            && bytes[offset] == (byte)'O'
+            && bytes[offset + 1] == (byte)'g'
+            && bytes[offset + 2] == (byte)'g'
+            && bytes[offset + 3] == (byte)'S';
     }
 
     /// <summary>
@@ -108,16 +143,16 @@ internal sealed class MoggExtractor
         if (channels.Count == 1)
         {
             // Mono channel duplicated to stereo
-            return $"[0:a]pan=stereo|c0=c{channels[0]}|c1=c{channels[0]}[out];[out]";
+            return $"pan=stereo|c0=c{channels[0]}|c1=c{channels[0]}";
         }
 
         if (channels.Count >= 2)
         {
             // Use first two channels as L/R
-            return $"[0:a]pan=stereo|c0=c{channels[0]}|c1=c{channels[1]}[out];[out]";
+            return $"pan=stereo|c0=c{channels[0]}|c1=c{channels[1]}";
         }
 
-        return "[0:a]aformat=channel_layouts=stereo[out];[out]";
+        return "aformat=channel_layouts=stereo";
     }
 
     private static string NormaliseStemName(string stem)
@@ -132,6 +167,33 @@ internal sealed class MoggExtractor
             "crowd" => "crowd",
             _ => stem.ToLowerInvariant(),
         };
+    }
+
+    private static int? TryReadVorbisChannelCount(ReadOnlySpan<byte> oggBytes)
+    {
+        ReadOnlySpan<byte> marker = [
+            (byte)0x01,
+            (byte)'v', (byte)'o', (byte)'r', (byte)'b', (byte)'i', (byte)'s',
+        ];
+
+        for (int i = 0; i <= oggBytes.Length - marker.Length - 5; i++)
+        {
+            if (!oggBytes.Slice(i, marker.Length).SequenceEqual(marker))
+            {
+                continue;
+            }
+
+            int channelOffset = i + marker.Length + 4;
+            if (channelOffset >= oggBytes.Length)
+            {
+                return null;
+            }
+
+            int channels = oggBytes[channelOffset];
+            return channels > 0 ? channels : null;
+        }
+
+        return null;
     }
 
     private async Task RunFfmpegAsync(string[] args, CancellationToken cancellationToken)
@@ -170,8 +232,9 @@ internal sealed class MoggExtractor
 
         if (process.ExitCode != 0)
         {
+            string stderrTail = stderr.Length <= 2000 ? stderr : stderr[^2000..];
             throw new InvalidOperationException(
-                $"ffmpeg exited with code {process.ExitCode}: {stderr.AsSpan(0, Math.Min(400, stderr.Length))}");
+                $"ffmpeg exited with code {process.ExitCode}. Command: {_ffmpegPath} {string.Join(' ', args)}\n{stderrTail}");
         }
     }
 

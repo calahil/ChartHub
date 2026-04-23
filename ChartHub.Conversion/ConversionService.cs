@@ -150,17 +150,28 @@ public sealed class ConversionService : IConversionService
         CancellationToken cancellationToken)
     {
         byte[]? moggBytes = null;
+        StfsEntry? moggEntry = null;
 
-        foreach ((string path, _) in stfs.GetAllFiles())
+        foreach ((string path, StfsEntry entry) in stfs.GetAllFiles())
         {
             if (path.EndsWith(".mogg", StringComparison.OrdinalIgnoreCase))
             {
-                moggBytes = stfs.ReadFile(path);
+                moggEntry = entry;
+                moggBytes = stfs.ReadEntry(entry);
+
+                // Some fan-made STFS packages carry broken hash-chain pointers for
+                // otherwise contiguous payload blocks. If the primary read yields no
+                // Ogg sync signature, retry this entry with forced sequential traversal.
+                if (moggBytes != null && !ContainsOggSyncWord(moggBytes) && !entry.IsConsecutive)
+                {
+                    moggBytes = stfs.ReadEntry(entry, forceConsecutive: true);
+                }
+
                 break;
             }
         }
 
-        if (moggBytes == null)
+        if (moggBytes == null || moggEntry == null)
         {
             throw new InvalidDataException("No MOGG audio file found inside the CON package.");
         }
@@ -168,6 +179,22 @@ public sealed class ConversionService : IConversionService
         var extractor = new MoggExtractor(_options.FfmpegPath);
         await extractor.ExtractStemsAsync(moggBytes, songInfo, songDir, cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    private static bool ContainsOggSyncWord(ReadOnlySpan<byte> bytes)
+    {
+        for (int i = 0; i <= bytes.Length - 4; i++)
+        {
+            if (bytes[i] == (byte)'O'
+                && bytes[i + 1] == (byte)'g'
+                && bytes[i + 2] == (byte)'g'
+                && bytes[i + 3] == (byte)'S')
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void ExtractAlbumArt(StfsReader stfs, string songDir)
@@ -205,10 +232,27 @@ public sealed class ConversionService : IConversionService
         var sb = new System.Text.StringBuilder(name.Length);
         foreach (char c in name)
         {
-            sb.Append(Array.IndexOf(invalid, c) >= 0 ? '_' : c);
+            // Keep a conservative subset so downstream tools (ffmpeg, etc.) never receive
+            // path segments with URL/framing characters like '#', '?', or '&'.
+            bool isSafe = char.IsLetterOrDigit(c)
+                || c == ' '
+                || c == '-'
+                || c == '_'
+                || c == '.'
+                || c == '(' || c == ')';
+
+            if (!isSafe || Array.IndexOf(invalid, c) >= 0 || char.IsControl(c))
+            {
+                sb.Append('_');
+            }
+            else
+            {
+                sb.Append(c);
+            }
         }
 
-        return sb.Length > 0 ? sb.ToString() : "song";
+        string sanitized = sb.ToString().Trim(' ', '.');
+        return sanitized.Length > 0 ? sanitized : "song";
     }
 
     private static void TryDeleteDirectory(string path)

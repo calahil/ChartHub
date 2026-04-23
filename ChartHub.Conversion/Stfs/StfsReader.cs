@@ -211,6 +211,19 @@ internal sealed class StfsReader : IDisposable
         return ReadFile(entry.FirstBlock, entry.FileSize, entry.IsConsecutive);
     }
 
+    /// <summary>
+    /// Reads the content of a file entry while overriding block traversal mode.
+    /// </summary>
+    /// <param name="entry">The STFS file entry to read.</param>
+    /// <param name="forceConsecutive">
+    /// When true, blocks are read as first, first+1, first+2 regardless of hash pointers.
+    /// </param>
+    public byte[] ReadEntry(StfsEntry entry, bool forceConsecutive)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return ReadFile(entry.FirstBlock, entry.FileSize, forceConsecutive);
+    }
+
     /// <summary>Reads the content of a file entry by its virtual path (case-insensitive).</summary>
     public byte[]? ReadFile(string virtualPath)
     {
@@ -276,8 +289,14 @@ internal sealed class StfsReader : IDisposable
 
         for (int i = 0; i < numBlocks && current != LastBlock; i++)
         {
-            int fileOffset = BlockFileOffset(current);
+            long fileOffset = BlockFileOffset(current);
             int bytesToRead = Math.Min(BlockSize, maxBytes - written);
+
+            if (fileOffset < 0 || fileOffset + bytesToRead > _streamLength)
+            {
+                throw new InvalidDataException($"STFS block {current} resolves to invalid file offset {fileOffset} (stream length {_streamLength}).");
+            }
+
             ReadAt(_stream, result, written, bytesToRead, fileOffset);
             written += bytesToRead;
 
@@ -305,7 +324,14 @@ internal sealed class StfsReader : IDisposable
     {
         int group = n / HashEntriesPerGroup;
         int idx = n % HashEntriesPerGroup;
-        int hashOffset = _headerSize + group * (HashEntriesPerGroup + 1) * BlockSize + idx * HashEntrySize;
+        long hashOffset = _headerSize
+            + ((long)group * (HashEntriesPerGroup + 1) * BlockSize)
+            + ((long)idx * HashEntrySize);
+
+        if (hashOffset < 0 || hashOffset + HashEntrySize > _streamLength)
+        {
+            return n + 1;
+        }
 
         byte[] entry = new byte[HashEntrySize];
         ReadAt(_stream, entry, 0, HashEntrySize, hashOffset);
@@ -326,7 +352,7 @@ internal sealed class StfsReader : IDisposable
         if (next != LastBlock)
         {
             long nextDataOffset = BlockFileOffset(next);
-            if (nextDataOffset + BlockSize > _streamLength)
+            if (nextDataOffset < 0 || nextDataOffset + BlockSize > _streamLength)
             {
                 return n + 1;
             }
@@ -335,13 +361,23 @@ internal sealed class StfsReader : IDisposable
         return next; // 0xFFFFFF = last block
     }
 
-    private int BlockFileOffset(int n)
+    private long BlockFileOffset(int n)
     {
-        return _headerSize + (n + n / HashEntriesPerGroup + 1) * BlockSize;
+        return _headerSize + ((long)n + (n / HashEntriesPerGroup) + 1L) * BlockSize;
     }
 
-    private static void ReadAt(Stream stream, byte[] buffer, int bufferOffset, int count, int fileOffset)
+    private static void ReadAt(Stream stream, byte[] buffer, int bufferOffset, int count, long fileOffset)
     {
+        if (fileOffset < 0)
+        {
+            throw new InvalidDataException($"Attempted to seek to a negative offset ({fileOffset}).");
+        }
+
+        if (fileOffset > stream.Length)
+        {
+            throw new EndOfStreamException($"Attempted to seek to offset {fileOffset} beyond stream length {stream.Length}.");
+        }
+
         stream.Seek(fileOffset, SeekOrigin.Begin);
         ReadExact(stream, buffer, bufferOffset, count);
     }

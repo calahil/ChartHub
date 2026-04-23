@@ -1,3 +1,4 @@
+using ChartHub.Conversion.Audio;
 using ChartHub.Conversion.Dta;
 using ChartHub.Conversion.Stfs;
 
@@ -138,6 +139,14 @@ public sealed class FanMadeConTests
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
             "../../../../../merges/The Suburbs-1e613af8-e156-491a-b4a4-9a3a04ff3093.rb3con"));
 
+    private static readonly string LocalDevSuburbsConPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../ChartHub.Server/dev-data/charthub/staging/jobs/405ca3d8-1099-4f97-874f-0a0059c4c3b1/The Suburbs-405ca3d8-1099-4f97-874f-0a0059c4c3b1.rb3con"));
+
+    private static readonly string LocalDevNeighborhoodConPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../ChartHub.Server/dev-data/charthub/staging/jobs/7aeafca4-70c6-476d-b517-e9ffbce2be28/Neighborhood #1 (Tunnels)-7aeafca4-70c6-476d-b517-e9ffbce2be28.rb3con"));
+
     [Fact]
     public void GetAllFiles_FanMadeCon_ContainsExpectedEntries()
     {
@@ -211,6 +220,83 @@ public sealed class FanMadeConTests
         Assert.Equal(0x0A, mogg[0]);
     }
 
+    [Fact]
+    public async Task ConvertAsync_FanMadeSuburbsCon_ProducesSongFolder()
+    {
+        string? conPath = ResolveAvailableSuburbsConPath();
+        if (conPath is null)
+        {
+            return;
+        }
+
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-convert-test-{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(outputRoot);
+
+            var service = new ConversionService();
+            Conversion.Models.ConversionResult result = await service.ConvertAsync(conPath, outputRoot);
+
+            Assert.True(Directory.Exists(result.OutputDirectory));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ogg")));
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConvertAsync_LocalNeighborhoodCon_SanitizesOutputPathAndSucceeds()
+    {
+        if (!File.Exists(LocalDevNeighborhoodConPath))
+        {
+            return;
+        }
+
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-convert-neighborhood-{Guid.NewGuid():N}");
+
+        try
+        {
+            Directory.CreateDirectory(outputRoot);
+
+            var service = new ConversionService();
+            Conversion.Models.ConversionResult result = await service.ConvertAsync(LocalDevNeighborhoodConPath, outputRoot);
+
+            Assert.True(Directory.Exists(result.OutputDirectory));
+            Assert.DoesNotContain("#", result.OutputDirectory, StringComparison.Ordinal);
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ogg")));
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+
+    private static string? ResolveAvailableSuburbsConPath()
+    {
+        if (File.Exists(SuburbsConPath))
+        {
+            return SuburbsConPath;
+        }
+
+        if (File.Exists(LocalDevSuburbsConPath))
+        {
+            return LocalDevSuburbsConPath;
+        }
+
+        return null;
+    }
+
     private static byte[]? FindDtaAnyPath(StfsReader reader)
     {
         foreach ((string path, _) in reader.GetAllFiles())
@@ -222,6 +308,265 @@ public sealed class FanMadeConTests
         }
 
         return null;
+    }
+}
+
+public sealed class StfsReaderSafetyTests
+{
+    [Fact]
+    public void ReadEntry_MalformedNextBlockPointer_FallsBackToSequentialBlocks()
+    {
+        using MemoryStream stream = BuildSyntheticConWithMalformedNextPointer();
+        using var reader = StfsReader.Open(stream);
+
+        (string _, StfsEntry entry) = reader.GetAllFiles().Single();
+        byte[] data = reader.ReadEntry(entry);
+
+        Assert.Equal(5000, data.Length);
+        Assert.Equal((byte)0x11, data[0]);
+        Assert.Equal((byte)0x11, data[4095]);
+        Assert.Equal((byte)0x22, data[4096]);
+        Assert.Equal((byte)0x22, data[^1]);
+    }
+
+    private static MemoryStream BuildSyntheticConWithMalformedNextPointer()
+    {
+        const int blockSize = 0x1000;
+        const int headerSize = 0x1000;
+        const int firstDataBlock = 170;
+        const int secondDataBlock = 171;
+
+        long dirBlockOffset = headerSize + (0 + 0 + 1) * blockSize;
+        long firstDataOffset = headerSize + (firstDataBlock + (firstDataBlock / 170) + 1) * blockSize;
+        long secondDataOffset = headerSize + (secondDataBlock + (secondDataBlock / 170) + 1) * blockSize;
+        long groupOneHashOffset = headerSize + (1L * 171 * blockSize);
+        int streamLength = (int)(secondDataOffset + blockSize);
+
+        byte[] bytes = new byte[streamLength];
+
+        // Header magic.
+        bytes[0] = 0x43; // C
+        bytes[1] = 0x4F; // O
+        bytes[2] = 0x4E; // N
+        bytes[3] = 0x20; // space
+
+        // Raw header size at 0x340 (BE32), rounded to 0x1000 by reader.
+        bytes[0x343] = 0x40;
+
+        // File table metadata at 0x37C-0x380.
+        bytes[0x37C] = 0x01; // file table block count = 1 (LE16)
+        bytes[0x37D] = 0x00;
+        bytes[0x37E] = 0x00; // file table first block = 0 (LE24)
+        bytes[0x37F] = 0x00;
+        bytes[0x380] = 0x00;
+
+        int dir = (int)dirBlockOffset;
+        string name = "song.bin";
+        for (int i = 0; i < name.Length; i++)
+        {
+            bytes[dir + i] = (byte)name[i];
+        }
+
+        bytes[dir + 0x28] = (byte)name.Length; // flags: file + name length
+        bytes[dir + 0x2F] = (byte)(firstDataBlock & 0xFF);
+        bytes[dir + 0x30] = (byte)((firstDataBlock >> 8) & 0xFF);
+        bytes[dir + 0x31] = (byte)((firstDataBlock >> 16) & 0xFF);
+        bytes[dir + 0x32] = 0xFF;
+        bytes[dir + 0x33] = 0xFF; // root parent marker
+
+        const int fileSize = 5000;
+        bytes[dir + 0x34] = (byte)((fileSize >> 24) & 0xFF);
+        bytes[dir + 0x35] = (byte)((fileSize >> 16) & 0xFF);
+        bytes[dir + 0x36] = (byte)((fileSize >> 8) & 0xFF);
+        bytes[dir + 0x37] = (byte)(fileSize & 0xFF);
+
+        // Group 1, index 0 hash entry describes block 170. Set a malformed explicit pointer.
+        int hash = (int)groupOneHashOffset;
+        bytes[hash + 20] = 0x01; // explicit pointer
+        bytes[hash + 21] = 0xFF;
+        bytes[hash + 22] = 0xFF;
+        bytes[hash + 23] = 0xFE; // absurd next block -> should trigger bounds fallback to n+1
+
+        Array.Fill(bytes, (byte)0x11, (int)firstDataOffset, blockSize);
+        Array.Fill(bytes, (byte)0x22, (int)secondDataOffset, blockSize);
+
+        return new MemoryStream(bytes, writable: false);
+    }
+}
+
+public sealed class MoggExtractorTests
+{
+    [Fact]
+    public async Task ExtractStemsAsync_InvalidStemChannels_AreSkipped()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            // Test harness uses a tiny bash ffmpeg stub.
+            return;
+        }
+
+        string tempRoot = Path.Combine(Path.GetTempPath(), $"charthub-mogg-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            string outputDir = Path.Combine(tempRoot, "out");
+            Directory.CreateDirectory(outputDir);
+
+            string invocationLog = Path.Combine(tempRoot, "ffmpeg-invocations.log");
+            string fakeFfmpeg = CreateFakeFfmpegScript(tempRoot, invocationLog);
+
+            var extractor = new MoggExtractor(fakeFfmpeg);
+            DtaSongInfo songInfo = new()
+            {
+                ShortName = "suburbs",
+                Title = "The Suburbs",
+                Artist = "Arcade Fire",
+                TrackChannels = new Dictionary<string, IReadOnlyList<int>>
+                {
+                    ["guitar"] = [0, 1],
+                    ["keys"] = [8, 9], // Invalid for a 2-channel Vorbis stream.
+                },
+                TotalChannels = 10,
+            };
+
+            byte[] moggBytes = BuildSyntheticMoggWithVorbisChannels(2);
+            IReadOnlyDictionary<string, string> stems = await extractor.ExtractStemsAsync(moggBytes, songInfo, outputDir);
+
+            Assert.Contains("song", stems.Keys);
+            Assert.Contains("guitar", stems.Keys);
+            Assert.DoesNotContain("keys", stems.Keys);
+
+            string[] invocations = File.ReadAllLines(invocationLog);
+            Assert.Equal(2, invocations.Length); // backing + guitar stem only
+            Assert.All(invocations, invocation => Assert.DoesNotContain("-filter_complex", invocation, StringComparison.Ordinal));
+            Assert.Contains("-af", invocations[1], StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExtractStemsAsync_BogusHeaderOffset_RecoversByOggSyncScan()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string tempRoot = Path.Combine(Path.GetTempPath(), $"charthub-mogg-offset-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            string outputDir = Path.Combine(tempRoot, "out");
+            Directory.CreateDirectory(outputDir);
+
+            string invocationLog = Path.Combine(tempRoot, "ffmpeg-invocations.log");
+            string fakeFfmpeg = CreateFakeFfmpegScript(tempRoot, invocationLog);
+
+            var extractor = new MoggExtractor(fakeFfmpeg);
+            DtaSongInfo songInfo = new()
+            {
+                ShortName = "suburbs",
+                Title = "The Suburbs",
+                Artist = "Arcade Fire",
+                TrackChannels = new Dictionary<string, IReadOnlyList<int>>
+                {
+                    ["guitar"] = [0, 1],
+                },
+                TotalChannels = 2,
+            };
+
+            // Header claims 0x20, but actual Ogg payload starts at 12.
+            // This forces recovery through the OggS sync scan path.
+            byte[] moggBytes = BuildSyntheticMoggWithVorbisChannels(2, declaredOffset: 0x20, actualOffset: 12);
+            IReadOnlyDictionary<string, string> stems = await extractor.ExtractStemsAsync(moggBytes, songInfo, outputDir);
+
+            Assert.Contains("song", stems.Keys);
+            Assert.Contains("guitar", stems.Keys);
+            Assert.True(File.Exists(stems["song"]));
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    private static string CreateFakeFfmpegScript(string root, string invocationLog)
+    {
+        string scriptPath = Path.Combine(root, "fake-ffmpeg.sh");
+        string script = "#!/usr/bin/env bash\n"
+            + "set -e\n"
+            + "in=\"\"\n"
+            + "for ((i=1;i<=$#;i++)); do\n"
+            + "  if [[ \"${!i}\" == \"-i\" ]]; then\n"
+            + "    j=$((i+1))\n"
+            + "    in=\"${!j}\"\n"
+            + "    break\n"
+            + "  fi\n"
+            + "done\n"
+            + "if [[ -n \"$in\" ]]; then\n"
+            + "  sig=$(head -c 4 \"$in\" || true)\n"
+            + "  if [[ \"$sig\" != \"OggS\" ]]; then\n"
+            + "    echo \"invalid-ogg\" >&2\n"
+            + "    exit 9\n"
+            + "  fi\n"
+            + "fi\n"
+            + $"echo \"$*\" >> \"{invocationLog}\"\n"
+            + "out=\"${@: -1}\"\n"
+            + "mkdir -p \"$(dirname \"$out\")\"\n"
+            + ": > \"$out\"\n";
+        File.WriteAllText(scriptPath, script);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(scriptPath,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+        }
+
+        return scriptPath;
+    }
+
+    private static byte[] BuildSyntheticMoggWithVorbisChannels(byte channels, int declaredOffset = 8, int actualOffset = 8)
+    {
+        byte[] rawOgg = new byte[64];
+        rawOgg[0] = (byte)'O';
+        rawOgg[1] = (byte)'g';
+        rawOgg[2] = (byte)'g';
+        rawOgg[3] = (byte)'S';
+        int marker = 16;
+        rawOgg[marker] = 0x01;
+        rawOgg[marker + 1] = (byte)'v';
+        rawOgg[marker + 2] = (byte)'o';
+        rawOgg[marker + 3] = (byte)'r';
+        rawOgg[marker + 4] = (byte)'b';
+        rawOgg[marker + 5] = (byte)'i';
+        rawOgg[marker + 6] = (byte)'s';
+        rawOgg[marker + 11] = channels; // packet_type + "vorbis" + version(4) + channels
+
+        if (actualOffset < 8)
+        {
+            throw new ArgumentOutOfRangeException(nameof(actualOffset), "MOGG payload offset must be at least 8.");
+        }
+
+        byte[] mogg = new byte[actualOffset + rawOgg.Length];
+        mogg[0] = 0x0A;
+        mogg[4] = (byte)(declaredOffset & 0xFF);
+        mogg[5] = (byte)((declaredOffset >> 8) & 0xFF);
+        mogg[6] = (byte)((declaredOffset >> 16) & 0xFF);
+        mogg[7] = (byte)((declaredOffset >> 24) & 0xFF);
+        Buffer.BlockCopy(rawOgg, 0, mogg, actualOffset, rawOgg.Length);
+        return mogg;
     }
 }
 
