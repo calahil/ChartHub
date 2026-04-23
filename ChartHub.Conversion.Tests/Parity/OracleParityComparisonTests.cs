@@ -7,13 +7,18 @@ public sealed class OracleParityComparisonTests
         {
             ["sng-biology"] = "Onyx oracle cannot extract this encrypted/unsupported SNG fixture.",
             ["rb3con-neighborhood-1"] = "ChartHub does not yet support MOGG encryption version 0x0D.",
+            ["sng-creature-comfort"] = "SNG notes.chart import is not implemented yet; ChartHub currently supports notes.mid.",
         };
 
     [Theory]
     [InlineData("rb3con-ready-to-start")]
     [InlineData("rb3con-neighborhood-1")]
     [InlineData("rb3con-arcade-fire-pack")]
+    [InlineData("rb3con-everything-now")]
     [InlineData("sng-biology")]
+    [InlineData("sng-release")]
+    [InlineData("sng-yellow-ledbetter")]
+    [InlineData("sng-creature-comfort")]
     public async Task Fixture_OptInComparison_CanGenerateOutputsAndValidateChecksums(string fixtureId)
     {
         if (!ParityPaths.IsOracleEnabled())

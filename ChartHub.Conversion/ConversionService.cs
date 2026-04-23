@@ -3,6 +3,7 @@ using ChartHub.Conversion.Dta;
 using ChartHub.Conversion.Image;
 using ChartHub.Conversion.Midi;
 using ChartHub.Conversion.Models;
+using ChartHub.Conversion.Sng;
 using ChartHub.Conversion.SongIni;
 using ChartHub.Conversion.Stfs;
 
@@ -47,18 +48,54 @@ public sealed class ConversionService : IConversionService
         };
     }
 
-    private static Task<ConversionResult> ConvertSngAsync(
+    private static async Task<ConversionResult> ConvertSngAsync(
         string sourcePath,
         string outputRoot,
         CancellationToken cancellationToken)
     {
-        _ = sourcePath;
-        _ = outputRoot;
-        _ = cancellationToken;
+        byte[] containerBytes = await File.ReadAllBytesAsync(sourcePath, cancellationToken).ConfigureAwait(false);
+        SngPackage package = SngPackageReader.Read(containerBytes);
+        ConversionMetadata metadata = SngMetadataExtractor.Extract(package, containerBytes, sourcePath);
 
-        throw new NotSupportedException(
-            "SNG conversion is not implemented yet. "
-            + "M2 work item: add SNGPKG reader and wire extraction to the standard conversion pipeline.");
+        string songDirName = SanitiseDirName(metadata.Title);
+        if (string.IsNullOrWhiteSpace(songDirName))
+        {
+            songDirName = SanitiseDirName(Path.GetFileNameWithoutExtension(sourcePath));
+        }
+
+        if (string.IsNullOrWhiteSpace(songDirName))
+        {
+            songDirName = "Unknown Song";
+        }
+
+        string songDir = Path.Combine(outputRoot, songDirName);
+        Directory.CreateDirectory(songDir);
+
+        try
+        {
+            byte[] midiBytes = SngMidiExtractor.ExtractCloneHeroMidi(package, containerBytes);
+            await File.WriteAllBytesAsync(Path.Combine(songDir, "notes.mid"), midiBytes, cancellationToken).ConfigureAwait(false);
+
+            await SngAudioExtractor.ExtractAsync(package, containerBytes, songDir, cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                await SngAlbumArtExtractor.ExtractAsync(package, containerBytes, songDir, cancellationToken).ConfigureAwait(false);
+            }
+            catch (InvalidDataException)
+            {
+                // Album art is optional for SNG installs.
+            }
+
+            await WriteSngSongIniAsync(package, containerBytes, sourcePath, songDir, metadata, cancellationToken).ConfigureAwait(false);
+
+            return new ConversionResult(songDir, metadata);
+        }
+        catch
+        {
+            TryDeleteDirectory(songDir);
+            throw;
+        }
     }
 
     private async Task<ConversionResult> ConvertConAsync(
@@ -274,6 +311,41 @@ public sealed class ConversionService : IConversionService
             && bytes[1] == (byte)'T'
             && bytes[2] == (byte)'h'
             && bytes[3] == (byte)'d';
+    }
+
+    private static async Task WriteSngSongIniAsync(
+        SngPackage package,
+        byte[] containerBytes,
+        string sourcePath,
+        string songDir,
+        ConversionMetadata metadata,
+        CancellationToken cancellationToken)
+    {
+        string songIniPath = Path.Combine(songDir, "song.ini");
+
+        if (SngPackageReader.TryFindEntry(package, "song.ini", out SngFileEntry? songIniEntry)
+            && songIniEntry != null)
+        {
+            byte[] songIniBytes = SngPackageReader.ReadFileData(containerBytes, songIniEntry);
+            await File.WriteAllBytesAsync(songIniPath, songIniBytes, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        string shortName = Path.GetFileNameWithoutExtension(sourcePath);
+        if (string.IsNullOrWhiteSpace(shortName))
+        {
+            shortName = metadata.Title;
+        }
+
+        string songIniContent = SongIniGenerator.Generate(new DtaSongInfo
+        {
+            ShortName = shortName,
+            Title = metadata.Title,
+            Artist = metadata.Artist,
+            Charter = metadata.Charter,
+        });
+
+        await File.WriteAllTextAsync(songIniPath, songIniContent, System.Text.Encoding.UTF8, cancellationToken).ConfigureAwait(false);
     }
 
     private static void ExtractAlbumArt(StfsReader stfs, string songDir, string? songFilePath = null)

@@ -103,9 +103,8 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
                     => await InstallArchiveAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
                 ServerInstallFileType.Con
                     => await InstallConAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
-                // TODO: Add SNG conversion/install pipeline support.
                 ServerInstallFileType.Sng
-                    => throw new InvalidOperationException("SNG install support is not implemented yet."),
+                    => await InstallSngAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
                 ServerInstallFileType.EncryptedSng
                     => throw new InvalidOperationException("SNG artifact appears encrypted or uses an unsupported official variant."),
                 _ => throw new InvalidOperationException("Unsupported install artifact format."),
@@ -178,6 +177,24 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         InstallLog.OnyxInstallCompleted(_logger, result.OutputDirectory, result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
         _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2109), nameof(DownloadJobInstallService),
             $"CON install finished. Output '{result.OutputDirectory}', artist='{result.Metadata.Artist}', title='{result.Metadata.Title}', charter='{result.Metadata.Charter}'.", null);
+
+        return await RehomeInstalledDirectoryAsync(jobId, result.OutputDirectory, source, Path.GetFileNameWithoutExtension(artifactPath), cancellationToken, serverMetadata).ConfigureAwait(false);
+    }
+
+    private async Task<ServerRehomeInstallResult> InstallSngAsync(Guid jobId, string artifactPath, string source, CancellationToken cancellationToken)
+    {
+        InstallLog.SngInstallStarted(_logger, artifactPath, source);
+        _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2111), nameof(DownloadJobInstallService),
+            $"SNG install started for '{artifactPath}', source '{source}'.", null);
+
+        string outputRoot = Path.Combine(_stagingDir, "sng", jobId.ToString("N"));
+        Directory.CreateDirectory(outputRoot);
+        ConversionResult result = await _conversionService.ConvertAsync(artifactPath, outputRoot, cancellationToken).ConfigureAwait(false);
+        ServerSongMetadata serverMetadata = new(result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
+
+        InstallLog.SngInstallCompleted(_logger, result.OutputDirectory, result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
+        _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2112), nameof(DownloadJobInstallService),
+            $"SNG install finished. Output '{result.OutputDirectory}', artist='{result.Metadata.Artist}', title='{result.Metadata.Title}', charter='{result.Metadata.Charter}'.", null);
 
         return await RehomeInstalledDirectoryAsync(jobId, result.OutputDirectory, source, Path.GetFileNameWithoutExtension(artifactPath), cancellationToken, serverMetadata).ConfigureAwait(false);
     }
@@ -339,5 +356,11 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
 
         [LoggerMessage(EventId = 2110, Level = LogLevel.Information, Message = "Rehomed install directory from '{FromPath}' to '{ToPath}' (relative '{RelativePath}').")]
         public static partial void RehomedInstallDirectory(ILogger logger, string fromPath, string toPath, string relativePath);
+
+        [LoggerMessage(EventId = 2111, Level = LogLevel.Information, Message = "SNG install started for artifact '{ArtifactPath}' and source '{Source}'.")]
+        public static partial void SngInstallStarted(ILogger logger, string artifactPath, string source);
+
+        [LoggerMessage(EventId = 2112, Level = LogLevel.Information, Message = "SNG install produced output '{OutputDirectory}' with metadata artist='{Artist}', title='{Title}', charter='{Charter}'.")]
+        public static partial void SngInstallCompleted(ILogger logger, string outputDirectory, string artist, string title, string charter);
     }
 }

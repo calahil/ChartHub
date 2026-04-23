@@ -29,8 +29,36 @@ fixtures:
       transformedMediaParity: functional
       nonTranscodedParity: functional  # Multi-song pack: ChartHub converts 1st song only, Onyx extracts all. Use functional comparison.
 
+  - id: rb3con-everything-now
+    inputPath: merges/Everything Now-41b4f812-9e41-4e70-ac4a-a31d449945f2.rb3con
+    inputType: rb3con
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
   - id: sng-biology
     inputPath: merges/Biology.sng
+    inputType: sng
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  - id: sng-release
+    inputPath: merges/Pearl Jam - Release (Harmonix).sng
+    inputType: sng
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  - id: sng-yellow-ledbetter
+    inputPath: merges/Pearl Jam - Yellow Ledbetter (farottone).sng
+    inputType: sng
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  - id: sng-creature-comfort
+    inputPath: merges/Arcade Fire - Creature Comfort (Debugmod12).sng
     inputType: sng
     expected:
       transformedMediaParity: functional

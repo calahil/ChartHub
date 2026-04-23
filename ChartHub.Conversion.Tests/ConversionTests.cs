@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 
 using ChartHub.Conversion.Audio;
 using ChartHub.Conversion.Dta;
+using ChartHub.Conversion.Models;
 using ChartHub.Conversion.Sng;
 using ChartHub.Conversion.Stfs;
 
@@ -130,20 +131,34 @@ public sealed class StfsReaderTests
 
 public sealed class ConversionServiceRoutingTests
 {
+    private static readonly string NotesMidSngPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../merges/Pearl Jam - Yellow Ledbetter (farottone).sng"));
+
     [Fact]
-    public async Task ConvertAsync_SngInput_ThrowsNotImplementedMessage()
+    public async Task ConvertAsync_SngInput_ConvertsFixtureIntoCloneHeroFolder()
     {
         string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-sng-route-test-{Guid.NewGuid():N}");
 
         try
         {
+            if (!File.Exists(NotesMidSngPath))
+            {
+                return;
+            }
+
             Directory.CreateDirectory(outputRoot);
 
             var service = new ConversionService();
-            NotSupportedException ex = await Assert.ThrowsAsync<NotSupportedException>(
-                () => service.ConvertAsync("/tmp/fake-input.sng", outputRoot));
+            ConversionResult result = await service.ConvertAsync(NotesMidSngPath, outputRoot);
 
-            Assert.Contains("SNG conversion is not implemented yet", ex.Message, StringComparison.Ordinal);
+            Assert.Equal("Pearl Jam", result.Metadata.Artist);
+            Assert.Equal("Yellow Ledbetter", result.Metadata.Title);
+            Assert.Equal("farottone", result.Metadata.Charter);
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "notes.mid")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.opus")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "album.jpg")));
         }
         finally
         {

@@ -38,18 +38,24 @@ Current validation status (local opt-in parity run):
 - `rb3con-neighborhood-1`: passing under fixture policy
 - `sng-biology`: passing under fixture policy
 - `rb3con-arcade-fire-pack`: passing
+- `sng-release`: passing under fixture policy
 
 Latest verification snapshot:
 
-- Oracle parity suite (`OracleParityComparisonTests`): green (4/4)
+- Oracle parity suite (`OracleParityComparisonTests`): green (5/5)
 - Temporary MOGG candidate diagnostics removed after unblock; robust fallback logic retained
-- Conversion routing guard: `.sng` route wired with explicit not-implemented exception + test coverage
+- Conversion routing: `.sng` route now converts end-to-end through the native SNG pipeline
 - SNGPKG reader: magic/version + file-table extraction implemented with synthetic + real fixture tests
 - SNG metadata extractor: parses embedded `song.ini` ([song] section) with filename/unknown fallbacks + focused unit coverage
+- SNG MIDI extractor: `notes.mid` packages reuse RB→CH MIDI conversion with passthrough fallback for non-standard `notes.mid` payloads; `notes.chart` packages still fail explicitly pending chart import support
+- SNG audio extractor: `.opus` / `.ogg` container audio entries now extract as-is (including multi-stem packages with `guitar.opus`, `drums.opus`, etc.)
+- SNG album art extractor: container image entries now prefer `album.jpg` / `.jpeg` / `.png`, fall back to first supported image, and write normalized `album.*` output
+- SNG install path: server `DownloadJobInstallService` now routes supported `.sng` artifacts through native conversion + standard rehome/install flow
+- Supported SNG parity fixture + baseline: `sng-release` added to `fixtures.yaml` with committed Onyx checksums
 
 Next active slice:
 
-- Implement SNG MIDI extractor + RB→CH MIDI conversion reuse
+- Expand M3 fixture matrix coverage
 
 ## Opt-In Local Runs
 
@@ -106,14 +112,14 @@ Pre-requisites: M1 complete.
 - [x] Encrypted/official SNG variant detection and explicit install failure routing (`EncryptedSng`)
 - [x] SNG reader (parse SNGPKG container: file table, file entries, file data blocks)
 - [x] SNG metadata extractor (song.ini embedded in container or derived fields)
-- [ ] SNG MIDI extractor + RB→CH MIDI conversion reuse
-- [ ] SNG audio extractor (OGG stem files from container)
-- [ ] SNG album art extractor
+- [x] SNG MIDI extractor + RB→CH MIDI conversion reuse
+- [x] SNG audio extractor (OGG stem files from container)
+- [x] SNG album art extractor
 - [x] `ConversionService.ConvertAsync` branch wired for `.sng`
-- [ ] `DownloadJobInstallService.InstallSngAsync` (parallel to existing `InstallConAsync`)
-- [ ] Parity fixture(s) for supported SNG (e.g. fan-made Arcade Fire SNG added to `fixtures.yaml`)
-- [ ] Committed Onyx baselines for at least one SNG fixture
-- [ ] Parity passing for SNG fixtures
+- [x] `DownloadJobInstallService.InstallSngAsync` (parallel to existing `InstallConAsync`)
+- [x] Parity fixture(s) for supported SNG (e.g. fan-made Arcade Fire SNG added to `fixtures.yaml`)
+- [x] Committed Onyx baselines for at least one SNG fixture
+- [x] Parity passing for SNG fixtures
 
 ### M3 — Broadened fixture matrix and stricter production gate
 

@@ -209,6 +209,29 @@ public sealed class DownloadJobInstallServiceTests
         Assert.Equal("SNG artifact appears encrypted or uses an unsupported official variant.", ex.Message);
     }
 
+    [Fact]
+    public async Task InstallJobSngUsesConversionPipelineAndRehomesInstalledFolder()
+    {
+        using var env = new TempEnvironment();
+
+        string sngPath = Path.Combine(env.DownloadsDir, "song.sng");
+        await File.WriteAllBytesAsync(sngPath, [0x53, 0x4E, 0x47, 0x50, 0x4B, 0x47, 0x01]);
+
+        DownloadJobInstallService sut = env.BuildService(
+            fileType: ServerInstallFileType.Sng,
+            conversionService: new StubConversionService());
+
+        DownloadJobResponse job = MakeJob(downloadedPath: sngPath);
+        DownloadJobInstallResult result = await sut.InstallJobAsync(job);
+
+        Assert.True(Directory.Exists(result.InstalledPath));
+        Assert.StartsWith(env.CloneHeroRoot, result.InstalledPath, StringComparison.Ordinal);
+        Assert.Equal("Stub Artist", result.Metadata.Artist);
+        Assert.Equal("Stub Title", result.Metadata.Title);
+        Assert.True(File.Exists(Path.Combine(result.InstalledPath, "song.ini")));
+        Assert.True(File.Exists(Path.Combine(result.InstalledPath, "notes.mid")));
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // Cancellation
     // ──────────────────────────────────────────────────────────────────────────
@@ -315,6 +338,7 @@ public sealed class DownloadJobInstallServiceTests
         public DownloadJobInstallService BuildService(
             ServerInstallFileType fileType = ServerInstallFileType.Zip,
             IJobLogSink? sink = null,
+            IConversionService? conversionService = null,
             CancellationToken cancelOnTypeResolve = default)
         {
             IOptions<ServerPathOptions> pathOptions = Microsoft.Extensions.Options.Options.Create(new ServerPathOptions
@@ -327,7 +351,7 @@ public sealed class DownloadJobInstallServiceTests
                 pathOptions,
                 new StubWebHostEnvironment(Root),
                 new StubFileTypeResolver(fileType, cancelOnTypeResolve),
-                new StubConversionService(),
+                conversionService ?? new StubConversionService(),
                 new ServerSongIniMetadataParser(),
                 new ServerCloneHeroDirectorySchemaService(),
                 NullLogger<DownloadJobInstallService>.Instance,
@@ -377,8 +401,18 @@ public sealed class DownloadJobInstallServiceTests
 
     private sealed class StubConversionService : IConversionService
     {
-        public Task<ConversionResult> ConvertAsync(string sourcePath, string outputRoot, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException("CON conversion not supported in unit tests.");
+        public async Task<ConversionResult> ConvertAsync(string sourcePath, string outputRoot, CancellationToken cancellationToken = default)
+        {
+            string songDir = Path.Combine(outputRoot, "stub-song");
+            Directory.CreateDirectory(songDir);
+            await File.WriteAllTextAsync(
+                Path.Combine(songDir, "song.ini"),
+                "[song]\nartist = Stub Artist\nname = Stub Title\ncharter = Stub Charter\n",
+                cancellationToken);
+            await File.WriteAllTextAsync(Path.Combine(songDir, "notes.mid"), "stub", cancellationToken);
+
+            return new ConversionResult(songDir, new ConversionMetadata("Stub Artist", "Stub Title", "Stub Charter"));
+        }
     }
 
     private sealed class StubWebHostEnvironment(string contentRootPath) : IWebHostEnvironment
