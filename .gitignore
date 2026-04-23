@@ -392,5 +392,6 @@ FodyWeavers.xsd
 ChartHub.BackupApi/cache
 dev-data/
 merges/
+.parity-artifacts/
 /site/
 scripts/delete-workflow-runs.sh

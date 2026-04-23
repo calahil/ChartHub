@@ -1,0 +1,7 @@
+version: 1
+oracle:
+  tool: onyx
+  releaseTag: "20251011"
+  commit: "ad8dc396ce90a3ace3a8d69164de5564f1904207"
+
+fixtures: []

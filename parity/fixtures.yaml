@@ -1,0 +1,30 @@
+version: 1
+oracle:
+  tool: onyx
+  releaseTag: "20251011"
+  commit: "ad8dc396ce90a3ace3a8d69164de5564f1904207"
+  parityPolicy:
+    transformedMedia: functional
+    nonTranscodedFiles: byte
+
+fixtures:
+  - id: rb3con-neighborhood-1
+    inputPath: merges/Neighborhood #1 (Tunnels)-6011b6b4-7095-4f83-acb9-95416a302615.rb3con
+    inputType: rb3con
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  - id: rb3con-ready-to-start
+    inputPath: merges/Ready to Start-e99c44e9-43a5-4c54-aa86-4cffb56bb215.rb3con
+    inputType: rb3con
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  - id: sng-biology
+    inputPath: merges/Biology.sng
+    inputType: sng
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
