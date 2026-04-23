@@ -8,9 +8,19 @@ using ChartHub.Hud.Views;
 
 namespace ChartHub.Hud;
 
-public sealed class App(int serverPort) : Application
+public sealed class App : Application
 {
-    private readonly int _serverPort = serverPort;
+    private readonly int _serverPort;
+
+    public App()
+        : this(serverPort: 5000)
+    {
+    }
+
+    public App(int serverPort)
+    {
+        _serverPort = serverPort;
+    }
 
     public override void Initialize()
     {

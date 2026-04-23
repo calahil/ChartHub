@@ -2,6 +2,11 @@
 
 This directory defines parity fixtures and committed checksums for conversion comparisons.
 
+## Staging Plan Source Of Truth
+
+The maintained staging-ready converter audit and milestone ledger lives in `parity/STAGING_CONVERTER_PLAN.md`.
+Use that file as the authoritative status for M1-M7, completion evidence, and remaining blockers.
+
 ## Baseline
 
 - Oracle tool: Onyx
