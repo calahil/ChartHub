@@ -134,6 +134,9 @@ public sealed class ConversionServiceRoutingTests
     private static readonly string NotesMidSngPath =
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
             "../../../../../merges/Pearl Jam - Yellow Ledbetter (farottone).sng"));
+    private static readonly string NotesChartSngPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../merges/Calibration - Calibration Chart 225 BPM (JoMartineau).sng"));
 
     [Fact]
     public async Task ConvertAsync_SngInput_ConvertsFixtureIntoCloneHeroFolder()
@@ -159,6 +162,37 @@ public sealed class ConversionServiceRoutingTests
             Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")));
             Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.opus")));
             Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "album.jpg")));
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConvertAsync_SngInputWithNotesChart_ExtractsNotesChart()
+    {
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-sng-route-test-{Guid.NewGuid():N}");
+
+        try
+        {
+            if (!File.Exists(NotesChartSngPath))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(outputRoot);
+
+            var service = new ConversionService();
+            ConversionResult result = await service.ConvertAsync(NotesChartSngPath, outputRoot);
+
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "notes.chart")));
+            Assert.False(File.Exists(Path.Combine(result.OutputDirectory, "notes.mid")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")));
+            Assert.True(Directory.EnumerateFiles(result.OutputDirectory, "*.opus", SearchOption.TopDirectoryOnly).Any());
         }
         finally
         {

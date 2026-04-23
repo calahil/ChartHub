@@ -73,8 +73,8 @@ public sealed class ConversionService : IConversionService
 
         try
         {
-            byte[] midiBytes = SngMidiExtractor.ExtractCloneHeroMidi(package, containerBytes);
-            await File.WriteAllBytesAsync(Path.Combine(songDir, "notes.mid"), midiBytes, cancellationToken).ConfigureAwait(false);
+            SngChartContent chart = SngMidiExtractor.ExtractCloneHeroChart(package, containerBytes);
+            await File.WriteAllBytesAsync(Path.Combine(songDir, chart.FileName), chart.Bytes, cancellationToken).ConfigureAwait(false);
 
             await SngAudioExtractor.ExtractAsync(package, containerBytes, songDir, cancellationToken).ConfigureAwait(false);
 

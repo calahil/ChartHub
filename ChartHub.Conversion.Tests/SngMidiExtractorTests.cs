@@ -11,7 +11,7 @@ public sealed class SngMidiExtractorTests
             "../../../../../merges/Pearl Jam - Yellow Ledbetter (farottone).sng"));
 
     [Fact]
-    public void ExtractCloneHeroMidi_WhenNotesMidPresent_ReturnsConvertedMidi()
+    public void ExtractCloneHeroChart_WhenNotesMidPresent_ReturnsConvertedMidi()
     {
         byte[] containerBytes = BuildSyntheticSngPkg(
             [
@@ -20,35 +20,36 @@ public sealed class SngMidiExtractorTests
             ]);
 
         SngPackage package = SngPackageReader.Read(containerBytes);
-        byte[] converted = SngMidiExtractor.ExtractCloneHeroMidi(package, containerBytes);
+        SngChartContent converted = SngMidiExtractor.ExtractCloneHeroChart(package, containerBytes);
 
-        Assert.True(converted.Length >= 14);
-        Assert.Equal((byte)'M', converted[0]);
-        Assert.Equal((byte)'T', converted[1]);
-        Assert.Equal((byte)'h', converted[2]);
-        Assert.Equal((byte)'d', converted[3]);
-        Assert.Equal(2, ReadUInt16BE(converted, 10));
+        Assert.Equal("notes.mid", converted.FileName);
+        Assert.True(converted.Bytes.Length >= 14);
+        Assert.Equal((byte)'M', converted.Bytes[0]);
+        Assert.Equal((byte)'T', converted.Bytes[1]);
+        Assert.Equal((byte)'h', converted.Bytes[2]);
+        Assert.Equal((byte)'d', converted.Bytes[3]);
+        Assert.Equal(2, ReadUInt16BE(converted.Bytes, 10));
     }
 
     [Fact]
-    public void ExtractCloneHeroMidi_WhenOnlyNotesChartPresent_ThrowsNotSupported()
+    public void ExtractCloneHeroChart_WhenOnlyNotesChartPresent_ReturnsChartPayload()
     {
+        byte[] chartBytes = Encoding.ASCII.GetBytes("chart");
         byte[] containerBytes = BuildSyntheticSngPkg(
             [
-                ("notes.chart", Encoding.ASCII.GetBytes("chart")),
+                ("notes.chart", chartBytes),
                 ("song.opus", [0x01, 0x02, 0x03]),
             ]);
 
         SngPackage package = SngPackageReader.Read(containerBytes);
+        SngChartContent extracted = SngMidiExtractor.ExtractCloneHeroChart(package, containerBytes);
 
-        NotSupportedException ex = Assert.Throws<NotSupportedException>(
-            () => SngMidiExtractor.ExtractCloneHeroMidi(package, containerBytes));
-
-        Assert.Contains("notes.chart", ex.Message, StringComparison.Ordinal);
+        Assert.Equal("notes.chart", extracted.FileName);
+        Assert.Equal(chartBytes, extracted.Bytes);
     }
 
     [Fact]
-    public void ExtractCloneHeroMidi_WhenNotesMidIsNonStandard_PassesBytesThrough()
+    public void ExtractCloneHeroChart_WhenNotesMidIsNonStandard_PassesBytesThrough()
     {
         byte[] nonStandardBytes = Encoding.ASCII.GetBytes("NOT-A-STANDARD-MIDI");
         byte[] containerBytes = BuildSyntheticSngPkg(
@@ -58,13 +59,14 @@ public sealed class SngMidiExtractorTests
             ]);
 
         SngPackage package = SngPackageReader.Read(containerBytes);
-        byte[] extracted = SngMidiExtractor.ExtractCloneHeroMidi(package, containerBytes);
+        SngChartContent extracted = SngMidiExtractor.ExtractCloneHeroChart(package, containerBytes);
 
-        Assert.Equal(nonStandardBytes, extracted);
+        Assert.Equal("notes.mid", extracted.FileName);
+        Assert.Equal(nonStandardBytes, extracted.Bytes);
     }
 
     [Fact]
-    public void ExtractCloneHeroMidi_RealFixtureWithNotesMid_ParsesAndConverts()
+    public void ExtractCloneHeroChart_RealFixtureWithNotesMid_ParsesAndConverts()
     {
         if (!File.Exists(MidiFixturePath))
         {
@@ -73,13 +75,14 @@ public sealed class SngMidiExtractorTests
 
         byte[] containerBytes = File.ReadAllBytes(MidiFixturePath);
         SngPackage package = SngPackageReader.Read(containerBytes);
-        byte[] converted = SngMidiExtractor.ExtractCloneHeroMidi(package, containerBytes);
+        SngChartContent converted = SngMidiExtractor.ExtractCloneHeroChart(package, containerBytes);
 
-        Assert.True(converted.Length >= 14);
-        Assert.Equal((byte)'M', converted[0]);
-        Assert.Equal((byte)'T', converted[1]);
-        Assert.Equal((byte)'h', converted[2]);
-        Assert.Equal((byte)'d', converted[3]);
+        Assert.Equal("notes.mid", converted.FileName);
+        Assert.True(converted.Bytes.Length >= 14);
+        Assert.Equal((byte)'M', converted.Bytes[0]);
+        Assert.Equal((byte)'T', converted.Bytes[1]);
+        Assert.Equal((byte)'h', converted.Bytes[2]);
+        Assert.Equal((byte)'d', converted.Bytes[3]);
     }
 
     private static byte[] BuildSyntheticSngPkg(IReadOnlyList<(string Name, byte[] Data)> files)

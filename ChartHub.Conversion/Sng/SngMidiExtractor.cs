@@ -7,7 +7,7 @@ namespace ChartHub.Conversion.Sng;
 /// </summary>
 internal static class SngMidiExtractor
 {
-    internal static byte[] ExtractCloneHeroMidi(SngPackage package, byte[] containerBytes)
+    internal static SngChartContent ExtractCloneHeroChart(SngPackage package, byte[] containerBytes)
     {
         if (SngPackageReader.TryFindEntry(package, "notes.mid", out SngFileEntry? midiEntry)
             && midiEntry != null)
@@ -18,17 +18,16 @@ internal static class SngMidiExtractor
             // In that case preserve the payload rather than failing conversion.
             if (!StartsWithMidiHeader(midiBytes))
             {
-                return midiBytes;
+                return new SngChartContent("notes.mid", midiBytes);
             }
 
-            return RbMidiConverter.Convert(midiBytes);
+            return new SngChartContent("notes.mid", RbMidiConverter.Convert(midiBytes));
         }
 
         if (SngPackageReader.TryFindEntry(package, "notes.chart", out SngFileEntry? chartEntry)
             && chartEntry != null)
         {
-            throw new NotSupportedException(
-                "SNG packages with notes.chart are not supported yet. Expected notes.mid for RB MIDI conversion reuse.");
+            return new SngChartContent("notes.chart", SngPackageReader.ReadFileData(containerBytes, chartEntry));
         }
 
         throw new InvalidDataException("No notes.mid or notes.chart entry found in SNG package.");
@@ -43,3 +42,5 @@ internal static class SngMidiExtractor
             && bytes[3] == (byte)'d';
     }
 }
+
+internal readonly record struct SngChartContent(string FileName, byte[] Bytes);

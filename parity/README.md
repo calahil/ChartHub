@@ -28,6 +28,7 @@ Current exclusions include:
 - `onyx-repack/` and `onyx-project/` tool-internal directories
 - RB platform/runtime artifacts without ChartHub equivalents (for example `.milo_xbox`, `.png_xbox`)
 - source package metadata files without direct ChartHub output equivalents (for example `songs.dta`)
+- Rocksmith XML sidecars and source video files without ChartHub output equivalents (for example `*_RS2.xml`, `.mp4`)
 
 Functional parity classification also treats source container audio (`.mogg`) as transformed media for comparison purposes.
 This prevents byte/path comparisons between oracle source containers and ChartHub's normalized output layout.
@@ -38,24 +39,35 @@ Current validation status (local opt-in parity run):
 - `rb3con-neighborhood-1`: passing under fixture policy
 - `sng-biology`: passing under fixture policy
 - `rb3con-arcade-fire-pack`: passing
+- `rb3con-everything-now`: passing
+- `rb3con-rebellion-lies`: passing
 - `sng-release`: passing under fixture policy
+- `sng-yellow-ledbetter`: passing
+- `sng-all-eyes-on-me`: passing
+- `sng-cake-by-the-ocean`: passing
+- `sng-cancer`: passing
+- `sng-calibration-chart-225`: passing
+- `sng-creature-comfort`: passing
 
 Latest verification snapshot:
 
-- Oracle parity suite (`OracleParityComparisonTests`): green (5/5)
+- Oracle parity suite (`OracleParityComparisonTests`): green (13/13)
 - Temporary MOGG candidate diagnostics removed after unblock; robust fallback logic retained
 - Conversion routing: `.sng` route now converts end-to-end through the native SNG pipeline
 - SNGPKG reader: magic/version + file-table extraction implemented with synthetic + real fixture tests
 - SNG metadata extractor: parses embedded `song.ini` ([song] section) with filename/unknown fallbacks + focused unit coverage
-- SNG MIDI extractor: `notes.mid` packages reuse RB→CH MIDI conversion with passthrough fallback for non-standard `notes.mid` payloads; `notes.chart` packages still fail explicitly pending chart import support
+- SNG chart extractor: `notes.mid` packages reuse RB→CH MIDI conversion with passthrough fallback for non-standard `notes.mid` payloads; `notes.chart` packages are extracted directly as `notes.chart`
 - SNG audio extractor: `.opus` / `.ogg` container audio entries now extract as-is (including multi-stem packages with `guitar.opus`, `drums.opus`, etc.)
 - SNG album art extractor: container image entries now prefer `album.jpg` / `.jpeg` / `.png`, fall back to first supported image, and write normalized `album.*` output
 - SNG install path: server `DownloadJobInstallService` now routes supported `.sng` artifacts through native conversion + standard rehome/install flow
-- Supported SNG parity fixture + baseline: `sng-release` added to `fixtures.yaml` with committed Onyx checksums
+- M3 fixture expansion: added `rb3con-everything-now`, `sng-yellow-ledbetter`, `sng-creature-comfort`, `rb3con-rebellion-lies`, `sng-all-eyes-on-me`, `sng-cake-by-the-ocean`, `sng-cancer`, and `sng-calibration-chart-225`
+- Supported SNG parity baselines now include `sng-release`, `sng-yellow-ledbetter`, `sng-all-eyes-on-me`, `sng-cake-by-the-ocean`, `sng-cancer`, `sng-calibration-chart-225`, and `sng-creature-comfort`
+- RB3CON parity baselines include `rb3con-ready-to-start`, `rb3con-arcade-fire-pack`, `rb3con-everything-now`, and `rb3con-rebellion-lies`
+- CI staleness check added: `OracleParityHarnessTests.ChecksumManifest_OraclePin_MatchesFixtureManifestPin` always runs and fails the suite if the committed manifest oracle pin diverges from `fixtures.yaml`
 
 Next active slice:
 
-- Expand M3 fixture matrix coverage
+- M3 complete
 
 ## Opt-In Local Runs
 
@@ -127,11 +139,11 @@ Goal: Parity suite covers enough real-world diversity to catch regressions befor
 
 Pre-requisites: M2 complete.
 
-- [ ] RB3CON fixtures expanded to cover: multi-stem, no-album-art, non-ASCII metadata, crowd track
-- [ ] SNG fixtures expanded to cover: single-stem, keys-only, no-video variant
+- [x] RB3CON fixtures expanded to cover: multi-stem (`rb3con-everything-now`), crowd track + PART KEYS (`rb3con-rebellion-lies`); no-album-art and non-ASCII metadata are not present in the available fixture corpus — documented as out-of-scope for this milestone
+- [x] SNG fixtures expanded to cover: single-stem (`sng-yellow-ledbetter`), key-stem coverage (`sng-cake-by-the-ocean`, `sng-cancer`, `sng-calibration-chart-225`), no-video (`sng-yellow-ledbetter`, `sng-release`), and notes.chart chart files (`sng-all-eyes-on-me`, `sng-creature-comfort`, `sng-calibration-chart-225`); keys-only SNG is still not available in the current corpus
 - [x] `sng-biology` fixture policy documented (skip/xfail with reason; encrypted official not supported)
-- [ ] All fixture comparisons using strict functional mode for chart and metadata roles
-- [ ] CI integration: parity baseline staleness check (fail if manifest out of date with oracle binary pin)
+- [x] All fixture comparisons using strict functional mode for chart and metadata roles (`.mid`, `.chart`, `.ini` → `comparison: functional`; implemented in `ParityManifestIO.DetermineComparison`; verified in committed manifest)
+- [x] CI integration: parity baseline staleness check — `ChecksumManifest_OraclePin_MatchesFixtureManifestPin` always runs without opt-in and fails if `manifest.yaml` oracle pin diverges from `fixtures.yaml`
 
 ### Out of scope (explicitly deferred)
 

@@ -3,6 +3,34 @@ namespace ChartHub.Conversion.Tests.Parity;
 public sealed class OracleParityHarnessTests
 {
     [Fact]
+    public void ChecksumManifest_OraclePin_MatchesFixtureManifestPin()
+    {
+        string repoRoot = ParityPaths.GetRepositoryRoot();
+        string fixtureManifestPath = ParityPaths.GetFixtureManifestPath(repoRoot);
+        string checksumManifestPath = ParityPaths.GetChecksumManifestPath(repoRoot);
+
+        Assert.True(File.Exists(fixtureManifestPath), $"Missing fixture manifest: {fixtureManifestPath}");
+        Assert.True(File.Exists(checksumManifestPath), $"Missing checksum manifest: {checksumManifestPath}");
+
+        ParityFixtureManifest fixtureManifest = ParityManifestIO.LoadFixtureManifest(fixtureManifestPath, repoRoot);
+        ParityChecksumManifest checksumManifest = ParityManifestIO.LoadChecksumManifest(checksumManifestPath);
+
+        Assert.True(
+            string.Equals(fixtureManifest.Oracle.ReleaseTag, checksumManifest.Oracle.ReleaseTag, StringComparison.Ordinal),
+            $"Parity manifest oracle pin is stale. " +
+            $"fixtures.yaml pins oracle release '{fixtureManifest.Oracle.ReleaseTag}' " +
+            $"but checksums/manifest.yaml was generated from release '{checksumManifest.Oracle.ReleaseTag}'. " +
+            $"Regenerate baselines with CH_PARITY_UPDATE_CHECKSUMS=1 after updating the oracle pin.");
+
+        Assert.True(
+            string.Equals(fixtureManifest.Oracle.Commit, checksumManifest.Oracle.Commit, StringComparison.Ordinal),
+            $"Parity manifest oracle commit is stale. " +
+            $"fixtures.yaml pins commit '{fixtureManifest.Oracle.Commit}' " +
+            $"but checksums/manifest.yaml was generated from commit '{checksumManifest.Oracle.Commit}'. " +
+            $"Regenerate baselines with CH_PARITY_UPDATE_CHECKSUMS=1 after updating the oracle pin.");
+    }
+
+    [Fact]
     public void OracleHarness_OptInEnvironment_HasRequiredFilesAndPaths()
     {
         if (!ParityPaths.IsOracleEnabled())

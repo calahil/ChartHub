@@ -36,6 +36,13 @@ fixtures:
       transformedMediaParity: functional
       nonTranscodedParity: byte
 
+  - id: rb3con-rebellion-lies
+    inputPath: "merges/Rebellion (Lies)-9d99fd98-abd8-42dd-bc75-ff5b05411e09.rb3con"
+    inputType: rb3con
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
   - id: sng-biology
     inputPath: merges/Biology.sng
     inputType: sng
@@ -52,6 +59,34 @@ fixtures:
 
   - id: sng-yellow-ledbetter
     inputPath: merges/Pearl Jam - Yellow Ledbetter (farottone).sng
+    inputType: sng
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  - id: sng-all-eyes-on-me
+    inputPath: merges/Bo Burnham - All Eyes On Me (Gooba).sng
+    inputType: sng
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  - id: sng-cake-by-the-ocean
+    inputPath: merges/DNCE - Cake By The Ocean (metalli3212).sng
+    inputType: sng
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  - id: sng-cancer
+    inputPath: merges/My Chemical Romance - Cancer (Stealth).sng
+    inputType: sng
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  - id: sng-calibration-chart-225
+    inputPath: merges/Calibration - Calibration Chart 225 BPM (JoMartineau).sng
     inputType: sng
     expected:
       transformedMediaParity: functional

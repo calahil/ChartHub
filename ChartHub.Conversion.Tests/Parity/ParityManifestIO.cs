@@ -77,6 +77,8 @@ internal static class ParityManifestIO
         ".png_xbox",
         ".jpg_xbox",
         ".dta",
+        "_RS2.xml",
+        ".mp4",
     ];
 
     internal static ParityFixtureManifest LoadFixtureManifest(string path, string repoRoot)
