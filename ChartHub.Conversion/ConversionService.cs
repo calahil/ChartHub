@@ -76,7 +76,7 @@ public sealed class ConversionService : IConversionService
             await ExtractAudioAsync(stfs, songInfo, songDir, cancellationToken).ConfigureAwait(false);
 
             // --- Extract and convert album art ---
-            ExtractAlbumArt(stfs, songDir);
+            ExtractAlbumArt(stfs, songDir, songInfo.SongFilePath);
 
             // --- Write song.ini ---
             string songIniContent = SongIniGenerator.Generate(songInfo);
@@ -118,17 +118,50 @@ public sealed class ConversionService : IConversionService
         string songDir,
         CancellationToken cancellationToken)
     {
-        byte[]? midiBytes = null;
+        StfsEntry? midiEntry = null;
 
-        // Prefer MIDI named after the song short name
-        foreach ((string path, _) in stfs.GetAllFiles())
+        // Prefer the MIDI whose path matches the song's declared SongFilePath (multi-song packs
+        // have one .mid per song; taking the first file would pick the wrong song).
+        if (!string.IsNullOrEmpty(songInfo.SongFilePath))
         {
-            string name = Path.GetFileName(path);
-            if (name.EndsWith(".mid", StringComparison.OrdinalIgnoreCase))
+            string expectedSuffix = (songInfo.SongFilePath + ".mid").Replace('\\', '/');
+            foreach ((string path, StfsEntry entry) in stfs.GetAllFiles())
             {
-                midiBytes = stfs.ReadFile(path);
-                break;
+                string normPath = path.Replace('\\', '/');
+                if (normPath.EndsWith(expectedSuffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    midiEntry = entry;
+                    break;
+                }
             }
+        }
+
+        // Fallback: first .mid in the package.
+        if (midiEntry == null)
+        {
+            foreach ((string path, StfsEntry entry) in stfs.GetAllFiles())
+            {
+                if (path.EndsWith(".mid", StringComparison.OrdinalIgnoreCase))
+                {
+                    midiEntry = entry;
+                    break;
+                }
+            }
+        }
+
+        if (midiEntry == null)
+        {
+            throw new InvalidDataException("No MIDI track found inside the CON package.");
+        }
+
+        byte[]? midiBytes = stfs.ReadEntry(midiEntry);
+
+        // Fan-made multi-song packs can have broken hash-chain pointers that cause the block
+        // reader to return blocks out of order. If the read doesn't start with the MThd magic,
+        // retry with forced sequential traversal.
+        if (midiBytes != null && !StartsWithMidiHeader(midiBytes) && !midiEntry.IsConsecutive)
+        {
+            midiBytes = stfs.ReadEntry(midiEntry, forceConsecutive: true);
         }
 
         if (midiBytes == null)
@@ -136,7 +169,18 @@ public sealed class ConversionService : IConversionService
             throw new InvalidDataException("No MIDI track found inside the CON package.");
         }
 
-        byte[] chMidi = RbMidiConverter.Convert(midiBytes);
+        byte[] chMidi;
+        try
+        {
+            chMidi = RbMidiConverter.Convert(midiBytes);
+        }
+        catch (InvalidDataException)
+        {
+            // Block chain traversal may have assembled blocks in the wrong order even though
+            // the first block started with a valid MThd header. Retry with consecutive traversal.
+            midiBytes = stfs.ReadEntry(midiEntry, forceConsecutive: true);
+            chMidi = RbMidiConverter.Convert(midiBytes);
+        }
         await File.WriteAllBytesAsync(
             Path.Combine(songDir, "notes.mid"),
             chMidi,
@@ -149,60 +193,119 @@ public sealed class ConversionService : IConversionService
         string songDir,
         CancellationToken cancellationToken)
     {
-        byte[]? moggBytes = null;
-        StfsEntry? moggEntry = null;
+        var extractor = new MoggExtractor(_options.FfmpegPath);
+        var tried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var candidates = new List<(string Path, StfsEntry Entry)>();
+        var attemptLog = new List<string>();
 
+        // Prefer the MOGG whose path matches the song's declared SongFilePath.
+        if (!string.IsNullOrEmpty(songInfo.SongFilePath))
+        {
+            string expectedSuffix = (songInfo.SongFilePath + ".mogg").Replace('\\', '/');
+            foreach ((string path, StfsEntry entry) in stfs.GetAllFiles())
+            {
+                string normPath = path.Replace('\\', '/');
+                if (normPath.EndsWith(expectedSuffix, StringComparison.OrdinalIgnoreCase)
+                    && tried.Add(normPath))
+                {
+                    candidates.Add((path, entry));
+                }
+            }
+        }
+
+        // Fallback: any .mogg in the package.
         foreach ((string path, StfsEntry entry) in stfs.GetAllFiles())
         {
-            if (path.EndsWith(".mogg", StringComparison.OrdinalIgnoreCase))
+            string normPath = path.Replace('\\', '/');
+            if (normPath.EndsWith(".mogg", StringComparison.OrdinalIgnoreCase)
+                && tried.Add(normPath))
             {
-                moggEntry = entry;
-                moggBytes = stfs.ReadEntry(entry);
+                candidates.Add((path, entry));
+            }
+        }
 
-                // Some fan-made STFS packages carry broken hash-chain pointers for
-                // otherwise contiguous payload blocks. If the primary read yields no
-                // Ogg sync signature, retry this entry with forced sequential traversal.
-                if (moggBytes != null && !ContainsOggSyncWord(moggBytes) && !entry.IsConsecutive)
+        Exception? lastError = null;
+        foreach ((string path, StfsEntry entry) in candidates)
+        {
+            foreach (bool forceConsecutive in new[] { false, true })
+            {
+                try
                 {
-                    moggBytes = stfs.ReadEntry(entry, forceConsecutive: true);
+                    byte[] moggBytes = stfs.ReadEntry(entry, forceConsecutive);
+                    int version = ReadLittleEndianInt32OrDefault(moggBytes);
+                    attemptLog.Add($"candidate='{path}', forceConsecutive={forceConsecutive}, len={moggBytes.Length}, version=0x{version:X8}");
+                    await extractor.ExtractStemsAsync(moggBytes, songInfo, songDir, cancellationToken)
+                        .ConfigureAwait(false);
+                    return;
                 }
-
-                break;
+                catch (InvalidDataException ex)
+                {
+                    lastError = ex;
+                }
+                catch (NotSupportedException ex)
+                {
+                    lastError = ex;
+                }
             }
         }
 
-        if (moggBytes == null || moggEntry == null)
-        {
-            throw new InvalidDataException("No MOGG audio file found inside the CON package.");
-        }
+        string attempts = attemptLog.Count == 0
+            ? "no candidates"
+            : string.Join("; ", attemptLog);
 
-        var extractor = new MoggExtractor(_options.FfmpegPath);
-        await extractor.ExtractStemsAsync(moggBytes, songInfo, songDir, cancellationToken)
-            .ConfigureAwait(false);
+        throw new InvalidDataException(
+            $"No MOGG audio file found inside the CON package. Attempts: {attempts}",
+            lastError);
     }
 
-    private static bool ContainsOggSyncWord(ReadOnlySpan<byte> bytes)
+    private static int ReadLittleEndianInt32OrDefault(byte[] bytes)
     {
-        for (int i = 0; i <= bytes.Length - 4; i++)
+        if (bytes.Length < 4)
         {
-            if (bytes[i] == (byte)'O'
-                && bytes[i + 1] == (byte)'g'
-                && bytes[i + 2] == (byte)'g'
-                && bytes[i + 3] == (byte)'S')
+            return 0;
+        }
+
+        return bytes[0]
+            | (bytes[1] << 8)
+            | (bytes[2] << 16)
+            | (bytes[3] << 24);
+    }
+
+    private static bool StartsWithMidiHeader(ReadOnlySpan<byte> bytes)
+    {
+        // Standard MIDI files begin with the MThd chunk header: 'M','T','h','d'
+        return bytes.Length >= 4
+            && bytes[0] == (byte)'M'
+            && bytes[1] == (byte)'T'
+            && bytes[2] == (byte)'h'
+            && bytes[3] == (byte)'d';
+    }
+
+    private static void ExtractAlbumArt(StfsReader stfs, string songDir, string? songFilePath = null)
+    {
+        // Determine the song subfolder to prefer art from the correct song in multi-song packs.
+        // SongFilePath is like "songs/<shortname>/<shortname>"; the parent dir is "songs/<shortname>/".
+        string? songSubfolder = null;
+        if (!string.IsNullOrEmpty(songFilePath))
+        {
+            string normalized = songFilePath.Replace('\\', '/');
+            int lastSlash = normalized.LastIndexOf('/');
+            if (lastSlash > 0)
             {
-                return true;
+                songSubfolder = normalized[..(lastSlash + 1)]; // "songs/<shortname>/"
             }
         }
 
-        return false;
-    }
-
-    private static void ExtractAlbumArt(StfsReader stfs, string songDir)
-    {
         foreach ((string path, _) in stfs.GetAllFiles())
         {
-            if (path.EndsWith(".png_xbox", StringComparison.OrdinalIgnoreCase)
-                || path.EndsWith("_keep.png_xbox", StringComparison.OrdinalIgnoreCase))
+            string normPath = path.Replace('\\', '/');
+            if (songSubfolder != null && !normPath.StartsWith(songSubfolder, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (normPath.EndsWith(".png_xbox", StringComparison.OrdinalIgnoreCase)
+                || normPath.EndsWith("_keep.png_xbox", StringComparison.OrdinalIgnoreCase))
             {
                 byte[]? texBytes = stfs.ReadFile(path);
                 if (texBytes == null)

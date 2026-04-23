@@ -60,15 +60,48 @@ internal static class RbMidiConverter
         var tracks = new List<byte[]>(trackCount);
         for (int t = 0; t < trackCount; t++)
         {
+            if (pos + 8 > midiBytes.Length)
+            {
+                break;
+            }
+
             byte[] trackHeader = ReadExact(midiBytes, ref pos, 8);
             if (trackHeader[0] != 'M' || trackHeader[1] != 'T' || trackHeader[2] != 'r' || trackHeader[3] != 'k')
             {
-                throw new InvalidDataException($"Expected MTrk at offset {pos - 8}.");
+                // Some fan-made files have malformed track boundaries in the header count/lengths.
+                // Try to resync to the next MTrk chunk; if none exists, keep tracks parsed so far.
+                int resyncPos = FindNextTrackHeader(midiBytes, pos - 7);
+                if (resyncPos < 0)
+                {
+                    break;
+                }
+
+                pos = resyncPos;
+                if (pos + 8 > midiBytes.Length)
+                {
+                    break;
+                }
+
+                trackHeader = ReadExact(midiBytes, ref pos, 8);
+                if (trackHeader[0] != 'M' || trackHeader[1] != 'T' || trackHeader[2] != 'r' || trackHeader[3] != 'k')
+                {
+                    break;
+                }
             }
 
             int trackLen = ReadBE32(trackHeader, 4);
+            if (trackLen < 0 || pos + trackLen > midiBytes.Length)
+            {
+                break;
+            }
+
             byte[] trackData = ReadExact(midiBytes, ref pos, trackLen);
             tracks.Add(trackData);
+        }
+
+        if (tracks.Count == 0)
+        {
+            throw new InvalidDataException("No valid MTrk chunks found in MIDI data.");
         }
 
         // Filter out RB-only tracks (keep track 0 always — it's the tempo map)
@@ -277,5 +310,21 @@ internal static class RbMidiConverter
         s.WriteByte((byte)((v >> 16) & 0xFF));
         s.WriteByte((byte)((v >> 8) & 0xFF));
         s.WriteByte((byte)(v & 0xFF));
+    }
+
+    private static int FindNextTrackHeader(byte[] data, int start)
+    {
+        for (int i = Math.Max(0, start); i <= data.Length - 4; i++)
+        {
+            if (data[i] == (byte)'M'
+                && data[i + 1] == (byte)'T'
+                && data[i + 2] == (byte)'r'
+                && data[i + 3] == (byte)'k')
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 }

@@ -43,6 +43,7 @@ internal static class ParityManifestIO
 {
     private static readonly HashSet<string> TransformedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
+        ".mogg",
         ".ogg",
         ".opus",
         ".mp3",
@@ -56,6 +57,27 @@ internal static class ParityManifestIO
         ".webp",
         ".ini",
     };
+
+    // Paths produced by the Onyx oracle that are tool-internal and have no ChartHub equivalent.
+    // Exclude these when building checksums so they are never written to the manifest.
+    private static readonly string[] OracleInternalPrefixes =
+    [
+        "onyx-repack/",
+        "onyx-project/",
+    ];
+
+    // File extensions produced by the Onyx oracle that ChartHub never outputs.
+    // .milo_xbox etc. — Rock Band 3 animation/choreography data, not relevant to Clone Hero.
+    // .png_xbox etc. — Xbox-specific art format, ChartHub converts to standard PNG.
+    private static readonly string[] OracleInternalSuffixes =
+    [
+        ".milo_xbox",
+        ".milo_ps3",
+        ".milo_wii",
+        ".png_xbox",
+        ".jpg_xbox",
+        ".dta",
+    ];
 
     internal static ParityFixtureManifest LoadFixtureManifest(string path, string repoRoot)
     {
@@ -220,6 +242,10 @@ internal static class ParityManifestIO
                     Role: DetermineRole(relativePath),
                     Comparison: DetermineComparison(relativePath));
             })
+            .Where(file => !OracleInternalPrefixes.Any(prefix =>
+                file.Path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                && !OracleInternalSuffixes.Any(suffix =>
+                file.Path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)))
             .ToList();
     }
 
@@ -273,7 +299,7 @@ internal static class ParityManifestIO
         string extension = Path.GetExtension(relativePath);
         return extension.ToLowerInvariant() switch
         {
-            ".ogg" or ".opus" or ".mp3" or ".wav" => "audio",
+            ".mogg" or ".ogg" or ".opus" or ".mp3" or ".wav" => "audio",
             ".mid" or ".midi" or ".chart" => "chart",
             ".ini" => "metadata",
             ".png" or ".jpg" or ".jpeg" or ".webp" => "art",

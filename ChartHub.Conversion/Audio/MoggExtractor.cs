@@ -114,10 +114,25 @@ internal sealed class MoggExtractor
         {
             0x0A => moggBytes[ReadMoggOggOffset(moggBytes)..],
             0x0B => DecryptMogg0x0B(moggBytes),
-            _ => throw new NotSupportedException(
-                $"MOGG encryption version 0x{version:X2} is not supported. " +
-                "Only unencrypted (0x0A) and RB1-style encrypted (0x0B) MOGG files are handled."),
+            _ => RecoverRawOggFromUnknownHeader(moggBytes, version),
         };
+    }
+
+    private static byte[] RecoverRawOggFromUnknownHeader(byte[] moggBytes, int version)
+    {
+        // Some fan-made packages can contain malformed MOGG headers while still embedding
+        // a valid Ogg stream in the payload. If an OggS sync word exists, recover from it.
+        for (int i = 0; i <= moggBytes.Length - 4; i++)
+        {
+            if (IsOggSyncAt(moggBytes, i))
+            {
+                return moggBytes[i..];
+            }
+        }
+
+        throw new NotSupportedException(
+            $"MOGG encryption version 0x{version:X2} is not supported. " +
+            "Only unencrypted (0x0A) and RB1-style encrypted (0x0B) MOGG files are handled.");
     }
 
     /// <summary>

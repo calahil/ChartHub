@@ -35,11 +35,23 @@ internal static class DtaParser
     /// <summary>Parses a songs.dta byte array and returns the first song entry found.</summary>
     public static DtaSongInfo Parse(byte[] dtaBytes)
     {
+        return ParseAll(dtaBytes).First();
+    }
+
+    /// <summary>Parses a songs.dta byte array and returns every song entry found.</summary>
+    public static IReadOnlyList<DtaSongInfo> ParseAll(byte[] dtaBytes)
+    {
         string text = Encoding.Latin1.GetString(dtaBytes);
         List<string> tokens = Tokenise(text);
         int pos = 0;
         DtaNode root = ParseList(tokens, ref pos);
-        return ExtractSong(root);
+        List<DtaNode> songNodes = FindSongNodes(root);
+        if (songNodes.Count == 0)
+        {
+            throw new InvalidDataException("DTA file contains no parseable song entry.");
+        }
+
+        return songNodes.Select(ExtractSong).ToList();
     }
 
     // ---- tokeniser ---------------------------------------------------------
@@ -153,34 +165,36 @@ internal static class DtaParser
 
     // ---- extraction --------------------------------------------------------
 
-    private static DtaSongInfo ExtractSong(DtaNode root)
+    private static List<DtaNode> FindSongNodes(DtaNode root)
     {
         // Determine the song entry node:
         // - If root's first child is an atom, root itself IS the song entry (no outer wrapper).
         // - If root's first child is a list, root is a container of song entries.
-        DtaNode? songNode = null;
+        List<DtaNode> songNodes = [];
         if (root.IsList && root.Children!.Count > 0)
         {
             if (root.Children[0].Atom != null)
             {
-                // root IS the song entry
-                songNode = root;
+                songNodes.Add(root);
             }
             else
             {
-                // root is a container — find the first child that looks like a song entry
                 foreach (DtaNode child in root.Children!)
                 {
                     if (child.IsList && child.Children!.Count > 0 && child.Children[0].Atom != null)
                     {
-                        songNode = child;
-                        break;
+                        songNodes.Add(child);
                     }
                 }
             }
         }
 
-        if (songNode == null || !songNode.IsList || songNode.Children!.Count == 0)
+        return songNodes;
+    }
+
+    private static DtaSongInfo ExtractSong(DtaNode songNode)
+    {
+        if (!songNode.IsList || songNode.Children!.Count == 0)
         {
             throw new InvalidDataException("DTA file contains no parseable song entry.");
         }

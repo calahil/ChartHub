@@ -391,7 +391,8 @@ MigrationBackup/
 FodyWeavers.xsd
 ChartHub.BackupApi/cache
 dev-data/
-merges/
+merges/*
+!merges/Arcade Fire Pack.rb3con
 .parity-artifacts/
 /site/
 scripts/delete-workflow-runs.sh

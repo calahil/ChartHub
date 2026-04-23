@@ -22,6 +22,13 @@ fixtures:
       transformedMediaParity: functional
       nonTranscodedParity: byte
 
+  - id: rb3con-arcade-fire-pack
+    inputPath: merges/Arcade Fire Pack.rb3con
+    inputType: rb3con
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: functional  # Multi-song pack: ChartHub converts 1st song only, Onyx extracts all. Use functional comparison.
+
   - id: sng-biology
     inputPath: merges/Biology.sng
     inputType: sng

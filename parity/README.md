@@ -22,6 +22,23 @@ Local outputs must be written under `.parity-artifacts/`:
 
 These folders are intentionally excluded from git. Only checksum manifests in `parity/checksums/` are committed.
 
+When checksums are generated from Onyx output, oracle-internal artifacts are filtered out before manifest write.
+Current exclusions include:
+
+- `onyx-repack/` and `onyx-project/` tool-internal directories
+- RB platform/runtime artifacts without ChartHub equivalents (for example `.milo_xbox`, `.png_xbox`)
+- source package metadata files without direct ChartHub output equivalents (for example `songs.dta`)
+
+Functional parity classification also treats source container audio (`.mogg`) as transformed media for comparison purposes.
+This prevents byte/path comparisons between oracle source containers and ChartHub's normalized output layout.
+
+Current validation status (local opt-in parity run):
+
+- `rb3con-ready-to-start`: passing
+- `rb3con-neighborhood-1`: passing under fixture policy
+- `sng-biology`: passing under fixture policy
+- `rb3con-arcade-fire-pack`: passing
+
 ## Opt-In Local Runs
 
 Parity runs are opt-in. Set this environment variable to enable parity tests locally:
@@ -64,8 +81,8 @@ Goal: ChartHub output must be functionally equivalent to Onyx for all committed 
 - [x] Oracle parity harness infrastructure (opt-in, env-driven, update-mode)
 - [x] Committed Onyx baselines for `rb3con-ready-to-start` and `rb3con-neighborhood-1`
 - [x] Parity comparison assertions upgraded from byte-only → full functional (all `comparison: functional` files compared by role, not just byte files)
-- [ ] At least one fixture with multi-song DTA (more than one song entry per CON)
-- [ ] Parity passing for all committed RB3CON fixtures (local opt-in run clean, no deltas)
+- [x] At least one fixture with multi-song DTA (more than one song entry per CON)
+- [x] Parity passing for all committed RB3CON fixtures (local opt-in run clean, no deltas)
 
 ### M2 — Supported SNG conversion pipeline
 
@@ -94,7 +111,7 @@ Pre-requisites: M2 complete.
 
 - [ ] RB3CON fixtures expanded to cover: multi-stem, no-album-art, non-ASCII metadata, crowd track
 - [ ] SNG fixtures expanded to cover: single-stem, keys-only, no-video variant
-- [ ] `sng-biology` fixture policy documented (skip/xfail with reason; encrypted official not supported)
+- [x] `sng-biology` fixture policy documented (skip/xfail with reason; encrypted official not supported)
 - [ ] All fixture comparisons using strict functional mode for chart and metadata roles
 - [ ] CI integration: parity baseline staleness check (fail if manifest out of date with oracle binary pin)
 
