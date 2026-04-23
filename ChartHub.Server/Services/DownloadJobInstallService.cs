@@ -23,12 +23,14 @@ public sealed record DownloadJobInstallResult(
     string StagedPath,
     string InstalledPath,
     string InstalledRelativePath,
-    ServerSongMetadata Metadata);
+    ServerSongMetadata Metadata,
+    IReadOnlyList<ConversionStatus>? Statuses = null);
 
 public sealed record ServerRehomeInstallResult(
     string InstalledPath,
     string InstalledRelativePath,
-    ServerSongMetadata Metadata);
+    ServerSongMetadata Metadata,
+    IReadOnlyList<ConversionStatus> Statuses);
 
 public sealed partial class DownloadJobInstallService : IDownloadJobInstallService
 {
@@ -118,7 +120,8 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
                 stagedPath,
                 installedPath.InstalledPath,
                 installedPath.InstalledRelativePath,
-                installedPath.Metadata);
+                installedPath.Metadata,
+                installedPath.Statuses);
         }
         catch (Exception ex)
         {
@@ -173,12 +176,20 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         Directory.CreateDirectory(outputRoot);
         ConversionResult result = await _conversionService.ConvertAsync(artifactPath, outputRoot, cancellationToken).ConfigureAwait(false);
         ServerSongMetadata serverMetadata = new(result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
+        LogConversionStatuses(jobId, result.Statuses);
 
         InstallLog.OnyxInstallCompleted(_logger, result.OutputDirectory, result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
         _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2109), nameof(DownloadJobInstallService),
             $"CON install finished. Output '{result.OutputDirectory}', artist='{result.Metadata.Artist}', title='{result.Metadata.Title}', charter='{result.Metadata.Charter}'.", null);
 
-        return await RehomeInstalledDirectoryAsync(jobId, result.OutputDirectory, source, Path.GetFileNameWithoutExtension(artifactPath), cancellationToken, serverMetadata).ConfigureAwait(false);
+        return await RehomeInstalledDirectoryAsync(
+            jobId,
+            result.OutputDirectory,
+            source,
+            Path.GetFileNameWithoutExtension(artifactPath),
+            cancellationToken,
+            serverMetadata,
+            result.Statuses).ConfigureAwait(false);
     }
 
     private async Task<ServerRehomeInstallResult> InstallSngAsync(Guid jobId, string artifactPath, string source, CancellationToken cancellationToken)
@@ -191,12 +202,20 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         Directory.CreateDirectory(outputRoot);
         ConversionResult result = await _conversionService.ConvertAsync(artifactPath, outputRoot, cancellationToken).ConfigureAwait(false);
         ServerSongMetadata serverMetadata = new(result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
+        LogConversionStatuses(jobId, result.Statuses);
 
         InstallLog.SngInstallCompleted(_logger, result.OutputDirectory, result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
         _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2112), nameof(DownloadJobInstallService),
             $"SNG install finished. Output '{result.OutputDirectory}', artist='{result.Metadata.Artist}', title='{result.Metadata.Title}', charter='{result.Metadata.Charter}'.", null);
 
-        return await RehomeInstalledDirectoryAsync(jobId, result.OutputDirectory, source, Path.GetFileNameWithoutExtension(artifactPath), cancellationToken, serverMetadata).ConfigureAwait(false);
+        return await RehomeInstalledDirectoryAsync(
+            jobId,
+            result.OutputDirectory,
+            source,
+            Path.GetFileNameWithoutExtension(artifactPath),
+            cancellationToken,
+            serverMetadata,
+            result.Statuses).ConfigureAwait(false);
     }
 
     private Task<ServerRehomeInstallResult> RehomeInstalledDirectoryAsync(
@@ -205,7 +224,8 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         string source,
         string? fallbackTitle,
         CancellationToken cancellationToken,
-        ServerSongMetadata? fallbackMetadata = null)
+        ServerSongMetadata? fallbackMetadata = null,
+        IReadOnlyList<ConversionStatus>? statuses = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -241,7 +261,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
 
         if (string.Equals(layout.FullPath, sourceToMove, StringComparison.Ordinal))
         {
-            return Task.FromResult(new ServerRehomeInstallResult(sourceToMove, layout.RelativePath, metadata));
+            return Task.FromResult(new ServerRehomeInstallResult(sourceToMove, layout.RelativePath, metadata, statuses ?? []));
         }
 
         string? parent = Path.GetDirectoryName(layout.FullPath);
@@ -262,7 +282,30 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
             Cleanup(currentDirectory);
         }
 
-        return Task.FromResult(new ServerRehomeInstallResult(layout.FullPath, layout.RelativePath, metadata));
+        return Task.FromResult(new ServerRehomeInstallResult(layout.FullPath, layout.RelativePath, metadata, statuses ?? []));
+    }
+
+    private void LogConversionStatuses(Guid jobId, IReadOnlyList<ConversionStatus>? statuses)
+    {
+        if (statuses is null || statuses.Count == 0)
+        {
+            return;
+        }
+
+        foreach (ConversionStatus status in statuses)
+        {
+            if (string.Equals(status.Code, ConversionStatusCodes.AudioIncomplete, StringComparison.OrdinalIgnoreCase))
+            {
+                InstallLog.AudioIncomplete(_logger, jobId, status.Message);
+                _jobLogSink.Add(jobId, LogLevel.Warning, new EventId(2113), nameof(DownloadJobInstallService),
+                    $"Conversion status '{status.Code}': {status.Message}", null);
+                continue;
+            }
+
+            InstallLog.ConversionStatus(_logger, jobId, status.Code, status.Message);
+            _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2114), nameof(DownloadJobInstallService),
+                $"Conversion status '{status.Code}': {status.Message}", null);
+        }
     }
 
     private string MoveArtifactToStaging(Guid jobId, string artifactPath)
@@ -362,5 +405,11 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
 
         [LoggerMessage(EventId = 2112, Level = LogLevel.Information, Message = "SNG install produced output '{OutputDirectory}' with metadata artist='{Artist}', title='{Title}', charter='{Charter}'.")]
         public static partial void SngInstallCompleted(ILogger logger, string outputDirectory, string artist, string title, string charter);
+
+        [LoggerMessage(EventId = 2113, Level = LogLevel.Warning, Message = "Install job {JobId} completed with audio fallback: {Message}")]
+        public static partial void AudioIncomplete(ILogger logger, Guid jobId, string message);
+
+        [LoggerMessage(EventId = 2114, Level = LogLevel.Information, Message = "Install job {JobId} reported conversion status {Code}: {Message}")]
+        public static partial void ConversionStatus(ILogger logger, Guid jobId, string code, string message);
     }
 }

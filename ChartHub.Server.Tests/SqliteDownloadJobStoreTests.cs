@@ -131,6 +131,37 @@ public sealed class SqliteDownloadJobStoreTests : IDisposable
     }
 
     [Fact]
+    public void MarkInstalledPersistsConversionStatuses()
+    {
+        SqliteDownloadJobStore sut = BuildStore();
+        DownloadJobResponse created = sut.Create(new CreateDownloadJobRequest
+        {
+            Source = "rhythmverse",
+            SourceId = "abc",
+            DisplayName = "Track",
+            SourceUrl = "https://example.com/track.zip",
+        });
+
+        sut.MarkInstalled(
+            created.JobId,
+            "/clonehero/track",
+            conversionStatuses:
+            [
+                new DownloadJobStatus
+                {
+                    Code = "audio-incomplete",
+                    Message = "Only backing audio was produced.",
+                },
+            ]);
+
+        Assert.True(sut.TryGet(created.JobId, out DownloadJobResponse? updated));
+        Assert.NotNull(updated);
+        DownloadJobStatus status = Assert.Single(updated!.ConversionStatuses);
+        Assert.Equal("audio-incomplete", status.Code);
+        Assert.Equal("Only backing audio was produced.", status.Message);
+    }
+
+    [Fact]
     public void EnsureSchemaMigratesLegacyStagedAndCompletedStages()
     {
         Directory.CreateDirectory(_tempRoot);

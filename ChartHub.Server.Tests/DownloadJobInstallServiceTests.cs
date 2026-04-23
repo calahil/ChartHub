@@ -228,8 +228,37 @@ public sealed class DownloadJobInstallServiceTests
         Assert.StartsWith(env.CloneHeroRoot, result.InstalledPath, StringComparison.Ordinal);
         Assert.Equal("Stub Artist", result.Metadata.Artist);
         Assert.Equal("Stub Title", result.Metadata.Title);
+        Assert.Empty(result.Statuses ?? []);
         Assert.True(File.Exists(Path.Combine(result.InstalledPath, "song.ini")));
         Assert.True(File.Exists(Path.Combine(result.InstalledPath, "notes.mid")));
+    }
+
+    [Fact]
+    public async Task InstallJobConWithAudioIncompleteStatusEmitsWarningAndReturnsStatus()
+    {
+        using var env = new TempEnvironment();
+
+        string conPath = Path.Combine(env.DownloadsDir, "song.rb3con");
+        await File.WriteAllBytesAsync(conPath, [0x43, 0x4F, 0x4E, 0x20]);
+
+        var sink = new CapturingJobLogSink();
+        DownloadJobInstallService sut = env.BuildService(
+            fileType: ServerInstallFileType.Con,
+            conversionService: new StubConversionService(
+                [new ConversionStatus(ConversionStatusCodes.AudioIncomplete, "Only backing audio was produced.")]),
+            sink: sink);
+
+        DownloadJobResponse job = MakeJob(downloadedPath: conPath);
+        DownloadJobInstallResult result = await sut.InstallJobAsync(job);
+
+        Assert.Contains(result.Statuses ?? [], status =>
+            string.Equals(status.Code, ConversionStatusCodes.AudioIncomplete, StringComparison.Ordinal));
+
+        IReadOnlyList<JobLogEntry> entries = sink.GetLogs(job.JobId);
+        Assert.Contains(entries, entry =>
+            string.Equals(entry.Level, nameof(LogLevel.Warning), StringComparison.Ordinal)
+            && string.Equals(entry.Category, nameof(DownloadJobInstallService), StringComparison.Ordinal)
+            && entry.EventId == 2113);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -399,7 +428,7 @@ public sealed class DownloadJobInstallServiceTests
         }
     }
 
-    private sealed class StubConversionService : IConversionService
+    private sealed class StubConversionService(IReadOnlyList<ConversionStatus>? statuses = null) : IConversionService
     {
         public async Task<ConversionResult> ConvertAsync(string sourcePath, string outputRoot, CancellationToken cancellationToken = default)
         {
@@ -411,7 +440,10 @@ public sealed class DownloadJobInstallServiceTests
                 cancellationToken);
             await File.WriteAllTextAsync(Path.Combine(songDir, "notes.mid"), "stub", cancellationToken);
 
-            return new ConversionResult(songDir, new ConversionMetadata("Stub Artist", "Stub Title", "Stub Charter"));
+            return new ConversionResult(
+                songDir,
+                new ConversionMetadata("Stub Artist", "Stub Title", "Stub Charter"),
+                statuses);
         }
     }
 

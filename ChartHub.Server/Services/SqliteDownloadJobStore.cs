@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using ChartHub.Server.Contracts;
 using ChartHub.Server.Options;
 
@@ -41,7 +43,8 @@ public interface IDownloadJobStore
         string? title = null,
         string? charter = null,
         string? sourceMd5 = null,
-        string? sourceChartHash = null);
+        string? sourceChartHash = null,
+        IReadOnlyList<DownloadJobStatus>? conversionStatuses = null);
 
     void MarkCancelled(Guid jobId);
 
@@ -171,7 +174,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     created_at_utc,
                     updated_at_utc,
                     file_type,
-                    drum_gen_requested
+                    drum_gen_requested,
+                    conversion_statuses_json
                 FROM download_jobs
                 ORDER BY updated_at_utc DESC;
                 """;
@@ -215,7 +219,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     created_at_utc,
                     updated_at_utc,
                     file_type,
-                    drum_gen_requested
+                    drum_gen_requested,
+                    conversion_statuses_json
                 FROM download_jobs
                 WHERE job_id = $jobId
                 LIMIT 1;
@@ -310,7 +315,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     created_at_utc,
                     updated_at_utc,
                     file_type,
-                    drum_gen_requested
+                    drum_gen_requested,
+                    conversion_statuses_json
                 FROM download_jobs
                 WHERE stage = 'Queued'
                 ORDER BY created_at_utc ASC
@@ -423,7 +429,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     created_at_utc,
                     updated_at_utc,
                     file_type,
-                    drum_gen_requested
+                                        drum_gen_requested,
+                                        conversion_statuses_json
                 FROM download_jobs
                 WHERE stage = 'Downloaded'
                   AND (file_type IS NULL OR file_type = 'Unknown')
@@ -471,7 +478,8 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
         string? title = null,
         string? charter = null,
         string? sourceMd5 = null,
-        string? sourceChartHash = null)
+        string? sourceChartHash = null,
+        IReadOnlyList<DownloadJobStatus>? conversionStatuses = null)
     {
         lock (_syncLock)
         {
@@ -488,6 +496,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     charter = COALESCE($charter, charter),
                     source_md5 = COALESCE($sourceMd5, source_md5),
                     source_chart_hash = COALESCE($sourceChartHash, source_chart_hash),
+                    conversion_statuses_json = $conversionStatusesJson,
                     stage = 'Installed',
                     progress_percent = 100,
                     completed_at_utc = $completedAtUtc,
@@ -502,6 +511,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             command.Parameters.AddWithValue("$charter", DbValueOrNull(charter));
             command.Parameters.AddWithValue("$sourceMd5", DbValueOrNull(sourceMd5));
             command.Parameters.AddWithValue("$sourceChartHash", DbValueOrNull(sourceChartHash));
+            command.Parameters.AddWithValue("$conversionStatusesJson", (object?)SerializeStatuses(conversionStatuses) ?? DBNull.Value);
             command.Parameters.AddWithValue("$completedAtUtc", now.ToString("O"));
             command.Parameters.AddWithValue("$updatedAtUtc", now.ToString("O"));
             command.ExecuteNonQuery();
@@ -613,6 +623,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     charter TEXT NULL,
                     source_md5 TEXT NULL,
                     source_chart_hash TEXT NULL,
+                    conversion_statuses_json TEXT NULL,
                     error TEXT NULL,
                     created_at_utc TEXT NOT NULL,
                     updated_at_utc TEXT NOT NULL,
@@ -652,6 +663,7 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             EnsureColumnExists(connection, "charter", "TEXT NULL");
             EnsureColumnExists(connection, "source_md5", "TEXT NULL");
             EnsureColumnExists(connection, "source_chart_hash", "TEXT NULL");
+            EnsureColumnExists(connection, "conversion_statuses_json", "TEXT NULL");
             EnsureColumnExists(connection, "file_type", "TEXT NULL");
             EnsureColumnExists(connection, "drum_gen_requested", "INTEGER NOT NULL DEFAULT 0");
 
@@ -762,7 +774,36 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(18)),
             FileType = reader.FieldCount > 19 && !reader.IsDBNull(19) ? reader.GetString(19) : null,
             DrumGenRequested = reader.FieldCount > 20 && reader.GetInt32(20) != 0,
+            ConversionStatuses = reader.FieldCount > 21 ? DeserializeStatuses(reader.IsDBNull(21) ? null : reader.GetString(21)) : [],
         };
+    }
+
+    private static string? SerializeStatuses(IReadOnlyList<DownloadJobStatus>? statuses)
+    {
+        if (statuses is null || statuses.Count == 0)
+        {
+            return null;
+        }
+
+        return JsonSerializer.Serialize(statuses);
+    }
+
+    private static IReadOnlyList<DownloadJobStatus> DeserializeStatuses(string? statusesJson)
+    {
+        if (string.IsNullOrWhiteSpace(statusesJson))
+        {
+            return [];
+        }
+
+        try
+        {
+            IReadOnlyList<DownloadJobStatus>? statuses = JsonSerializer.Deserialize<IReadOnlyList<DownloadJobStatus>>(statusesJson);
+            return statuses ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     private static object DbValueOrNull(string? value)

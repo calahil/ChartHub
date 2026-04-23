@@ -252,7 +252,10 @@ public static partial class DownloadEndpoints
                 installResult.Metadata.Title,
                 installResult.Metadata.Charter,
                 sourceMd5,
-                sourceChartHash);
+                sourceChartHash,
+                installResult.Statuses?
+                    .Select(status => new DownloadJobStatus { Code = status.Code, Message = status.Message })
+                    .ToArray());
 
             cloneHeroLibraryService.UpsertInstalledSong(new CloneHeroLibraryUpsertRequest(
                 Source: job.Source,

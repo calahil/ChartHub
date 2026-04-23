@@ -5,7 +5,27 @@ namespace ChartHub.Conversion.Models;
 /// </summary>
 /// <param name="OutputDirectory">Absolute path to the produced song directory.</param>
 /// <param name="Metadata">Extracted song metadata.</param>
-public sealed record ConversionResult(string OutputDirectory, ConversionMetadata Metadata);
+/// <param name="Statuses">Optional conversion status entries describing degraded-but-successful outcomes.</param>
+public sealed record ConversionResult(
+    string OutputDirectory,
+    ConversionMetadata Metadata,
+    IReadOnlyList<ConversionStatus>? Statuses = null);
+
+/// <summary>Known conversion status codes emitted in <see cref="ConversionResult.Statuses"/>.</summary>
+public static class ConversionStatusCodes
+{
+    /// <summary>
+    /// Conversion succeeded, but only backing audio was produced (instrument stems were unavailable).
+    /// </summary>
+    public const string AudioIncomplete = "audio-incomplete";
+}
+
+/// <summary>
+/// A non-fatal conversion status entry that callers can surface for diagnostics.
+/// </summary>
+/// <param name="Code">Stable machine-readable status code.</param>
+/// <param name="Message">Human-readable status message.</param>
+public sealed record ConversionStatus(string Code, string Message);
 
 /// <summary>Song metadata extracted from the source file.</summary>
 /// <param name="Artist">Song artist.</param>

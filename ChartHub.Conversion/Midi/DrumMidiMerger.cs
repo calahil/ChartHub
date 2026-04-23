@@ -41,18 +41,34 @@ public sealed class DrumMidiMerger : IDrumMidiMerger
     private static readonly Dictionary<byte, byte> GmToChNote = new()
     {
         // Kick
-        [35] = 96, [36] = 96,
+        [35] = 96,
+        [36] = 96,
         // Snare / Rim / Clap
-        [37] = 97, [38] = 97, [39] = 97, [40] = 97,
+        [37] = 97,
+        [38] = 97,
+        [39] = 97,
+        [40] = 97,
         // Hi-hat (closed / pedal / open)
-        [42] = 98, [44] = 98, [46] = 98,
+        [42] = 98,
+        [44] = 98,
+        [46] = 98,
         // High / Mid toms → Blue
-        [47] = 99, [48] = 99, [50] = 99,
+        [47] = 99,
+        [48] = 99,
+        [50] = 99,
         // Low / Floor toms + Crash → Green
-        [41] = 100, [43] = 100, [45] = 100,
-        [49] = 100, [52] = 100, [55] = 100, [57] = 100,
+        [41] = 100,
+        [43] = 100,
+        [45] = 100,
+        [49] = 100,
+        [52] = 100,
+        [55] = 100,
+        [57] = 100,
         // Ride / Cowbell → Orange (5th lane cymbal)
-        [51] = 101, [53] = 101, [56] = 101, [59] = 101,
+        [51] = 101,
+        [53] = 101,
+        [56] = 101,
+        [59] = 101,
     };
 
     private const string PartDrumsTrackName = "PART DRUMS";

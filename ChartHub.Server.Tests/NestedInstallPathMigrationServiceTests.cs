@@ -217,7 +217,7 @@ public sealed class NestedInstallPathMigrationServiceTests
         public void UpdateFileType(Guid jobId, string fileType) => throw new NotSupportedException();
         public IReadOnlyList<DownloadJobResponse> ListDownloadedWithoutFileType() => throw new NotSupportedException();
         public void MarkStaged(Guid jobId, string stagedPath) => throw new NotSupportedException();
-        public void MarkInstalled(Guid jobId, string installedPath, string? installedRelativePath = null, string? artist = null, string? title = null, string? charter = null, string? sourceMd5 = null, string? sourceChartHash = null) => throw new NotSupportedException();
+        public void MarkInstalled(Guid jobId, string installedPath, string? installedRelativePath = null, string? artist = null, string? title = null, string? charter = null, string? sourceMd5 = null, string? sourceChartHash = null, IReadOnlyList<DownloadJobStatus>? conversionStatuses = null) => throw new NotSupportedException();
         public void MarkCancelled(Guid jobId) => throw new NotSupportedException();
         public void MarkFailed(Guid jobId, string errorMessage) => throw new NotSupportedException();
         public int DeleteFinishedOlderThan(DateTimeOffset thresholdUtc) => throw new NotSupportedException();

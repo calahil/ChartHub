@@ -39,13 +39,37 @@ public sealed class ConversionService : IConversionService
         CancellationToken cancellationToken = default)
     {
         string extension = Path.GetExtension(sourcePath).ToLowerInvariant();
-
-        return extension switch
+        if (extension is ".con" or ".rb3con")
         {
-            ".con" or ".rb3con" => await ConvertConAsync(sourcePath, outputRoot, cancellationToken).ConfigureAwait(false),
-            ".sng" => await ConvertSngAsync(sourcePath, outputRoot, cancellationToken).ConfigureAwait(false),
-            _ => throw new NotSupportedException($"Source file type '{extension}' is not supported. Expected .con, .rb3con, or .sng."),
-        };
+            return await ConvertConAsync(sourcePath, outputRoot, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (extension is ".sng")
+        {
+            return await ConvertSngAsync(sourcePath, outputRoot, cancellationToken).ConfigureAwait(false);
+        }
+
+        // Some Xbox STFS exports are extensionless (for example LIVE packages).
+        // Fall back to container magic sniffing so these packages still convert.
+        byte[] magic = new byte[4];
+        await using (FileStream stream = File.OpenRead(sourcePath))
+        {
+            if (await stream.ReadAsync(magic.AsMemory(0, magic.Length), cancellationToken).ConfigureAwait(false) == magic.Length
+                && IsStfsContainerMagic(magic))
+            {
+                return await ConvertConAsync(sourcePath, outputRoot, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        throw new NotSupportedException($"Source file type '{extension}' is not supported. Expected .con, .rb3con, .sng, or an extensionless STFS package.");
+
+    }
+
+    private static bool IsStfsContainerMagic(ReadOnlySpan<byte> magic)
+    {
+        return magic.SequenceEqual("CON "u8)
+            || magic.SequenceEqual("LIVE"u8)
+            || magic.SequenceEqual("PIRS"u8);
     }
 
     private static async Task<ConversionResult> ConvertSngAsync(
@@ -125,7 +149,7 @@ public sealed class ConversionService : IConversionService
             await ExtractMidiAsync(stfs, songInfo, songDir, cancellationToken).ConfigureAwait(false);
 
             // --- Extract and split MOGG audio ---
-            await ExtractAudioAsync(stfs, songInfo, songDir, cancellationToken).ConfigureAwait(false);
+            AudioExtractionOutcome audioOutcome = await ExtractAudioAsync(stfs, songInfo, songDir, cancellationToken).ConfigureAwait(false);
 
             // --- Extract and convert album art ---
             ExtractAlbumArt(stfs, songDir, songInfo.SongFilePath);
@@ -138,8 +162,18 @@ public sealed class ConversionService : IConversionService
                 System.Text.Encoding.UTF8,
                 cancellationToken).ConfigureAwait(false);
 
+            var statuses = new List<ConversionStatus>();
+            if (audioOutcome.IsAudioIncomplete)
+            {
+                statuses.Add(new ConversionStatus(
+                    ConversionStatusCodes.AudioIncomplete,
+                    "Conversion produced only the backing audio file because no instrument stems could be mapped from the source package."));
+            }
+
             var metadata = new ConversionMetadata(songInfo.Artist, songInfo.Title, songInfo.Charter);
-            return new ConversionResult(songDir, metadata);
+            return statuses.Count == 0
+                ? new ConversionResult(songDir, metadata)
+                : new ConversionResult(songDir, metadata, statuses);
         }
         catch
         {
@@ -239,7 +273,7 @@ public sealed class ConversionService : IConversionService
             cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task ExtractAudioAsync(
+    private async Task<AudioExtractionOutcome> ExtractAudioAsync(
         StfsReader stfs,
         DtaSongInfo songInfo,
         string songDir,
@@ -283,9 +317,12 @@ public sealed class ConversionService : IConversionService
                 try
                 {
                     byte[] moggBytes = stfs.ReadEntry(entry, forceConsecutive);
-                    await extractor.ExtractStemsAsync(moggBytes, songInfo, songDir, cancellationToken)
+                    IReadOnlyDictionary<string, string> stems = await extractor.ExtractStemsAsync(moggBytes, songInfo, songDir, cancellationToken)
                         .ConfigureAwait(false);
-                    return;
+
+                    bool hasInstrumentStem = stems.Keys
+                        .Any(key => !string.Equals(key, "song", StringComparison.OrdinalIgnoreCase));
+                    return new AudioExtractionOutcome(IsAudioIncomplete: !hasInstrumentStem);
                 }
                 catch (InvalidDataException ex)
                 {
@@ -302,6 +339,8 @@ public sealed class ConversionService : IConversionService
             "No MOGG audio file found inside the CON package.",
             lastError);
     }
+
+    private readonly record struct AudioExtractionOutcome(bool IsAudioIncomplete);
 
     private static bool StartsWithMidiHeader(ReadOnlySpan<byte> bytes)
     {

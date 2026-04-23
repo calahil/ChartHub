@@ -620,7 +620,8 @@ public sealed class CloneHeroEndpointsIntegrationTests
             string? title = null,
             string? charter = null,
             string? sourceMd5 = null,
-            string? sourceChartHash = null)
+            string? sourceChartHash = null,
+            IReadOnlyList<DownloadJobStatus>? conversionStatuses = null)
         {
             if (_jobs.TryGetValue(jobId, out DownloadJobResponse? existing))
             {
@@ -642,6 +643,7 @@ public sealed class CloneHeroEndpointsIntegrationTests
                     Charter = charter ?? existing.Charter,
                     SourceMd5 = sourceMd5 ?? existing.SourceMd5,
                     SourceChartHash = sourceChartHash ?? existing.SourceChartHash,
+                    ConversionStatuses = conversionStatuses ?? existing.ConversionStatuses,
                     Error = existing.Error,
                     CreatedAtUtc = existing.CreatedAtUtc,
                     UpdatedAtUtc = DateTimeOffset.UtcNow,

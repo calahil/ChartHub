@@ -29,7 +29,7 @@ internal sealed class MoggExtractor
     /// <param name="songInfo">DTA metadata providing channel-to-stem mapping.</param>
     /// <param name="outputDir">Directory where stem OGGs will be written.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Map of stem name (e.g. "guitar", "drums") to output OGG file path.</returns>
+    /// <returns>Map of stem name (e.g. "guitar", "drums", "rhythm") to output OGG file path.</returns>
     public async Task<IReadOnlyDictionary<string, string>> ExtractStemsAsync(
         byte[] moggBytes,
         DtaSongInfo songInfo,
@@ -55,8 +55,29 @@ internal sealed class MoggExtractor
                 cancellationToken).ConfigureAwait(false);
             stems["song"] = backingPath;
 
-            // Extract per-stem OGG files using channel filter expressions.
+            // Normalise stem names up front (for example bass -> rhythm) and merge
+            // duplicate aliases into a single stem output.
+            var normalisedTracks = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
             foreach ((string stem, IReadOnlyList<int> channels) in songInfo.TrackChannels)
+            {
+                string normalisedStem = NormaliseStemName(stem);
+                if (!normalisedTracks.TryGetValue(normalisedStem, out List<int>? mergedChannels))
+                {
+                    mergedChannels = [];
+                    normalisedTracks[normalisedStem] = mergedChannels;
+                }
+
+                foreach (int channel in channels)
+                {
+                    if (!mergedChannels.Contains(channel))
+                    {
+                        mergedChannels.Add(channel);
+                    }
+                }
+            }
+
+            // Extract per-stem OGG files using channel filter expressions.
+            foreach ((string stem, List<int> channels) in normalisedTracks)
             {
                 if (channels.Count == 0)
                 {
@@ -114,8 +135,115 @@ internal sealed class MoggExtractor
         {
             0x0A => moggBytes[ReadMoggOggOffset(moggBytes)..],
             0x0B => DecryptMogg0x0B(moggBytes),
+            0x0D => DecryptMogg0x0D(moggBytes),
             _ => RecoverRawOggFromUnknownHeader(moggBytes, version),
         };
+
+    }
+
+    // C3 Custom Creators Collective private key for MOGG version 0x0D.
+    // This is the community-documented symmetric key used by C3 Tools to encrypt custom exports.
+    // See: https://github.com/trojannemo/Nautilus (Mogg.cs – C3_PRIVATE_KEY_D)
+    private static readonly byte[] C3PrivateKey0D =
+    [
+        0xC0, 0x87, 0x69, 0x00, 0xE2, 0x7C, 0x73, 0xEB,
+            0xCC, 0xD4, 0x21, 0x3D, 0x70, 0x2A, 0x4F, 0xED,
+        ];
+
+    /// <summary>
+    /// Decrypts the OGG payload from a MOGG version 0x0D file (C3 custom format).
+    /// </summary>
+    /// <remarks>
+    /// Header layout for 0x0D:
+    ///   [0..3]   version (0x0D LE)
+    ///   [4..7]   OGG data offset LE
+    ///   [8..11]  OGG map version LE
+    ///   [12..15] buffer size LE
+    ///   [16..19] seek-table entry count N LE
+    ///   [20..20+N*8-1] seek table
+    ///   [20+N*8..20+N*8+71] PUBLIC_KEY (72 bytes; first 16 are the AES counter seed)
+    ///   [OGG data offset..] OGG data (encrypted with AES-CTR using C3PrivateKey0D)
+    /// The decrypted stream may begin with "HMXA" instead of "OggS"; if so the serial
+    /// (bytes 0x0C–0x0F) and checksum (bytes 0x14–0x17) must be recomputed from the
+    /// PUBLIC_KEY bytes before the result is a valid Ogg bitstream.
+    /// </remarks>
+    private static byte[] DecryptMogg0x0D(byte[] moggBytes)
+    {
+        if (moggBytes.Length < 20)
+        {
+            throw new InvalidDataException("0x0D MOGG file is too short to read the seek-table entry count.");
+        }
+
+        int numPairs = moggBytes[16] | (moggBytes[17] << 8) | (moggBytes[18] << 16) | (moggBytes[19] << 24);
+        int publicKeyOffset = 20 + (numPairs * 8);
+
+        // PUBLIC_KEY for 0x0D is 72 bytes; first 16 bytes are the AES counter seed.
+        if (moggBytes.Length < publicKeyOffset + 72)
+        {
+            throw new InvalidDataException(
+                "0x0D MOGG file is too short to contain the 72-byte PUBLIC_KEY after the seek table.");
+        }
+
+        byte[] publicKey = moggBytes[publicKeyOffset..(publicKeyOffset + 72)];
+        int oggDataStart = moggBytes[4] | (moggBytes[5] << 8) | (moggBytes[6] << 16) | (moggBytes[7] << 24);
+        byte[] encryptedOgg = moggBytes[oggDataStart..];
+
+        byte[] decryptedOgg = DecryptMoggAesCtr(encryptedOgg, C3PrivateKey0D, publicKey[..16]);
+
+        // C3-encrypted MOGGs may start with HMXA instead of OggS. Fix the header if so.
+        if (decryptedOgg.Length >= 4
+            && decryptedOgg[0] == 0x48 && decryptedOgg[1] == 0x4D
+            && decryptedOgg[2] == 0x58 && decryptedOgg[3] == 0x41)
+        {
+            FixHmxaHeader(decryptedOgg, publicKey);
+        }
+
+        return decryptedOgg;
+    }
+
+    /// <summary>
+    /// Converts an HMXA-prefixed decrypted OGG stream into a valid OggS stream.
+    /// Rewrites bytes 0–3 (magic), 0x0C–0x0F (serial), and 0x14–0x17 (checksum).
+    /// </summary>
+    private static void FixHmxaHeader(byte[] oggData, byte[] publicKey)
+    {
+        // Replace HMXA → OggS magic.
+        oggData[0] = (byte)'O';
+        oggData[1] = (byte)'g';
+        oggData[2] = (byte)'g';
+        oggData[3] = (byte)'S';
+
+        if (oggData.Length < 0x18 || publicKey.Length < 0x1C)
+        {
+            return;
+        }
+
+        // Match the original C3 Tools byte-order semantics exactly.
+        // Serial/checksum are read from the HMXA header in reverse order,
+        // transformed, then written back as reversed bytes.
+        uint mogg0x10 = (uint)(publicKey[0x10] | (publicKey[0x11] << 8) | (publicKey[0x12] << 16) | (publicKey[0x13] << 24));
+        uint serial = (uint)(oggData[0x0F] | (oggData[0x0E] << 8) | (oggData[0x0D] << 16) | (oggData[0x0C] << 24));
+        unchecked
+        {
+            uint serialCrypt = (mogg0x10 ^ 0x5c5c5c5c) * (0x00190000 + 0x0000660d) + 0x3c6f0000 - 0xca1;
+            serialCrypt = (serialCrypt * (0x00190000 + 0x660d)) + 0x3c6f0000 - 0xca1;
+            serialCrypt ^= serial;
+            byte[] serialLe = BitConverter.GetBytes(serialCrypt);
+            byte[] serialBytes = [serialLe[3], serialLe[2], serialLe[1], serialLe[0]];
+            serialBytes.CopyTo(oggData, 0x0C);
+        }
+
+        // ChecksumCrypt transform (uses PUBLIC_KEY bytes 0x18–0x1B).
+        uint mogg0x18 = (uint)(publicKey[0x18] | (publicKey[0x19] << 8) | (publicKey[0x1A] << 16) | (publicKey[0x1B] << 24));
+        uint checksum = (uint)(oggData[0x17] | (oggData[0x16] << 8) | (oggData[0x15] << 16) | (oggData[0x14] << 24));
+        unchecked
+        {
+            uint checksumCrypt = (mogg0x18 ^ 0x36363636) * (0x00190000 + 0x0000660d) + 0x3c6f0000 - 0xca1;
+            checksumCrypt ^= checksum;
+            byte[] checksumLe = BitConverter.GetBytes(checksumCrypt);
+            byte[] checksumBytes = [checksumLe[3], checksumLe[2], checksumLe[1], checksumLe[0]];
+            checksumBytes.CopyTo(oggData, 0x14);
+        }
     }
 
     private static byte[] RecoverRawOggFromUnknownHeader(byte[] moggBytes, int version)
@@ -132,7 +260,7 @@ internal sealed class MoggExtractor
 
         throw new NotSupportedException(
             $"MOGG encryption version 0x{version:X2} is not supported. " +
-            "Only unencrypted (0x0A) and RB1-style encrypted (0x0B) MOGG files are handled.");
+                "Only unencrypted (0x0A), RB1-style encrypted (0x0B), and C3 custom (0x0D) MOGG files are handled.");
     }
 
     /// <summary>
@@ -187,7 +315,7 @@ internal sealed class MoggExtractor
         byte[] keystream = new byte[16];
         byte[] result = new byte[data.Length];
 
-    using var aes = Aes.Create();
+        using var aes = Aes.Create();
         aes.Key = key;
         aes.Mode = CipherMode.ECB;
         aes.Padding = PaddingMode.None;
@@ -293,7 +421,8 @@ internal sealed class MoggExtractor
         return stem.ToLowerInvariant() switch
         {
             "drum" or "drums" => "drums",
-            "bass" => "bass",
+            "bass" => "rhythm",
+            "rhythm" => "rhythm",
             "guitar" => "guitar",
             "vocals" or "vocal" => "vocals",
             "keys" => "keys",

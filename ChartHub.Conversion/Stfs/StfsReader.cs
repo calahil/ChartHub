@@ -101,10 +101,14 @@ internal sealed class StfsReader : IDisposable
         byte[] header = new byte[0x400];
         ReadExact(stream, header, 0, header.Length);
 
-        // Verify magic "CON "
-        if (header[0] != 0x43 || header[1] != 0x4F || header[2] != 0x4E || header[3] != 0x20)
+        bool isCon = header[0] == 0x43 && header[1] == 0x4F && header[2] == 0x4E && header[3] == 0x20;
+        bool isLive = header[0] == 0x4C && header[1] == 0x49 && header[2] == 0x56 && header[3] == 0x45;
+        bool isPirs = header[0] == 0x50 && header[1] == 0x49 && header[2] == 0x52 && header[3] == 0x53;
+
+        // Verify STFS package magic "CON ", "LIVE", or "PIRS".
+        if (!isCon && !isLive && !isPirs)
         {
-            throw new InvalidDataException("Not a valid CON STFS package (missing 'CON ' magic).");
+            throw new InvalidDataException("Not a valid STFS package (missing 'CON ', 'LIVE', or 'PIRS' magic).");
         }
 
         // Header size is stored at 0x340 as a 4-byte big-endian value, then rounded up to 0x1000.

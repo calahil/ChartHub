@@ -6,7 +6,6 @@ public sealed class OracleParityComparisonTests
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["sng-biology"] = "Onyx oracle cannot extract this encrypted/unsupported SNG fixture.",
-            ["rb3con-neighborhood-1"] = "ChartHub does not yet support MOGG encryption version 0x0D.",
         };
 
     [Theory]

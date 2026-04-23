@@ -59,12 +59,24 @@ public sealed class DownloadJobResponse
 
     public string? FileType { get; init; }
 
+    /// <summary>
+    /// Non-fatal conversion statuses recorded during install (for example audio fallback).
+    /// </summary>
+    public IReadOnlyList<DownloadJobStatus> ConversionStatuses { get; init; } = [];
+
     /// <summary>Whether AI drum generation was requested for this job.</summary>
     public bool DrumGenRequested { get; init; }
 
     public required DateTimeOffset CreatedAtUtc { get; init; }
 
     public required DateTimeOffset UpdatedAtUtc { get; init; }
+}
+
+public sealed class DownloadJobStatus
+{
+    public required string Code { get; init; }
+
+    public required string Message { get; init; }
 }
 
 public sealed class DownloadProgressEvent
