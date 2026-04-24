@@ -19,6 +19,7 @@ public interface IConversionService
     Task<ConversionResult> ConvertAsync(
         string sourcePath,
         string outputRoot,
+        Action<ConversionProgressUpdate>? progress = null,
         CancellationToken cancellationToken = default);
 }
 
@@ -34,17 +35,18 @@ public sealed class ConversionService : IConversionService
     public async Task<ConversionResult> ConvertAsync(
         string sourcePath,
         string outputRoot,
+        Action<ConversionProgressUpdate>? progress = null,
         CancellationToken cancellationToken = default)
     {
         string extension = Path.GetExtension(sourcePath).ToLowerInvariant();
         if (extension is ".con" or ".rb3con")
         {
-            return await ConvertConAsync(sourcePath, outputRoot, cancellationToken).ConfigureAwait(false);
+            return await ConvertConAsync(sourcePath, outputRoot, progress, cancellationToken).ConfigureAwait(false);
         }
 
         if (extension is ".sng")
         {
-            return await ConvertSngAsync(sourcePath, outputRoot, cancellationToken).ConfigureAwait(false);
+            return await ConvertSngAsync(sourcePath, outputRoot, progress, cancellationToken).ConfigureAwait(false);
         }
 
         // Some Xbox STFS exports are extensionless (for example LIVE packages).
@@ -55,7 +57,7 @@ public sealed class ConversionService : IConversionService
             if (await stream.ReadAsync(magic.AsMemory(0, magic.Length), cancellationToken).ConfigureAwait(false) == magic.Length
                 && IsStfsContainerMagic(magic))
             {
-                return await ConvertConAsync(sourcePath, outputRoot, cancellationToken).ConfigureAwait(false);
+                return await ConvertConAsync(sourcePath, outputRoot, progress, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -73,10 +75,13 @@ public sealed class ConversionService : IConversionService
     private static async Task<ConversionResult> ConvertSngAsync(
         string sourcePath,
         string outputRoot,
+        Action<ConversionProgressUpdate>? progress,
         CancellationToken cancellationToken)
     {
+        ReportProgress(progress, ConversionProgressStages.ParseContainer, 91, "Reading SNG package");
         byte[] containerBytes = await File.ReadAllBytesAsync(sourcePath, cancellationToken).ConfigureAwait(false);
         SngPackage package = SngPackageReader.Read(containerBytes);
+        ReportProgress(progress, ConversionProgressStages.ParseDta, 91.5, "Extracting SNG metadata");
         ConversionMetadata metadata = SngMetadataExtractor.Extract(package, containerBytes, sourcePath);
 
         string songDirName = SanitiseDirName(metadata.Title);
@@ -95,16 +100,21 @@ public sealed class ConversionService : IConversionService
 
         try
         {
+            ReportProgress(progress, ConversionProgressStages.ConvertMidi, 92.5, "Extracting chart data");
             IReadOnlyList<SngChartContent> charts = SngMidiExtractor.ExtractCloneHeroCharts(package, containerBytes);
             foreach (SngChartContent chart in charts)
             {
                 await File.WriteAllBytesAsync(Path.Combine(songDir, chart.FileName), chart.Bytes, cancellationToken).ConfigureAwait(false);
             }
 
+            ReportProgress(progress, ConversionProgressStages.DecodeMogg, 93.5, "Extracting SNG audio payloads");
+            ReportProgress(progress, ConversionProgressStages.MixBacking, 93.8, "Preparing backing audio output");
+            ReportProgress(progress, ConversionProgressStages.MixStems, 94.0, "Preparing optional stem outputs");
             await SngAudioExtractor.ExtractAsync(package, containerBytes, songDir, cancellationToken).ConfigureAwait(false);
 
             try
             {
+                ReportProgress(progress, ConversionProgressStages.ExtractAlbumArt, 94.5, "Extracting album art");
                 await SngAlbumArtExtractor.ExtractAsync(package, containerBytes, songDir, cancellationToken).ConfigureAwait(false);
             }
             catch (InvalidDataException)
@@ -112,7 +122,9 @@ public sealed class ConversionService : IConversionService
                 // Album art is optional for SNG installs.
             }
 
+            ReportProgress(progress, ConversionProgressStages.WriteSongIni, 95.5, "Writing song.ini");
             await WriteSngSongIniAsync(package, containerBytes, sourcePath, songDir, metadata, cancellationToken).ConfigureAwait(false);
+            ReportProgress(progress, ConversionProgressStages.Finalize, 96, "Conversion output finalized");
 
             return new ConversionResult(songDir, metadata);
         }
@@ -126,8 +138,10 @@ public sealed class ConversionService : IConversionService
     private async Task<ConversionResult> ConvertConAsync(
         string sourcePath,
         string outputRoot,
+        Action<ConversionProgressUpdate>? progress,
         CancellationToken cancellationToken)
     {
+        ReportProgress(progress, ConversionProgressStages.ParseContainer, 91, "Opening RB3CON container");
         using var stfs = StfsReader.Open(sourcePath);
 
         // --- Locate and parse songs.dta ---
@@ -137,6 +151,7 @@ public sealed class ConversionService : IConversionService
             throw new InvalidDataException($"No songs.dta found inside '{sourcePath}'.");
         }
 
+        ReportProgress(progress, ConversionProgressStages.ParseDta, 91.5, "Parsing songs.dta");
         DtaSongInfo songInfo = DtaParser.Parse(dtaBytes);
 
         // --- Prepare output directory ---
@@ -147,21 +162,29 @@ public sealed class ConversionService : IConversionService
         try
         {
             // --- Extract and convert MIDI ---
+            ReportProgress(progress, ConversionProgressStages.ConvertMidi, 92.5, "Converting MIDI");
             await ExtractMidiAsync(stfs, songInfo, songDir, cancellationToken).ConfigureAwait(false);
 
             // --- Extract and split MOGG audio ---
+            ReportProgress(progress, ConversionProgressStages.DecodeMogg, 93.2, "Decrypting and decoding MOGG audio");
+            ReportProgress(progress, ConversionProgressStages.MixBacking, 93.6, "Generating backing track");
+            ReportProgress(progress, ConversionProgressStages.MixStems, 94.0, "Generating optional stems");
             AudioExtractionOutcome audioOutcome = await ExtractAudioAsync(stfs, songInfo, songDir, cancellationToken).ConfigureAwait(false);
+            DtaSongInfo effectiveSongInfo = WithSongLengthFromAudio(songInfo, audioOutcome.BackingDurationMs);
 
             // --- Extract and convert album art ---
+            ReportProgress(progress, ConversionProgressStages.ExtractAlbumArt, 94.5, "Extracting album art");
             ExtractAlbumArt(stfs, songDir, songInfo.SongFilePath);
 
             // --- Write song.ini ---
-            string songIniContent = SongIniGenerator.Generate(songInfo);
+            ReportProgress(progress, ConversionProgressStages.WriteSongIni, 95.5, "Writing song.ini");
+            string songIniContent = SongIniGenerator.Generate(effectiveSongInfo);
             await File.WriteAllTextAsync(
                 Path.Combine(songDir, "song.ini"),
                 songIniContent,
                 System.Text.Encoding.UTF8,
                 cancellationToken).ConfigureAwait(false);
+            ReportProgress(progress, ConversionProgressStages.Finalize, 96, "Conversion output finalized");
 
             var statuses = new List<ConversionStatus>();
             if (audioOutcome.IsAudioIncomplete)
@@ -171,7 +194,7 @@ public sealed class ConversionService : IConversionService
                     "Conversion produced only the backing audio file because no instrument stems could be mapped from the source package."));
             }
 
-            var metadata = new ConversionMetadata(songInfo.Artist, songInfo.Title, songInfo.Charter);
+            var metadata = new ConversionMetadata(effectiveSongInfo.Artist, effectiveSongInfo.Title, effectiveSongInfo.Charter);
             return statuses.Count == 0
                 ? new ConversionResult(songDir, metadata)
                 : new ConversionResult(songDir, metadata, statuses);
@@ -346,7 +369,12 @@ public sealed class ConversionService : IConversionService
 
             bool hasInstrumentStem = stems.Keys
                 .Any(key => !string.Equals(key, "song", StringComparison.OrdinalIgnoreCase));
-            return new AudioExtractionOutcome(IsAudioIncomplete: !hasInstrumentStem);
+            int? backingDurationMs = selectedAttempt.Value.DurationSeconds > 0
+                ? (int)(selectedAttempt.Value.DurationSeconds * 1000)
+                : null;
+            return new AudioExtractionOutcome(
+                IsAudioIncomplete: !hasInstrumentStem,
+                BackingDurationMs: backingDurationMs);
         }
 
         throw new InvalidDataException(
@@ -354,7 +382,37 @@ public sealed class ConversionService : IConversionService
             lastError);
     }
 
-    private readonly record struct AudioExtractionOutcome(bool IsAudioIncomplete);
+    private readonly record struct AudioExtractionOutcome(bool IsAudioIncomplete, int? BackingDurationMs);
+
+    private static DtaSongInfo WithSongLengthFromAudio(DtaSongInfo songInfo, int? backingDurationMs)
+    {
+        if (backingDurationMs is null or <= 0)
+        {
+            return songInfo;
+        }
+
+        return new DtaSongInfo
+        {
+            ShortName = songInfo.ShortName,
+            Title = songInfo.Title,
+            Artist = songInfo.Artist,
+            Charter = songInfo.Charter,
+            Album = songInfo.Album,
+            Genre = songInfo.Genre,
+            Year = songInfo.Year,
+            AlbumTrack = songInfo.AlbumTrack,
+            SongLengthMs = backingDurationMs.Value,
+            PreviewStartMs = songInfo.PreviewStartMs,
+            PreviewEndMs = songInfo.PreviewEndMs,
+            VocalParts = songInfo.VocalParts,
+            Ranks = songInfo.Ranks,
+            SongFilePath = songInfo.SongFilePath,
+            TrackChannels = songInfo.TrackChannels,
+            Pans = songInfo.Pans,
+            Vols = songInfo.Vols,
+            TotalChannels = songInfo.TotalChannels,
+        };
+    }
 
     private static bool StartsWithMidiHeader(ReadOnlySpan<byte> bytes)
     {
@@ -404,7 +462,6 @@ public sealed class ConversionService : IConversionService
     private static void ExtractAlbumArt(StfsReader stfs, string songDir, string? songFilePath = null)
     {
         // Determine the song subfolder to prefer art from the correct song in multi-song packs.
-        // SongFilePath is like "songs/<shortname>/<shortname>"; the parent dir is "songs/<shortname>/".
         string? songSubfolder = null;
         if (!string.IsNullOrEmpty(songFilePath))
         {
@@ -412,11 +469,42 @@ public sealed class ConversionService : IConversionService
             int lastSlash = normalized.LastIndexOf('/');
             if (lastSlash > 0)
             {
-                songSubfolder = normalized[..(lastSlash + 1)]; // "songs/<shortname>/"
+                songSubfolder = normalized[..(lastSlash + 1)];
             }
         }
 
-        foreach ((string path, _) in stfs.GetAllFiles())
+        bool TryWriteFromPath(string path, bool decodeXboxTexture)
+        {
+            byte[]? bytes = stfs.ReadFile(path);
+            if (bytes == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                if (decodeXboxTexture)
+                {
+                    byte[] pngBytes = PngXboxDecoder.Decode(bytes);
+                    File.WriteAllBytes(Path.Combine(songDir, "album.png"), pngBytes);
+                    return true;
+                }
+
+                string ext = Path.GetExtension(path).ToLowerInvariant();
+                string outName = ext is ".jpg" or ".jpeg" ? "album.jpg" : "album.png";
+                File.WriteAllBytes(Path.Combine(songDir, outName), bytes);
+                return true;
+            }
+            catch (InvalidDataException)
+            {
+                return false;
+            }
+        }
+
+        IEnumerable<(string path, StfsEntry entry)> entries = stfs.GetAllFiles();
+
+        // Pass 1: scoped to song subfolder when available.
+        foreach ((string path, _) in entries)
         {
             string normPath = path.Replace('\\', '/');
             if (songSubfolder != null && !normPath.StartsWith(songSubfolder, StringComparison.OrdinalIgnoreCase))
@@ -424,27 +512,39 @@ public sealed class ConversionService : IConversionService
                 continue;
             }
 
-            if (normPath.EndsWith(".png_xbox", StringComparison.OrdinalIgnoreCase)
+            if ((normPath.EndsWith(".png_xbox", StringComparison.OrdinalIgnoreCase)
                 || normPath.EndsWith("_keep.png_xbox", StringComparison.OrdinalIgnoreCase))
+                && TryWriteFromPath(path, decodeXboxTexture: true))
             {
-                byte[]? texBytes = stfs.ReadFile(path);
-                if (texBytes == null)
-                {
-                    continue;
-                }
+                return;
+            }
 
-                try
-                {
-                    byte[] pngBytes = PngXboxDecoder.Decode(texBytes);
-                    File.WriteAllBytes(Path.Combine(songDir, "album.png"), pngBytes);
-                    return; // use first valid image found
-                }
-                catch (InvalidDataException)
-                {
-                    // Non-fatal: album art is optional.
-                }
+            if ((normPath.EndsWith("album.png", StringComparison.OrdinalIgnoreCase)
+                || normPath.EndsWith("album.jpg", StringComparison.OrdinalIgnoreCase)
+                || normPath.EndsWith("album.jpeg", StringComparison.OrdinalIgnoreCase))
+                && TryWriteFromPath(path, decodeXboxTexture: false))
+            {
+                return;
+            }
+        }
 
-                break;
+        // Pass 2: package-wide fallback.
+        foreach ((string path, _) in entries)
+        {
+            string normPath = path.Replace('\\', '/');
+            if ((normPath.EndsWith(".png_xbox", StringComparison.OrdinalIgnoreCase)
+                || normPath.EndsWith("_keep.png_xbox", StringComparison.OrdinalIgnoreCase))
+                && TryWriteFromPath(path, decodeXboxTexture: true))
+            {
+                return;
+            }
+
+            if ((normPath.EndsWith("album.png", StringComparison.OrdinalIgnoreCase)
+                || normPath.EndsWith("album.jpg", StringComparison.OrdinalIgnoreCase)
+                || normPath.EndsWith("album.jpeg", StringComparison.OrdinalIgnoreCase))
+                && TryWriteFromPath(path, decodeXboxTexture: false))
+            {
+                return;
             }
         }
     }
@@ -487,5 +587,14 @@ public sealed class ConversionService : IConversionService
 
         try { Directory.Delete(path, recursive: true); }
         catch { /* best-effort cleanup */ }
+    }
+
+    private static void ReportProgress(
+        Action<ConversionProgressUpdate>? progress,
+        string stage,
+        double percent,
+        string? message = null)
+    {
+        progress?.Invoke(new ConversionProgressUpdate(stage, percent, message));
     }
 }

@@ -173,9 +173,65 @@ public class DownloadViewModelTests
     }
 
     [Fact]
-    public async Task RefreshQueue_HidesInstalledAndCompletedJobs()
+    public async Task RefreshQueue_MapsConvertingSubStageToConvertingState()
     {
-        using var temp = new TemporaryDirectoryFixture("download-vm-hide-installed");
+        using var temp = new TemporaryDirectoryFixture("download-vm-converting-substage");
+        using AppGlobalSettings settings = CreateSettings(
+            temp.RootPath,
+            serverApiBaseUrl: "http://127.0.0.1:5001",
+            serverApiAuthToken: "token");
+
+        var fakeClient = new FakeChartHubServerApiClient
+        {
+            Jobs =
+            [
+                new ChartHubServerDownloadJobResponse(
+                    new Guid("22222222-2222-2222-2222-222222222222"),
+                    LibrarySourceNames.RhythmVerse,
+                    "id-conv",
+                    "Converting Song",
+                    "https://example.test/song-conv",
+                    "Converting:MixBacking",
+                    94,
+                    "/tmp/song-conv.zip",
+                    null,
+                    null,
+                    null,
+                    DateTimeOffset.UtcNow,
+                    DateTimeOffset.UtcNow),
+            ],
+        };
+
+        var sharedQueue = new SharedDownloadQueue();
+
+        var sut = new ViewModels.DownloadViewModel(
+            settings,
+            fakeClient,
+            sharedQueue,
+            uiInvoke: action =>
+            {
+                action();
+                return Task.CompletedTask;
+            });
+
+        try
+        {
+            bool queueLoaded = await WaitForConditionAsync(() => sut.IngestionQueue.Count == 1, TimeSpan.FromSeconds(2));
+            Assert.True(queueLoaded);
+
+            Assert.Equal(IngestionState.Converting, sut.IngestionQueue[0].CurrentState);
+            Assert.Equal(94, sut.IngestionQueue[0].ProgressPercent);
+        }
+        finally
+        {
+            await sut.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task RefreshQueue_KeepsInstalledAndCompletedJobsVisible()
+    {
+        using var temp = new TemporaryDirectoryFixture("download-vm-keep-installed");
         using AppGlobalSettings settings = CreateSettings(
             temp.RootPath,
             serverApiBaseUrl: "http://127.0.0.1:5001",
@@ -242,10 +298,14 @@ public class DownloadViewModelTests
 
         try
         {
-            bool queueLoaded = await WaitForConditionAsync(() => sut.IngestionQueue.Count == 1, TimeSpan.FromSeconds(2));
+            bool queueLoaded = await WaitForConditionAsync(() => sut.IngestionQueue.Count == 3, TimeSpan.FromSeconds(2));
             Assert.True(queueLoaded);
-            Assert.Single(sut.IngestionQueue);
-            Assert.Equal("Downloaded Song", sut.IngestionQueue[0].DisplayName);
+            Assert.Equal(3, sut.IngestionQueue.Count);
+
+            var names = sut.IngestionQueue.Select(item => item.DisplayName).ToHashSet(StringComparer.Ordinal);
+            Assert.Contains("Installed Song", names);
+            Assert.Contains("Completed Song", names);
+            Assert.Contains("Downloaded Song", names);
         }
         finally
         {

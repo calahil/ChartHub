@@ -419,9 +419,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
 
     private async Task MergeServerJobsAsync(IReadOnlyList<ChartHubServerDownloadJobResponse> allJobs, CancellationToken cancellationToken)
     {
-        IEnumerable<ChartHubServerDownloadJobResponse> filtered = allJobs.Where(job =>
-            !string.Equals(job.Stage, "Installed", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(job.Stage, "Completed", StringComparison.OrdinalIgnoreCase));
+        IEnumerable<ChartHubServerDownloadJobResponse> filtered = allJobs;
 
         filtered = SelectedQueueSort switch
         {
@@ -589,6 +587,11 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
 
     private static IngestionState MapServerStage(string stage)
     {
+        if (stage.StartsWith("Converting:", StringComparison.OrdinalIgnoreCase))
+        {
+            return IngestionState.Converting;
+        }
+
         if (Enum.TryParse(stage, ignoreCase: true, out IngestionState parsed))
         {
             return parsed;

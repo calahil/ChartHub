@@ -12,8 +12,10 @@
 
   <ItemGroup>
     <!-- DXT1/DXT5 decoded pixels are written to PNG via ImageSharp (cross-platform PNG encoding). -->
+    <PackageReference Include="OggVorbisEncoder" Version="1.2.2" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="NVorbis" Version="0.10.5" />
+    <PackageReference Include="StbVorbisSharp" Version="1.22.4" />
   </ItemGroup>
 
 </Project>

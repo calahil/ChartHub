@@ -23,8 +23,10 @@ namespace ChartHub.Conversion.Image;
 internal static class PngXboxDecoder
 {
     private const int HeaderSize = 0x20;
+    private const int LegacyDxt5HeaderSize = 0x20;
     private const byte FormatDxt1 = 0x08;
     private const byte FormatDxt5 = 0x18;
+    private const byte FormatLegacyVersion = 0x01;
 
     /// <summary>Decodes a <c>.png_xbox</c> byte array and returns PNG-encoded bytes.</summary>
     public static byte[] Decode(byte[] rawBytes)
@@ -39,6 +41,11 @@ internal static class PngXboxDecoder
         int height = rawBytes[4] | (rawBytes[5] << 8);
 
         bool isDxt5 = fmt == FormatDxt5;
+        if (fmt == FormatLegacyVersion)
+        {
+            return DecodeLegacyDxt5(rawBytes);
+        }
+
         if (fmt != FormatDxt1 && fmt != FormatDxt5)
         {
             throw new InvalidDataException($"Unsupported PNG Xbox format identifier: 0x{fmt:X2}. Expected DXT1 (0x08) or DXT5 (0x18).");
@@ -64,6 +71,41 @@ internal static class PngXboxDecoder
         using var ms = new MemoryStream();
         image.SaveAsPng(ms);
         return ms.ToArray();
+    }
+
+    private static byte[] DecodeLegacyDxt5(byte[] rawBytes)
+    {
+        const int width = 256;
+        const int height = 256;
+        const int bytesPerBlock = 16;
+
+        int blockW = (width + 3) / 4;
+        int blockH = (height + 3) / 4;
+        int dxtDataLen = blockW * blockH * bytesPerBlock;
+
+        if (rawBytes.Length < LegacyDxt5HeaderSize + dxtDataLen)
+        {
+            throw new InvalidDataException("Legacy PNG Xbox texture is too short for a 256x256 DXT5 top mip.");
+        }
+
+        byte[] dxtData = rawBytes[LegacyDxt5HeaderSize..(LegacyDxt5HeaderSize + dxtDataLen)];
+        Swap16InPlace(dxtData);
+
+        byte[] linearDxt = Detile(dxtData, blockW, blockH, bytesPerBlock);
+        byte[] rgba = DecodeDxt5(linearDxt, blockW, blockH);
+
+        using var image = SixLabors.ImageSharp.Image.LoadPixelData<Rgba32>(rgba, width, height);
+        using var ms = new MemoryStream();
+        image.SaveAsPng(ms);
+        return ms.ToArray();
+    }
+
+    private static void Swap16InPlace(byte[] data)
+    {
+        for (int i = 0; i + 1 < data.Length; i += 2)
+        {
+            (data[i], data[i + 1]) = (data[i + 1], data[i]);
+        }
     }
 
     // ---- Xbox 360 tile order de-swizzle ------------------------------------

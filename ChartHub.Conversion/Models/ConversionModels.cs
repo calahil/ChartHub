@@ -33,6 +33,28 @@ public sealed record ConversionStatus(string Code, string Message);
 /// <param name="Charter">Chart author.</param>
 public sealed record ConversionMetadata(string Artist, string Title, string Charter);
 
+/// <summary>
+/// Progress update emitted by the conversion pipeline.
+/// </summary>
+/// <param name="Stage">Machine-readable stage identifier (for example <c>Converting:ParseDta</c>).</param>
+/// <param name="ProgressPercent">Overall job progress percentage reported to the server pipeline.</param>
+/// <param name="Message">Optional human-readable detail for diagnostics.</param>
+public sealed record ConversionProgressUpdate(string Stage, double ProgressPercent, string? Message = null);
+
+/// <summary>Known conversion stage names used for server/UI progress reporting.</summary>
+public static class ConversionProgressStages
+{
+    public const string ParseContainer = "Converting:ParseContainer";
+    public const string ParseDta = "Converting:ParseDta";
+    public const string ConvertMidi = "Converting:ConvertMidi";
+    public const string DecodeMogg = "Converting:DecodeMogg";
+    public const string MixBacking = "Converting:MixBacking";
+    public const string MixStems = "Converting:MixStems";
+    public const string ExtractAlbumArt = "Converting:ExtractAlbumArt";
+    public const string WriteSongIni = "Converting:WriteSongIni";
+    public const string Finalize = "Converting:Finalize";
+}
+
 /// <summary>Options controlling conversion behaviour.</summary>
 public sealed class ConversionOptions
 {

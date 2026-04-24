@@ -406,12 +406,16 @@ public sealed class DownloadJobInstallServiceTests
             {
                 StagingDir = StagingDir,
                 CloneHeroRoot = CloneHeroRoot,
+                SqliteDbPath = Path.Combine(Root, "test-server.db"),
             });
+
+            IDownloadJobStore jobStore = new SqliteDownloadJobStore(pathOptions, new StubWebHostEnvironment(Root));
 
             return new DownloadJobInstallService(
                 pathOptions,
                 new StubWebHostEnvironment(Root),
                 new StubFileTypeResolver(fileType, cancelOnTypeResolve),
+                jobStore,
                 conversionService ?? new StubConversionService(),
                 new ServerSongIniMetadataParser(),
                 new ServerCloneHeroDirectorySchemaService(),
@@ -464,7 +468,11 @@ public sealed class DownloadJobInstallServiceTests
         IReadOnlyList<ConversionStatus>? statuses = null,
         ConversionMetadata? metadata = null) : IConversionService
     {
-        public async Task<ConversionResult> ConvertAsync(string sourcePath, string outputRoot, CancellationToken cancellationToken = default)
+        public async Task<ConversionResult> ConvertAsync(
+            string sourcePath,
+            string outputRoot,
+            Action<ConversionProgressUpdate>? progress = null,
+            CancellationToken cancellationToken = default)
         {
             string songDir = Path.Combine(outputRoot, "stub-song");
             Directory.CreateDirectory(songDir);

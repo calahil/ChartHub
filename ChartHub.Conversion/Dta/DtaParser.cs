@@ -275,7 +275,7 @@ internal static class DtaParser
                     break;
 
                 case "preview":
-                    (previewStartMs, previewEndMs) = ExtractPreview(value);
+                    (previewStartMs, previewEndMs) = ExtractPreview(entry.Children!);
                     break;
 
                 case "rank":
@@ -411,15 +411,11 @@ internal static class DtaParser
         }
     }
 
-    private static (int Start, int End) ExtractPreview(DtaNode previewNode)
+    private static (int Start, int End) ExtractPreview(List<DtaNode> previewEntryChildren)
     {
-        if (!previewNode.IsList || previewNode.Children is null)
-        {
-            return (0, 0);
-        }
-
-        int start = previewNode.Children.Count > 0 ? ParseInt(ExtractFirstAtom(previewNode.Children[0])) : 0;
-        int end = previewNode.Children.Count > 1 ? ParseInt(ExtractFirstAtom(previewNode.Children[1])) : 0;
+        // Entry shape: ('preview' 35000 65000)
+        int start = previewEntryChildren.Count > 1 ? ParseInt(ExtractFirstAtom(previewEntryChildren[1])) : 0;
+        int end = previewEntryChildren.Count > 2 ? ParseInt(ExtractFirstAtom(previewEntryChildren[2])) : 0;
         return (start, end);
     }
 

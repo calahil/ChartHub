@@ -66,16 +66,18 @@ internal sealed class StfsReader : IDisposable
     private readonly Stream _stream;
     private readonly long _streamLength;
     private readonly int _headerSize;
+    private readonly int _blockSeparation;
     private readonly int _fileTableFirstBlock;
     private readonly int _fileTableBlockCount;
     private List<StfsEntry>? _entries;
     private bool _disposed;
 
-    private StfsReader(Stream stream, long streamLength, int headerSize, int fileTableFirstBlock, int fileTableBlockCount)
+    private StfsReader(Stream stream, long streamLength, int headerSize, int blockSeparation, int fileTableFirstBlock, int fileTableBlockCount)
     {
         _stream = stream;
         _streamLength = streamLength;
         _headerSize = headerSize;
+        _blockSeparation = blockSeparation;
         _fileTableFirstBlock = fileTableFirstBlock;
         _fileTableBlockCount = fileTableBlockCount;
     }
@@ -119,11 +121,12 @@ internal sealed class StfsReader : IDisposable
         // Layout: [0] size, [1] reserved, [2] block_separation,
         //         [3–4] file_table_block_count (LE16),
         //         [5–7] file_table_block_num (LE24).
+        int blockSeparation = header[0x37B];
         int fileTableBlockCount = header[0x37C] | (header[0x37D] << 8);
         int fileTableFirstBlock = header[0x37E] | (header[0x37F] << 8) | (header[0x380] << 16);
 
         long streamLength = stream.Length;
-        var reader = new StfsReader(stream, streamLength, headerSize, fileTableFirstBlock, fileTableBlockCount);
+        var reader = new StfsReader(stream, streamLength, headerSize, blockSeparation, fileTableFirstBlock, fileTableBlockCount);
         reader.ParseEntries();
         return reader;
     }
@@ -367,7 +370,13 @@ internal sealed class StfsReader : IDisposable
 
     private long BlockFileOffset(int n)
     {
-        return _headerSize + ((long)n + (n / HashEntriesPerGroup) + 1L) * BlockSize;
+        int group = n / HashEntriesPerGroup;
+
+        // Base female-topology adjustment is one hash block per 170 data blocks.
+        // For block_separation=1 CON packages, there is one additional separation/hash block
+        // after the first group boundary that shifts all subsequent data blocks by +1.
+        long interleaved = group + ((_blockSeparation > 0 && group > 0) ? _blockSeparation : 0);
+        return _headerSize + ((long)n + interleaved + 1L) * BlockSize;
     }
 
     private static void ReadAt(Stream stream, byte[] buffer, int bufferOffset, int count, long fileOffset)

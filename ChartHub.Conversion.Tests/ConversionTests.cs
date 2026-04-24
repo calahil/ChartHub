@@ -136,6 +136,10 @@ public sealed class ConversionServiceRoutingTests
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
             "../../../../../merges/Ready to Start-e99c44e9-43a5-4c54-aa86-4cffb56bb215.rb3con"));
 
+    private static readonly string BrokeRb3ConPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../kam_mm_broke.rb3con"));
+
     private static readonly string NotesMidSngPath =
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
             "../../../../../merges/Pearl Jam - Yellow Ledbetter (farottone).sng"));
@@ -225,17 +229,78 @@ public sealed class ConversionServiceRoutingTests
             var service = new ConversionService();
             ConversionResult result = await service.ConvertAsync(SampleRb3ConPath, outputRoot);
 
-            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.wav")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ogg")));
 
             string[] stems = Directory
-                .EnumerateFiles(result.OutputDirectory, "*.wav", SearchOption.TopDirectoryOnly)
+                .EnumerateFiles(result.OutputDirectory, "*.ogg", SearchOption.TopDirectoryOnly)
                 .Select(Path.GetFileName)
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .Select(name => name!)
-                .Where(name => !string.Equals(name, "song.wav", StringComparison.OrdinalIgnoreCase))
+                .Where(name => !string.Equals(name, "song.ogg", StringComparison.OrdinalIgnoreCase))
                 .ToArray();
 
-            Assert.True(stems.Length > 0, "Expected at least one instrument stem WAV generated from RB3CON channel mapping.");
+            Assert.True(stems.Length > 0, "Expected at least one instrument stem OGG generated from RB3CON channel mapping.");
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConvertAsync_BrokeRb3Con_WritesAlbumPng()
+    {
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-broke-route-test-{Guid.NewGuid():N}");
+
+        try
+        {
+            if (!File.Exists(BrokeRb3ConPath))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(outputRoot);
+
+            var service = new ConversionService();
+            ConversionResult result = await service.ConvertAsync(BrokeRb3ConPath, outputRoot);
+
+            string albumPath = Path.Combine(result.OutputDirectory, "album.png");
+            Assert.True(File.Exists(albumPath), "Expected album art extracted from legacy png_xbox fixture.");
+            Assert.True(new FileInfo(albumPath).Length > 0, "Expected extracted album art to be non-empty.");
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConvertAsync_BrokeRb3Con_SongIniUsesBackingAudioDuration()
+    {
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-broke-songlength-test-{Guid.NewGuid():N}");
+
+        try
+        {
+            if (!File.Exists(BrokeRb3ConPath))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(outputRoot);
+
+            var service = new ConversionService();
+            ConversionResult result = await service.ConvertAsync(BrokeRb3ConPath, outputRoot);
+
+            string songIniPath = Path.Combine(result.OutputDirectory, "song.ini");
+            string songIni = await File.ReadAllTextAsync(songIniPath);
+
+            Assert.Contains("song_length = 200873\r\n", songIni, StringComparison.Ordinal);
         }
         finally
         {
@@ -578,7 +643,7 @@ public sealed class FanMadeConTests
 
             Assert.True(Directory.Exists(result.OutputDirectory));
             Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")));
-            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.wav")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ogg")));
         }
         finally
         {
@@ -609,7 +674,7 @@ public sealed class FanMadeConTests
             Assert.True(Directory.Exists(result.OutputDirectory));
             Assert.DoesNotContain("#", result.OutputDirectory, StringComparison.Ordinal);
             Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")));
-            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.wav")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ogg")));
         }
         finally
         {
@@ -1180,10 +1245,27 @@ public sealed class DtaParserTests
         Assert.Contains("track = 2\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("album_track = 2\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("diff_drums = 1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_drums_real = 1\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("diff_guitar = 1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_guitarghl = -1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_bassghl = -1\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("diff_vocals = 3\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("diff_vocals_harm = 3\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("diff_band = 1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_drums_real_ps = -1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_keys_real_ps = -1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_guitar_pad = -1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_bass_pad = -1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_drums_pad = -1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_vocals_pad = -1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_keys_pad = -1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("star_power_note = 116\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("multiplier_note = 116\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("sysex_slider = False\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("sysex_open_bass = False\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("pro_drums = True\r\n", songIni, StringComparison.Ordinal);
+        Assert.DoesNotContain("five_lane_drums = ", songIni, StringComparison.Ordinal);
+        Assert.DoesNotContain("drum_fallback_blue = ", songIni, StringComparison.Ordinal);
     }
 }
 

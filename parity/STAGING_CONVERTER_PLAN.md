@@ -1,190 +1,249 @@
 # Staging-Ready Converter Plan Ledger
 
-Last updated: 2026-04-23
+Last updated: 2026-04-24
 Owner: Conversion library workstream
 
-This file is the repository source of truth for staging readiness against the modified M1-M7 plan.
-Status values:
-- Complete: implemented and backed by committed tests/fixtures.
-- Partial: meaningful implementation exists, but at least one acceptance requirement is still missing.
-- Blocked: cannot proceed without an external dependency or unresolved decision.
-- Not started: no implemented path yet.
+---
 
-## Locked Scope Requirements
+## MANDATORY ANCHOR — READ BEFORE TOUCHING ANY CONVERSION CODE
 
-- RB3CON support must include MOGG versions 0x0A, 0x0B, and 0x0D.
-- RB3CON no_album_art fixture coverage is explicitly out-of-scope for final release.
-- Unencrypted SNG support must cover notes.mid and notes.chart with canonical normalization expectations.
-- Parity gate is strict: all committed fixtures pass with no known-unsupported skips.
-- Every required edge case needs committed fixture-backed proof.
-- Post-processing must fully handle chart-based installs.
-- External decode tools are not a runtime requirement; audio extraction must be internal and deterministic.
-- Performance gates must be measurable.
-- Converter API contract must be frozen for staging.
+The authoritative reference for ALL conversion behavior is the Onyx source code at:
 
-## Milestone Audit
+  `onyx-source/onyx/haskell/packages/onyx-lib/src/Onyx/Build/CloneHero.hs`
+  function: `psRules`
 
-### M1. Contract Lock
+No conversion behavior may be implemented, changed, or guessed without first tracing
+it back to a specific line or function in that file. "It seemed right" is not acceptable.
 
-Status: Partial
+The goal is ONE thing only: produce a Clone Hero / Phase Shift folder from an RB3CON
+(encrypted 0x0B, unencrypted 0x0A, or 0x0D) or an unencrypted SNG input, with output
+IDENTICAL to what Onyx produces from the same input via "Create CH/PS song folder".
 
-What exists:
-- Converter result contract includes structured conversion statuses:
-  - ChartHub.Conversion/Models/ConversionModels.cs
-- Server API contract surfaces conversion statuses:
-  - ChartHub.Server/Contracts/DownloadJobContracts.cs
-- OpenAPI examples include conversion status schema examples with tests:
-  - ChartHub.Server/OpenApi/OpenApiTransformers.cs
-  - ChartHub.Server.Tests/OpenApiTransformersTests.cs
+Everything in ChartHub.Conversion that does not serve that goal must be removed.
+The parity harness infrastructure, milestone ledger ceremony, and oracle comparison
+machinery are SECONDARY — they are only useful if the conversion itself is correct.
+They are currently masking the fact that the conversion is broken.
 
-Remaining gaps:
-- No explicit versioned contract freeze artifact (for example, contract snapshot + break detector policy).
-- Error taxonomy is not fully enumerated/locked as a staging contract.
-- Acceptance matrix for all converter inputs/failures is not captured as a formal locked document.
+---
 
-### M2. RB3CON Complete Audio Support
+## WHAT ONYX ACTUALLY PRODUCES (per CloneHero.hs psRules)
 
-Status: Partial
+For a PS folder build, Onyx writes these files to `<target>/ps/`:
 
-What exists:
-  - ChartHub.Conversion/Audio/MoggExtractor.cs
-  - ChartHub.Conversion/ConversionService.cs
-  - Run: `./merges/audit-conversion-fixtures.sh merges/`
-  - ChartHub.Conversion/ConversionService.cs
-  - ChartHub.Conversion.Tests/ConversionTests.cs
-  - ChartHub.Conversion/Audio/MoggExtractor.cs
-  - ChartHub.Conversion.Tests/ConversionTests.cs (`ConvertAsync_Rb3ConInput_ProducesInstrumentStemAudio`)
-  - `rb3con-bad-medicine` (`merges/Bon Jovi - Bad Medicine_chps_rb3con.rb3con`)
-  - parity/fixtures.yaml
-  - ChartHub.Conversion.Tests/Parity/OracleParityComparisonTests.cs
+### Always present
+- `notes.mid` — RB3 MIDI processed through `RB3.processPS` (track filtering + CH mapping)
+- `song.ini` — generated from DTA metadata + difficulty tiers + preview bounds + song length
+- `album.png` or `album.jpg` — cover art; PNG from `gen/cover-full.png` (decoded Xbox texture),
+  or JPEG if the original source is already JPEG
 
-Remaining gaps:
+### Audio — always present
+- `song.ogg` — the BACKING track: all MOGG channels NOT assigned to any instrument stem,
+  mixed to stereo using per-channel pan/vol from DTA, rendered to OGG.
+  Built by `sourceBacking`. Audio format controlled by `ps.audioFormat` (default: `"ogg"`).
 
-### M3. SNG Complete Chart Support
+### Audio — present only when the instrument part exists AND the mixed result is non-silent
+Each of these is built from the MOGG channels assigned to that instrument in the DTA track map,
+mixed to stereo using DTA pan/vol, rendered to OGG. Onyx uses a "try-" phony gate that checks
+if the rendered audio is non-zero length before copying it to the output folder.
 
-Status: Partial
+- `guitar.ogg`  — guitar + guitarCoop MOGG channels
+- `rhythm.ogg`  — bass + rhythm MOGG channels
+- `keys.ogg`    — keys MOGG channels
+- `vocals.ogg`  — vocals MOGG channels
+- `crowd.ogg`   — crowd MOGG channels
+- `drums.ogg`   — drums channels (only when DrumMixMode == D0, i.e. single drum stem)
+- `drums_1.ogg` — kick channels  (when mixMode != D0)
+- `drums_2.ogg` — snare channels (when mixMode != D0; kit when D4)
+- `drums_3.ogg` — cymbals channels (when mixMode != D0 and not GH-style drums)
+- `drums_4.ogg` — toms channels (only when ghDrumsAudio == true)
 
-What exists:
-  - ChartHub.Conversion/ConversionService.cs
-- SNG chart extraction now writes dual output when available:
-  - sidecar `notes.chart` when present in the source package
-- Parity manifest normalization now treats `notes.mid` as canonical when both chart files exist in the same output directory (drops sibling `notes.chart` from checksum comparison set):
-  - ChartHub.Conversion.Tests/Parity/ParityManifestIO.cs
-- Synthetic canonical-equivalence regression test is in place (both-files output normalizes to the same checksum set as midi-only output):
-  - ChartHub.Conversion.Tests/Parity/ParityManifestIOTests.cs
-  - parity/fixtures.yaml
-  - Verified via `./merges/audit-conversion-fixtures.sh merges/`
+### song.ini required fields (direct from psRules makeSongIni)
+These fields MUST be present — Onyx always emits them:
+  name, artist, album, charter, year, genre, song_length, preview_start_time, preview_end_time,
+  diff_band, diff_guitar, diff_guitar_ghl, diff_bass, diff_bass_ghl, diff_drums, diff_drums_real,
+  diff_keys, diff_keys_real, diff_vocals, diff_vocals_harm, diff_dance, diff_bass_real,
+  diff_guitar_real, diff_guitar_coop, diff_rhythm, diff_drums_real_ps, diff_keys_real_ps,
+  diff_guitar_pad, diff_bass_pad, diff_drums_pad, diff_vocals_pad, diff_keys_pad,
+  pro_drums, five_lane_drums, drum_fallback_blue, star_power_note (= 116),
+  sysex_slider, sysex_open_bass, loading_phrase, tags (= "cover" if cover song)
 
-Remaining gaps:
-- ~~Canonical normalization equivalence is not yet proven for notes.chart-only versus notes.mid-only same-song pairs.~~
-  - `sng-why-go-harmonix` (notes.mid source: Pearl Jam - Why Go (Harmonix).sng)
-  - `sng-why-go-highfine` (notes.chart source: Pearl Jam - Why Go (highfine).sng)
-  - parity/fixtures.yaml
-- Both fixtures wired into oracle comparison harness:
-  - ChartHub.Conversion.Tests/Parity/OracleParityComparisonTests.cs
-- Real-corpus canonical equivalence tests proving cross-format normalization:
-  - notes.mid source → canonical output contains notes.mid, no notes.chart
-  - notes.chart source → canonical output contains notes.chart, no notes.mid
-  - ChartHub.Conversion.Tests/Parity/OracleParityEquivalenceTests.cs (new)
-- Real-corpus cross-container equivalence fixtures committed (same Harmonix master in both RB3CON and SNG):
-  - `rb3con-snuff` (Slipknot - Snuff RB3CON) and `sng-snuff-harmonix` (Slipknot - Snuff (Harmonix).sng)
-  - Both produce notes.mid canonical output; functional role set compared across container types
-  - parity/fixtures.yaml
-  - ChartHub.Conversion.Tests/Parity/OracleParityEquivalenceTests.cs (updated)
-  - ChartHub.Conversion.Tests/Parity/OracleParityComparisonTests.cs (updated)
+---
 
-Status for M3 gap: Complete
+## KNOWN BROKEN STATE (as of 2026-04-24)
 
-### M4. Post-Processing Parity Hardening
+The ChartHub.Conversion library is not producing correct output. Confirmed by direct
+comparison of `~/.local/share/Steam/.../clonehero/Modest Mouse/Broke/Kamotch__rhythmverse`
+against `onyx-conversion` sibling folder for the same song:
 
-Status: Partial
+| File | ChartHub output | Onyx output |
+|---|---|---|
+| album.png | MISSING | present |
+| song.ogg | present but STATIC (raw multi-channel dump) | present, stereo, correct |
+| guitar.ogg / rhythm.ogg / etc. | absent or wrong | absent (single-stem song — correct) |
+| song.ini | missing most fields | full field set |
+| notes.mid | present | present |
 
-What exists:
-- Post-processing drum merge path exists for installed songs.
-- Explicit chart-origin strategy is implemented for notes.chart-only installs:
-  - Preserve existing `notes.chart`
-  - Promote generated transcription output to `notes.mid`
-  - Keep notes.mid merge behavior for installs that already have `notes.mid`
-  - ChartHub.Server/Services/PostProcessingService.cs
-- Unit coverage now validates both paths:
-  - notes.mid merge path
-  - notes.chart-only promotion path
-  - ChartHub.Server.Tests/PostProcessingServiceTests.cs
+Root causes (traced, not guessed):
+1. Audio: raw MOGG bytes are dumped as-is after MOGG header strip. Multi-channel OGG
+   is not stereo — Clone Hero cannot play it / plays as static. Must decode + stereo-mix
+   per channel using DTA pan/vol before writing song.ogg.
+2. Album art: extractor only searches a song-scoped subfolder path inside the STFS for
+   `.png_xbox`. The actual art in many RB3CON packages is at the package root or
+   under a different path. Needs a two-pass search: scoped first, then package-wide.
+3. song.ini: many fields from psRules `makeSongIni` are absent. DTA tier/rank values
+   are not being extracted or mapped to the `diff_*` key schema correctly.
 
-Remaining gaps:
-- No fixture-backed post-processing parity tests across both chart origins.
+---
 
-### M5. Fixture Matrix Completion
+## ACTIONABLE EXECUTION PLAN (Onyx 1:1 Port)
 
-Status: Partial
+This is the only active implementation plan.
 
-What exists:
-- Committed fixture manifest and checksum baseline process:
-  - parity/fixtures.yaml
-  - parity/checksums/manifest.yaml
-- Oracle pin staleness guard test is in place:
-  - ChartHub.Conversion.Tests/Parity/OracleParityHarnessTests.cs
-- Known-unsupported parity skip behavior was removed from committed fixture execution:
-  - ChartHub.Conversion.Tests/Parity/OracleParityComparisonTests.cs
-  - parity/fixtures.yaml
-- Real-corpus same-song cross-format equivalence fixtures committed and wired:
-  - `sng-why-go-harmonix` (notes.mid source) and `sng-why-go-highfine` (notes.chart source)
-  - ChartHub.Conversion.Tests/Parity/OracleParityEquivalenceTests.cs (new)
-  - ChartHub.Conversion.Tests/Parity/OracleParityComparisonTests.cs (updated)
+### Rule 0
+- Every conversion behavior must reference a specific Onyx function/path before implementation.
+- If no Onyx source anchor is identified, do not implement the behavior.
+- Hard requirement: conversion runtime must be pure C# in-process with zero external decoder/mixer processes.
+- Forbidden at runtime: ffmpeg, ffprobe, onyx CLI, shell-outs, or any external audio forks.
+- If audio decode/remix parity is not achievable in-process, stop and document the blocker; do not add process dependencies.
 
-Remaining gaps:
-- Edge-case matrix is not fully closed with committed parity fixtures for all required tags that remain in release scope.
+### Phase 1 — Lock stage/progress contract for DownloadsView
 
-### M6. Non-Functional Staging Gates
+Goal:
+- Surface conversion internals in DownloadsView with clear stage and percent progression.
 
-Status: Complete
+Implementation:
+- Keep existing top-level pipeline stage flow:
+   - ResolvingSource → Downloading → Downloaded → InstallQueued → Staging → Installing → Installed
+- Introduce conversion sub-stages as concrete Stage strings persisted in `download_jobs.stage`
+   and streamed over SSE (`/api/v1/downloads/jobs/stream`), using names that map to UI text:
+   - Converting:ParseContainer
+   - Converting:ParseDta
+   - Converting:ConvertMidi
+   - Converting:DecodeMogg
+   - Converting:MixBacking
+   - Converting:MixStems
+   - Converting:ExtractAlbumArt
+   - Converting:WriteSongIni
+   - Converting:Finalize
+- Percent allocation (deterministic):
+   - Download complete: 80
+   - InstallQueued: 88
+   - Staging: 90
+   - Converting:* spans 91–96 (fixed per-substage increments)
+   - Installing: 97
+   - Installed: 100
+- Update client stage mapping so unknown stage strings do not collapse to `Queued`:
+   - `MapServerStage` must treat `Converting:*` as `IngestionState.Converting`.
+   - Keep terminal states visible (already done).
 
-What exists:
-- Repeatability gate: same synthetic SNG input converted twice produces identical SHA256 checksums for all output files:
-  - ChartHub.Conversion.Tests/StagingGateTests.cs (`StagingGateRepeatabilityTests`)
-- SLO ceiling gate: synthetic SNG conversion must complete within 10 000 ms wall-time ceiling:
-  - ChartHub.Conversion.Tests/StagingGateTests.cs (`ConvertAsync_SyntheticSng_CompletesWithinSloWallTimeCeiling`)
-- Allocation ceiling gate: synthetic SNG conversion must not allocate more than 256 MiB (`GC.GetTotalAllocatedBytes`):
-  - ChartHub.Conversion.Tests/StagingGateTests.cs (`ConvertAsync_SyntheticSng_AllocatesUnderCeiling`)
-- Resilience gates, all exercising deterministic partial-failure throws:
-  - Corrupt SNG bytes → `InvalidDataException`
-  - Unsupported file extension → `NotSupportedException`
-  - SNG with no chart file → `InvalidDataException`
-  - ChartHub.Conversion.Tests/StagingGateTests.cs (`StagingGateResilienceTests`)
+Acceptance:
+- DownloadsView shows monotonic stage transitions and non-jumping progress for each conversion.
+- SSE stream payload reflects every conversion sub-stage transition.
 
-### M7. Staging Exit Criteria
+### Phase 2 — Wire conversion progress callbacks end-to-end
 
-Status: Complete (all gate evidence present)
+Goal:
+- Emit stage/progress from conversion internals without violating MVVM boundaries.
 
-Exit criteria satisfied:
+Implementation:
+- Add a conversion progress callback contract in `ChartHub.Conversion`:
+   - Example shape: `(stage, percent, message)` with deterministic stage IDs.
+- Pass callback from `DownloadJobInstallService` into `IConversionService.ConvertAsync`.
+- On callback:
+   - `IDownloadJobStore.UpdateProgress(jobId, stage, percent)`
+   - emit structured logs (ILogger)
+   - emit job log entries (`IJobLogSink`) with stage and percent context.
 
-| Criterion | Evidence |
-|---|---|
-| 100% committed fixture pass, zero known-unsupported skips | OracleParityHarnessTests (staleness guard), OracleParityComparisonTests (14 fixtures, no skip path) |
-| Canonical chart policy enforced and proven | ParityManifestIOTests, OracleParityEquivalenceTests |
-| Same-song cross-format equivalence proven | sng-why-go-harmonix + sng-why-go-highfine fixture pair |
-| Same-song cross-container equivalence proven | rb3con-snuff + sng-snuff-harmonix fixture pair |
-| Chart-origin post-processing parity | PostProcessingServiceTests (notes.mid merge path + chart-only promotion path) |
-| Repeatability gate committed | StagingGateRepeatabilityTests |
-| SLO ceiling committed | StagingGateRepeatabilityTests (10 000 ms wall-time + 256 MiB allocation) |
-| Resilience gates committed | StagingGateResilienceTests (corrupt, unsupported, no-chart) |
-| Contract surfaces conversion status | ConversionModels, DownloadJobContracts, OpenApiTransformers |
-| RB3CON MOGG versions 0x0A/0x0B/0x0D covered | MoggExtractor, ConversionTests |
+Acceptance:
+- All conversion sub-stages persist to `download_jobs` and appear in `/jobs/{id}/logs`.
 
-## Current Snapshot
+### Phase 3 — Rebuild audio path to match Onyx sourceBacking/sourceStereoParts
 
-All M1–M7 gate implementations are committed. Remaining work before a staging-ready claim is made:
+Goal:
+- Replace raw OGG passthrough with Onyx-equivalent decode/remix logic.
 
-Previously implemented:
+Implementation:
+- Restore decoded audio path in `MoggExtractor`:
+   - decrypt 0x0A/0x0B/0x0D as currently supported.
+   - decode Vorbis channels.
+   - apply Onyx pan/vol math equivalent to `applyPansVols`.
+   - build `song.ogg` from backing channels (all channels not assigned to used parts/crowd).
+- Build optional stems with Onyx channel selection rules:
+   - guitar/rhythm/keys/vocals/crowd and drum split variants (`drums`, `drums_1..4`) only when present and non-silent.
+- Do not use external runtime tools for decode/mix.
 
-## Next Slice Order
+Acceptance:
+- `song.ogg` is audible and non-static in Clone Hero for Broke fixture.
+- Stem presence/absence matches Onyx output for the same input.
 
-1. ~~Implement and test internal per-instrument stem splitting parity.~~ (Complete)
-2. ~~Add paired same-song notes.mid vs notes.chart canonical equivalence fixtures and assertions.~~ (Complete)
-3. ~~Implement chart-aware post-processing merge behavior with fixture-backed tests.~~ (Complete)
+### Phase 4 — Complete song.ini parity with Onyx makeSongIni
 
-## Update Discipline
-For every conversion-library slice:
-- Update this ledger in the same change.
-- Record evidence paths (code + tests + fixture IDs).
-- Do not mark a milestone complete unless all acceptance requirements in that milestone are met.
+Goal:
+- Emit the same functional key set as Onyx CH/PS `song.ini`.
+
+Implementation:
+- Expand DTA extraction for all keys used by Onyx `makeSongIni`.
+- Expand generator to include missing fields (for example):
+   - `diff_guitar_ghl`, `diff_bass_ghl`, `diff_drums_real_ps`, `diff_keys_real_ps`
+   - `diff_*_pad` placeholders
+   - `pro_drums`, `five_lane_drums`, `drum_fallback_blue`
+   - `star_power_note`, `sysex_slider`, `sysex_open_bass`
+- Keep existing preview fix; ensure start/end always map when present in DTA.
+
+Acceptance:
+- Broke `song.ini` contains all required Onyx key families with correct values or Onyx-equivalent defaults.
+
+### Phase 5 — Album art parity hardening
+
+Goal:
+- Ensure `album.png`/`album.jpg` output parity with Onyx for RB3CON and unencrypted SNG.
+
+Implementation:
+- Keep two-pass RB3CON search (song-scoped then package-wide).
+- Prefer decoded `.png_xbox` where applicable; preserve JPEG when source is JPEG-equivalent.
+- Emit conversion stage/log entries for selected source path and decode result.
+
+Acceptance:
+- Broke fixture always installs with album art file present in final folder.
+
+### Phase 6 — Observability sink requirements (mandatory)
+
+For each conversion sub-stage transition and major output decision, emit to both sinks:
+- Structured server logs (`ILogger` with stable event IDs).
+- Job log sink (`IJobLogSink`) for per-job timeline retrieval in DownloadsView.
+
+Required payload fields:
+- `jobId`
+- `stage`
+- `progressPercent`
+- `sourcePath` (when safe)
+- `outputPath` (when safe)
+- `decision` (for example `stem-silent-skip`, `album-source-selected`, `song-ini-field-defaulted`)
+
+Failure reporting requirement:
+- Do not emit generic failure text only.
+- Include exact stage and parser/mixer/decode context.
+
+### Phase 7 — Verification gate for this plan
+
+Must pass before marking complete:
+- Real fixture install diff against Onyx folder for Broke:
+   - required artifacts present (`notes.mid`, `song.ini`, `song.ogg`, album art)
+   - no static-audio regression
+   - song.ini key family parity checked
+- DownloadsView displays conversion sub-stages and monotonic percent during live install.
+- `/jobs/{id}/logs` shows full conversion timeline with stage/decision entries.
+
+Completion definition:
+- Only declare success when live install output and user-visible stage flow match the Onyx-backed expectations above.
+
+---
+
+Legacy M1-M7 milestone sections were intentionally removed on 2026-04-24 because
+they created false confidence and repeatedly derailed implementation work away from
+the Onyx source path.
+
+This document now serves only as:
+- An anchor to exact Onyx source behavior.
+- A statement of the currently broken converter state.
+- A strict instruction to implement 1:1 CH/PS folder output from source-defined behavior.

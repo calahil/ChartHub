@@ -38,6 +38,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
     private readonly string _cloneHeroRoot;
     private readonly string _contentRootPath;
     private readonly IServerInstallFileTypeResolver _fileTypeResolver;
+    private readonly IDownloadJobStore _jobStore;
     private readonly IConversionService _conversionService;
     private readonly IServerSongIniMetadataParser _songIniParser;
     private readonly IServerCloneHeroDirectorySchemaService _schemaService;
@@ -48,6 +49,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         IOptions<ServerPathOptions> pathOptions,
         IWebHostEnvironment environment,
         IServerInstallFileTypeResolver fileTypeResolver,
+        IDownloadJobStore jobStore,
         IConversionService conversionService,
         IServerSongIniMetadataParser songIniParser,
         IServerCloneHeroDirectorySchemaService schemaService,
@@ -59,6 +61,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         _stagingDir = ServerContentPathResolver.Resolve(paths.StagingDir, _contentRootPath);
         _cloneHeroRoot = ServerContentPathResolver.Resolve(paths.CloneHeroRoot, _contentRootPath);
         _fileTypeResolver = fileTypeResolver;
+        _jobStore = jobStore;
         _conversionService = conversionService;
         _songIniParser = songIniParser;
         _schemaService = schemaService;
@@ -175,7 +178,9 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
 
         string outputRoot = Path.Combine(_stagingDir, "con", jobId.ToString("N"));
         Directory.CreateDirectory(outputRoot);
-        ConversionResult result = await _conversionService.ConvertAsync(artifactPath, outputRoot, cancellationToken).ConfigureAwait(false);
+        ConversionResult result = await _conversionService
+            .ConvertAsync(artifactPath, outputRoot, update => ReportConversionProgress(jobId, update), cancellationToken)
+            .ConfigureAwait(false);
         ServerSongMetadata serverMetadata = BuildFallbackMetadata(job, result.Metadata);
         LogConversionStatuses(jobId, result.Statuses);
 
@@ -202,7 +207,9 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
 
         string outputRoot = Path.Combine(_stagingDir, "sng", jobId.ToString("N"));
         Directory.CreateDirectory(outputRoot);
-        ConversionResult result = await _conversionService.ConvertAsync(artifactPath, outputRoot, cancellationToken).ConfigureAwait(false);
+        ConversionResult result = await _conversionService
+            .ConvertAsync(artifactPath, outputRoot, update => ReportConversionProgress(jobId, update), cancellationToken)
+            .ConfigureAwait(false);
         ServerSongMetadata serverMetadata = BuildFallbackMetadata(job, result.Metadata);
         LogConversionStatuses(jobId, result.Statuses);
 
@@ -326,6 +333,21 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
             ResolveFallbackValue(primary.Artist, fallback.Artist, "Unknown Artist"),
             ResolveFallbackValue(primary.Title, fallback.Title, "Unknown Song"),
             ResolveFallbackValue(primary.Charter, fallback.Charter, "Unknown Charter"));
+    }
+
+    private void ReportConversionProgress(Guid jobId, ConversionProgressUpdate update)
+    {
+        double clamped = Math.Clamp(update.ProgressPercent, 0, 100);
+        _jobStore.UpdateProgress(jobId, update.Stage, clamped);
+
+        InstallLog.ConversionProgress(_logger, jobId, update.Stage, clamped, update.Message ?? string.Empty);
+        _jobLogSink.Add(
+            jobId,
+            LogLevel.Information,
+            new EventId(2115),
+            nameof(DownloadJobInstallService),
+            $"Conversion progress stage='{update.Stage}' percent={clamped:0.##} message='{update.Message ?? string.Empty}'.",
+            null);
     }
 
     private void LogConversionStatuses(Guid jobId, IReadOnlyList<ConversionStatus>? statuses)
@@ -454,5 +476,8 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
 
         [LoggerMessage(EventId = 2114, Level = LogLevel.Information, Message = "Install job {JobId} reported conversion status {Code}: {Message}")]
         public static partial void ConversionStatus(ILogger logger, Guid jobId, string code, string message);
+
+        [LoggerMessage(EventId = 2115, Level = LogLevel.Information, Message = "Install job {JobId} conversion stage '{Stage}' at {ProgressPercent}% ({Message})")]
+        public static partial void ConversionProgress(ILogger logger, Guid jobId, string stage, double progressPercent, string message);
     }
 }
