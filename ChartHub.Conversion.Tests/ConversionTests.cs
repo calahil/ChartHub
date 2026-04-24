@@ -4,6 +4,7 @@ using ChartHub.Conversion.Audio;
 using ChartHub.Conversion.Dta;
 using ChartHub.Conversion.Models;
 using ChartHub.Conversion.Sng;
+using ChartHub.Conversion.SongIni;
 using ChartHub.Conversion.Stfs;
 
 namespace ChartHub.Conversion.Tests;
@@ -224,7 +225,7 @@ public sealed class ConversionServiceRoutingTests
             var service = new ConversionService();
             ConversionResult result = await service.ConvertAsync(SampleRb3ConPath, outputRoot);
 
-            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ogg")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.wav")));
 
             string[] stems = Directory
                 .EnumerateFiles(result.OutputDirectory, "*.wav", SearchOption.TopDirectoryOnly)
@@ -577,7 +578,7 @@ public sealed class FanMadeConTests
 
             Assert.True(Directory.Exists(result.OutputDirectory));
             Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")));
-            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ogg")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.wav")));
         }
         finally
         {
@@ -608,7 +609,7 @@ public sealed class FanMadeConTests
             Assert.True(Directory.Exists(result.OutputDirectory));
             Assert.DoesNotContain("#", result.OutputDirectory, StringComparison.Ordinal);
             Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")));
-            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ogg")));
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.wav")));
         }
         finally
         {
@@ -1121,6 +1122,68 @@ public sealed class DtaParserTests
 
         DtaSongInfo info = DtaParser.Parse(System.Text.Encoding.Latin1.GetBytes(nestedAuthorDta));
         Assert.Equal("kamotch", info.Charter);
+    }
+
+    [Fact]
+    public void Parse_WhenCommentFooterContainsAuthor_UsesFooterAsCharterFallback()
+    {
+        const string footerAuthorDta = """
+            ('suburbanwar'
+              ('name' "Ready to Start")
+              ('artist' "Arcade Fire")
+              ('song' ('name' "songs/readytostart_af/readytostart_af"))
+            )
+            ;Song authored by Yaniv297
+            """;
+
+        DtaSongInfo info = DtaParser.Parse(System.Text.Encoding.Latin1.GetBytes(footerAuthorDta));
+        Assert.Equal("Yaniv297", info.Charter);
+    }
+
+    [Fact]
+    public void GenerateSongIni_WhenDtaContainsOnyxFields_WritesExpectedKeys()
+    {
+        DtaSongInfo info = new()
+        {
+            ShortName = "suburbanwar",
+            Title = "Ready to Start",
+            Artist = "Arcade Fire",
+            Charter = "Yaniv297",
+            Album = "The Suburbs",
+            Genre = "alternative",
+            Year = "2010",
+            AlbumTrack = 2,
+            SongLengthMs = 257033,
+            PreviewStartMs = 30000,
+            PreviewEndMs = 60000,
+            VocalParts = 2,
+            Ranks = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["drum"] = 124,
+                ["guitar"] = 139,
+                ["bass"] = 1,
+                ["vocals"] = 218,
+                ["keys"] = 153,
+                ["band"] = 165,
+            }
+        };
+
+        string songIni = SongIniGenerator.Generate(info);
+
+        Assert.Contains("album = The Suburbs\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("frets = Yaniv297\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("song_length = 257033\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("preview_start_time = 30000\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("preview_end_time = 60000\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("genre = alternative\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("year = 2010\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("track = 2\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("album_track = 2\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_drums = 1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_guitar = 1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_vocals = 3\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_vocals_harm = 3\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_band = 1\r\n", songIni, StringComparison.Ordinal);
     }
 }
 

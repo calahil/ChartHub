@@ -52,14 +52,249 @@ internal sealed class MoggExtractor
         CancellationToken cancellationToken = default)
     {
         byte[] rawOggBytes = ExtractRawOggBytes(moggBytes);
-        var stems = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            return await ExtractDecodedAsync(rawOggBytes, songInfo, outputDir, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or ArgumentException)
+        {
+            Dictionary<string, string> stems = new(StringComparer.OrdinalIgnoreCase);
+            string backingPath = Path.Combine(outputDir, "song.ogg");
+            await File.WriteAllBytesAsync(backingPath, rawOggBytes, cancellationToken).ConfigureAwait(false);
+            stems["song"] = backingPath;
+            return stems;
+        }
+    }
 
-        // Write the extracted OGG as the single backing track.
-        string backingPath = Path.Combine(outputDir, "song.ogg");
-        await File.WriteAllBytesAsync(backingPath, rawOggBytes, cancellationToken).ConfigureAwait(false);
+    private static async Task<IReadOnlyDictionary<string, string>> ExtractDecodedAsync(
+        byte[] rawOggBytes,
+        DtaSongInfo songInfo,
+        string outputDir,
+        CancellationToken cancellationToken)
+    {
+        (int sampleRate, float[][] decodedChannels) = DecodeVorbisChannels(rawOggBytes);
+        if (decodedChannels.Length == 0 || decodedChannels[0].Length == 0)
+        {
+            throw new InvalidDataException("Decoded MOGG audio contained no samples.");
+        }
+
+        Dictionary<string, string> stems = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, List<int>> normalisedTracks = BuildNormalisedTrackMap(songInfo.TrackChannels);
+
+        var backingChannels = normalisedTracks
+            .Where(pair => !string.Equals(pair.Key, "crowd", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(pair => pair.Value)
+            .Distinct()
+            .OrderBy(index => index)
+            .ToList();
+        if (backingChannels.Count == 0)
+        {
+            backingChannels = Enumerable.Range(0, decodedChannels.Length).ToList();
+        }
+
+        float[] backingStereo = MixChannelsToStereo(decodedChannels, backingChannels, songInfo.Pans, songInfo.Vols);
+        string backingPath = Path.Combine(outputDir, "song.wav");
+        await WriteStereoWavAsync(backingPath, sampleRate, backingStereo, cancellationToken).ConfigureAwait(false);
         stems["song"] = backingPath;
 
+        foreach ((string stem, List<int> channels) in normalisedTracks)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var validChannels = channels
+                .Where(channel => channel >= 0 && channel < decodedChannels.Length)
+                .Distinct()
+                .ToList();
+            if (validChannels.Count == 0)
+            {
+                continue;
+            }
+
+            float[] stereo = MixChannelsToStereo(decodedChannels, validChannels, songInfo.Pans, songInfo.Vols);
+            if (IsSilent(stereo))
+            {
+                continue;
+            }
+
+            string stemPath = Path.Combine(outputDir, $"{stem}.wav");
+            await WriteStereoWavAsync(stemPath, sampleRate, stereo, cancellationToken).ConfigureAwait(false);
+            stems[stem] = stemPath;
+        }
+
         return stems;
+    }
+
+    private static Dictionary<string, List<int>> BuildNormalisedTrackMap(
+        IReadOnlyDictionary<string, IReadOnlyList<int>> trackChannels)
+    {
+        Dictionary<string, List<int>> result = new(StringComparer.OrdinalIgnoreCase);
+        foreach ((string stem, IReadOnlyList<int> channels) in trackChannels)
+        {
+            string key = NormaliseStemName(stem);
+            if (!result.TryGetValue(key, out List<int>? list))
+            {
+                list = [];
+                result[key] = list;
+            }
+
+            foreach (int channel in channels)
+            {
+                if (!list.Contains(channel))
+                {
+                    list.Add(channel);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static string NormaliseStemName(string stem)
+    {
+        return stem.ToLowerInvariant() switch
+        {
+            "drum" or "drums" => "drums",
+            "bass" => "rhythm",
+            "rhythm" => "rhythm",
+            "guitar" => "guitar",
+            "vocals" or "vocal" => "vocals",
+            "keys" => "keys",
+            "crowd" => "crowd",
+            _ => stem.ToLowerInvariant(),
+        };
+    }
+
+    private static (int SampleRate, float[][] Channels) DecodeVorbisChannels(byte[] oggBytes)
+    {
+        using var stream = new MemoryStream(oggBytes, writable: false);
+        using var reader = new VorbisReader(stream, closeOnDispose: false);
+
+        int sourceChannels = reader.Channels;
+        if (sourceChannels <= 0)
+        {
+            throw new InvalidDataException("OGG stream reports no channels.");
+        }
+
+        List<float>[] perChannel = Enumerable.Range(0, sourceChannels)
+            .Select(_ => new List<float>(8192))
+            .ToArray();
+
+        float[] chunk = new float[4096 * sourceChannels];
+        while (true)
+        {
+            int sampleCount = reader.ReadSamples(chunk, 0, chunk.Length);
+            if (sampleCount <= 0)
+            {
+                break;
+            }
+
+            int frameCount = sampleCount / sourceChannels;
+            for (int frame = 0; frame < frameCount; frame++)
+            {
+                int baseIndex = frame * sourceChannels;
+                for (int channel = 0; channel < sourceChannels; channel++)
+                {
+                    perChannel[channel].Add(chunk[baseIndex + channel]);
+                }
+            }
+        }
+
+        return (reader.SampleRate, perChannel.Select(list => list.ToArray()).ToArray());
+    }
+
+    private static float[] MixChannelsToStereo(
+        float[][] sourceChannels,
+        IReadOnlyList<int> indexes,
+        IReadOnlyList<float> pans,
+        IReadOnlyList<float> vols)
+    {
+        int frameCount = sourceChannels[0].Length;
+        float[] output = new float[frameCount * 2];
+
+        for (int frame = 0; frame < frameCount; frame++)
+        {
+            double left = 0;
+            double right = 0;
+
+            foreach (int index in indexes)
+            {
+                float sample = sourceChannels[index][frame];
+                float pan = index < pans.Count ? pans[index] : 0;
+                float volDb = index < vols.Count ? vols[index] : 0;
+                double gain = Math.Pow(10, volDb / 20.0);
+                (double panL, double panR) = StereoPanRatios(pan);
+
+                left += sample * gain * panL;
+                right += sample * gain * panR;
+            }
+
+            output[frame * 2] = (float)Math.Clamp(left, -1.0, 1.0);
+            output[(frame * 2) + 1] = (float)Math.Clamp(right, -1.0, 1.0);
+        }
+
+        return output;
+    }
+
+    private static (double Left, double Right) StereoPanRatios(float pan)
+    {
+        double theta = pan * (Math.PI / 4.0);
+        double factor = Math.Sqrt(2.0) / 2.0;
+        double left = factor * (Math.Cos(theta) - Math.Sin(theta));
+        double right = factor * (Math.Cos(theta) + Math.Sin(theta));
+        return (left, right);
+    }
+
+    private static bool IsSilent(float[] interleavedStereo)
+    {
+        for (int i = 0; i < interleavedStereo.Length; i++)
+        {
+            if (Math.Abs(interleavedStereo[i]) > 0.0001f)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static Task WriteStereoWavAsync(
+        string path,
+        int sampleRate,
+        float[] interleavedStereo,
+        CancellationToken cancellationToken)
+    {
+        return Task.Run(() =>
+        {
+            int bitsPerSample = 16;
+            int channels = 2;
+            int blockAlign = channels * (bitsPerSample / 8);
+            int byteRate = sampleRate * blockAlign;
+            int dataLength = interleavedStereo.Length * 2;
+
+            using FileStream stream = File.Create(path);
+            using BinaryWriter writer = new(stream);
+
+            writer.Write("RIFF"u8.ToArray());
+            writer.Write(36 + dataLength);
+            writer.Write("WAVE"u8.ToArray());
+            writer.Write("fmt "u8.ToArray());
+            writer.Write(16);
+            writer.Write((short)1);
+            writer.Write((short)channels);
+            writer.Write(sampleRate);
+            writer.Write(byteRate);
+            writer.Write((short)blockAlign);
+            writer.Write((short)bitsPerSample);
+            writer.Write("data"u8.ToArray());
+            writer.Write(dataLength);
+
+            foreach (float sample in interleavedStereo)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                short pcm = (short)Math.Clamp(sample * short.MaxValue, short.MinValue, short.MaxValue);
+                writer.Write(pcm);
+            }
+        }, cancellationToken);
     }
 
     // HMX private key for MOGG version 0x0B (Rock Band 1 / RB1 DLC).

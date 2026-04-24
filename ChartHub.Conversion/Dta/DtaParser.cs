@@ -11,6 +11,16 @@ internal sealed class DtaSongInfo
     public required string Title { get; init; }
     public required string Artist { get; init; }
     public string Charter { get; init; } = "Unknown";
+    public string Album { get; init; } = string.Empty;
+    public string Genre { get; init; } = string.Empty;
+    public string Year { get; init; } = string.Empty;
+    public int AlbumTrack { get; init; }
+    public int SongLengthMs { get; init; }
+    public int PreviewStartMs { get; init; }
+    public int PreviewEndMs { get; init; }
+    public int VocalParts { get; init; }
+    public IReadOnlyDictionary<string, int> Ranks { get; init; }
+        = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
     public string SongFilePath { get; init; } = string.Empty;
 
     /// <summary>Channel assignments per instrument stem (drum, bass, guitar, vocals, keys, crowd).</summary>
@@ -42,6 +52,7 @@ internal static class DtaParser
     public static IReadOnlyList<DtaSongInfo> ParseAll(byte[] dtaBytes)
     {
         string text = Encoding.Latin1.GetString(dtaBytes);
+        string? footerCharter = TryExtractCommentCharter(text);
         List<string> tokens = Tokenise(text);
         int pos = 0;
         DtaNode root = ParseList(tokens, ref pos);
@@ -51,7 +62,7 @@ internal static class DtaParser
             throw new InvalidDataException("DTA file contains no parseable song entry.");
         }
 
-        return songNodes.Select(ExtractSong).ToList();
+        return songNodes.Select(node => ExtractSong(node, footerCharter)).ToList();
     }
 
     // ---- tokeniser ---------------------------------------------------------
@@ -192,7 +203,7 @@ internal static class DtaParser
         return songNodes;
     }
 
-    private static DtaSongInfo ExtractSong(DtaNode songNode)
+    private static DtaSongInfo ExtractSong(DtaNode songNode, string? footerCharter)
     {
         if (!songNode.IsList || songNode.Children!.Count == 0)
         {
@@ -207,8 +218,17 @@ internal static class DtaParser
         string title = string.Empty;
         string artist = string.Empty;
         string charter = "Unknown";
+        string album = string.Empty;
+        string genre = string.Empty;
+        string year = string.Empty;
         string songFilePath = string.Empty;
+        int albumTrack = 0;
+        int songLengthMs = 0;
+        int previewStartMs = 0;
+        int previewEndMs = 0;
+        int vocalParts = 0;
         var trackChannels = new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase);
+        var ranks = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var pans = new List<float>();
         var vols = new List<float>();
         int totalChannels = 0;
@@ -234,15 +254,49 @@ internal static class DtaParser
                     artist = UnquoteString(ExtractFirstAtom(value));
                     break;
 
+                case "album_name":
+                    album = UnquoteString(ExtractFirstAtom(value));
+                    break;
+
+                case "genre":
+                    genre = UnquoteString(ExtractFirstAtom(value)).Trim('\'');
+                    break;
+
+                case "year_released":
+                    year = UnquoteString(ExtractFirstAtom(value));
+                    break;
+
+                case "album_track_number":
+                    albumTrack = ParseInt(ExtractFirstAtom(value));
+                    break;
+
+                case "song_length":
+                    songLengthMs = ParseInt(ExtractFirstAtom(value));
+                    break;
+
+                case "preview":
+                    (previewStartMs, previewEndMs) = ExtractPreview(value);
+                    break;
+
+                case "rank":
+                    ExtractRankBlock(entry.Children!, ranks);
+                    break;
+
                 case "charter":
                 case "author":
                     charter = UnquoteString(ExtractFirstAtom(value));
                     break;
 
                 case "song":
-                    ExtractSongBlock(entry.Children!, ref songFilePath, ref totalChannels, trackChannels, pans, vols);
+                    ExtractSongBlock(entry.Children!, ref songFilePath, ref totalChannels, ref vocalParts, trackChannels, pans, vols);
                     break;
             }
+        }
+
+        if ((string.IsNullOrWhiteSpace(charter) || string.Equals(charter, "Unknown", StringComparison.OrdinalIgnoreCase))
+            && !string.IsNullOrWhiteSpace(footerCharter))
+        {
+            charter = footerCharter!;
         }
 
         return new DtaSongInfo
@@ -251,6 +305,15 @@ internal static class DtaParser
             Title = title,
             Artist = artist,
             Charter = charter,
+            Album = album,
+            Genre = genre,
+            Year = year,
+            AlbumTrack = albumTrack,
+            SongLengthMs = songLengthMs,
+            PreviewStartMs = previewStartMs,
+            PreviewEndMs = previewEndMs,
+            VocalParts = vocalParts,
+            Ranks = ranks,
             SongFilePath = songFilePath,
             TrackChannels = trackChannels,
             Pans = pans,
@@ -263,6 +326,7 @@ internal static class DtaParser
         List<DtaNode> songBlockChildren,
         ref string songFilePath,
         ref int totalChannels,
+        ref int vocalParts,
         Dictionary<string, IReadOnlyList<int>> trackChannels,
         List<float> pans,
         List<float> vols)
@@ -297,6 +361,10 @@ internal static class DtaParser
                     ExtractTracksBlock(entry.Children![1], trackChannels);
                     break;
 
+                case "vocal_parts":
+                    vocalParts = ParseInt(ExtractFirstAtom(entry.Children![1]));
+                    break;
+
                 case "pans":
                     // (pans (f f f ...))
                     if (entry.Children![1].IsList)
@@ -321,6 +389,38 @@ internal static class DtaParser
                     break;
             }
         }
+    }
+
+    private static void ExtractRankBlock(List<DtaNode> rankBlockChildren, Dictionary<string, int> ranks)
+    {
+        for (int i = 1; i < rankBlockChildren.Count; i++)
+        {
+            DtaNode entry = rankBlockChildren[i];
+            if (!entry.IsList || entry.Children!.Count < 2)
+            {
+                continue;
+            }
+
+            string instrument = entry.Children[0].Atom?.Trim('\'') ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(instrument))
+            {
+                continue;
+            }
+
+            ranks[instrument] = ParseInt(ExtractFirstAtom(entry.Children[1]));
+        }
+    }
+
+    private static (int Start, int End) ExtractPreview(DtaNode previewNode)
+    {
+        if (!previewNode.IsList || previewNode.Children is null)
+        {
+            return (0, 0);
+        }
+
+        int start = previewNode.Children.Count > 0 ? ParseInt(ExtractFirstAtom(previewNode.Children[0])) : 0;
+        int end = previewNode.Children.Count > 1 ? ParseInt(ExtractFirstAtom(previewNode.Children[1])) : 0;
+        return (start, end);
     }
 
     private static void ExtractTracksBlock(DtaNode tracksNode, Dictionary<string, IReadOnlyList<int>> trackChannels)
@@ -417,5 +517,39 @@ internal static class DtaParser
         }
 
         return 0f;
+    }
+
+    private static string? TryExtractCommentCharter(string text)
+    {
+        using StringReader reader = new(text);
+        while (reader.ReadLine() is string line)
+        {
+            string trimmed = line.Trim();
+            const string authoredPrefix = ";Song authored by ";
+            if (trimmed.StartsWith(authoredPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                string value = trimmed[authoredPrefix.Length..].Trim();
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            if (trimmed.StartsWith(";Author=", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith(";Charter=", StringComparison.OrdinalIgnoreCase))
+            {
+                int separator = trimmed.IndexOf('=');
+                if (separator >= 0 && separator < trimmed.Length - 1)
+                {
+                    string value = trimmed[(separator + 1)..].Trim();
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        return value;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 }
