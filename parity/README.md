@@ -108,7 +108,7 @@ Goal: ChartHub output must be functionally equivalent to Onyx for all committed 
 
 - [x] STFS/CON reader with fan-made hash-pointer fallback
 - [x] DTA parser (S-expression, song metadata, channel map)
-- [x] MOGG extractor — unencrypted (0x0A): OGG offset recovery, stem splitting, ffmpeg invocation
+- [x] MOGG extractor — unencrypted (0x0A): OGG offset recovery and internal audio extraction
 - [x] MOGG decryptor — encrypted (0x0B AES-CTR): key-based decryption before OGG extraction
 - [x] RB3 MIDI → CH MIDI converter (track filtering)
 - [x] song.ini generator

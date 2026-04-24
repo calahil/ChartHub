@@ -234,14 +234,7 @@ apt-get install -y \
 apt-mark manual bluez bluez-tools
 
 # ---------------------------------------------------------------------------
-# 10. Install media codecs
-# ---------------------------------------------------------------------------
-echo "==> Installing ffmpeg..."
-apt-get install -y ffmpeg
-apt-mark manual ffmpeg
-
-# ---------------------------------------------------------------------------
-# 11. Install SSH server and deploy tools
+# 10. Install SSH server and deploy tools
 # ---------------------------------------------------------------------------
 echo "==> Installing openssh-server and unzip..."
 apt-get install -y \
@@ -250,7 +243,7 @@ apt-get install -y \
 apt-mark manual openssh-server unzip
 
 # ---------------------------------------------------------------------------
-# 12. Install .NET runtimes
+# 11. Install .NET runtimes
 #     ChartHub.Server targets net10.0; 8.0 retained as fallback.
 # ---------------------------------------------------------------------------
 echo "==> Installing .NET runtimes (8.0 + 10.0)..."
@@ -487,7 +480,6 @@ echo "   linux-firmware                        — AMD GPU microcode"
 echo "   libdrm2 / libdrm-amdgpu1              — kernel DRM interface"
 echo "   pulseaudio / alsa-utils               — audio (USB drum, USB mic, games)"
 echo "   bluez                                 — Bluetooth game controllers"
-echo "   ffmpeg                                — media codecs"
 echo "   openssh-server                        — CI SSH access"
 echo "   dotnet-runtime-10.0 + aspnetcore-runtime-10.0 — ChartHub.Server target"
 echo "   dotnet-runtime-8.0  + aspnetcore-runtime-8.0  — fallback"

@@ -36,9 +36,4 @@ public sealed record ConversionMetadata(string Artist, string Title, string Char
 /// <summary>Options controlling conversion behaviour.</summary>
 public sealed class ConversionOptions
 {
-    /// <summary>
-    /// Path to the ffmpeg executable used for MOGG audio decoding.
-    /// When <c>null</c>, "ffmpeg" is resolved from PATH.
-    /// </summary>
-    public string? FfmpegPath { get; init; }
 }

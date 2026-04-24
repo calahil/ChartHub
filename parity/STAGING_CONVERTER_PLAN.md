@@ -13,11 +13,12 @@ Status values:
 ## Locked Scope Requirements
 
 - RB3CON support must include MOGG versions 0x0A, 0x0B, and 0x0D.
+- RB3CON no_album_art fixture coverage is explicitly out-of-scope for final release.
 - Unencrypted SNG support must cover notes.mid and notes.chart with canonical normalization expectations.
 - Parity gate is strict: all committed fixtures pass with no known-unsupported skips.
 - Every required edge case needs committed fixture-backed proof.
 - Post-processing must fully handle chart-based installs.
-- ffmpeg cannot be a hard runtime requirement; deterministic fallback behavior is required.
+- External decode tools are not a runtime requirement; audio extraction must be internal and deterministic.
 - Performance gates must be measurable.
 - Converter API contract must be frozen for staging.
 
@@ -57,9 +58,7 @@ What exists:
   - ChartHub.Conversion.Tests/ConversionTests.cs
 
 Remaining gaps:
-- Deterministic no-ffmpeg fallback is not implemented as a successful degraded path.
-  Current behavior can hard-fail when ffmpeg is unavailable.
-- No committed test proving deterministic fallback semantics when ffmpeg is missing.
+- Internal per-instrument stem splitting parity is not complete yet in the native path.
 
 ### M3. SNG Complete Chart Support
 
@@ -108,8 +107,7 @@ Remaining gaps:
 - Parity comparison currently contains known-unsupported skip behavior:
   - ChartHub.Conversion.Tests/Parity/OracleParityComparisonTests.cs
 - Strict release gate requirement (no known-unsupported skips) is not satisfied.
-- Edge-case matrix is not fully closed with committed parity fixtures for all required tags.
-  Current audit also indicates no-album-art coverage gap in scanned corpus.
+- Edge-case matrix is not fully closed with committed parity fixtures for all required tags that remain in release scope.
 
 ### M6. Non-Functional Staging Gates
 
@@ -137,7 +135,7 @@ Implemented recently:
 
 Critical blockers to staging-ready claim:
 - Remove known-unsupported parity skips and close unsupported fixture policy gap.
-- Implement deterministic no-ffmpeg fallback semantics.
+- Complete internal per-instrument stem splitting parity.
 - Complete canonical notes.mid/notes.chart equivalence normalization proof.
 - Implement chart-origin-aware post-processing merge strategy.
 - Add measurable non-functional staging gates.
@@ -145,7 +143,7 @@ Critical blockers to staging-ready claim:
 ## Next Slice Order
 
 1. Remove known-unsupported skip policy from parity comparison and align fixture set to strict gate.
-2. Implement and test deterministic no-ffmpeg fallback behavior.
+2. Implement and test internal per-instrument stem splitting parity.
 3. Add paired same-song notes.mid vs notes.chart canonical equivalence fixtures and assertions.
 4. Implement chart-aware post-processing merge behavior with fixture-backed tests.
 5. Define and enforce SLO, repeatability, resilience, and soak gates.

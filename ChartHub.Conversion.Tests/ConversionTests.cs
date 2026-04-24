@@ -692,14 +692,9 @@ public sealed class StfsReaderSafetyTests
 public sealed class MoggExtractorTests
 {
     [Fact]
-    public async Task ExtractStemsAsync_BassStem_IsNormalisedToRhythm()
+    public async Task ExtractStemsAsync_ProducesBackingAudioDeterministically()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
-        string tempRoot = Path.Combine(Path.GetTempPath(), $"charthub-mogg-rhythm-test-{Guid.NewGuid():N}");
+        string tempRoot = Path.Combine(Path.GetTempPath(), $"charthub-mogg-backing-only-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempRoot);
 
         try
@@ -707,60 +702,8 @@ public sealed class MoggExtractorTests
             string outputDir = Path.Combine(tempRoot, "out");
             Directory.CreateDirectory(outputDir);
 
-            string invocationLog = Path.Combine(tempRoot, "ffmpeg-invocations.log");
-            string fakeFfmpeg = CreateFakeFfmpegScript(tempRoot, invocationLog);
+            var extractor = new MoggExtractor();
 
-            var extractor = new MoggExtractor(fakeFfmpeg);
-            DtaSongInfo songInfo = new()
-            {
-                ShortName = "suburbs",
-                Title = "The Suburbs",
-                Artist = "Arcade Fire",
-                TrackChannels = new Dictionary<string, IReadOnlyList<int>>
-                {
-                    ["bass"] = [0, 1],
-                },
-                TotalChannels = 2,
-            };
-
-            byte[] moggBytes = BuildSyntheticMoggWithVorbisChannels(2);
-            IReadOnlyDictionary<string, string> stems = await extractor.ExtractStemsAsync(moggBytes, songInfo, outputDir);
-
-            Assert.Contains("song", stems.Keys);
-            Assert.Contains("rhythm", stems.Keys);
-            Assert.DoesNotContain("bass", stems.Keys);
-            Assert.True(File.Exists(Path.Combine(outputDir, "rhythm.ogg")));
-        }
-        finally
-        {
-            if (Directory.Exists(tempRoot))
-            {
-                Directory.Delete(tempRoot, recursive: true);
-            }
-        }
-    }
-
-    [Fact]
-    public async Task ExtractStemsAsync_InvalidStemChannels_AreSkipped()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            // Test harness uses a tiny bash ffmpeg stub.
-            return;
-        }
-
-        string tempRoot = Path.Combine(Path.GetTempPath(), $"charthub-mogg-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempRoot);
-
-        try
-        {
-            string outputDir = Path.Combine(tempRoot, "out");
-            Directory.CreateDirectory(outputDir);
-
-            string invocationLog = Path.Combine(tempRoot, "ffmpeg-invocations.log");
-            string fakeFfmpeg = CreateFakeFfmpegScript(tempRoot, invocationLog);
-
-            var extractor = new MoggExtractor(fakeFfmpeg);
             DtaSongInfo songInfo = new()
             {
                 ShortName = "suburbs",
@@ -769,22 +712,24 @@ public sealed class MoggExtractorTests
                 TrackChannels = new Dictionary<string, IReadOnlyList<int>>
                 {
                     ["guitar"] = [0, 1],
-                    ["keys"] = [8, 9], // Invalid for a 2-channel Vorbis stream.
                 },
-                TotalChannels = 10,
+                TotalChannels = 2,
             };
 
             byte[] moggBytes = BuildSyntheticMoggWithVorbisChannels(2);
             IReadOnlyDictionary<string, string> stems = await extractor.ExtractStemsAsync(moggBytes, songInfo, outputDir);
 
-            Assert.Contains("song", stems.Keys);
-            Assert.Contains("guitar", stems.Keys);
-            Assert.DoesNotContain("keys", stems.Keys);
+            Assert.True(stems.TryGetValue("song", out string? backingPath));
+            Assert.NotNull(backingPath);
+            Assert.True(File.Exists(backingPath));
+            Assert.DoesNotContain("guitar", stems.Keys);
 
-            string[] invocations = File.ReadAllLines(invocationLog);
-            Assert.Equal(2, invocations.Length); // backing + guitar stem only
-            Assert.All(invocations, invocation => Assert.DoesNotContain("-filter_complex", invocation, StringComparison.Ordinal));
-            Assert.Contains("-af", invocations[1], StringComparison.Ordinal);
+            byte[] backingBytes = await File.ReadAllBytesAsync(backingPath!);
+            Assert.True(backingBytes.Length >= 4);
+            Assert.Equal((byte)'O', backingBytes[0]);
+            Assert.Equal((byte)'g', backingBytes[1]);
+            Assert.Equal((byte)'g', backingBytes[2]);
+            Assert.Equal((byte)'S', backingBytes[3]);
         }
         finally
         {
@@ -798,11 +743,6 @@ public sealed class MoggExtractorTests
     [Fact]
     public async Task ExtractStemsAsync_BogusHeaderOffset_RecoversByOggSyncScan()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         string tempRoot = Path.Combine(Path.GetTempPath(), $"charthub-mogg-offset-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempRoot);
 
@@ -811,10 +751,7 @@ public sealed class MoggExtractorTests
             string outputDir = Path.Combine(tempRoot, "out");
             Directory.CreateDirectory(outputDir);
 
-            string invocationLog = Path.Combine(tempRoot, "ffmpeg-invocations.log");
-            string fakeFfmpeg = CreateFakeFfmpegScript(tempRoot, invocationLog);
-
-            var extractor = new MoggExtractor(fakeFfmpeg);
+            var extractor = new MoggExtractor();
             DtaSongInfo songInfo = new()
             {
                 ShortName = "suburbs",
@@ -833,7 +770,7 @@ public sealed class MoggExtractorTests
             IReadOnlyDictionary<string, string> stems = await extractor.ExtractStemsAsync(moggBytes, songInfo, outputDir);
 
             Assert.Contains("song", stems.Keys);
-            Assert.Contains("guitar", stems.Keys);
+            Assert.DoesNotContain("guitar", stems.Keys);
             Assert.True(File.Exists(stems["song"]));
         }
         finally
@@ -847,13 +784,8 @@ public sealed class MoggExtractorTests
 
 
     [Fact]
-    public async Task ExtractStemsAsync_Mogg0x0B_DecryptsAndExtractsStemsSuccessfully()
+    public async Task ExtractStemsAsync_Mogg0x0B_DecryptsAndWritesBackingTrack()
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         string tempRoot = Path.Combine(Path.GetTempPath(), $"charthub-mogg-0x0b-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempRoot);
 
@@ -862,10 +794,7 @@ public sealed class MoggExtractorTests
             string outputDir = Path.Combine(tempRoot, "out");
             Directory.CreateDirectory(outputDir);
 
-            string invocationLog = Path.Combine(tempRoot, "ffmpeg-invocations.log");
-            string fakeFfmpeg = CreateFakeFfmpegScript(tempRoot, invocationLog);
-
-            var extractor = new MoggExtractor(fakeFfmpeg);
+            var extractor = new MoggExtractor();
             DtaSongInfo songInfo = new()
             {
                 ShortName = "testtrack",
@@ -883,7 +812,54 @@ public sealed class MoggExtractorTests
             IReadOnlyDictionary<string, string> stems = await extractor.ExtractStemsAsync(mogg0x0b, songInfo, outputDir);
 
             Assert.Contains("song", stems.Keys);
-            Assert.Contains("guitar", stems.Keys);
+            Assert.DoesNotContain("guitar", stems.Keys);
+
+            byte[] backingBytes = await File.ReadAllBytesAsync(stems["song"]);
+            Assert.True(backingBytes.Length >= 4);
+            Assert.Equal((byte)'O', backingBytes[0]);
+            Assert.Equal((byte)'g', backingBytes[1]);
+            Assert.Equal((byte)'g', backingBytes[2]);
+            Assert.Equal((byte)'S', backingBytes[3]);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExtractStemsAsync_Mogg0x0A_WritesBackingTrack()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), $"charthub-mogg-0x0d-test-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            string outputDir = Path.Combine(tempRoot, "out");
+            Directory.CreateDirectory(outputDir);
+
+            var extractor = new MoggExtractor();
+            DtaSongInfo songInfo = new()
+            {
+                ShortName = "testtrack",
+                Title = "Test Track",
+                Artist = "Test Artist",
+                TrackChannels = new Dictionary<string, IReadOnlyList<int>>
+                {
+                    ["guitar"] = [0, 1],
+                },
+                TotalChannels = 2,
+            };
+
+            byte[] mogg0x0a = BuildSyntheticMoggWithVorbisChannels(2);
+            IReadOnlyDictionary<string, string> stems = await extractor.ExtractStemsAsync(mogg0x0a, songInfo, outputDir);
+
+            Assert.Contains("song", stems.Keys);
+            Assert.DoesNotContain("guitar", stems.Keys);
+            Assert.True(File.Exists(stems["song"]));
         }
         finally
         {
@@ -997,42 +973,6 @@ public sealed class MoggExtractorTests
 
         return result;
     }
-    private static string CreateFakeFfmpegScript(string root, string invocationLog)
-    {
-        string scriptPath = Path.Combine(root, "fake-ffmpeg.sh");
-        string script = "#!/usr/bin/env bash\n"
-            + "set -e\n"
-            + "in=\"\"\n"
-            + "for ((i=1;i<=$#;i++)); do\n"
-            + "  if [[ \"${!i}\" == \"-i\" ]]; then\n"
-            + "    j=$((i+1))\n"
-            + "    in=\"${!j}\"\n"
-            + "    break\n"
-            + "  fi\n"
-            + "done\n"
-            + "if [[ -n \"$in\" ]]; then\n"
-            + "  sig=$(head -c 4 \"$in\" || true)\n"
-            + "  if [[ \"$sig\" != \"OggS\" ]]; then\n"
-            + "    echo \"invalid-ogg\" >&2\n"
-            + "    exit 9\n"
-            + "  fi\n"
-            + "fi\n"
-            + $"echo \"$*\" >> \"{invocationLog}\"\n"
-            + "out=\"${@: -1}\"\n"
-            + "mkdir -p \"$(dirname \"$out\")\"\n"
-            + ": > \"$out\"\n";
-        File.WriteAllText(scriptPath, script);
-        if (!OperatingSystem.IsWindows())
-        {
-            File.SetUnixFileMode(scriptPath,
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-        }
-
-        return scriptPath;
-    }
-
     private static byte[] BuildSyntheticMoggWithVorbisChannels(byte channels, int declaredOffset = 8, int actualOffset = 8)
     {
         byte[] rawOgg = new byte[64];

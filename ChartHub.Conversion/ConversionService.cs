@@ -25,11 +25,9 @@ public interface IConversionService
 /// <inheritdoc />
 public sealed class ConversionService : IConversionService
 {
-    private readonly ConversionOptions _options;
-
     public ConversionService(ConversionOptions? options = null)
     {
-        _options = options ?? new ConversionOptions();
+        _ = options;
     }
 
     /// <inheritdoc />
@@ -279,7 +277,7 @@ public sealed class ConversionService : IConversionService
         string songDir,
         CancellationToken cancellationToken)
     {
-        var extractor = new MoggExtractor(_options.FfmpegPath);
+        var extractor = new MoggExtractor();
         var tried = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var candidates = new List<(string Path, StfsEntry Entry)>();
 
@@ -441,7 +439,7 @@ public sealed class ConversionService : IConversionService
         var sb = new System.Text.StringBuilder(name.Length);
         foreach (char c in name)
         {
-            // Keep a conservative subset so downstream tools (ffmpeg, etc.) never receive
+            // Keep a conservative subset so downstream tooling never receives
             // path segments with URL/framing characters like '#', '?', or '&'.
             bool isSafe = char.IsLetterOrDigit(c)
                 || c == ' '
