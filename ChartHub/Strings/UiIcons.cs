@@ -27,6 +27,8 @@ public static class UiIcons
     public const string VocalsSmall = "avares://ChartHub/Resources/Images/vocals_small.svg";
 
     public const string MenuIcon = "avares://ChartHub/Resources/Images/menu.svg";
+    public const string Logout = "avares://ChartHub/Resources/Images/logout_24dp.svg";
+    public const string InstallDesktop = "avares://ChartHub/Resources/Images/install_desktop_24dp.svg";
     public const string XCancelButton = "avares://ChartHub/Resources/Images/x_cancel_button.svg";
     public const string DeleteButton = "avares://ChartHub/Resources/Images/delete24dp.svg";
 

@@ -16,17 +16,26 @@
         <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
     </UserControl.Resources>
 
-    <Grid RowDefinitions="Auto,*" Margin="10">
+    <Grid RowDefinitions="Auto,*" Margin="12">
         <!-- Toolbar -->
-        <StackPanel Grid.Row="0" Spacing="4">
+        <StackPanel Grid.Row="0" Spacing="8">
             <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
-                <Button Content="{Binding PageStrings.InstallSongs}"
-                        HorizontalContentAlignment="Center"
+                <Button Width="40"
+                        Height="40"
                         CornerRadius="10"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="{Binding PageStrings.InstallSongs}"
                         IsEnabled="{Binding IsAnyChecked}"
-                        Command="{Binding InstallSongs}"
-                        VerticalAlignment="Stretch"
-                        Width="140" />
+                        Command="{Binding InstallSongs}">
+                    <Button.Content>
+                        <Image Width="20"
+                               Height="20"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Source="{Binding Source={x:Static strings:UiIcons.InstallDesktop}, Converter={StaticResource AssetPathToImageConverter}}" />
+                    </Button.Content>
+                </Button>
             </StackPanel>
         </StackPanel>
 
@@ -34,20 +43,18 @@
               RowDefinitions="Auto,*">
             <StackPanel Grid.Row="0"
                         Orientation="Horizontal"
-                        Spacing="8"
-                        HorizontalAlignment="Right">
-                    <TextBlock Text="{Binding PageStrings.StateLabel}"
-                           VerticalAlignment="Center" />
-                <ComboBox ItemsSource="{Binding QueueStateFilters}"
-                          SelectedItem="{Binding SelectedQueueStateFilter}"
-                          Width="170" />
-                    <TextBlock Text="{Binding PageStrings.SortLabel}"
+                        Spacing="10"
+                        Margin="0,4,0,0"
+                        HorizontalAlignment="Left">
+                <TextBlock Text="{Binding PageStrings.SortLabel}"
                            VerticalAlignment="Center" />
                 <ComboBox ItemsSource="{Binding QueueSortOptions}"
                           SelectedItem="{Binding SelectedQueueSort}"
+                          CornerRadius="10"
                           Width="140" />
-                    <CheckBox Content="{Binding PageStrings.Descending}"
+                <CheckBox Content="{Binding PageStrings.Descending}"
                           IsChecked="{Binding IsQueueSortDescending}"
+                          Margin="2,0,0,0"
                           VerticalAlignment="Center" />
             </StackPanel>
 
@@ -88,7 +95,7 @@
                                                        Source="{Binding FileType, Converter={StaticResource DownloadFileTypeToIconConverter}}" />
                                                 <!-- Info stack -->
                                                 <StackPanel Grid.Column="2"
-                                                            Spacing="3"
+                                                            Spacing="4"
                                                             VerticalAlignment="Top">
                                                     <TextBlock Text="{Binding DisplayName}"
                                                                FontWeight="SemiBold"
@@ -148,7 +155,7 @@
                                                            Height="18"
                                                            HorizontalAlignment="Center"
                                                            VerticalAlignment="Center"
-                                                           Source="{Binding Source={x:Static strings:UiIcons.DeleteButton}, Converter={StaticResource AssetPathToImageConverter}, ConverterParameter='#ED8796'}" />
+                                                           Source="{Binding Source={x:Static strings:UiIcons.DeleteButton}, Converter={StaticResource AssetPathToImageConverter}}" />
                                                 </Button>
                                             </Grid>
                                             <!-- Log toggle button -->
@@ -182,7 +189,7 @@
                                                                     <TextBlock FontSize="10"
                                                                                FontFamily="Monospace"
                                                                                TextWrapping="Wrap"
-                                                                               Margin="0,1"
+                                                                               Margin="0,2"
                                                                                Text="{Binding Message}" />
                                                                 </DataTemplate>
                                                             </ItemsControl.ItemTemplate>

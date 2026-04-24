@@ -168,24 +168,40 @@ public sealed class DesktopGoogleAuthProvider(IConfiguration configuration, ISec
 
     private string? ResolveDesktopClientId()
     {
-        return _settingsOrchestrator.Current.GoogleAuth.DesktopClientId
-            ?? _configuration["GoogleDrive:desktop_client_id"]
-            ?? _configuration["GoogleDrive:DesktopClientId"]
-            ?? Environment.GetEnvironmentVariable("GOOGLEDRIVE_DESKTOP_CLIENT_ID")
-            ?? _configuration["GoogleDrive:client_id"]
-            ?? _configuration["GoogleDrive:ClientId"]
-            ?? Environment.GetEnvironmentVariable("GOOGLEDRIVE_CLIENT_ID");
+        return FirstNonWhiteSpace(
+            _settingsOrchestrator.Current.GoogleAuth.DesktopClientId,
+            _configuration["GoogleDrive:desktop_client_id"],
+            _configuration["GoogleDrive:DesktopClientId"],
+            Environment.GetEnvironmentVariable("GOOGLEDRIVE_DESKTOP_CLIENT_ID"),
+            _configuration["GoogleDrive:client_id"],
+            _configuration["GoogleDrive:ClientId"],
+            Environment.GetEnvironmentVariable("GOOGLEDRIVE_CLIENT_ID"));
     }
 
     private async Task<string?> ResolveDesktopClientSecretAsync()
     {
-        return await _secretStore.GetAsync(SecretKeys.GoogleDesktopClientSecret).ConfigureAwait(false)
-            ?? _configuration["GoogleDrive:desktop_client_secret"]
-            ?? _configuration["GoogleDrive:DesktopClientSecret"]
-            ?? Environment.GetEnvironmentVariable("GOOGLEDRIVE_DESKTOP_CLIENT_SECRET")
-            ?? _configuration["GoogleDrive:client_secret"]
-            ?? _configuration["GoogleDrive:ClientSecret"]
-            ?? Environment.GetEnvironmentVariable("GOOGLEDRIVE_CLIENT_SECRET");
+        string? secretFromStore = await _secretStore.GetAsync(SecretKeys.GoogleDesktopClientSecret).ConfigureAwait(false);
+        return FirstNonWhiteSpace(
+            secretFromStore,
+            _configuration["GoogleDrive:desktop_client_secret"],
+            _configuration["GoogleDrive:DesktopClientSecret"],
+            Environment.GetEnvironmentVariable("GOOGLEDRIVE_DESKTOP_CLIENT_SECRET"),
+            _configuration["GoogleDrive:client_secret"],
+            _configuration["GoogleDrive:ClientSecret"],
+                Environment.GetEnvironmentVariable("GOOGLEDRIVE_CLIENT_SECRET"));
+    }
+
+    internal static string? FirstNonWhiteSpace(params string?[] values)
+    {
+        foreach (string? value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
     }
 }
 

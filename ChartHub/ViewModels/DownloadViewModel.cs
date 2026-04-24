@@ -62,26 +62,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     public bool HasIngestionQueueItems => IngestionQueue.Count > 0;
     public bool ShowQueueEmptyState => !HasIngestionQueueItems;
 
-    public IReadOnlyList<string> QueueStateFilters { get; } = ["All"];
-
     public IReadOnlyList<string> QueueSortOptions { get; } = ["Updated", "Source", "State", "Name"];
-
-    private string _selectedQueueStateFilter = "All";
-    public string SelectedQueueStateFilter
-    {
-        get => _selectedQueueStateFilter;
-        set
-        {
-            if (_selectedQueueStateFilter == value)
-            {
-                return;
-            }
-
-            _selectedQueueStateFilter = value;
-            OnPropertyChanged(nameof(SelectedQueueStateFilter));
-            ObserveBackgroundTask(RefreshIngestionQueueAsync(), "Queue state filter changed");
-        }
-    }
 
     private string _selectedQueueSort = "Updated";
     public string SelectedQueueSort

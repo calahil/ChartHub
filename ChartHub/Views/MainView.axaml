@@ -45,13 +45,15 @@
                           Grid.RowDefinitions="Auto"
                           Background="{StaticResource ThemeBackgroundBrush}">
                         <Button Grid.Row="0"
-                                Margin="10,0,0,0"
-                            CornerRadius="10"
+                                Margin="0,12,0,0"
+                                Width="40"
+                                Height="40"
+                                CornerRadius="10"
                                 Command="{Binding ShowFiltersPaneCommand}"
                                 HorizontalAlignment="Right">
                             <Image Source="{Binding RhythmVerseViewModel.PageStrings.ShowFilters, Converter={StaticResource AssetPathToImageConverter}}"
-                                   Width="{StaticResource IconSizeDense}"
-                                   Height="{StaticResource IconSizeDense}" />
+                                   Width="20"
+                                   Height="20" />
                         </Button>
                     </Grid>
 
@@ -235,56 +237,77 @@
                 </Grid>
             </SplitView.Pane>
 
-            <TabControl SelectedIndex="{Binding SelectedMainTabIndex}">
-                <TabItem Header="{Binding PageStrings.RhythmVerse}"
-                         FontSize="16">
-                    <ContentControl Content="{Binding RhythmVerseViewModel}" />
-                </TabItem>
-                <TabItem Header="{Binding PageStrings.Encore}"
-                         FontSize="16">
-                    <ContentControl Content="{Binding EncoreViewModel}" />
-                </TabItem>
-                <TabItem Header="{Binding PageStrings.Downloads}"
-                         FontSize="16"
-                         IsVisible="{Binding IsDownloadTabVisible}">
-                    <ContentControl Content="{Binding DownloadViewModel}" />
-                </TabItem>
-                <TabItem Header="{Binding PageStrings.CloneHero}"
-                         FontSize="16"
-                         IsVisible="{Binding IsCloneHeroTabVisible}">
-                    <ContentControl Content="{Binding CloneHeroViewModel}" />
-                </TabItem>
-                <TabItem Header="{Binding PageStrings.DesktopEntry}"
-                         FontSize="16"
-                         IsVisible="{Binding IsDesktopEntryTabVisible}">
-                    <ContentControl Content="{Binding DesktopEntryViewModel}" />
-                </TabItem>
-                <TabItem Header="{Binding PageStrings.Volume}"
-                         FontSize="16"
-                         IsVisible="{Binding IsVolumeTabVisible}">
-                    <ContentControl Content="{Binding VolumeViewModel}" />
-                </TabItem>
-                <TabItem Header="{Binding PageStrings.Settings}"
-                         FontSize="16"
-                         IsVisible="{Binding IsSettingsTabVisible}">
-                    <ContentControl Content="{Binding SettingsViewModel}" />
-                </TabItem>
-                <TabItem Header="{Binding PageStrings.Controller}"
-                         FontSize="16"
-                         IsVisible="{Binding IsCompanionMode}">
-                    <ContentControl Content="{Binding VirtualControllerViewModel}" />
-                </TabItem>
-                <TabItem Header="{Binding PageStrings.Mouse}"
-                         FontSize="16"
-                         IsVisible="{Binding IsCompanionMode}">
-                    <ContentControl Content="{Binding VirtualTouchPadViewModel}" />
-                </TabItem>
-                <TabItem Header="{Binding PageStrings.Keyboard}"
-                         FontSize="16"
-                         IsVisible="{Binding IsCompanionMode}">
-                    <ContentControl Content="{Binding VirtualKeyboardViewModel}" />
-                </TabItem>
-            </TabControl>
+            <Grid RowDefinitions="Auto,*">
+                <Button Grid.Row="0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Margin="0,12,12,0"
+                        Width="40"
+                        Height="40"
+                        CornerRadius="10"
+                        ToolTip.Tip="{Binding AuthButtonText}"
+                        Command="{Binding AuthButtonCommand}">
+                    <Button.Content>
+                        <Image Width="20"
+                               Height="20"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Source="{Binding Source={x:Static strings:UiIcons.Logout}, Converter={StaticResource AssetPathToImageConverter}}" />
+                    </Button.Content>
+                </Button>
+
+                <TabControl Grid.Row="1"
+                            SelectedIndex="{Binding SelectedMainTabIndex}">
+                    <TabItem Header="{Binding PageStrings.RhythmVerse}"
+                             FontSize="16">
+                        <ContentControl Content="{Binding RhythmVerseViewModel}" />
+                    </TabItem>
+                    <TabItem Header="{Binding PageStrings.Encore}"
+                             FontSize="16">
+                        <ContentControl Content="{Binding EncoreViewModel}" />
+                    </TabItem>
+                    <TabItem Header="{Binding PageStrings.Downloads}"
+                             FontSize="16"
+                             IsVisible="{Binding IsDownloadTabVisible}">
+                        <ContentControl Content="{Binding DownloadViewModel}" />
+                    </TabItem>
+                    <TabItem Header="{Binding PageStrings.CloneHero}"
+                             FontSize="16"
+                             IsVisible="{Binding IsCloneHeroTabVisible}">
+                        <ContentControl Content="{Binding CloneHeroViewModel}" />
+                    </TabItem>
+                    <TabItem Header="{Binding PageStrings.DesktopEntry}"
+                             FontSize="16"
+                             IsVisible="{Binding IsDesktopEntryTabVisible}">
+                        <ContentControl Content="{Binding DesktopEntryViewModel}" />
+                    </TabItem>
+                    <TabItem Header="{Binding PageStrings.Volume}"
+                             FontSize="16"
+                             IsVisible="{Binding IsVolumeTabVisible}">
+                        <ContentControl Content="{Binding VolumeViewModel}" />
+                    </TabItem>
+                    <TabItem Header="{Binding PageStrings.Settings}"
+                             FontSize="16"
+                             IsVisible="{Binding IsSettingsTabVisible}">
+                        <ContentControl Content="{Binding SettingsViewModel}" />
+                    </TabItem>
+                    <TabItem Header="{Binding PageStrings.Controller}"
+                             FontSize="16"
+                             IsVisible="{Binding IsCompanionMode}">
+                        <ContentControl Content="{Binding VirtualControllerViewModel}" />
+                    </TabItem>
+                    <TabItem Header="{Binding PageStrings.Mouse}"
+                             FontSize="16"
+                             IsVisible="{Binding IsCompanionMode}">
+                        <ContentControl Content="{Binding VirtualTouchPadViewModel}" />
+                    </TabItem>
+                    <TabItem Header="{Binding PageStrings.Keyboard}"
+                             FontSize="16"
+                             IsVisible="{Binding IsCompanionMode}">
+                        <ContentControl Content="{Binding VirtualKeyboardViewModel}" />
+                    </TabItem>
+                </TabControl>
+            </Grid>
         </SplitView>
 
         <SplitView Grid.Row="0"
@@ -554,11 +577,20 @@
                                    Text="{Binding CurrentMainTabTitle}" />
 
                         <Button Grid.Column="2"
-                            Padding="12,6"
-                            CornerRadius="10"
-                            VerticalAlignment="Center"
-                            Content="{Binding AuthButtonText}"
-                            Command="{Binding AuthButtonCommand}" />
+                                Width="40"
+                                Height="40"
+                                CornerRadius="10"
+                                VerticalAlignment="Center"
+                                ToolTip.Tip="{Binding AuthButtonText}"
+                                Command="{Binding AuthButtonCommand}">
+                            <Button.Content>
+                                <Image Width="20"
+                                       Height="20"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Source="{Binding Source={x:Static strings:UiIcons.Logout}, Converter={StaticResource AssetPathToImageConverter}}" />
+                            </Button.Content>
+                        </Button>
                     </Grid>
                 </Border>
 
@@ -566,16 +598,6 @@
                                 Content="{Binding SelectedMainContentViewModel}" />
             </Grid>
         </SplitView>
-
-            <Button Grid.Row="0"
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Margin="0,12,12,0"
-                Padding="14,8"
-                CornerRadius="12"
-                Content="{Binding AuthButtonText}"
-                Command="{Binding AuthButtonCommand}"
-                IsVisible="{Binding IsDesktopMode}" />
 
             <Border Grid.Row="0"
                 Grid.RowSpan="2"

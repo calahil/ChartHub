@@ -93,7 +93,7 @@
                                                    Height="18"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
-                                                   Source="{Binding Source={x:Static strings:UiIcons.XCancelButton}, Converter={StaticResource AssetPathToImageConverter}, ConverterParameter='#ED8796'}" />
+                                                   Source="{Binding Source={x:Static strings:UiIcons.XCancelButton}, Converter={StaticResource AssetPathToImageConverter}}" />
                                         </Button.Content>
                                     </Button>
                                     <Button Width="28"
@@ -109,7 +109,7 @@
                                                    Height="18"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center"
-                                                   Source="{Binding Source={x:Static strings:UiIcons.XCancelButton}, Converter={StaticResource AssetPathToImageConverter}, ConverterParameter='#ED8796'}" />
+                                                   Source="{Binding Source={x:Static strings:UiIcons.XCancelButton}, Converter={StaticResource AssetPathToImageConverter}}" />
                                         </Button.Content>
                                     </Button>
                                 </Panel>
@@ -130,7 +130,7 @@
                                                Foreground="{StaticResource ThemeForegroundLowBrush}" />
                                                                         <StackPanel Grid.Column="1"
                                                                                                 Margin="10,0,0,0"
-                                                                                                Spacing="2">
+                                                                                                Spacing="4">
                                                                                 <TextBlock Text="{Binding ErrorMessage}"
                                                                                                      TextWrapping="Wrap"
                                                                                                      Foreground="{StaticResource SemanticError}"
