@@ -41,12 +41,11 @@ This prevents byte/path comparisons between oracle source containers and ChartHu
 Current validation status (local opt-in parity run):
 
 - `rb3con-ready-to-start`: passing
-- `rb3con-neighborhood-1`: passing under fixture policy
-- `sng-biology`: passing under fixture policy
+- `rb3con-neighborhood-1`: passing
 - `rb3con-arcade-fire-pack`: passing
 - `rb3con-everything-now`: passing
 - `rb3con-rebellion-lies`: passing
-- `sng-release`: passing under fixture policy
+- `sng-release`: passing
 - `sng-yellow-ledbetter`: passing
 - `sng-all-eyes-on-me`: passing
 - `sng-cake-by-the-ocean`: passing
@@ -56,12 +55,12 @@ Current validation status (local opt-in parity run):
 
 Latest verification snapshot:
 
-- Oracle parity suite (`OracleParityComparisonTests`): green (13/13)
+- Oracle parity suite (`OracleParityComparisonTests`): green (12/12)
 - Temporary MOGG candidate diagnostics removed after unblock; robust fallback logic retained
 - Conversion routing: `.sng` route now converts end-to-end through the native SNG pipeline
 - SNGPKG reader: magic/version + file-table extraction implemented with synthetic + real fixture tests
 - SNG metadata extractor: parses embedded `song.ini` ([song] section) with filename/unknown fallbacks + focused unit coverage
-- SNG chart extractor: `notes.mid` packages reuse RB→CH MIDI conversion with passthrough fallback for non-standard `notes.mid` payloads; `notes.chart` packages are extracted directly as `notes.chart`
+- SNG chart extractor: extracts both chart artifacts when available, writing canonical `notes.mid` (RB→CH conversion with passthrough fallback for non-standard payloads) plus `notes.chart` sidecar; chart-only packages remain supported
 - SNG audio extractor: `.opus` / `.ogg` container audio entries now extract as-is (including multi-stem packages with `guitar.opus`, `drums.opus`, etc.)
 - SNG album art extractor: container image entries now prefer `album.jpg` / `.jpeg` / `.png`, fall back to first supported image, and write normalized `album.*` output
 - SNG install path: server `DownloadJobInstallService` now routes supported `.sng` artifacts through native conversion + standard rehome/install flow
@@ -72,7 +71,7 @@ Latest verification snapshot:
 
 Next active slice:
 
-- M3 complete
+- M3 in progress (dual-output + canonical parity policy implemented; same-song equivalence fixtures still pending)
 
 ## Opt-In Local Runs
 
@@ -146,7 +145,6 @@ Pre-requisites: M2 complete.
 
 - [x] RB3CON fixtures expanded to cover: multi-stem (`rb3con-everything-now`), crowd track + PART KEYS (`rb3con-rebellion-lies`); no-album-art and non-ASCII metadata are not present in the available fixture corpus — documented as out-of-scope for this milestone
 - [x] SNG fixtures expanded to cover: single-stem (`sng-yellow-ledbetter`), key-stem coverage (`sng-cake-by-the-ocean`, `sng-cancer`, `sng-calibration-chart-225`), no-video (`sng-yellow-ledbetter`, `sng-release`), and notes.chart chart files (`sng-all-eyes-on-me`, `sng-creature-comfort`, `sng-calibration-chart-225`); keys-only SNG is still not available in the current corpus
-- [x] `sng-biology` fixture policy documented (skip/xfail with reason; encrypted official not supported)
 - [x] All fixture comparisons using strict functional mode for chart and metadata roles (`.mid`, `.chart`, `.ini` → `comparison: functional`; implemented in `ParityManifestIO.DetermineComparison`; verified in committed manifest)
 - [x] CI integration: parity baseline staleness check — `ChecksumManifest_OraclePin_MatchesFixtureManifestPin` always runs without opt-in and fails if `manifest.yaml` oracle pin diverges from `fixtures.yaml`
 

@@ -54,8 +54,8 @@ public sealed class PostProcessingService : IPostProcessingService
             PostProcessLog.SongArchived(_logger, songId, archiveDest);
         }
 
-        // Find existing MIDI in the installed song folder (notes.mid / notes.chart).
         string existingMidiPath = Path.Combine(installedPath, "notes.mid");
+        string existingChartPath = Path.Combine(installedPath, "notes.chart");
 
         byte[] mergedMidi;
         if (File.Exists(existingMidiPath))
@@ -66,7 +66,13 @@ public sealed class PostProcessingService : IPostProcessingService
         }
         else
         {
-            // No existing MIDI — use generated MIDI directly (already in CH format).
+            // If this install originated from notes.chart, preserve notes.chart and promote generated MIDI to notes.mid.
+            if (File.Exists(existingChartPath))
+            {
+                PostProcessLog.ChartOnlyPromotedToMidi(_logger, songId, existingChartPath, existingMidiPath);
+            }
+
+            // No existing notes.mid to merge into.
             mergedMidi = File.ReadAllBytes(midiResultPath);
         }
 
@@ -96,6 +102,9 @@ internal static partial class PostProcessLog
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Song {SongId} archived to {ArchivePath}.")]
     public static partial void SongArchived(ILogger logger, string songId, string archivePath);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "notes.chart-only song {SongId} detected at {ChartPath}; generated drums promoted to {MidiPath}.")]
+    public static partial void ChartOnlyPromotedToMidi(ILogger logger, string songId, string chartPath, string midiPath);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Drum MIDI merged for song {SongId} → {MidiPath}.")]
     public static partial void DrumsMerged(ILogger logger, string songId, string midiPath);

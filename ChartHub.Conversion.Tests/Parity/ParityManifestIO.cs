@@ -231,7 +231,7 @@ internal static class ParityManifestIO
             throw new DirectoryNotFoundException($"Parity output directory not found: {directoryPath}");
         }
 
-        return Directory
+        var files = Directory
             .EnumerateFiles(directoryPath, "*", SearchOption.AllDirectories)
             .OrderBy(path => path, StringComparer.Ordinal)
             .Select(path =>
@@ -249,6 +249,37 @@ internal static class ParityManifestIO
                 && !OracleInternalSuffixes.Any(suffix =>
                 file.Path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)))
             .ToList();
+
+        return NormalizeCanonicalChartFiles(files);
+    }
+
+    private static IReadOnlyList<ParityChecksumFile> NormalizeCanonicalChartFiles(
+        IReadOnlyList<ParityChecksumFile> files)
+    {
+        var canonicalDirectories = files
+            .Where(file => string.Equals(Path.GetFileName(file.Path), "notes.mid", StringComparison.OrdinalIgnoreCase))
+            .Select(file => NormalizeDirectory(Path.GetDirectoryName(file.Path)))
+            .ToHashSet(StringComparer.Ordinal);
+
+        return files
+            .Where(file =>
+            {
+                if (!string.Equals(Path.GetFileName(file.Path), "notes.chart", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                string directory = NormalizeDirectory(Path.GetDirectoryName(file.Path));
+                return !canonicalDirectories.Contains(directory);
+            })
+            .ToList();
+    }
+
+    private static string NormalizeDirectory(string? directory)
+    {
+        return string.IsNullOrEmpty(directory)
+            ? string.Empty
+            : directory.Replace(Path.DirectorySeparatorChar, '/');
     }
 
     internal static ParityChecksumManifest UpsertFixture(

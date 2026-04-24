@@ -11,7 +11,7 @@ public sealed class SngMidiExtractorTests
             "../../../../../merges/Pearl Jam - Yellow Ledbetter (farottone).sng"));
 
     [Fact]
-    public void ExtractCloneHeroChart_WhenNotesMidPresent_ReturnsConvertedMidi()
+    public void ExtractCloneHeroCharts_WhenNotesMidPresent_ReturnsCanonicalMidi()
     {
         byte[] containerBytes = BuildSyntheticSngPkg(
             [
@@ -20,7 +20,8 @@ public sealed class SngMidiExtractorTests
             ]);
 
         SngPackage package = SngPackageReader.Read(containerBytes);
-        SngChartContent converted = SngMidiExtractor.ExtractCloneHeroChart(package, containerBytes);
+        IReadOnlyList<SngChartContent> charts = SngMidiExtractor.ExtractCloneHeroCharts(package, containerBytes);
+        SngChartContent converted = Assert.Single(charts);
 
         Assert.Equal("notes.mid", converted.FileName);
         Assert.True(converted.Bytes.Length >= 14);
@@ -32,7 +33,26 @@ public sealed class SngMidiExtractorTests
     }
 
     [Fact]
-    public void ExtractCloneHeroChart_WhenOnlyNotesChartPresent_ReturnsChartPayload()
+    public void ExtractCloneHeroCharts_WhenBothChartFormatsPresent_ReturnsMidAndChart()
+    {
+        byte[] chartBytes = Encoding.ASCII.GetBytes("chart");
+        byte[] containerBytes = BuildSyntheticSngPkg(
+            [
+                ("notes.mid", BuildRbMidiWithVenueTrack()),
+                ("notes.chart", chartBytes),
+                ("song.opus", [0x01, 0x02, 0x03]),
+            ]);
+
+        SngPackage package = SngPackageReader.Read(containerBytes);
+        IReadOnlyList<SngChartContent> charts = SngMidiExtractor.ExtractCloneHeroCharts(package, containerBytes);
+
+        Assert.Equal(2, charts.Count);
+        Assert.Contains(charts, chart => string.Equals(chart.FileName, "notes.mid", StringComparison.Ordinal));
+        Assert.Contains(charts, chart => string.Equals(chart.FileName, "notes.chart", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ExtractCloneHeroCharts_WhenOnlyNotesChartPresent_ReturnsChartPayload()
     {
         byte[] chartBytes = Encoding.ASCII.GetBytes("chart");
         byte[] containerBytes = BuildSyntheticSngPkg(
@@ -42,14 +62,15 @@ public sealed class SngMidiExtractorTests
             ]);
 
         SngPackage package = SngPackageReader.Read(containerBytes);
-        SngChartContent extracted = SngMidiExtractor.ExtractCloneHeroChart(package, containerBytes);
+        IReadOnlyList<SngChartContent> charts = SngMidiExtractor.ExtractCloneHeroCharts(package, containerBytes);
+        SngChartContent extracted = Assert.Single(charts);
 
         Assert.Equal("notes.chart", extracted.FileName);
         Assert.Equal(chartBytes, extracted.Bytes);
     }
 
     [Fact]
-    public void ExtractCloneHeroChart_WhenNotesMidIsNonStandard_PassesBytesThrough()
+    public void ExtractCloneHeroCharts_WhenNotesMidIsNonStandard_PassesBytesThrough()
     {
         byte[] nonStandardBytes = Encoding.ASCII.GetBytes("NOT-A-STANDARD-MIDI");
         byte[] containerBytes = BuildSyntheticSngPkg(
@@ -59,14 +80,15 @@ public sealed class SngMidiExtractorTests
             ]);
 
         SngPackage package = SngPackageReader.Read(containerBytes);
-        SngChartContent extracted = SngMidiExtractor.ExtractCloneHeroChart(package, containerBytes);
+        IReadOnlyList<SngChartContent> charts = SngMidiExtractor.ExtractCloneHeroCharts(package, containerBytes);
+        SngChartContent extracted = Assert.Single(charts);
 
         Assert.Equal("notes.mid", extracted.FileName);
         Assert.Equal(nonStandardBytes, extracted.Bytes);
     }
 
     [Fact]
-    public void ExtractCloneHeroChart_RealFixtureWithNotesMid_ParsesAndConverts()
+    public void ExtractCloneHeroCharts_RealFixtureWithNotesMid_ParsesAndConverts()
     {
         if (!File.Exists(MidiFixturePath))
         {
@@ -75,9 +97,9 @@ public sealed class SngMidiExtractorTests
 
         byte[] containerBytes = File.ReadAllBytes(MidiFixturePath);
         SngPackage package = SngPackageReader.Read(containerBytes);
-        SngChartContent converted = SngMidiExtractor.ExtractCloneHeroChart(package, containerBytes);
+        IReadOnlyList<SngChartContent> charts = SngMidiExtractor.ExtractCloneHeroCharts(package, containerBytes);
+        SngChartContent converted = charts.Single(chart => string.Equals(chart.FileName, "notes.mid", StringComparison.Ordinal));
 
-        Assert.Equal("notes.mid", converted.FileName);
         Assert.True(converted.Bytes.Length >= 14);
         Assert.Equal((byte)'M', converted.Bytes[0]);
         Assert.Equal((byte)'T', converted.Bytes[1]);

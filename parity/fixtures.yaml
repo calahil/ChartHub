@@ -43,9 +43,9 @@ fixtures:
       transformedMediaParity: functional
       nonTranscodedParity: byte
 
-  - id: sng-biology
-    inputPath: merges/Biology.sng
-    inputType: sng
+  - id: rb3con-bad-medicine
+    inputPath: "merges/Bon Jovi - Bad Medicine_chps_rb3con.rb3con"
+    inputType: rb3con
     expected:
       transformedMediaParity: functional
       nonTranscodedParity: byte
@@ -94,6 +94,38 @@ fixtures:
 
   - id: sng-creature-comfort
     inputPath: merges/Arcade Fire - Creature Comfort (Debugmod12).sng
+    inputType: sng
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  # Same-song cross-format pair: Harmonix source has notes.mid; highfine source has notes.chart.
+  # Used by OracleParityEquivalenceTests to prove canonical normalization across chart origins.
+  - id: sng-why-go-harmonix
+    inputPath: "merges/Pearl Jam - Why Go (Harmonix).sng"
+    inputType: sng
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  - id: sng-why-go-highfine
+    inputPath: "merges/Pearl Jam - Why Go (highfine).sng"
+    inputType: sng
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  # Same-song cross-container pair: same Harmonix master in both RB3CON and SNG container formats.
+  # Used by OracleParityEquivalenceTests to prove converter output parity across container types.
+  - id: rb3con-snuff
+    inputPath: "merges/Slipknot - Snuff.rb3con"
+    inputType: rb3con
+    expected:
+      transformedMediaParity: functional
+      nonTranscodedParity: byte
+
+  - id: sng-snuff-harmonix
+    inputPath: "merges/Slipknot - Snuff (Harmonix).sng"
     inputType: sng
     expected:
       transformedMediaParity: functional

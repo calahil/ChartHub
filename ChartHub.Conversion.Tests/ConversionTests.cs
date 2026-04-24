@@ -131,6 +131,10 @@ public sealed class StfsReaderTests
 
 public sealed class ConversionServiceRoutingTests
 {
+    private static readonly string SampleRb3ConPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../merges/Ready to Start-e99c44e9-43a5-4c54-aa86-4cffb56bb215.rb3con"));
+
     private static readonly string NotesMidSngPath =
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
             "../../../../../merges/Pearl Jam - Yellow Ledbetter (farottone).sng"));
@@ -193,6 +197,44 @@ public sealed class ConversionServiceRoutingTests
             Assert.False(File.Exists(Path.Combine(result.OutputDirectory, "notes.mid")));
             Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")));
             Assert.True(Directory.EnumerateFiles(result.OutputDirectory, "*.opus", SearchOption.TopDirectoryOnly).Any());
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConvertAsync_Rb3ConInput_ProducesInstrumentStemAudio()
+    {
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-rb3con-route-test-{Guid.NewGuid():N}");
+
+        try
+        {
+            if (!File.Exists(SampleRb3ConPath))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(outputRoot);
+
+            var service = new ConversionService();
+            ConversionResult result = await service.ConvertAsync(SampleRb3ConPath, outputRoot);
+
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ogg")));
+
+            string[] stems = Directory
+                .EnumerateFiles(result.OutputDirectory, "*.wav", SearchOption.TopDirectoryOnly)
+                .Select(Path.GetFileName)
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name!)
+                .Where(name => !string.Equals(name, "song.wav", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+            Assert.True(stems.Length > 0, "Expected at least one instrument stem WAV generated from RB3CON channel mapping.");
         }
         finally
         {

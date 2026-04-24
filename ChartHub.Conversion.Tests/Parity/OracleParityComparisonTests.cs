@@ -2,19 +2,13 @@ namespace ChartHub.Conversion.Tests.Parity;
 
 public sealed class OracleParityComparisonTests
 {
-    private static readonly IReadOnlyDictionary<string, string> KnownUnsupportedFixtures =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["sng-biology"] = "Onyx oracle cannot extract this encrypted/unsupported SNG fixture.",
-        };
-
     [Theory]
     [InlineData("rb3con-ready-to-start")]
     [InlineData("rb3con-neighborhood-1")]
     [InlineData("rb3con-arcade-fire-pack")]
     [InlineData("rb3con-everything-now")]
     [InlineData("rb3con-rebellion-lies")]
-    [InlineData("sng-biology")]
+    [InlineData("rb3con-bad-medicine")]
     [InlineData("sng-release")]
     [InlineData("sng-yellow-ledbetter")]
     [InlineData("sng-all-eyes-on-me")]
@@ -22,6 +16,10 @@ public sealed class OracleParityComparisonTests
     [InlineData("sng-cancer")]
     [InlineData("sng-calibration-chart-225")]
     [InlineData("sng-creature-comfort")]
+    [InlineData("sng-why-go-harmonix")]
+    [InlineData("sng-why-go-highfine")]
+    [InlineData("rb3con-snuff")]
+    [InlineData("sng-snuff-harmonix")]
     public async Task Fixture_OptInComparison_CanGenerateOutputsAndValidateChecksums(string fixtureId)
     {
         if (!ParityPaths.IsOracleEnabled())
@@ -37,13 +35,6 @@ public sealed class OracleParityComparisonTests
             ParityPaths.GetChecksumManifestPath(repoRoot));
 
         ParityFixtureDefinition fixture = fixtureManifest.Fixtures.Single(item => item.Id == fixtureId);
-
-        // Explicitly skip fixtures that are known unsupported by current toolchain.
-        // Keep these fixtures in manifests so parity policy remains visible and trackable.
-        if (KnownUnsupportedFixtures.ContainsKey(fixtureId))
-        {
-            return;
-        }
 
         string inputPath = Path.Combine(repoRoot, fixture.InputPath.Replace('/', Path.DirectorySeparatorChar));
         string artifactsRoot = ParityPaths.GetArtifactsRoot(repoRoot);

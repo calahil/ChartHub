@@ -7,8 +7,10 @@ namespace ChartHub.Conversion.Sng;
 /// </summary>
 internal static class SngMidiExtractor
 {
-    internal static SngChartContent ExtractCloneHeroChart(SngPackage package, byte[] containerBytes)
+    internal static IReadOnlyList<SngChartContent> ExtractCloneHeroCharts(SngPackage package, byte[] containerBytes)
     {
+        List<SngChartContent> charts = [];
+
         if (SngPackageReader.TryFindEntry(package, "notes.mid", out SngFileEntry? midiEntry)
             && midiEntry != null)
         {
@@ -16,21 +18,24 @@ internal static class SngMidiExtractor
 
             // Some fan-made SNG packages ship a non-RB-standard notes.mid payload.
             // In that case preserve the payload rather than failing conversion.
-            if (!StartsWithMidiHeader(midiBytes))
-            {
-                return new SngChartContent("notes.mid", midiBytes);
-            }
-
-            return new SngChartContent("notes.mid", RbMidiConverter.Convert(midiBytes));
+            byte[] canonicalMidi = StartsWithMidiHeader(midiBytes)
+                ? RbMidiConverter.Convert(midiBytes)
+                : midiBytes;
+            charts.Add(new SngChartContent("notes.mid", canonicalMidi));
         }
 
         if (SngPackageReader.TryFindEntry(package, "notes.chart", out SngFileEntry? chartEntry)
             && chartEntry != null)
         {
-            return new SngChartContent("notes.chart", SngPackageReader.ReadFileData(containerBytes, chartEntry));
+            charts.Add(new SngChartContent("notes.chart", SngPackageReader.ReadFileData(containerBytes, chartEntry)));
         }
 
-        throw new InvalidDataException("No notes.mid or notes.chart entry found in SNG package.");
+        if (charts.Count == 0)
+        {
+            throw new InvalidDataException("No notes.mid or notes.chart entry found in SNG package.");
+        }
+
+        return charts;
     }
 
     private static bool StartsWithMidiHeader(ReadOnlySpan<byte> bytes)

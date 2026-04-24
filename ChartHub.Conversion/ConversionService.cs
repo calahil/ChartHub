@@ -95,8 +95,11 @@ public sealed class ConversionService : IConversionService
 
         try
         {
-            SngChartContent chart = SngMidiExtractor.ExtractCloneHeroChart(package, containerBytes);
-            await File.WriteAllBytesAsync(Path.Combine(songDir, chart.FileName), chart.Bytes, cancellationToken).ConfigureAwait(false);
+            IReadOnlyList<SngChartContent> charts = SngMidiExtractor.ExtractCloneHeroCharts(package, containerBytes);
+            foreach (SngChartContent chart in charts)
+            {
+                await File.WriteAllBytesAsync(Path.Combine(songDir, chart.FileName), chart.Bytes, cancellationToken).ConfigureAwait(false);
+            }
 
             await SngAudioExtractor.ExtractAsync(package, containerBytes, songDir, cancellationToken).ConfigureAwait(false);
 

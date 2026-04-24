@@ -396,3 +396,4 @@ merges/*
 .parity-artifacts/
 /site/
 scripts/delete-workflow-runs.sh
+onyx-source/*
