@@ -153,7 +153,10 @@ public sealed record ChartHubServerCreateDownloadJobRequest(
     string Source,
     string SourceId,
     string DisplayName,
-    string SourceUrl);
+    string SourceUrl,
+    string? RequestedArtist = null,
+    string? RequestedTitle = null,
+    string? RequestedCharter = null);
 
 public sealed record ChartHubServerDownloadJobStatus(
     string Code,

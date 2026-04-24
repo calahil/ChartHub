@@ -62,20 +62,7 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
     public bool HasIngestionQueueItems => IngestionQueue.Count > 0;
     public bool ShowQueueEmptyState => !HasIngestionQueueItems;
 
-    public IReadOnlyList<string> QueueStateFilters { get; } =
-    [
-        "All",
-        nameof(IngestionState.Queued),
-        nameof(IngestionState.ResolvingSource),
-        nameof(IngestionState.Downloading),
-        nameof(IngestionState.Downloaded),
-        nameof(IngestionState.Staged),
-        nameof(IngestionState.Converting),
-        nameof(IngestionState.Converted),
-        nameof(IngestionState.Installing),
-        nameof(IngestionState.Failed),
-        nameof(IngestionState.Cancelled),
-    ];
+    public IReadOnlyList<string> QueueStateFilters { get; } = ["All"];
 
     public IReadOnlyList<string> QueueSortOptions { get; } = ["Updated", "Source", "State", "Name"];
 
@@ -435,11 +422,6 @@ public class DownloadViewModel : INotifyPropertyChanged, IAsyncDisposable
         IEnumerable<ChartHubServerDownloadJobResponse> filtered = allJobs.Where(job =>
             !string.Equals(job.Stage, "Installed", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(job.Stage, "Completed", StringComparison.OrdinalIgnoreCase));
-
-        if (!string.Equals(SelectedQueueStateFilter, "All", StringComparison.OrdinalIgnoreCase))
-        {
-            filtered = filtered.Where(job => string.Equals(job.Stage, SelectedQueueStateFilter, StringComparison.OrdinalIgnoreCase));
-        }
 
         filtered = SelectedQueueSort switch
         {

@@ -14,6 +14,15 @@ public sealed class CreateDownloadJobRequest
     [MaxLength(2048)]
     public required string SourceUrl { get; init; }
 
+    [MaxLength(500)]
+    public string? RequestedArtist { get; init; }
+
+    [MaxLength(500)]
+    public string? RequestedTitle { get; init; }
+
+    [MaxLength(500)]
+    public string? RequestedCharter { get; init; }
+
     /// <summary>
     /// When true the server will auto-queue an AI drum transcription job after install
     /// for songs whose source has no drum track.
@@ -54,6 +63,12 @@ public sealed class DownloadJobResponse
     public string? SourceMd5 { get; init; }
 
     public string? SourceChartHash { get; init; }
+
+    public string? RequestedArtist { get; init; }
+
+    public string? RequestedTitle { get; init; }
+
+    public string? RequestedCharter { get; init; }
 
     public string? Error { get; init; }
 

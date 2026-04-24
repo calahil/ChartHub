@@ -313,17 +313,17 @@ public sealed class ConversionService : IConversionService
         Exception? lastError = null;
         foreach ((string path, StfsEntry entry) in candidates)
         {
+            (byte[] MoggBytes, double DurationSeconds)? selectedAttempt = null;
             foreach (bool forceConsecutive in new[] { false, true })
             {
                 try
                 {
                     byte[] moggBytes = stfs.ReadEntry(entry, forceConsecutive);
-                    IReadOnlyDictionary<string, string> stems = await extractor.ExtractStemsAsync(moggBytes, songInfo, songDir, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    bool hasInstrumentStem = stems.Keys
-                        .Any(key => !string.Equals(key, "song", StringComparison.OrdinalIgnoreCase));
-                    return new AudioExtractionOutcome(IsAudioIncomplete: !hasInstrumentStem);
+                    double durationSeconds = extractor.EstimateBackingDurationSeconds(moggBytes);
+                    if (selectedAttempt is null || durationSeconds > selectedAttempt.Value.DurationSeconds)
+                    {
+                        selectedAttempt = (moggBytes, durationSeconds);
+                    }
                 }
                 catch (InvalidDataException ex)
                 {
@@ -334,6 +334,19 @@ public sealed class ConversionService : IConversionService
                     lastError = ex;
                 }
             }
+
+            if (selectedAttempt is null)
+            {
+                continue;
+            }
+
+            IReadOnlyDictionary<string, string> stems = await extractor
+                .ExtractStemsAsync(selectedAttempt.Value.MoggBytes, songInfo, songDir, cancellationToken)
+                .ConfigureAwait(false);
+
+            bool hasInstrumentStem = stems.Keys
+                .Any(key => !string.Equals(key, "song", StringComparison.OrdinalIgnoreCase));
+            return new AudioExtractionOutcome(IsAudioIncomplete: !hasInstrumentStem);
         }
 
         throw new InvalidDataException(

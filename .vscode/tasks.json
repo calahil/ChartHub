@@ -174,7 +174,7 @@
             "type": "shell",
             "args": [
                 "-lc",
-                "dotnet build ${workspaceFolder}/ChartHub/ChartHub.csproj -t:Run -c Debug -p:EnableAndroid=true -f net10.0-android -p:Device=emulator-5554 -p:RuntimeIdentifier=android-x64 -p:EmbedAssembliesIntoApk=true -p:AndroidAttachDebugger=true -p:AndroidSdbHostPort=10001 -p:AndroidSdbTargetPort=10001 -p:AndroidSdkDirectory=${HOME}/Android/Sdk"
+                "dotnet build ${workspaceFolder}/ChartHub/ChartHub.csproj -t:Run -c Debug -p:EnableAndroid=true -f net10.0-android -p:Device=emulator-5554 -p:RuntimeIdentifier=android-x64 -p:EmbedAssembliesIntoApk=true -p:AndroidAttachDebugger=true -p:AndroidSdbHostPort=10001 -p:AndroidSdbTargetPort=10001 -p:AndroidSdkDirectory=${HOME}/Android/Sdk -p:AndroidKeyStore=true -p:AndroidSigningKeyAlias=androiddebugkey -p:AndroidSigningKeyPass=android -p:AndroidSigningStorePass=android"
             ],
             "problemMatcher": "$msCompile",
             "dependsOn": [
@@ -203,23 +203,11 @@
         },
         {
             "label": "run-debug-android-phone",
-            "command": "dotnet",
+            "command": "bash",
             "type": "shell",
             "args": [
-                "build",
-                "${workspaceFolder}/ChartHub/ChartHub.csproj",
-                "-t:Run",
-                "-c",
-                "Debug",
-                "-p:EnableAndroid=true",
-                "-f",
-                "net10.0-android",
-                "-p:Device=R5CY10G7DWP",
-                "-p:RuntimeIdentifier=android-arm64",
-                "-p:AndroidAttachDebugger=true",
-                "-p:AndroidSdbHostPort=10002",
-                "-p:AndroidSdbTargetPort=10002",
-                "-p:AndroidSdkDirectory=${env:HOME}/Android/Sdk"
+                "-lc",
+                "set -e && cd ${workspaceFolder} && dotnet build ChartHub/ChartHub.csproj -c Debug -f net10.0-android -p:RuntimeIdentifier=android-arm64 -p:AndroidKeyStore=true -p:AndroidSigningKeyAlias=androiddebugkey -p:AndroidSigningKeyPass=android -p:AndroidSigningStorePass=android && ${HOME}/Android/Sdk/platform-tools/adb -s R5CY10G7DWP install -r ChartHub/bin/Debug/net10.0-android/android-arm64/com.calahilstudios.charthub-Signed.apk && ${HOME}/Android/Sdk/platform-tools/adb -s R5CY10G7DWP shell am start -W -n com.calahilstudios.charthub/crc64921bd654f26924bb.MainActivity && echo 'App launched. Debugger would connect via port 10002'"
             ],
             "problemMatcher": "$msCompile",
             "group": "test"

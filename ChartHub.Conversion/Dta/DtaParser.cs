@@ -227,16 +227,16 @@ internal static class DtaParser
             switch (key)
             {
                 case "name":
-                    title = UnquoteString(value.Atom ?? value.Children?.FirstOrDefault()?.Atom ?? string.Empty);
+                    title = UnquoteString(ExtractFirstAtom(value));
                     break;
 
                 case "artist":
-                    artist = UnquoteString(value.Atom ?? value.Children?.FirstOrDefault()?.Atom ?? string.Empty);
+                    artist = UnquoteString(ExtractFirstAtom(value));
                     break;
 
                 case "charter":
                 case "author":
-                    charter = UnquoteString(value.Atom ?? value.Children?.FirstOrDefault()?.Atom ?? string.Empty);
+                    charter = UnquoteString(ExtractFirstAtom(value));
                     break;
 
                 case "song":
@@ -365,6 +365,37 @@ internal static class DtaParser
         }
 
         return s;
+    }
+
+    private static string ExtractFirstAtom(DtaNode node)
+    {
+        if (!string.IsNullOrWhiteSpace(node.Atom))
+        {
+            return node.Atom;
+        }
+
+        if (!node.IsList || node.Children is null)
+        {
+            return string.Empty;
+        }
+
+        int startIndex = 0;
+        if (node.Children.Count > 1 && !string.IsNullOrWhiteSpace(node.Children[0].Atom))
+        {
+            // Treat list as a key/value tuple and prefer value nodes over the key atom.
+            startIndex = 1;
+        }
+
+        for (int i = startIndex; i < node.Children.Count; i++)
+        {
+            string value = ExtractFirstAtom(node.Children[i]);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return string.Empty;
     }
 
     private static int ParseInt(string? s)

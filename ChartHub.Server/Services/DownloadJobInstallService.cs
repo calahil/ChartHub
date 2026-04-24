@@ -104,9 +104,9 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
                 ServerInstallFileType.Zip or ServerInstallFileType.Rar or ServerInstallFileType.SevenZip
                     => await InstallArchiveAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
                 ServerInstallFileType.Con
-                    => await InstallConAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
+                    => await InstallConAsync(job, stagedPath, source, cancellationToken).ConfigureAwait(false),
                 ServerInstallFileType.Sng
-                    => await InstallSngAsync(job.JobId, stagedPath, source, cancellationToken).ConfigureAwait(false),
+                    => await InstallSngAsync(job, stagedPath, source, cancellationToken).ConfigureAwait(false),
                 ServerInstallFileType.EncryptedSng
                     => throw new InvalidOperationException("SNG artifact appears encrypted or uses an unsupported official variant."),
                 _ => throw new InvalidOperationException("Unsupported install artifact format."),
@@ -166,8 +166,9 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         }
     }
 
-    private async Task<ServerRehomeInstallResult> InstallConAsync(Guid jobId, string artifactPath, string source, CancellationToken cancellationToken)
+    private async Task<ServerRehomeInstallResult> InstallConAsync(DownloadJobResponse job, string artifactPath, string source, CancellationToken cancellationToken)
     {
+        Guid jobId = job.JobId;
         InstallLog.OnyxInstallStarted(_logger, artifactPath, source);
         _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2108), nameof(DownloadJobInstallService),
             $"CON install started for '{artifactPath}', source '{source}'.", null);
@@ -175,7 +176,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         string outputRoot = Path.Combine(_stagingDir, "con", jobId.ToString("N"));
         Directory.CreateDirectory(outputRoot);
         ConversionResult result = await _conversionService.ConvertAsync(artifactPath, outputRoot, cancellationToken).ConfigureAwait(false);
-        ServerSongMetadata serverMetadata = new(result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
+        ServerSongMetadata serverMetadata = BuildFallbackMetadata(job, result.Metadata);
         LogConversionStatuses(jobId, result.Statuses);
 
         InstallLog.OnyxInstallCompleted(_logger, result.OutputDirectory, result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
@@ -192,8 +193,9 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
             result.Statuses).ConfigureAwait(false);
     }
 
-    private async Task<ServerRehomeInstallResult> InstallSngAsync(Guid jobId, string artifactPath, string source, CancellationToken cancellationToken)
+    private async Task<ServerRehomeInstallResult> InstallSngAsync(DownloadJobResponse job, string artifactPath, string source, CancellationToken cancellationToken)
     {
+        Guid jobId = job.JobId;
         InstallLog.SngInstallStarted(_logger, artifactPath, source);
         _jobLogSink.Add(jobId, LogLevel.Information, new EventId(2111), nameof(DownloadJobInstallService),
             $"SNG install started for '{artifactPath}', source '{source}'.", null);
@@ -201,7 +203,7 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         string outputRoot = Path.Combine(_stagingDir, "sng", jobId.ToString("N"));
         Directory.CreateDirectory(outputRoot);
         ConversionResult result = await _conversionService.ConvertAsync(artifactPath, outputRoot, cancellationToken).ConfigureAwait(false);
-        ServerSongMetadata serverMetadata = new(result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
+        ServerSongMetadata serverMetadata = BuildFallbackMetadata(job, result.Metadata);
         LogConversionStatuses(jobId, result.Statuses);
 
         InstallLog.SngInstallCompleted(_logger, result.OutputDirectory, result.Metadata.Artist, result.Metadata.Title, result.Metadata.Charter);
@@ -216,6 +218,33 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
             cancellationToken,
             serverMetadata,
             result.Statuses).ConfigureAwait(false);
+    }
+
+    private static ServerSongMetadata BuildFallbackMetadata(DownloadJobResponse job, ConversionMetadata metadata)
+    {
+        return new ServerSongMetadata(
+            ResolveFallbackValue(metadata.Artist, job.RequestedArtist, "Unknown Artist"),
+            ResolveFallbackValue(metadata.Title, job.RequestedTitle, "Unknown Song"),
+            ResolveFallbackValue(metadata.Charter, job.RequestedCharter, "Unknown Charter"));
+    }
+
+    private static string ResolveFallbackValue(string? primary, string? fallback, string defaultValue)
+    {
+        if (!string.IsNullOrWhiteSpace(primary)
+            && !string.Equals(primary, defaultValue, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(primary, "Unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            return primary.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(fallback)
+            && !string.Equals(fallback, defaultValue, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(fallback, "Unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            return fallback.Trim();
+        }
+
+        return defaultValue;
     }
 
     private Task<ServerRehomeInstallResult> RehomeInstalledDirectoryAsync(
@@ -238,9 +267,10 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
             .EnumerateFiles(currentDirectory, "*", SearchOption.AllDirectories)
             .FirstOrDefault(path => Path.GetFileName(path).Equals("song.ini", StringComparison.OrdinalIgnoreCase));
 
-        ServerSongMetadata metadata = songIniPath is not null
+        ServerSongMetadata parsedMetadata = songIniPath is not null
             ? _songIniParser.ParseFromSongIni(songIniPath)
-            : fallbackMetadata ?? new ServerSongMetadata("Unknown Artist", fallbackTitle ?? "Unknown Song", "Unknown Charter");
+            : new ServerSongMetadata("Unknown Artist", fallbackTitle ?? "Unknown Song", "Unknown Charter");
+        ServerSongMetadata metadata = MergeMetadataWithFallback(parsedMetadata, fallbackMetadata);
 
         // If the archive had a top-level subdirectory, song.ini will be found inside it rather than
         // directly in the staging workspace root. Move only the song.ini's parent so that extra
@@ -283,6 +313,19 @@ public sealed partial class DownloadJobInstallService : IDownloadJobInstallServi
         }
 
         return Task.FromResult(new ServerRehomeInstallResult(layout.FullPath, layout.RelativePath, metadata, statuses ?? []));
+    }
+
+    private static ServerSongMetadata MergeMetadataWithFallback(ServerSongMetadata primary, ServerSongMetadata? fallback)
+    {
+        if (fallback is null)
+        {
+            return primary;
+        }
+
+        return new ServerSongMetadata(
+            ResolveFallbackValue(primary.Artist, fallback.Artist, "Unknown Artist"),
+            ResolveFallbackValue(primary.Title, fallback.Title, "Unknown Song"),
+            ResolveFallbackValue(primary.Charter, fallback.Charter, "Unknown Charter"));
     }
 
     private void LogConversionStatuses(Guid jobId, IReadOnlyList<ConversionStatus>? statuses)

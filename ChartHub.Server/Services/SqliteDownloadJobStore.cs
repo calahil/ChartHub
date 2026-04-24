@@ -106,6 +106,9 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     charter,
                     source_md5,
                     source_chart_hash,
+                    requested_artist,
+                    requested_title,
+                    requested_charter,
                     installed_relative_path,
                     drum_gen_requested,
                     created_at_utc,
@@ -124,6 +127,9 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     NULL,
                     NULL,
                     NULL,
+                    $requestedArtist,
+                    $requestedTitle,
+                    $requestedCharter,
                     NULL,
                     $drumGenRequested,
                     $createdAtUtc,
@@ -135,6 +141,9 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             command.Parameters.AddWithValue("$sourceId", request.SourceId);
             command.Parameters.AddWithValue("$displayName", request.DisplayName);
             command.Parameters.AddWithValue("$sourceUrl", request.SourceUrl);
+            command.Parameters.AddWithValue("$requestedArtist", DbValueOrNull(request.RequestedArtist));
+            command.Parameters.AddWithValue("$requestedTitle", DbValueOrNull(request.RequestedTitle));
+            command.Parameters.AddWithValue("$requestedCharter", DbValueOrNull(request.RequestedCharter));
             command.Parameters.AddWithValue("$stage", "Queued");
             command.Parameters.AddWithValue("$progressPercent", 0d);
             command.Parameters.AddWithValue("$drumGenRequested", request.DrumGenRequested ? 1 : 0);
@@ -170,6 +179,9 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     charter,
                     source_md5,
                     source_chart_hash,
+                    requested_artist,
+                    requested_title,
+                    requested_charter,
                     error,
                     created_at_utc,
                     updated_at_utc,
@@ -215,6 +227,9 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     charter,
                     source_md5,
                     source_chart_hash,
+                    requested_artist,
+                    requested_title,
+                    requested_charter,
                     error,
                     created_at_utc,
                     updated_at_utc,
@@ -311,6 +326,9 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     charter,
                     source_md5,
                     source_chart_hash,
+                    requested_artist,
+                    requested_title,
+                    requested_charter,
                     error,
                     created_at_utc,
                     updated_at_utc,
@@ -425,6 +443,9 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     charter,
                     source_md5,
                     source_chart_hash,
+                                        requested_artist,
+                                        requested_title,
+                                        requested_charter,
                     error,
                     created_at_utc,
                     updated_at_utc,
@@ -623,6 +644,9 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
                     charter TEXT NULL,
                     source_md5 TEXT NULL,
                     source_chart_hash TEXT NULL,
+                    requested_artist TEXT NULL,
+                    requested_title TEXT NULL,
+                    requested_charter TEXT NULL,
                     conversion_statuses_json TEXT NULL,
                     error TEXT NULL,
                     created_at_utc TEXT NOT NULL,
@@ -663,6 +687,9 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             EnsureColumnExists(connection, "charter", "TEXT NULL");
             EnsureColumnExists(connection, "source_md5", "TEXT NULL");
             EnsureColumnExists(connection, "source_chart_hash", "TEXT NULL");
+            EnsureColumnExists(connection, "requested_artist", "TEXT NULL");
+            EnsureColumnExists(connection, "requested_title", "TEXT NULL");
+            EnsureColumnExists(connection, "requested_charter", "TEXT NULL");
             EnsureColumnExists(connection, "conversion_statuses_json", "TEXT NULL");
             EnsureColumnExists(connection, "file_type", "TEXT NULL");
             EnsureColumnExists(connection, "drum_gen_requested", "INTEGER NOT NULL DEFAULT 0");
@@ -769,12 +796,15 @@ public sealed class SqliteDownloadJobStore : IDownloadJobStore
             Charter = reader.IsDBNull(13) ? null : reader.GetString(13),
             SourceMd5 = reader.IsDBNull(14) ? null : reader.GetString(14),
             SourceChartHash = reader.IsDBNull(15) ? null : reader.GetString(15),
-            Error = reader.IsDBNull(16) ? null : reader.GetString(16),
-            CreatedAtUtc = DateTimeOffset.Parse(reader.GetString(17)),
-            UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(18)),
-            FileType = reader.FieldCount > 19 && !reader.IsDBNull(19) ? reader.GetString(19) : null,
-            DrumGenRequested = reader.FieldCount > 20 && reader.GetInt32(20) != 0,
-            ConversionStatuses = reader.FieldCount > 21 ? DeserializeStatuses(reader.IsDBNull(21) ? null : reader.GetString(21)) : [],
+            RequestedArtist = reader.IsDBNull(16) ? null : reader.GetString(16),
+            RequestedTitle = reader.IsDBNull(17) ? null : reader.GetString(17),
+            RequestedCharter = reader.IsDBNull(18) ? null : reader.GetString(18),
+            Error = reader.IsDBNull(19) ? null : reader.GetString(19),
+            CreatedAtUtc = DateTimeOffset.Parse(reader.GetString(20)),
+            UpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(21)),
+            FileType = reader.FieldCount > 22 && !reader.IsDBNull(22) ? reader.GetString(22) : null,
+            DrumGenRequested = reader.FieldCount > 23 && reader.GetInt32(23) != 0,
+            ConversionStatuses = reader.FieldCount > 24 ? DeserializeStatuses(reader.IsDBNull(24) ? null : reader.GetString(24)) : [],
         };
     }
 

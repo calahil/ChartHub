@@ -723,7 +723,10 @@ public sealed class EncoreViewModel : INotifyPropertyChanged
             Source: LibrarySourceNames.Encore,
             SourceId: selected.SourceId,
             DisplayName: fileName,
-            SourceUrl: selected.DownloadUrl);
+            SourceUrl: selected.DownloadUrl,
+            RequestedArtist: selected.Artist,
+            RequestedTitle: selected.Name,
+            RequestedCharter: selected.Charter);
 
         try
         {

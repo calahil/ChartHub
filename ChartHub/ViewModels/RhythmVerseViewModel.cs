@@ -609,7 +609,10 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
             Source: "RhythmVerse",
             SourceId: pendingJob.SourceId,
             DisplayName: pendingJob.DisplayName,
-            SourceUrl: pendingJob.SourceUrl);
+            SourceUrl: pendingJob.SourceUrl,
+            RequestedArtist: song.Artist,
+            RequestedTitle: song.Title,
+            RequestedCharter: song.Author?.Shortname ?? song.Author?.Name);
 
         try
         {

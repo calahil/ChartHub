@@ -1106,6 +1106,22 @@ public sealed class DtaParserTests
         DtaSongInfo info = DtaParser.Parse(System.Text.Encoding.Latin1.GetBytes(SampleDta));
         Assert.Equal(10, info.TotalChannels);
     }
+
+    [Fact]
+    public void Parse_WhenAuthorValueIsNestedList_ExtractsCharter()
+    {
+        const string nestedAuthorDta = """
+            ('Broke'
+              ('name' "Broke")
+              ('artist' "Modest Mouse")
+              ('author' ('name' "kamotch"))
+              ('song' ('name' "songs/broke/broke"))
+            )
+            """;
+
+        DtaSongInfo info = DtaParser.Parse(System.Text.Encoding.Latin1.GetBytes(nestedAuthorDta));
+        Assert.Equal("kamotch", info.Charter);
+    }
 }
 
 /// <summary>Unit tests for <see cref="RbMidiConverter"/>.</summary>

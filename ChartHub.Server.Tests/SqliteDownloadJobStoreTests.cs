@@ -162,6 +162,28 @@ public sealed class SqliteDownloadJobStoreTests : IDisposable
     }
 
     [Fact]
+    public void CreatePersistsRequestedMetadataHints()
+    {
+        SqliteDownloadJobStore sut = BuildStore();
+        DownloadJobResponse created = sut.Create(new CreateDownloadJobRequest
+        {
+            Source = "rhythmverse",
+            SourceId = "abc",
+            DisplayName = "Track",
+            SourceUrl = "https://example.com/track.zip",
+            RequestedArtist = "Modest Mouse",
+            RequestedTitle = "Broke",
+            RequestedCharter = "kamotch",
+        });
+
+        Assert.True(sut.TryGet(created.JobId, out DownloadJobResponse? stored));
+        Assert.NotNull(stored);
+        Assert.Equal("Modest Mouse", stored!.RequestedArtist);
+        Assert.Equal("Broke", stored.RequestedTitle);
+        Assert.Equal("kamotch", stored.RequestedCharter);
+    }
+
+    [Fact]
     public void EnsureSchemaMigratesLegacyStagedAndCompletedStages()
     {
         Directory.CreateDirectory(_tempRoot);

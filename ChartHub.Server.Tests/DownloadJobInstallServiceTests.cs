@@ -261,6 +261,31 @@ public sealed class DownloadJobInstallServiceTests
             && entry.EventId == 2113);
     }
 
+    [Fact]
+    public async Task InstallJobConFallsBackToRequestedMetadataWhenConversionReturnsUnknown()
+    {
+        using var env = new TempEnvironment();
+
+        string conPath = Path.Combine(env.DownloadsDir, "song.rb3con");
+        await File.WriteAllBytesAsync(conPath, [0x43, 0x4F, 0x4E, 0x20]);
+
+        DownloadJobInstallService sut = env.BuildService(
+            fileType: ServerInstallFileType.Con,
+            conversionService: new StubConversionService(metadata: new ConversionMetadata("Unknown Artist", "Unknown Song", "Unknown")));
+
+        DownloadJobResponse job = MakeJob(
+            downloadedPath: conPath,
+            requestedArtist: "Modest Mouse",
+            requestedTitle: "Broke",
+            requestedCharter: "kamotch");
+
+        DownloadJobInstallResult result = await sut.InstallJobAsync(job);
+
+        Assert.Equal("Modest Mouse", result.Metadata.Artist);
+        Assert.Equal("Broke", result.Metadata.Title);
+        Assert.Equal("kamotch", result.Metadata.Charter);
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     // Cancellation
     // ──────────────────────────────────────────────────────────────────────────
@@ -314,7 +339,11 @@ public sealed class DownloadJobInstallServiceTests
     // Helpers
     // ──────────────────────────────────────────────────────────────────────────
 
-    private static DownloadJobResponse MakeJob(string? downloadedPath)
+    private static DownloadJobResponse MakeJob(
+        string? downloadedPath,
+        string? requestedArtist = null,
+        string? requestedTitle = null,
+        string? requestedCharter = null)
     {
         return new DownloadJobResponse
         {
@@ -326,6 +355,9 @@ public sealed class DownloadJobInstallServiceTests
             Stage = "Downloaded",
             ProgressPercent = 100,
             DownloadedPath = downloadedPath,
+            RequestedArtist = requestedArtist,
+            RequestedTitle = requestedTitle,
+            RequestedCharter = requestedCharter,
             CreatedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         };
@@ -428,21 +460,24 @@ public sealed class DownloadJobInstallServiceTests
         }
     }
 
-    private sealed class StubConversionService(IReadOnlyList<ConversionStatus>? statuses = null) : IConversionService
+    private sealed class StubConversionService(
+        IReadOnlyList<ConversionStatus>? statuses = null,
+        ConversionMetadata? metadata = null) : IConversionService
     {
         public async Task<ConversionResult> ConvertAsync(string sourcePath, string outputRoot, CancellationToken cancellationToken = default)
         {
             string songDir = Path.Combine(outputRoot, "stub-song");
             Directory.CreateDirectory(songDir);
+            ConversionMetadata finalMetadata = metadata ?? new ConversionMetadata("Stub Artist", "Stub Title", "Stub Charter");
             await File.WriteAllTextAsync(
                 Path.Combine(songDir, "song.ini"),
-                "[song]\nartist = Stub Artist\nname = Stub Title\ncharter = Stub Charter\n",
+                $"[song]\nartist = {finalMetadata.Artist}\nname = {finalMetadata.Title}\ncharter = {finalMetadata.Charter}\n",
                 cancellationToken);
             await File.WriteAllTextAsync(Path.Combine(songDir, "notes.mid"), "stub", cancellationToken);
 
             return new ConversionResult(
                 songDir,
-                new ConversionMetadata("Stub Artist", "Stub Title", "Stub Charter"),
+                finalMetadata,
                 statuses);
         }
     }
