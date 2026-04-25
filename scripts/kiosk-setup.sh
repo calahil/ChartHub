@@ -394,7 +394,15 @@ echo "    NOTE: Kiosk mode starts ChartHub.Server from start-kiosk-session.sh."
 # ---------------------------------------------------------------------------
 # 18. udev rule: grant input group read/write access to /dev/uinput
 #     Required for ChartHub.Server to create virtual gamepads via uinput.
+#     Also ensure the uinput kernel module is loaded at boot.  On Ubuntu
+#     Server (minimal) the module is not loaded by default, so /dev/uinput
+#     does not exist and UinputMouseService silently reports IsSupported=false.
 # ---------------------------------------------------------------------------
+echo "==> Loading uinput kernel module and persisting across reboots..."
+echo 'uinput' > /etc/modules-load.d/uinput.conf
+chmod 0644 /etc/modules-load.d/uinput.conf
+modprobe uinput
+
 echo "==> Installing uinput udev rule..."
 echo 'KERNEL=="uinput", GROUP="input", MODE="0660"' > /etc/udev/rules.d/99-uinput.rules
 chmod 0644 /etc/udev/rules.d/99-uinput.rules

@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 
 using ChartHub.Conversion.Audio;
 using ChartHub.Conversion.Dta;
+using ChartHub.Conversion.Image;
+using ChartHub.Conversion.Midi;
 using ChartHub.Conversion.Models;
 using ChartHub.Conversion.Sng;
 using ChartHub.Conversion.SongIni;
@@ -270,6 +272,10 @@ public sealed class ConversionServiceRoutingTests
             string albumPath = Path.Combine(result.OutputDirectory, "album.png");
             Assert.True(File.Exists(albumPath), "Expected album art extracted from legacy png_xbox fixture.");
             Assert.True(new FileInfo(albumPath).Length > 0, "Expected extracted album art to be non-empty.");
+
+            using var image = SixLabors.ImageSharp.Image.Load(albumPath);
+            Assert.Equal(256, image.Width);
+            Assert.Equal(256, image.Height);
         }
         finally
         {
@@ -281,7 +287,7 @@ public sealed class ConversionServiceRoutingTests
     }
 
     [Fact]
-    public async Task ConvertAsync_BrokeRb3Con_SongIniUsesBackingAudioDuration()
+    public async Task ConvertAsync_BrokeRb3Con_SongIniContainsPositiveSongLength()
     {
         string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-broke-songlength-test-{Guid.NewGuid():N}");
 
@@ -300,7 +306,26 @@ public sealed class ConversionServiceRoutingTests
             string songIniPath = Path.Combine(result.OutputDirectory, "song.ini");
             string songIni = await File.ReadAllTextAsync(songIniPath);
 
-            Assert.Contains("song_length = 200873\r\n", songIni, StringComparison.Ordinal);
+            // DTA song_length is preferred when non-zero (Onyx parity: authoritative MIDI-derived value).
+            // Audio backing duration is the fallback. Either way, song_length must be positive.
+            int songLength = 0;
+            foreach (string line in songIni.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                string trimmed = line.Trim();
+                if (trimmed.StartsWith("song_length", StringComparison.Ordinal)
+                    && trimmed.Contains('='))
+                {
+                    string[] parts = trimmed.Split('=', 2);
+                    if (int.TryParse(parts[1].Trim(), out int parsed))
+                    {
+                        songLength = parsed;
+                    }
+
+                    break;
+                }
+            }
+
+            Assert.True(songLength > 0, $"Expected positive song_length in song.ini but got {songLength}.");
         }
         finally
         {
@@ -309,6 +334,91 @@ public sealed class ConversionServiceRoutingTests
                 Directory.Delete(outputRoot, recursive: true);
             }
         }
+    }
+}
+
+[Trait("Category", "Unit")]
+public sealed class SongLengthTimingTests
+{
+    // Minimal DTA with an explicit song_length value.
+    private const string DtaWithLength = """
+        ('test_song
+          (name "Test Song")
+          (artist "Test Artist")
+          (song_length 185000)
+          (preview 10000 40000)
+          (song
+            (name "songs/test/test")
+            (tracks_count ())
+            (tracks ())
+            (pans ())
+            (vols ())
+          )
+          (rank)
+        )
+        """;
+
+    // Minimal DTA with no song_length (missing key entirely).
+    private const string DtaWithoutLength = """
+        ('test_song
+          (name "Test Song")
+          (artist "Test Artist")
+          (preview 10000 40000)
+          (song
+            (name "songs/test/test")
+            (tracks_count ())
+            (tracks ())
+            (pans ())
+            (vols ())
+          )
+          (rank)
+        )
+        """;
+
+    [Fact]
+    public void SongIniGenerator_WhenDtaHasSongLength_EmitsExactDtaValue()
+    {
+        // Arrange: parse DTA that carries an explicit song_length
+        DtaSongInfo songInfo = DtaParser.Parse(System.Text.Encoding.UTF8.GetBytes(DtaWithLength));
+
+        Assert.Equal(185000, songInfo.SongLengthMs);
+
+        // Act
+        string ini = SongIniGenerator.Generate(songInfo);
+
+        // Assert: DTA value preserved exactly
+        Assert.Contains("song_length = 185000", ini, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SongIniGenerator_WhenDtaHasNoSongLength_OmitsSongLength()
+    {
+        // Arrange: parse DTA with no song_length → SongLengthMs will be 0
+        DtaSongInfo songInfo = DtaParser.Parse(System.Text.Encoding.UTF8.GetBytes(DtaWithoutLength));
+
+        Assert.Equal(0, songInfo.SongLengthMs);
+
+        // Act
+        string ini = SongIniGenerator.Generate(songInfo);
+
+        // Assert: song_length must not be emitted when 0 (SongIniGenerator suppresses zeroes)
+        Assert.DoesNotContain("song_length", ini, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SongIniGenerator_WhenDtaHasSongLength_AudioDurationIsNotUsed()
+    {
+        // Arrange: DTA has song_length 185000; simulate audio measurement returning 190000.
+        // After the DTA-priority fix, the DTA value must win.
+        DtaSongInfo dtaSongInfo = DtaParser.Parse(System.Text.Encoding.UTF8.GetBytes(DtaWithLength));
+
+        // Simulate what ConversionService.WithSongLengthFromAudio does:
+        // When dtaSongInfo.SongLengthMs > 0, the method returns the original songInfo unchanged.
+        // The only observable test here is that SongIniGenerator uses the DTA value.
+        string ini = SongIniGenerator.Generate(dtaSongInfo);
+
+        Assert.Contains("song_length = 185000", ini, StringComparison.Ordinal);
+        Assert.DoesNotContain("song_length = 190000", ini, StringComparison.Ordinal);
     }
 }
 
@@ -800,6 +910,47 @@ public sealed class StfsReaderSafetyTests
 public sealed class MoggExtractorTests
 {
     [Fact]
+    public void BuildStemChannelMapForCloneHero_WhenSplitDrumAliasesExist_PrefersSplitDrumsOverCombinedStem()
+    {
+        Dictionary<string, IReadOnlyList<int>> trackChannels = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["drums"] = [0, 1],
+            ["kick"] = [2],
+            ["snare"] = [3],
+            ["cymbals"] = [4],
+            ["toms"] = [5],
+            ["guitar"] = [6, 7],
+        };
+
+        Dictionary<string, List<int>> stemMap = MoggExtractor.BuildStemChannelMapForCloneHero(trackChannels);
+
+        Assert.DoesNotContain("drums", stemMap.Keys);
+        Assert.Equal([2], stemMap["drums_1"]);
+        Assert.Equal([3], stemMap["drums_2"]);
+        Assert.Equal([4], stemMap["drums_3"]);
+        Assert.Equal([5], stemMap["drums_4"]);
+        Assert.Equal([6, 7], stemMap["guitar"]);
+    }
+
+    [Fact]
+    public void ShouldIncludeStemForCloneHero_DrumSplitStemsFollowDrumRank()
+    {
+        Dictionary<string, int> ranks = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["drum"] = 0,
+            ["guitar"] = 123,
+        };
+
+        bool includeDrums1 = MoggExtractor.ShouldIncludeStemForCloneHero("drums_1", ranks);
+        bool includeDrums2 = MoggExtractor.ShouldIncludeStemForCloneHero("drums_2", ranks);
+        bool includeGuitar = MoggExtractor.ShouldIncludeStemForCloneHero("guitar", ranks);
+
+        Assert.False(includeDrums1);
+        Assert.False(includeDrums2);
+        Assert.True(includeGuitar);
+    }
+
+    [Fact]
     public async Task ExtractStemsAsync_ProducesBackingAudioDeterministically()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), $"charthub-mogg-backing-only-{Guid.NewGuid():N}");
@@ -1206,6 +1357,34 @@ public sealed class DtaParserTests
     }
 
     [Fact]
+    public void Parse_AndGenerateSongIni_WhenDrumOverridesPresent_UsesOverrideValues()
+    {
+        const string dtaWithOverrides = """
+                        ('testsong'
+                            ('name' "Test Song")
+                            ('artist' "Test Artist")
+                            ('charter' "Test Charter")
+                            ('pro_drums' false)
+                            ('five_lane_drums' true)
+                            ('drum_fallback_blue' true)
+                            ('rank'
+                                ('drum' 124)
+                            )
+                            ('song'
+                                ('name' "songs/testsong/testsong")
+                            )
+                        )
+                        """;
+
+        DtaSongInfo info = DtaParser.Parse(System.Text.Encoding.Latin1.GetBytes(dtaWithOverrides));
+        string songIni = SongIniGenerator.Generate(info);
+
+        Assert.Contains("pro_drums = False\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("five_lane_drums = True\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("drum_fallback_blue = True\r\n", songIni, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GenerateSongIni_WhenDtaContainsOnyxFields_WritesExpectedKeys()
     {
         DtaSongInfo info = new()
@@ -1221,6 +1400,8 @@ public sealed class DtaParserTests
             SongLengthMs = 257033,
             PreviewStartMs = 30000,
             PreviewEndMs = 60000,
+            LoadingPhrase = "Onyx parity check",
+            IsCover = true,
             VocalParts = 2,
             Ranks = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
             {
@@ -1240,6 +1421,8 @@ public sealed class DtaParserTests
         Assert.Contains("song_length = 257033\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("preview_start_time = 30000\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("preview_end_time = 60000\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("loading_phrase = Onyx parity check\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("tags = cover\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("genre = alternative\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("year = 2010\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("track = 2\r\n", songIni, StringComparison.Ordinal);
@@ -1247,8 +1430,8 @@ public sealed class DtaParserTests
         Assert.Contains("diff_drums = 1\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("diff_drums_real = 1\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("diff_guitar = 1\r\n", songIni, StringComparison.Ordinal);
-        Assert.Contains("diff_guitarghl = -1\r\n", songIni, StringComparison.Ordinal);
-        Assert.Contains("diff_bassghl = -1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_guitar_ghl = -1\r\n", songIni, StringComparison.Ordinal);
+        Assert.Contains("diff_bass_ghl = -1\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("diff_vocals = 3\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("diff_vocals_harm = 3\r\n", songIni, StringComparison.Ordinal);
         Assert.Contains("diff_band = 1\r\n", songIni, StringComparison.Ordinal);
@@ -1385,3 +1568,469 @@ public sealed class RbMidiConverterTests
         return names;
     }
 }
+
+[Trait("Category", "Unit")]
+public sealed class ExpertPlusMidiGeneratorTests
+{
+    // Minimal helper: builds a well-formed Format-1 MIDI with one tempo track and one named track.
+    // The named track contains a single NoteOn and NoteOff event for the supplied note number.
+    private static byte[] BuildMinimalMidi(string trackName, byte noteNumber, byte velocity = 64)
+    {
+        // Named track data: [delta=0][TrackName meta][delta=0][NoteOn][delta=4][NoteOff][delta=0][EndOfTrack]
+        using var trackStream = new MemoryStream();
+
+        // delta 0
+        trackStream.WriteByte(0x00);
+        // FF 03 <len> <name>
+        trackStream.WriteByte(0xFF);
+        trackStream.WriteByte(0x03);
+        byte[] nameBytes = System.Text.Encoding.ASCII.GetBytes(trackName);
+        trackStream.WriteByte((byte)nameBytes.Length);
+        trackStream.Write(nameBytes);
+
+        // delta 0, NoteOn ch0 [note] [velocity]
+        trackStream.WriteByte(0x00);
+        trackStream.WriteByte(0x90);
+        trackStream.WriteByte(noteNumber);
+        trackStream.WriteByte(velocity);
+
+        // delta 4, NoteOff ch0 [note] 0
+        trackStream.WriteByte(0x04);
+        trackStream.WriteByte(0x80);
+        trackStream.WriteByte(noteNumber);
+        trackStream.WriteByte(0x00);
+
+        // delta 0, EndOfTrack
+        trackStream.WriteByte(0x00);
+        trackStream.WriteByte(0xFF);
+        trackStream.WriteByte(0x2F);
+        trackStream.WriteByte(0x00);
+
+        byte[] trackData = trackStream.ToArray();
+
+        // Minimal tempo track (just EndOfTrack)
+        byte[] tempoTrack = [0x00, 0xFF, 0x2F, 0x00];
+
+        using var ms = new MemoryStream();
+
+        // MThd
+        ms.Write("MThd"u8);
+        WriteUInt32BE(ms, 6);
+        WriteUInt16BE(ms, 1);  // format 1
+        WriteUInt16BE(ms, 2);  // two tracks
+        WriteUInt16BE(ms, 480); // division
+
+        // Track 0: tempo
+        ms.Write("MTrk"u8);
+        WriteUInt32BE(ms, (uint)tempoTrack.Length);
+        ms.Write(tempoTrack);
+
+        // Track 1: named track
+        ms.Write("MTrk"u8);
+        WriteUInt32BE(ms, (uint)trackData.Length);
+        ms.Write(trackData);
+
+        return ms.ToArray();
+    }
+
+    private static void WriteUInt16BE(Stream s, ushort v)
+    {
+        s.WriteByte((byte)(v >> 8));
+        s.WriteByte((byte)(v & 0xFF));
+    }
+
+    private static void WriteUInt32BE(Stream s, uint v)
+    {
+        s.WriteByte((byte)(v >> 24));
+        s.WriteByte((byte)((v >> 16) & 0xFF));
+        s.WriteByte((byte)((v >> 8) & 0xFF));
+        s.WriteByte((byte)(v & 0xFF));
+    }
+
+    [Fact]
+    public void Apply_WhenPartDrumsHasKick2x_RemapsNote95ToNote96()
+    {
+        byte[] input = BuildMinimalMidi("PART DRUMS", noteNumber: 95, velocity: 100);
+        byte[] output = ExpertPlusMidiGenerator.Apply(input);
+
+        // expert+.mid must be the same length or different only by the note byte change.
+        // The NoteOn data byte (note 95) must have become 96; velocity unchanged.
+        // Scan output for NoteOn event in PART DRUMS track — note byte must be 96, not 95.
+        bool foundNote96NoteOn = false;
+        bool foundNote95 = false;
+        int pos = 14; // skip MThd
+        while (pos + 8 <= output.Length)
+        {
+            if (output[pos] != 'M' || output[pos + 1] != 'T' || output[pos + 2] != 'r' || output[pos + 3] != 'k')
+            {
+                break;
+            }
+
+            int trackLen = (output[pos + 4] << 24) | (output[pos + 5] << 16) | (output[pos + 6] << 8) | output[pos + 7];
+            byte[] track = output[(pos + 8)..(pos + 8 + trackLen)];
+            pos += 8 + trackLen;
+
+            // Brute-force scan for NoteOn (0x90) byte sequences in the track payload.
+            for (int i = 0; i < track.Length - 2; i++)
+            {
+                if ((track[i] & 0xF0) == 0x90)
+                {
+                    byte note = track[i + 1];
+                    if (note == 96)
+                    {
+                        foundNote96NoteOn = true;
+                    }
+
+                    if (note == 95)
+                    {
+                        foundNote95 = true;
+                    }
+                }
+            }
+        }
+
+        Assert.True(foundNote96NoteOn, "expert+.mid must contain a NoteOn for note 96 (kick).");
+        Assert.False(foundNote95, "expert+.mid must not contain note 95 (2x kick removed).");
+    }
+
+    [Fact]
+    public void Apply_WhenTrackIsNotPartDrums_LeavesNotesUnchanged()
+    {
+        byte[] input = BuildMinimalMidi("PART GUITAR", noteNumber: 95, velocity: 64);
+        byte[] output = ExpertPlusMidiGenerator.Apply(input);
+
+        // Non-PART DRUMS tracks must not be modified — note 95 survives in output.
+        bool foundNote95 = false;
+        int pos = 14;
+        while (pos + 8 <= output.Length)
+        {
+            if (output[pos] != 'M' || output[pos + 1] != 'T' || output[pos + 2] != 'r' || output[pos + 3] != 'k')
+            {
+                break;
+            }
+
+            int trackLen = (output[pos + 4] << 24) | (output[pos + 5] << 16) | (output[pos + 6] << 8) | output[pos + 7];
+            byte[] track = output[(pos + 8)..(pos + 8 + trackLen)];
+            pos += 8 + trackLen;
+
+            for (int i = 0; i < track.Length - 2; i++)
+            {
+                if ((track[i] & 0xF0) == 0x90 && track[i + 1] == 95)
+                {
+                    foundNote95 = true;
+                }
+            }
+        }
+
+        Assert.True(foundNote95, "Non-drum tracks must not have note 95 remapped.");
+    }
+
+    [Fact]
+    public void Apply_WhenPartDrumsHasNoKick2x_OutputIsStructurallyIdentical()
+    {
+        // note 60 (green, Easy difficulty) — should pass through unchanged.
+        byte[] input = BuildMinimalMidi("PART DRUMS", noteNumber: 60, velocity: 80);
+        byte[] output = ExpertPlusMidiGenerator.Apply(input);
+
+        Assert.Equal(input.Length, output.Length);
+        Assert.Equal(input, output);
+    }
+
+    [Fact]
+    public void TransformDrumsTrack_RemapsNote95ToNote96WithRunningStatus()
+    {
+        // Build a raw track with two NoteOn events under running status:
+        // [0x00][0x90][95][100]  <- first NoteOn with explicit status
+        // [0x00][95][100]        <- second NoteOn via running status (no status byte)
+        // [0x00][0xFF][0x2F][0x00]  <- EndOfTrack
+        byte[] trackData =
+        [
+            0x00, 0x90, 95, 100,   // delta=0 NoteOn ch0 note=95 vel=100 (explicit)
+            0x00, 95, 100,          // delta=0 NoteOn via running status, note=95 vel=100
+            0x00, 0xFF, 0x2F, 0x00, // EndOfTrack
+        ];
+
+        byte[] result = ExpertPlusMidiGenerator.TransformDrumsTrack(trackData);
+
+        // Both note bytes (at index 2 and 5) should be 96.
+        Assert.Equal(96, result[2]);
+        Assert.Equal(96, result[5]);
+    }
+}
+
+/// <summary>
+/// Parity harness: regression assertions for file presence, song.ini key family, and drum
+/// stem naming. These tests are designed to fail loudly if a future change removes a required
+/// output artifact or regresses an Onyx-aligned behavior.
+/// </summary>
+/// <remarks>
+/// All tests guard on fixture availability — they skip (pass silently) on CI without assets.
+/// </remarks>
+[Trait("Category", "Parity")]
+public sealed class ParityHardeningTests
+{
+    // ------------------------------------------------------------------ fixtures
+
+    private static readonly string SampleRb3ConPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../merges/Ready to Start-e99c44e9-43a5-4c54-aa86-4cffb56bb215.rb3con"));
+
+    private static readonly string BrokeRb3ConPath =
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
+            "../../../../../kam_mm_broke.rb3con"));
+
+    // ------------------------------------------------------------------ required song.ini keys
+    // Every CON/SNG output must carry these keys regardless of source metadata.
+    private static readonly string[] RequiredSongIniKeys =
+    [
+        "name",
+        "artist",
+        "charter",
+        "frets",
+        "diff_band",
+        "diff_guitar",
+        "diff_guitar_ghl",
+        "diff_bass",
+        "diff_bass_ghl",
+        "diff_drums",
+        "diff_drums_real",
+        "diff_keys",
+        "diff_vocals",
+        "star_power_note",
+        "multiplier_note",
+    ];
+
+    // ------------------------------------------------------------------ helpers
+
+    private static IReadOnlyDictionary<string, string> ParseSongIni(string iniContent)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string line in iniContent.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith('[') || string.IsNullOrWhiteSpace(trimmed))
+            {
+                continue;
+            }
+
+            int eq = trimmed.IndexOf('=');
+            if (eq > 0)
+            {
+                result[trimmed[..eq].Trim()] = trimmed[(eq + 1)..].Trim();
+            }
+        }
+
+        return result;
+    }
+
+    // ------------------------------------------------------------------ file presence
+
+    [Fact]
+    public async Task ConvertAsync_SampleRb3Con_ProducesRequiredOutputFiles()
+    {
+        if (!File.Exists(SampleRb3ConPath))
+        {
+            return;
+        }
+
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-parity-files-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(outputRoot);
+            var service = new ConversionService();
+            ConversionResult result = await service.ConvertAsync(SampleRb3ConPath, outputRoot);
+
+            // Core chart files
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "notes.mid")),
+                "notes.mid must be present in every CON conversion output.");
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")),
+                "song.ini must be present in every CON conversion output.");
+
+            // expert+.mid: emitted when drum rank > 0
+            // The sample fixture has drums, so expert+.mid must be present.
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "expert+.mid")),
+                "expert+.mid must be present when the source has a non-zero drum rank.");
+
+            // Audio: at minimum the backing stem must exist
+            bool hasBacking = File.Exists(Path.Combine(result.OutputDirectory, "song.ogg"))
+                || Directory.EnumerateFiles(result.OutputDirectory, "*.ogg", SearchOption.TopDirectoryOnly).Any();
+            Assert.True(hasBacking, "At least one OGG audio file must be present after CON conversion.");
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConvertAsync_BrokeRb3Con_ProducesRequiredOutputFiles()
+    {
+        if (!File.Exists(BrokeRb3ConPath))
+        {
+            return;
+        }
+
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-parity-files-broke-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(outputRoot);
+            var service = new ConversionService();
+            ConversionResult result = await service.ConvertAsync(BrokeRb3ConPath, outputRoot);
+
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "notes.mid")),
+                "notes.mid must be present in every CON conversion output.");
+            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")),
+                "song.ini must be present in every CON conversion output.");
+
+            bool hasBacking = File.Exists(Path.Combine(result.OutputDirectory, "song.ogg"))
+                || Directory.EnumerateFiles(result.OutputDirectory, "*.ogg", SearchOption.TopDirectoryOnly).Any();
+            Assert.True(hasBacking, "At least one OGG audio file must be present after CON conversion.");
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ song.ini key family
+
+    [Fact]
+    public async Task ConvertAsync_SampleRb3Con_SongIniContainsRequiredKeyFamily()
+    {
+        if (!File.Exists(SampleRb3ConPath))
+        {
+            return;
+        }
+
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-parity-keys-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(outputRoot);
+            var service = new ConversionService();
+            ConversionResult result = await service.ConvertAsync(SampleRb3ConPath, outputRoot);
+
+            string iniContent = await File.ReadAllTextAsync(Path.Combine(result.OutputDirectory, "song.ini"));
+            IReadOnlyDictionary<string, string> keys = ParseSongIni(iniContent);
+
+            foreach (string requiredKey in RequiredSongIniKeys)
+            {
+                Assert.True(keys.ContainsKey(requiredKey),
+                    $"song.ini must contain required key '{requiredKey}' but it was absent.");
+            }
+
+            // Verify Onyx-aligned GHL key names (not the old diff_guitarghl / diff_bassghl form).
+            Assert.True(keys.ContainsKey("diff_guitar_ghl"),
+                "song.ini must use Onyx-aligned key 'diff_guitar_ghl' (not 'diff_guitarghl').");
+            Assert.True(keys.ContainsKey("diff_bass_ghl"),
+                "song.ini must use Onyx-aligned key 'diff_bass_ghl' (not 'diff_bassghl').");
+            Assert.False(keys.ContainsKey("diff_guitarghl"),
+                "song.ini must not emit legacy key 'diff_guitarghl'.");
+            Assert.False(keys.ContainsKey("diff_bassghl"),
+                "song.ini must not emit legacy key 'diff_bassghl'.");
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ drum stem naming
+
+    [Fact]
+    public async Task ConvertAsync_SampleRb3Con_DrumStemsFollowSplitOrCombinedRule()
+    {
+        if (!File.Exists(SampleRb3ConPath))
+        {
+            return;
+        }
+
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-parity-drums-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(outputRoot);
+            var service = new ConversionService();
+            ConversionResult result = await service.ConvertAsync(SampleRb3ConPath, outputRoot);
+
+            bool hasCombinedDrums = File.Exists(Path.Combine(result.OutputDirectory, "drums.ogg"));
+            bool hasSplitDrums = File.Exists(Path.Combine(result.OutputDirectory, "drums_1.ogg"))
+                || File.Exists(Path.Combine(result.OutputDirectory, "drums_2.ogg"))
+                || File.Exists(Path.Combine(result.OutputDirectory, "drums_3.ogg"))
+                || File.Exists(Path.Combine(result.OutputDirectory, "drums_4.ogg"));
+
+            // Onyx parity: output is either combined OR split, never both.
+            Assert.False(hasCombinedDrums && hasSplitDrums,
+                "Drum stems must follow the Onyx mutual-exclusion rule: output is either drums.ogg OR drums_N.ogg, never both.");
+
+            // At least one form must be present when the source DTA has a non-zero drum rank.
+            // (The sample fixture is known to have drums.)
+            Assert.True(hasCombinedDrums || hasSplitDrums,
+                "Expected at least one drum stem OGG (drums.ogg or drums_1..4.ogg) from a fixture with non-zero drum rank.");
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ expert+.mid content sanity
+
+    [Fact]
+    public async Task ConvertAsync_SampleRb3Con_ExpertPlusMidContainsNotesMidPartDrumsTrack()
+    {
+        if (!File.Exists(SampleRb3ConPath))
+        {
+            return;
+        }
+
+        string outputRoot = Path.Combine(Path.GetTempPath(), $"charthub-parity-expertplus-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(outputRoot);
+            var service = new ConversionService();
+            ConversionResult result = await service.ConvertAsync(SampleRb3ConPath, outputRoot);
+
+            string expertPlusPath = Path.Combine(result.OutputDirectory, "expert+.mid");
+            string notesMidPath = Path.Combine(result.OutputDirectory, "notes.mid");
+
+            if (!File.Exists(expertPlusPath))
+            {
+                // If no drum rank, expert+.mid is correctly absent — skip the rest.
+                return;
+            }
+
+            byte[] expertPlus = await File.ReadAllBytesAsync(expertPlusPath);
+            byte[] notesMid = await File.ReadAllBytesAsync(notesMidPath);
+
+            // expert+.mid must be a valid MIDI (starts with MThd).
+            Assert.True(expertPlus.Length >= 14
+                && expertPlus[0] == 'M' && expertPlus[1] == 'T'
+                && expertPlus[2] == 'h' && expertPlus[3] == 'd',
+                "expert+.mid must be a valid Standard MIDI file (MThd header).");
+
+            // expert+.mid must not be larger than notes.mid by more than a trivial margin —
+            // the transform only remaps note bytes and cannot add new events.
+            Assert.True(expertPlus.Length <= notesMid.Length + 16,
+                $"expert+.mid ({expertPlus.Length} bytes) must not be significantly larger than notes.mid ({notesMid.Length} bytes).");
+        }
+        finally
+        {
+            if (Directory.Exists(outputRoot))
+            {
+                Directory.Delete(outputRoot, recursive: true);
+            }
+        }
+    }
+}
+

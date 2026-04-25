@@ -82,7 +82,7 @@ internal sealed class MoggExtractor
             throw new InvalidDataException("Decoded MOGG audio contained no samples.");
         }
 
-        Dictionary<string, List<int>> normalisedTracks = BuildNormalisedTrackMap(songInfo.TrackChannels);
+        Dictionary<string, List<int>> normalisedTracks = BuildStemChannelMapForCloneHero(songInfo.TrackChannels);
         Dictionary<string, string> stems = new(StringComparer.OrdinalIgnoreCase);
 
         List<int> usedChannels = [];
@@ -93,7 +93,7 @@ internal sealed class MoggExtractor
                 continue;
             }
 
-            if (!ShouldIncludeStem(stem, songInfo.Ranks))
+            if (!ShouldIncludeStemForCloneHero(stem, songInfo.Ranks))
             {
                 continue;
             }
@@ -130,7 +130,7 @@ internal sealed class MoggExtractor
                     continue;
                 }
             }
-            else if (!ShouldIncludeStem(stem, songInfo.Ranks))
+            else if (!ShouldIncludeStemForCloneHero(stem, songInfo.Ranks))
             {
                 continue;
             }
@@ -159,13 +159,13 @@ internal sealed class MoggExtractor
         return stems;
     }
 
-    private static Dictionary<string, List<int>> BuildNormalisedTrackMap(IReadOnlyDictionary<string, IReadOnlyList<int>> trackChannels)
+    internal static Dictionary<string, List<int>> BuildStemChannelMapForCloneHero(IReadOnlyDictionary<string, IReadOnlyList<int>> trackChannels)
     {
         Dictionary<string, List<int>> result = new(StringComparer.OrdinalIgnoreCase);
 
         foreach ((string rawStem, IReadOnlyList<int> channels) in trackChannels)
         {
-            string stem = NormaliseStemName(rawStem);
+            string stem = NormaliseStemNameForCloneHero(rawStem);
             if (!result.TryGetValue(stem, out List<int>? list))
             {
                 list = [];
@@ -181,24 +181,36 @@ internal sealed class MoggExtractor
             }
         }
 
+        // Onyx output uses either combined drums or split drums_* outputs. If split channels are
+        // present in source metadata, prefer them and omit the combined drums stem.
+        if (HasAnySplitDrumStem(result))
+        {
+            result.Remove("drums");
+        }
+
         return result;
     }
 
-    private static string NormaliseStemName(string stem)
+    internal static string NormaliseStemNameForCloneHero(string stem)
     {
-        return stem.Trim().ToLowerInvariant() switch
+        string normalised = stem.Trim().ToLowerInvariant();
+        return normalised switch
         {
             "drum" or "drums" => "drums",
+            "drums_1" or "drum_1" or "drums1" or "drum1" or "kick" => "drums_1",
+            "drums_2" or "drum_2" or "drums2" or "drum2" or "snare" => "drums_2",
+            "drums_3" or "drum_3" or "drums3" or "drum3" or "kit" or "cymbals" => "drums_3",
+            "drums_4" or "drum_4" or "drums4" or "drum4" or "toms" => "drums_4",
             "bass" or "rhythm" => "rhythm",
             "guitar" or "guitar_coop" or "guitarcoop" => "guitar",
             "vocals" or "vocal" => "vocals",
             "keys" => "keys",
             "crowd" => "crowd",
-            _ => stem.Trim().ToLowerInvariant(),
+            _ => normalised,
         };
     }
 
-    private static bool ShouldIncludeStem(string stem, IReadOnlyDictionary<string, int> ranks)
+    internal static bool ShouldIncludeStemForCloneHero(string stem, IReadOnlyDictionary<string, int> ranks)
     {
         if (ranks.Count == 0)
         {
@@ -207,7 +219,7 @@ internal sealed class MoggExtractor
 
         return stem switch
         {
-            "drums" => HasNonZeroRank(ranks, "drum", "drums"),
+            "drums" or "drums_1" or "drums_2" or "drums_3" or "drums_4" => HasNonZeroRank(ranks, "drum", "drums"),
             "guitar" => HasNonZeroRank(ranks, "guitar", "guitar_coop", "guitarcoop"),
             "rhythm" => HasNonZeroRank(ranks, "bass", "rhythm"),
             "keys" => HasNonZeroRank(ranks, "keys"),
@@ -215,6 +227,14 @@ internal sealed class MoggExtractor
             "crowd" => true,
             _ => HasNonZeroRank(ranks, stem),
         };
+    }
+
+    private static bool HasAnySplitDrumStem(IReadOnlyDictionary<string, List<int>> tracks)
+    {
+        return tracks.ContainsKey("drums_1")
+            || tracks.ContainsKey("drums_2")
+            || tracks.ContainsKey("drums_3")
+            || tracks.ContainsKey("drums_4");
     }
 
     private static bool HasNonZeroRank(IReadOnlyDictionary<string, int> ranks, params string[] keys)

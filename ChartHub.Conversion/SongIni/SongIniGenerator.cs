@@ -34,6 +34,7 @@ internal static class SongIniGenerator
         string diffVocals = ToDifficulty(info.Ranks, "vocals", VocalDiffMap, "vocal");
         string diffVocalsHarm = info.VocalParts > 1 ? diffVocals : "-1";
         bool hasDrums = HasRank(info.Ranks, "drum", "drums");
+        bool? proDrums = info.ProDrums ?? (hasDrums ? true : null);
 
         AppendPair(sb, "name", info.Title);
         AppendPair(sb, "artist", info.Artist);
@@ -42,15 +43,17 @@ internal static class SongIniGenerator
         AppendPair(sb, "frets", info.Charter);
         AppendPair(sb, "year", info.Year);
         AppendPair(sb, "genre", FormatGenre(info.Genre));
-        AppendShown(sb, "pro_drums", hasDrums ? true : null);
+        AppendShown(sb, "pro_drums", proDrums);
         AppendPair(sb, "song_length", info.SongLengthMs > 0 ? info.SongLengthMs.ToString() : null);
         AppendPair(sb, "preview_start_time", info.PreviewStartMs > 0 ? info.PreviewStartMs.ToString() : null);
         AppendPair(sb, "preview_end_time", info.PreviewEndMs > 0 ? info.PreviewEndMs.ToString() : null);
+        AppendPair(sb, "loading_phrase", string.IsNullOrWhiteSpace(info.LoadingPhrase) ? null : info.LoadingPhrase);
+        AppendPair(sb, "tags", info.IsCover ? "cover" : null);
         AppendPair(sb, "diff_band", diffBand);
         AppendPair(sb, "diff_guitar", diffGuitar);
-        AppendPair(sb, "diff_guitarghl", "-1");
+        AppendPair(sb, "diff_guitar_ghl", "-1");
         AppendPair(sb, "diff_bass", diffBass);
-        AppendPair(sb, "diff_bassghl", "-1");
+        AppendPair(sb, "diff_bass_ghl", "-1");
         AppendPair(sb, "diff_drums", diffDrums);
         AppendPair(sb, "diff_drums_real", hasDrums ? diffDrums : "-1");
         AppendPair(sb, "diff_keys", diffKeys);
@@ -77,8 +80,8 @@ internal static class SongIniGenerator
         AppendPair(sb, "album_track", info.AlbumTrack > 0 ? info.AlbumTrack.ToString() : null);
         AppendShown(sb, "sysex_slider", false);
         AppendShown(sb, "sysex_open_bass", false);
-        AppendShown(sb, "five_lane_drums", null);
-        AppendShown(sb, "drum_fallback_blue", null);
+        AppendShown(sb, "five_lane_drums", info.FiveLaneDrums);
+        AppendShown(sb, "drum_fallback_blue", info.DrumFallbackBlue);
         return sb.ToString();
     }
 

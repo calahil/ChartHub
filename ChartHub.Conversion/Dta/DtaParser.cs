@@ -18,6 +18,11 @@ internal sealed class DtaSongInfo
     public int SongLengthMs { get; init; }
     public int PreviewStartMs { get; init; }
     public int PreviewEndMs { get; init; }
+    public string LoadingPhrase { get; init; } = string.Empty;
+    public bool IsCover { get; init; }
+    public bool? ProDrums { get; init; }
+    public bool? FiveLaneDrums { get; init; }
+    public bool? DrumFallbackBlue { get; init; }
     public int VocalParts { get; init; }
     public IReadOnlyDictionary<string, int> Ranks { get; init; }
         = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -226,6 +231,11 @@ internal static class DtaParser
         int songLengthMs = 0;
         int previewStartMs = 0;
         int previewEndMs = 0;
+        string loadingPhrase = string.Empty;
+        bool isCover = false;
+        bool? proDrums = null;
+        bool? fiveLaneDrums = null;
+        bool? drumFallbackBlue = null;
         int vocalParts = 0;
         var trackChannels = new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase);
         var ranks = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -278,6 +288,26 @@ internal static class DtaParser
                     (previewStartMs, previewEndMs) = ExtractPreview(entry.Children!);
                     break;
 
+                case "loading_phrase":
+                    loadingPhrase = UnquoteString(ExtractFirstAtom(value));
+                    break;
+
+                case "cover":
+                    isCover = ParseBool(ExtractFirstAtom(value));
+                    break;
+
+                case "pro_drums":
+                    proDrums = ParseBool(ExtractFirstAtom(value));
+                    break;
+
+                case "five_lane_drums":
+                    fiveLaneDrums = ParseBool(ExtractFirstAtom(value));
+                    break;
+
+                case "drum_fallback_blue":
+                    drumFallbackBlue = ParseBool(ExtractFirstAtom(value));
+                    break;
+
                 case "rank":
                     ExtractRankBlock(entry.Children!, ranks);
                     break;
@@ -312,6 +342,11 @@ internal static class DtaParser
             SongLengthMs = songLengthMs,
             PreviewStartMs = previewStartMs,
             PreviewEndMs = previewEndMs,
+            LoadingPhrase = loadingPhrase,
+            IsCover = isCover,
+            ProDrums = proDrums,
+            FiveLaneDrums = fiveLaneDrums,
+            DrumFallbackBlue = drumFallbackBlue,
             VocalParts = vocalParts,
             Ranks = ranks,
             SongFilePath = songFilePath,
@@ -502,6 +537,20 @@ internal static class DtaParser
         }
 
         return 0;
+    }
+
+    private static bool ParseBool(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s))
+        {
+            return false;
+        }
+
+        string normalized = s.Trim().Trim('\'').Trim('"');
+        return normalized.Equals("true", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("t", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("yes", StringComparison.OrdinalIgnoreCase)
+            || normalized.Equals("1", StringComparison.Ordinal);
     }
 
     private static float ParseFloat(string? s)

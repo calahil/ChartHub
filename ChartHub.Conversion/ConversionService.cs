@@ -164,6 +164,7 @@ public sealed class ConversionService : IConversionService
             // --- Extract and convert MIDI ---
             ReportProgress(progress, ConversionProgressStages.ConvertMidi, 92.5, "Converting MIDI");
             await ExtractMidiAsync(stfs, songInfo, songDir, cancellationToken).ConfigureAwait(false);
+            await WriteExpertPlusMidiAsync(songDir, songInfo, cancellationToken).ConfigureAwait(false);
 
             // --- Extract and split MOGG audio ---
             ReportProgress(progress, ConversionProgressStages.DecodeMogg, 93.2, "Decrypting and decoding MOGG audio");
@@ -297,6 +298,36 @@ public sealed class ConversionService : IConversionService
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Writes expert+.mid alongside notes.mid when the song has a non-zero drum rank.
+    /// Mirrors Onyx's <c>Drums.expertWith2x</c>: 2x kick pedal (note 95) is merged
+    /// into the Expert kick (note 96) on the PART DRUMS track.
+    /// </summary>
+    private static async Task WriteExpertPlusMidiAsync(
+        string songDir,
+        DtaSongInfo songInfo,
+        CancellationToken cancellationToken)
+    {
+        int drumRank = songInfo.Ranks.TryGetValue("drum", out int r) ? r : 0;
+        if (drumRank <= 0)
+        {
+            return;
+        }
+
+        string notesMidPath = Path.Combine(songDir, "notes.mid");
+        if (!File.Exists(notesMidPath))
+        {
+            return;
+        }
+
+        byte[] notesMidiBytes = await File.ReadAllBytesAsync(notesMidPath, cancellationToken).ConfigureAwait(false);
+        byte[] expertPlusBytes = ExpertPlusMidiGenerator.Apply(notesMidiBytes);
+        await File.WriteAllBytesAsync(
+            Path.Combine(songDir, "expert+.mid"),
+            expertPlusBytes,
+            cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task<AudioExtractionOutcome> ExtractAudioAsync(
         StfsReader stfs,
         DtaSongInfo songInfo,
@@ -386,7 +417,10 @@ public sealed class ConversionService : IConversionService
 
     private static DtaSongInfo WithSongLengthFromAudio(DtaSongInfo songInfo, int? backingDurationMs)
     {
-        if (backingDurationMs is null or <= 0)
+        // The DTA song_length is authoritative: it encodes the MIDI [end]-event time in ms,
+        // identical to Onyx's F.songLengthMS derivation. Only fall back to the audio-measured
+        // duration when the DTA carries no valid length (missing or zero).
+        if (songInfo.SongLengthMs > 0 || backingDurationMs is null or <= 0)
         {
             return songInfo;
         }
@@ -404,6 +438,11 @@ public sealed class ConversionService : IConversionService
             SongLengthMs = backingDurationMs.Value,
             PreviewStartMs = songInfo.PreviewStartMs,
             PreviewEndMs = songInfo.PreviewEndMs,
+            LoadingPhrase = songInfo.LoadingPhrase,
+            IsCover = songInfo.IsCover,
+            ProDrums = songInfo.ProDrums,
+            FiveLaneDrums = songInfo.FiveLaneDrums,
+            DrumFallbackBlue = songInfo.DrumFallbackBlue,
             VocalParts = songInfo.VocalParts,
             Ranks = songInfo.Ranks,
             SongFilePath = songInfo.SongFilePath,
@@ -473,9 +512,18 @@ public sealed class ConversionService : IConversionService
             }
         }
 
-        bool TryWriteFromPath(string path, bool decodeXboxTexture)
+        bool TryWriteFromEntry(string path, StfsEntry entry, bool decodeXboxTexture)
         {
-            byte[]? bytes = stfs.ReadFile(path);
+            byte[]? bytes = stfs.ReadEntry(entry);
+
+            // Fan-made CON packages can have malformed hash-chain pointers where the default
+            // traversal yields out-of-order blocks (typically corrupting the tail of files).
+            // Use the same consecutive-read fallback strategy we already apply for MIDI/MOGG.
+            if (bytes != null && !entry.IsConsecutive)
+            {
+                bytes = stfs.ReadEntry(entry, forceConsecutive: true);
+            }
+
             if (bytes == null)
             {
                 return false;
@@ -501,10 +549,10 @@ public sealed class ConversionService : IConversionService
             }
         }
 
-        IEnumerable<(string path, StfsEntry entry)> entries = stfs.GetAllFiles();
+        IReadOnlyList<(string path, StfsEntry entry)> entries = stfs.GetAllFiles().ToList();
 
         // Pass 1: scoped to song subfolder when available.
-        foreach ((string path, _) in entries)
+        foreach ((string path, StfsEntry entry) in entries)
         {
             string normPath = path.Replace('\\', '/');
             if (songSubfolder != null && !normPath.StartsWith(songSubfolder, StringComparison.OrdinalIgnoreCase))
@@ -514,7 +562,7 @@ public sealed class ConversionService : IConversionService
 
             if ((normPath.EndsWith(".png_xbox", StringComparison.OrdinalIgnoreCase)
                 || normPath.EndsWith("_keep.png_xbox", StringComparison.OrdinalIgnoreCase))
-                && TryWriteFromPath(path, decodeXboxTexture: true))
+                && TryWriteFromEntry(path, entry, decodeXboxTexture: true))
             {
                 return;
             }
@@ -522,19 +570,19 @@ public sealed class ConversionService : IConversionService
             if ((normPath.EndsWith("album.png", StringComparison.OrdinalIgnoreCase)
                 || normPath.EndsWith("album.jpg", StringComparison.OrdinalIgnoreCase)
                 || normPath.EndsWith("album.jpeg", StringComparison.OrdinalIgnoreCase))
-                && TryWriteFromPath(path, decodeXboxTexture: false))
+                && TryWriteFromEntry(path, entry, decodeXboxTexture: false))
             {
                 return;
             }
         }
 
         // Pass 2: package-wide fallback.
-        foreach ((string path, _) in entries)
+        foreach ((string path, StfsEntry entry) in entries)
         {
             string normPath = path.Replace('\\', '/');
             if ((normPath.EndsWith(".png_xbox", StringComparison.OrdinalIgnoreCase)
                 || normPath.EndsWith("_keep.png_xbox", StringComparison.OrdinalIgnoreCase))
-                && TryWriteFromPath(path, decodeXboxTexture: true))
+                && TryWriteFromEntry(path, entry, decodeXboxTexture: true))
             {
                 return;
             }
@@ -542,7 +590,7 @@ public sealed class ConversionService : IConversionService
             if ((normPath.EndsWith("album.png", StringComparison.OrdinalIgnoreCase)
                 || normPath.EndsWith("album.jpg", StringComparison.OrdinalIgnoreCase)
                 || normPath.EndsWith("album.jpeg", StringComparison.OrdinalIgnoreCase))
-                && TryWriteFromPath(path, decodeXboxTexture: false))
+                && TryWriteFromEntry(path, entry, decodeXboxTexture: false))
             {
                 return;
             }
