@@ -50,10 +50,18 @@ public class AuthFlowViewModelTests
         public AuthSessionState CurrentState => AuthSessionState.Unauthenticated;
         public string? SignedInEmail => null;
         public string? CurrentAccessToken => null;
-#pragma warning disable CS0067
-        public event PropertyChangedEventHandler? PropertyChanged;
-        public event EventHandler? SessionStateChanged;
-#pragma warning restore CS0067
+        public event PropertyChangedEventHandler? PropertyChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public event EventHandler? SessionStateChanged
+        {
+            add { }
+            remove { }
+        }
+
         public Task AttemptSilentRestoreAsync() => Task.CompletedTask;
         public Task SignInAsync() => Task.CompletedTask;
         public Task SignOutAsync() => Task.CompletedTask;
