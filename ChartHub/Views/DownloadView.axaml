@@ -22,6 +22,7 @@
             <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right">
                 <Button Width="40"
                         Height="40"
+                    Padding="0"
                         CornerRadius="10"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Center"
@@ -29,8 +30,9 @@
                         IsEnabled="{Binding IsAnyChecked}"
                         Command="{Binding InstallSongs}">
                     <Button.Content>
-                        <Image Width="20"
-                               Height="20"
+                           <Image Width="26"
+                               Height="26"
+                               Stretch="Uniform"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Source="{Binding Source={x:Static strings:UiIcons.InstallDesktop}, Converter={StaticResource AssetPathToImageConverter}}" />

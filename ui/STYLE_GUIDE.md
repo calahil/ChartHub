@@ -237,6 +237,8 @@ Examples:
 ### 1) Icon-Only Actions
 - Must include `ToolTip.Tip`.
 - Keep hit area at least `40x40` for top-level actions.
+- For `40x40` icon buttons, use `Padding="0"` and a `26x26` icon image.
+- Keep the icon centered and use `Stretch="Uniform"` when sizing the image explicitly.
 
 ### 2) Disabled State
 - Use built-in control disabled visuals from theme.
@@ -265,7 +267,7 @@ Before merging a new view or major UI update, verify:
 1. Spacing uses the scale `4/6/8/10/12`.
 2. Radius uses `6/8/10/12` appropriately.
 3. Cards use tokenized border/background brushes.
-4. Icon-only actions are `40x40`, `CornerRadius=10`, tooltip present.
+4. Icon-only actions are `40x40`, `CornerRadius=10`, tooltip present, and use `26x26` icons with `Padding=0`.
 5. SVG assets use `fill="currentColor"`.
 6. No unapproved hardcoded color hex values in AXAML.
 7. Secondary text and semantic states use theme tokens.

@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:asyncImage="clr-namespace:AsyncImageLoader;assembly=AsyncImageLoader.Avalonia"
+             xmlns:strings="clr-namespace:ChartHub.Strings"
              xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
              xmlns:utilities="clr-namespace:ChartHub.Utilities"
              mc:Ignorable="d"
@@ -14,6 +15,8 @@
 
     <UserControl.Resources>
         <utilities:SafeImageUrlConverter x:Key="SafeImageUrlConverter"/>
+        <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+        <utilities:SvgColorImageConverter x:Key="SvgColorImageConverter" />
     </UserControl.Resources>
 
     <Grid Margin="10" RowDefinitions="Auto,Auto,*">
@@ -22,10 +25,24 @@
                        FontSize="18"
                        FontWeight="Bold" />
             <Button Grid.Column="1"
-                    Content="{Binding PageStrings.Refresh}"
+                    Width="40"
+                    Height="40"
+                    Padding="0"
                     CornerRadius="10"
                     Command="{Binding RefreshCommand}"
-                    IsEnabled="{Binding !IsBusy}" />
+                    ToolTip.Tip="{Binding PageStrings.Refresh}"
+                    IsEnabled="{Binding !IsBusy}">
+                  <Image Width="26"
+                      Height="26"
+                       Stretch="Uniform">
+                    <Image.Source>
+                        <MultiBinding Converter="{StaticResource SvgColorImageConverter}">
+                            <Binding Source="{x:Static strings:UiIcons.RefreshImage}" />
+                            <Binding Source="{StaticResource ThemeForegroundBrush}" />
+                        </MultiBinding>
+                    </Image.Source>
+                </Image>
+            </Button>
         </Grid>
 
         <Border Grid.Row="1"
@@ -97,16 +114,44 @@
                                                 Orientation="Horizontal"
                                                 Spacing="8"
                                                 VerticalAlignment="Center">
-                                        <Button Content="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).PageStrings.Execute}"
+                                        <Button Width="40"
+                                                Height="40"
+                                                Padding="0"
                                                 CornerRadius="10"
-                                            Command="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).ExecuteCommand}"
+                                                ToolTip.Tip="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).PageStrings.Execute}"
+                                                Command="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).ExecuteCommand}"
                                                 CommandParameter="{Binding}"
-                                                IsEnabled="{Binding CanExecute}" />
-                                        <Button Content="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).PageStrings.Kill}"
+                                                IsEnabled="{Binding CanExecute}">
+                                            <Image Width="26"
+                                                   Height="26"
+                                                   Stretch="Uniform">
+                                                <Image.Source>
+                                                    <MultiBinding Converter="{StaticResource SvgColorImageConverter}">
+                                                        <Binding Source="{x:Static strings:UiIcons.PlayCircle}" />
+                                                        <Binding Source="{StaticResource ThemeForegroundBrush}" />
+                                                    </MultiBinding>
+                                                </Image.Source>
+                                            </Image>
+                                        </Button>
+                                        <Button Width="40"
+                                                Height="40"
+                                                Padding="0"
                                                 CornerRadius="10"
-                                            Command="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).KillCommand}"
+                                                ToolTip.Tip="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).PageStrings.Kill}"
+                                                Command="{Binding #Root.((viewmodels:DesktopEntryViewModel)DataContext).KillCommand}"
                                                 CommandParameter="{Binding}"
-                                                IsEnabled="{Binding CanKill}" />
+                                                IsEnabled="{Binding CanKill}">
+                                            <Image Width="26"
+                                                   Height="26"
+                                                   Stretch="Uniform">
+                                                <Image.Source>
+                                                    <MultiBinding Converter="{StaticResource SvgColorImageConverter}">
+                                                        <Binding Source="{x:Static strings:UiIcons.StopCircle}" />
+                                                        <Binding Source="{StaticResource ThemeForegroundBrush}" />
+                                                    </MultiBinding>
+                                                </Image.Source>
+                                            </Image>
+                                        </Button>
                                     </StackPanel>
                                 </Grid>
                             </Border>

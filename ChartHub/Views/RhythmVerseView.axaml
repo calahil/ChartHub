@@ -83,15 +83,17 @@
                                         <Button Grid.Column="5"
                                                 Width="40"
                                                 Height="40"
+                                                Padding="0"
                                                 VerticalContentAlignment="Center"
                                                 HorizontalContentAlignment="Center"
                                                 CornerRadius="10"
                                                 Command="{Binding RefreshButtonCommand}"
                                                 HorizontalAlignment="Center"
                                                 VerticalAlignment="Center">
-                                                <Image Source="{Binding PageStrings.Refresh, Converter={StaticResource AssetPathToImageConverter}}"
-                                                       Width="20"
-                                                       Height="20" />
+                                                      <Image Source="{Binding PageStrings.Refresh, Converter={StaticResource AssetPathToImageConverter}}"
+                                                              Width="26"
+                                                              Height="26"
+                                                              Stretch="Uniform" />
                                         </Button>
                                 </Grid>
 
@@ -385,11 +387,13 @@
                                         <Button Grid.Column="1"
                                                                 Width="40"
                                                                 Height="40"
+                                                                Padding="0"
                                                                 CornerRadius="10"
                                                 Command="{Binding RefreshButtonCommand}">
                                                 <Image Source="{Binding PageStrings.Refresh, Converter={StaticResource AssetPathToImageConverter}}"
-                                                                         Width="20"
-                                                                         Height="20" />
+                                                                         Width="26"
+                                                                         Height="26"
+                                                                         Stretch="Uniform" />
                                         </Button>
                                 </Grid>
 
@@ -482,15 +486,17 @@
                                                                                                 HorizontalAlignment="Center"
                                                                                                 Width="40"
                                                                                                 Height="40"
+                                                                                                Padding="0"
                                                                                                 CornerRadius="10"
                                                                                                 Background="{StaticResource DataFieldBackgroundBrush}"
                                                                                                 BorderBrush="{StaticResource ThemeBorderMidBrush}"
                                                                                                 Command="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).DownloadFileCommand}"
                                                                                                 CommandParameter="{Binding}">
                                                                                                 <Button.Content>
-                                                                                                        <Image Source="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Download, Converter={StaticResource AssetPathToImageConverter}}"
-                                                                                                               Width="20"
-                                                                                                               Height="20" />
+                                                                                                                      <Image Source="{Binding #MobileSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings.Download, Converter={StaticResource AssetPathToImageConverter}}"
+                                                                                                                              Width="26"
+                                                                                                                              Height="26"
+                                                                                                                              Stretch="Uniform" />
                                                                                                 </Button.Content>
                                                                                         </Button>
 

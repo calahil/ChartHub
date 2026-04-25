@@ -48,12 +48,14 @@
                                 Margin="0,12,0,0"
                                 Width="40"
                                 Height="40"
+                                Padding="0"
                                 CornerRadius="10"
                                 Command="{Binding ShowFiltersPaneCommand}"
                                 HorizontalAlignment="Right">
                             <Image Source="{Binding RhythmVerseViewModel.PageStrings.ShowFilters, Converter={StaticResource AssetPathToImageConverter}}"
-                                   Width="20"
-                                   Height="20" />
+                                   Width="26"
+                                   Height="26"
+                                   Stretch="Uniform" />
                         </Button>
                     </Grid>
 
@@ -244,12 +246,14 @@
                         Margin="0,12,12,0"
                         Width="40"
                         Height="40"
+                        Padding="0"
                         CornerRadius="10"
                         ToolTip.Tip="{Binding AuthButtonText}"
                         Command="{Binding AuthButtonCommand}">
                     <Button.Content>
-                        <Image Width="20"
-                               Height="20"
+                        <Image Width="26"
+                               Height="26"
+                               Stretch="Uniform"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Source="{Binding Source={x:Static strings:UiIcons.Logout}, Converter={StaticResource AssetPathToImageConverter}}" />
@@ -558,13 +562,15 @@
                     <Grid ColumnDefinitions="Auto,*,Auto">
                         <Button Grid.Column="0"
                                 Width="40"
+                                Padding="0"
                             CornerRadius="10"
                             Height="40"
                                 ToolTip.Tip="{Binding PageStrings.MenuButton}"
                                 Command="{Binding ToggleAndroidNavPaneCommand}">
                             <Button.Content>
-                                <Image Width="20"
-                                       Height="20"
+                                <Image Width="26"
+                                       Height="26"
+                                       Stretch="Uniform"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
                                        Source="{Binding Source={x:Static strings:UiIcons.MenuIcon}, Converter={StaticResource AssetPathToImageConverter}}" />
@@ -579,13 +585,15 @@
                         <Button Grid.Column="2"
                                 Width="40"
                                 Height="40"
+                                Padding="0"
                                 CornerRadius="10"
                                 VerticalAlignment="Center"
                                 ToolTip.Tip="{Binding AuthButtonText}"
                                 Command="{Binding AuthButtonCommand}">
                             <Button.Content>
-                                <Image Width="20"
-                                       Height="20"
+                                <Image Width="26"
+                                       Height="26"
+                                       Stretch="Uniform"
                                        HorizontalAlignment="Center"
                                        VerticalAlignment="Center"
                                        Source="{Binding Source={x:Static strings:UiIcons.Logout}, Converter={StaticResource AssetPathToImageConverter}}" />

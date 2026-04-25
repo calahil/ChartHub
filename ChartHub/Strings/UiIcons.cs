@@ -31,6 +31,9 @@ public static class UiIcons
     public const string InstallDesktop = "avares://ChartHub/Resources/Images/install_desktop_24dp.svg";
     public const string XCancelButton = "avares://ChartHub/Resources/Images/x_cancel_button.svg";
     public const string DeleteButton = "avares://ChartHub/Resources/Images/delete24dp.svg";
+    public const string RefreshImage = "avares://ChartHub/Resources/Images/refresh24dp.svg";
+    public const string PlayCircle = "avares://ChartHub/Resources/Images/play_circle.svg";
+    public const string StopCircle = "avares://ChartHub/Resources/Images/stop_circle.svg";
 
     public const string JoystickIcon = "avares://ChartHub/Resources/Images/joystick24dp.svg";
     public const string ArrowUp = "avares://ChartHub/Resources/Images/arrow_up.svg";
