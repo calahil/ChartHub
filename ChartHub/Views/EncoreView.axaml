@@ -19,6 +19,49 @@
         <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
         <utilities:SvgColorImageConverter x:Key="SvgColorImageConverter" />
     </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- Rounded selection list styling -->
+        <Style Selector="ListBox.rounded-selection-list > ListBoxItem">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+
+        <!-- Song card base background (all list items) -->
+        <Style Selector="ListBox.rounded-selection-list > ListBoxItem Border.song-card">
+            <Setter Property="Background" Value="{StaticResource ThemeControlLowBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ThemeBorderMidBrush}" />
+        </Style>
+        <Style Selector="ListBox.rounded-selection-list > ListBoxItem:pointerover Border.song-card">
+            <Setter Property="Background" Value="{StaticResource ThemeControlMidBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ThemeAccentBrush2}" />
+        </Style>
+        <Style Selector="ListBox.rounded-selection-list > ListBoxItem:selected Border.song-card">
+            <Setter Property="Background" Value="{StaticResource ListBoxItemBackgroundSelected}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ThemeAccentBrush}" />
+        </Style>
+        <Style Selector="ListBox.rounded-selection-list > ListBoxItem:selected:pointerover Border.song-card">
+            <Setter Property="Background" Value="{StaticResource ListBoxItemBackgroundSelectedPointerOver}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ThemeAccentBrush}" />
+        </Style>
+
+        <!-- Mobile list item container -->
+        <Style Selector="ListBox#MobileSongsListBox > ListBoxItem">
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+        <Style Selector="ListBox#MobileSongsListBox > ListBoxItem:pointerover">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox#MobileSongsListBox > ListBoxItem:selected">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="ListBox#MobileSongsListBox > ListBoxItem:selected:pointerover">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+    </UserControl.Styles>
     <Grid RowDefinitions="*" ColumnDefinitions="*">
         <Grid>
             <Grid RowDefinitions="Auto,*"
@@ -96,23 +139,24 @@
                             Grid.Row="1"
                             Grid.Column="0"
                             BorderThickness="1"
+                            CornerRadius="8"
+                            ClipToBounds="True"
                             Padding="10">
                         <ListBox x:Name="EncoreSongsListBox"
                                  ItemsSource="{Binding DataItems}"
                                  SelectedItem="{Binding SelectedSong}"
                                  IsVisible="{Binding HasResults}"
+                                 Classes="rounded-selection-list"
                                  Background="{StaticResource ListBoxBackground}"
-                                 BorderThickness="1"
-                                 BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                 BorderThickness="0"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="models:EncoreSong">
-                                    <Border Margin="0,0,0,8"
+                                    <Border Classes="song-card"
+                                            Margin="0"
                                             Padding="1"
                                             CornerRadius="8"
-                                            BorderThickness="1"
-                                            BorderBrush="{StaticResource ThemeBorderMidBrush}"
-                                            Background="{StaticResource ThemeControlLowBrush}">
+                                            BorderThickness="1">
                                         <Grid RowDefinitions="*"
                                               ColumnDefinitions="128, 2.6*, 2.1*, 2*, 2*">
                                             <!-- Album Art -->
@@ -131,9 +175,9 @@
                                                   Grid.Column="1"
                                                   Margin="18,18,0,18">
                                                 <controls:SongInfoControl Song="{Binding}"
-                                                                          SongStrings="{Binding #EncoreSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).PageStrings}"
-                                                                          IsDesktopMode="{Binding #EncoreSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsDesktopMode}"
-                                                                          IsCompanionMode="{Binding #EncoreSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsCompanionMode}"/>
+                                                                          SongStrings="{Binding #EncoreSongsListBox.((viewmodels:EncoreViewModel)DataContext).PageStrings}"
+                                                                          IsDesktopMode="{Binding #EncoreSongsListBox.((viewmodels:EncoreViewModel)DataContext).IsDesktopMode}"
+                                                                          IsCompanionMode="{Binding #EncoreSongsListBox.((viewmodels:EncoreViewModel)DataContext).IsCompanionMode}"/>
                                             </Grid>
                                             <!-- Instrument Info -->
                                             <StackPanel Grid.Row="0"
@@ -144,8 +188,8 @@
                                                                             VerticalAlignment="Center"
                                                                             GlyphWidth="22"
                                                                             GlyphFontSize="16"
-                                                                            IsCompanionMode="{Binding #EncoreSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsCompanionMode}"
-                                                                            IsDesktopMode="{Binding #EncoreSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).IsDesktopMode}" />
+                                                                            IsCompanionMode="{Binding #EncoreSongsListBox.((viewmodels:EncoreViewModel)DataContext).IsCompanionMode}"
+                                                                            IsDesktopMode="{Binding #EncoreSongsListBox.((viewmodels:EncoreViewModel)DataContext).IsDesktopMode}" />
 
                                             </StackPanel>
                                             <!-- Creator Info -->
@@ -154,20 +198,20 @@
                                                   ColumnDefinitions="*,3*"
                                                   RowDefinitions="32,Auto,*"
                                                   Margin="18,18,18,18">
-                                                <Button Grid.Row="0"
+                                                <Border Grid.Row="0"
                                                         Grid.Column="1"
                                                         CornerRadius="10"
                                                         HorizontalAlignment="Stretch"
                                                         VerticalAlignment="Stretch"
-                                                        Command="{Binding #EncoreSongsListBox.((viewmodels:RhythmVerseViewModel)DataContext).ViewCreatorCommand}"
-                                                        CommandParameter="{Binding}">
-                                                    <Button.Content>
-                                                        <TextBlock Text="{Binding ApplicationUsername}"
-                                                                   Foreground="{StaticResource ThemeAccentBrush}"
-                                                                   VerticalAlignment="Center"
-                                                                   HorizontalAlignment="Center" />
-                                                    </Button.Content>
-                                                </Button>
+                                                        Padding="8,2"
+                                                        Background="{StaticResource DataFieldBackgroundBrush}"
+                                                        BorderThickness="1"
+                                                        BorderBrush="{StaticResource ThemeBorderMidBrush}">
+                                                    <TextBlock Text="{Binding ApplicationUsername}"
+                                                               Foreground="{StaticResource ThemeAccentBrush}"
+                                                               VerticalAlignment="Center"
+                                                               HorizontalAlignment="Center" />
+                                                </Border>
                                             </Grid>
                                             <!-- Download Info -->
                                             <Grid Grid.Row="1"
@@ -180,6 +224,9 @@
                                                         HorizontalAlignment="Stretch"
                                                         VerticalAlignment="Stretch"
                                                         CornerRadius="10"
+                                                           Background="{StaticResource DataFieldBackgroundBrush}"
+                                                           BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                           BorderThickness="1"
                                                         Command="{Binding #EncoreSongsListBox.((viewmodels:EncoreViewModel)DataContext).DownloadSongCommand}"
                                                         CommandParameter="{Binding}">
                                                     <Button.Content>
@@ -199,7 +246,7 @@
                                                             CornerRadius="10"
                                                             BorderThickness="1"
                                                             BorderBrush="{StaticResource ThemeAccentBrush}"
-                                                            Background="{StaticResource ThemeControlMidBrush}"
+                                                            Background="{StaticResource DataFieldBackgroundBrush}"
                                                             IsVisible="{Binding IsInLibrary}">
                                                         <TextBlock Text="{Binding #EncoreSongsListBox.((viewmodels:EncoreViewModel)DataContext).PageStrings.InLibrary}"
                                                                    FontSize="11"
@@ -273,20 +320,23 @@
                         <Border Grid.Row="1"
                                 BorderBrush="{StaticResource ThemeBorderMidBrush}"
                                 BorderThickness="1"
+                                CornerRadius="8"
+                                ClipToBounds="True"
                                 Padding="8">
                             <ListBox ItemsSource="{Binding DataItems}"
                                      SelectionMode="Single"
                                      SelectedItem="{Binding SelectedSong}"
                                      Background="{StaticResource ListBoxBackground}"
+                                     Classes="rounded-selection-list"
                                      x:Name="MobileSongsListBox"
                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                    <Border Classes="song-card"
                                             BorderThickness="1"
-                                            CornerRadius="5"
+                                            CornerRadius="8"
                                             Padding="8"
-                                            Margin="0,0,0,6">
+                                            Margin="0">
                                         <Grid RowDefinitions="Auto,Auto,Auto,Auto"
                                               ColumnDefinitions="48,*,Auto">
                                             <Image asyncImage:ImageLoader.Source="{Binding AlbumArtUrl, Converter={StaticResource SafeImageUrlConverter}, ConverterParameter=album}"
@@ -319,6 +369,11 @@
                                                     VerticalAlignment="Top"
                                                     HorizontalAlignment="Center"
                                                     Width="32"
+                                                   Height="32"
+                                                   CornerRadius="10"
+                                                   Background="{StaticResource DataFieldBackgroundBrush}"
+                                                   BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                                                   BorderThickness="1"
                                                     Command="{Binding #MobileSongsListBox.((viewmodels:EncoreViewModel)DataContext).DownloadSongCommand}"
                                                     CommandParameter="{Binding}">
                                                 <Button.Content>
@@ -337,7 +392,7 @@
                                                     CornerRadius="10"
                                                     BorderThickness="1"
                                                     BorderBrush="{StaticResource ThemeAccentBrush}"
-                                                    Background="{StaticResource ThemeControlMidBrush}"
+                                                    Background="{StaticResource DataFieldBackgroundBrush}"
                                                     IsVisible="{Binding IsInLibrary}">
                                                 <TextBlock Text="{Binding #MobileSongsListBox.((viewmodels:EncoreViewModel)DataContext).PageStrings.InLibrary}"
                                                            FontSize="11"

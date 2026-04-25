@@ -34,6 +34,7 @@
   <SolidColorBrush x:Key="ThemeControlLowBrush"        Color="{StaticResource MacchiatoSurface0}"/>
   <SolidColorBrush x:Key="ThemeControlMidBrush"        Color="{StaticResource MacchiatoSurface1}"/>
   <SolidColorBrush x:Key="ThemeControlHighBrush"       Color="{StaticResource MacchiatoSurface2}"/>
+  <SolidColorBrush x:Key="DataFieldBackgroundBrush"     Color="{StaticResource MacchiatoMantle}"/>
   <SolidColorBrush x:Key="ThemeControlHighlightLow"    Color="{StaticResource MacchiatoOverlay0}"/>
   <SolidColorBrush x:Key="ThemeControlHighlightMid"    Color="{StaticResource MacchiatoOverlay1}"/>
   <SolidColorBrush x:Key="ThemeControlHighlightHigh"   Color="{StaticResource MacchiatoOverlay2}"/>

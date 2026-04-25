@@ -24,7 +24,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     IsVisible="{Binding HasDrums, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                    Background="{StaticResource ThemeControlMidBrush}">
+                                    Background="{StaticResource DataFieldBackgroundBrush}">
                                    <Image Source="{Binding Source={x:Static strings:UiIcons.DrumsSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                           Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                             </Border>
@@ -34,7 +34,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     IsVisible="{Binding HasDrums, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                    Background="{StaticResource ThemeControlMidBrush}">
+                                    Background="{StaticResource DataFieldBackgroundBrush}">
                                    <Panel>
                                           <controls:StarRatingControl Rating="{Binding DrumString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                                       GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
@@ -56,7 +56,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     IsVisible="{Binding HasGuitar, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                    Background="{StaticResource ThemeControlMidBrush}">
+                                    Background="{StaticResource DataFieldBackgroundBrush}">
                                    <Image Source="{Binding Source={x:Static strings:UiIcons.GuitarSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                           Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                             </Border>
@@ -66,7 +66,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     IsVisible="{Binding HasGuitar, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                    Background="{StaticResource ThemeControlMidBrush}">
+                                    Background="{StaticResource DataFieldBackgroundBrush}">
                                    <Panel>
                                           <controls:StarRatingControl Rating="{Binding GuitarString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                                       GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
@@ -88,7 +88,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     IsVisible="{Binding HasKeys, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                    Background="{StaticResource ThemeControlMidBrush}">
+                                    Background="{StaticResource DataFieldBackgroundBrush}">
                                    <Image Source="{Binding Source={x:Static strings:UiIcons.KeysSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                           Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                             </Border>
@@ -98,7 +98,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     IsVisible="{Binding HasKeys, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                    Background="{StaticResource ThemeControlMidBrush}">
+                                    Background="{StaticResource DataFieldBackgroundBrush}">
                                    <Panel>
                                           <controls:StarRatingControl Rating="{Binding KeysString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                                       GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
@@ -120,7 +120,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     IsVisible="{Binding HasBass, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                    Background="{StaticResource ThemeControlMidBrush}">
+                                    Background="{StaticResource DataFieldBackgroundBrush}">
                                    <Image Source="{Binding Source={x:Static strings:UiIcons.BassSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                           Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                             </Border>
@@ -130,7 +130,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     IsVisible="{Binding HasBass, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                    Background="{StaticResource ThemeControlMidBrush}">
+                                    Background="{StaticResource DataFieldBackgroundBrush}">
                                    <Panel>
                                           <controls:StarRatingControl Rating="{Binding BassString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                                       GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
@@ -152,7 +152,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     IsVisible="{Binding HasVocals, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                    Background="{StaticResource ThemeControlMidBrush}">
+                                    Background="{StaticResource DataFieldBackgroundBrush}">
                                    <Image Source="{Binding Source={x:Static strings:UiIcons.VocalsSmall}, Converter={StaticResource AssetPathToImageConverter}}"
                                           Height="{Binding GlyphFontSize, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}" />
                             </Border>
@@ -162,7 +162,7 @@
                                     Margin="0,0,8,8"
                                     CornerRadius="10"
                                     IsVisible="{Binding HasVocals, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
-                                    Background="{StaticResource ThemeControlMidBrush}">
+                                    Background="{StaticResource DataFieldBackgroundBrush}">
                                    <Panel>
                                           <controls:StarRatingControl Rating="{Binding VocalString, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"
                                                                       GlyphWidth="{Binding GlyphWidth, RelativeSource={RelativeSource AncestorType=controls:SongRatingControl}}"

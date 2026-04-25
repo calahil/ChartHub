@@ -18,7 +18,7 @@
               Grid.Column="0"
               Margin="0,0,8,8"
               CornerRadius="10"
-              Background="{StaticResource ThemeControlMidBrush}">
+              Background="{StaticResource DataFieldBackgroundBrush}">
         <Image Source="{Binding SongStrings.Artist, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}, Converter={StaticResource AssetPathToImageConverter}}"
                Width="{StaticResource IconSizeInline}"
                Height="{StaticResource IconSizeInline}"
@@ -30,7 +30,7 @@
               Grid.Column="1"
               Margin="0,0,8,8"
               CornerRadius="10"
-              Background="{StaticResource ThemeControlMidBrush}">
+              Background="{StaticResource DataFieldBackgroundBrush}">
       <TextBlock
       Text="{Binding ArtistText, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
         Foreground="{StaticResource ThemeForegroundBrush}"
@@ -43,7 +43,7 @@
               Grid.Column="0"
               Margin="0,0,8,8"
               CornerRadius="10"
-              Background="{StaticResource ThemeControlMidBrush}">
+              Background="{StaticResource DataFieldBackgroundBrush}">
         <Image Source="{Binding SongStrings.SongTitle, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}, Converter={StaticResource AssetPathToImageConverter}}"
                Width="{StaticResource IconSizeInline}"
                Height="{StaticResource IconSizeInline}"
@@ -54,7 +54,7 @@
               Grid.Column="1"
               Margin="0,0,8,8"
               CornerRadius="10"
-              Background="{StaticResource ThemeControlMidBrush}">
+              Background="{StaticResource DataFieldBackgroundBrush}">
       <TextBlock Text="{Binding TitleText, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
                    Foreground="{StaticResource ThemeForegroundBrush}"
                    FontSize="13"
@@ -66,7 +66,7 @@
               Grid.Column="0"
               Margin="0,0,8,8"
               CornerRadius="10"
-              Background="{StaticResource ThemeControlMidBrush}">
+              Background="{StaticResource DataFieldBackgroundBrush}">
         <Image Source="{Binding SongStrings.Album, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}, Converter={StaticResource AssetPathToImageConverter}}"
                Width="{StaticResource IconSizeInline}"
                Height="{StaticResource IconSizeInline}"
@@ -77,7 +77,7 @@
               Grid.Column="1"
               Margin="0,0,8,8"
               CornerRadius="10"
-              Background="{StaticResource ThemeControlMidBrush}">
+              Background="{StaticResource DataFieldBackgroundBrush}">
       <TextBlock Text="{Binding AlbumText, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
                    Foreground="{StaticResource ThemeForegroundBrush}"
                    FontSize="12"
@@ -94,7 +94,7 @@
                 Grid.Column="0"
                 Margin="0,0,8,8"
                 CornerRadius="10"
-                Background="{StaticResource ThemeControlMidBrush}">
+                Background="{StaticResource DataFieldBackgroundBrush}">
           <Image Source="{Binding SongStrings.Time, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}, Converter={StaticResource AssetPathToImageConverter}}"
                  Width="{StaticResource IconSizeInline}"
                  Height="{StaticResource IconSizeInline}"
@@ -105,7 +105,7 @@
                 Grid.Column="1"
                 Margin="0,0,8,8"
                 CornerRadius="10"
-                Background="{StaticResource ThemeControlMidBrush}">
+                Background="{StaticResource DataFieldBackgroundBrush}">
           <TextBlock Text="{Binding FormattedTimeText, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
                      Foreground="{StaticResource ThemeForegroundBrush}"
                      FontSize="11"
@@ -117,7 +117,7 @@
                 Grid.Column="4"
                 Margin="0,0,8,8"
                 CornerRadius="10"
-                Background="{StaticResource ThemeControlMidBrush}">
+                Background="{StaticResource DataFieldBackgroundBrush}">
           <Image Source="{Binding SongStrings.Released, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}, Converter={StaticResource AssetPathToImageConverter}}"
                  Width="{StaticResource IconSizeInline}"
                  Height="{StaticResource IconSizeInline}"
@@ -128,7 +128,7 @@
                 Grid.Column="5"
                 Margin="0,0,8,8"
                 CornerRadius="10"
-                Background="{StaticResource ThemeControlMidBrush}">
+                Background="{StaticResource DataFieldBackgroundBrush}">
           <TextBlock Text="{Binding YearText, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
                      Foreground="{StaticResource ThemeForegroundBrush}"
                      FontSize="11"
@@ -140,7 +140,7 @@
                 Grid.Column="0"
                 Margin="0,0,8,8"
                 CornerRadius="10"
-                Background="{StaticResource ThemeControlMidBrush}">
+                Background="{StaticResource DataFieldBackgroundBrush}">
           <Image Source="{Binding SongStrings.Genre, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}, Converter={StaticResource AssetPathToImageConverter}}"
                  Width="{StaticResource IconSizeInline}"
                  Height="{StaticResource IconSizeInline}"
@@ -152,7 +152,7 @@
                 Grid.ColumnSpan="5"
                 Margin="0,0,8,8"
                 CornerRadius="10"
-                Background="{StaticResource ThemeControlMidBrush}">
+                Background="{StaticResource DataFieldBackgroundBrush}">
           <TextBlock Text="{Binding GenreText, RelativeSource={RelativeSource AncestorType=controls:SongInfoControl}}"
                      Foreground="{StaticResource ThemeForegroundBrush}"
                      FontSize="11"
