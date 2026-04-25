@@ -82,4 +82,46 @@ public class ToolboxTests
 
         Assert.Equal(expected, result);
     }
+
+    [Fact]
+    public void DebugResetSongProcessor_MovesPhaseShiftFilesAndClearsMusicDirectories()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), $"charthub-toolbox-tests-{Guid.NewGuid():N}");
+        string phaseshiftDir = Path.Combine(tempRoot, "phaseshift");
+        string downloadDir = Path.Combine(tempRoot, "downloads");
+        string phaseshiftMusicDir = Path.Combine(tempRoot, "music");
+        string musicSubDir = Path.Combine(phaseshiftMusicDir, "song-a");
+
+        Directory.CreateDirectory(phaseshiftDir);
+        Directory.CreateDirectory(downloadDir);
+        Directory.CreateDirectory(musicSubDir);
+
+        string sourceChart = Path.Combine(phaseshiftDir, "notes.chart");
+        string sourceIni = Path.Combine(phaseshiftDir, "song.ini");
+        string musicFile = Path.Combine(musicSubDir, "audio.ogg");
+
+        File.WriteAllText(sourceChart, "chart-data");
+        File.WriteAllText(sourceIni, "ini-data");
+        File.WriteAllText(musicFile, "audio-data");
+
+        try
+        {
+            Toolbox.DebugResetSongProcessor(phaseshiftDir, downloadDir, phaseshiftMusicDir);
+
+            Assert.False(File.Exists(sourceChart));
+            Assert.False(File.Exists(sourceIni));
+            Assert.True(File.Exists(Path.Combine(downloadDir, "notes.chart")));
+            Assert.True(File.Exists(Path.Combine(downloadDir, "song.ini")));
+
+            Assert.False(Directory.Exists(musicSubDir));
+            Assert.Empty(Directory.GetDirectories(phaseshiftMusicDir));
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
 }
