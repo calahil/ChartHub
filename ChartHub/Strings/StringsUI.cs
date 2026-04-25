@@ -274,3 +274,13 @@ public class InputPageStrings : StringsUI
     public string Mouse => UiLocalization.Get("Main.Mouse");
     public string Keyboard => UiLocalization.Get("Main.Keyboard");
 }
+
+public class InputShellPageStrings : StringsUI
+{
+    public string Input => UiLocalization.Get("Main.Input");
+    public string Controller => UiLocalization.Get("Main.Controller");
+    public string Mouse => UiLocalization.Get("Main.Mouse");
+    public string Keyboard => UiLocalization.Get("Main.Keyboard");
+    public string Back => UiLocalization.Get("InputShell.Back");
+    public string Menu => UiLocalization.Get("Main.MenuButton");
+}

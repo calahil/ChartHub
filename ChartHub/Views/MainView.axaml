@@ -295,21 +295,6 @@
                              IsVisible="{Binding IsSettingsTabVisible}">
                         <ContentControl Content="{Binding SettingsViewModel}" />
                     </TabItem>
-                    <TabItem Header="{Binding PageStrings.Controller}"
-                             FontSize="16"
-                             IsVisible="{Binding IsCompanionMode}">
-                        <ContentControl Content="{Binding VirtualControllerViewModel}" />
-                    </TabItem>
-                    <TabItem Header="{Binding PageStrings.Mouse}"
-                             FontSize="16"
-                             IsVisible="{Binding IsCompanionMode}">
-                        <ContentControl Content="{Binding VirtualTouchPadViewModel}" />
-                    </TabItem>
-                    <TabItem Header="{Binding PageStrings.Keyboard}"
-                             FontSize="16"
-                             IsVisible="{Binding IsCompanionMode}">
-                        <ContentControl Content="{Binding VirtualKeyboardViewModel}" />
-                    </TabItem>
                 </TabControl>
             </Grid>
         </SplitView>
@@ -385,41 +370,6 @@
                                 Height="44"
                                         Width="220"
                                         IsVisible="{Binding IsSettingsTabVisible}" />
-
-                                <!-- Input accordion header (companion mode only) -->
-                                <Button CornerRadius="10"
-                                        HorizontalContentAlignment="Left"
-                                        Height="44"
-                                        Width="220"
-                                        IsVisible="{Binding IsCompanionMode}"
-                                        Command="{Binding ToggleInputAccordionCommand}">
-                                    <TextBlock Text="{Binding PageStrings.Input}"
-                                               VerticalAlignment="Center" />
-                                </Button>
-
-                                <!-- Input sub-items -->
-                                <StackPanel Spacing="6"
-                                            IsVisible="{Binding IsInputAccordionExpanded}"
-                                            Margin="16,0,0,0">
-                                    <Button Content="{Binding PageStrings.Controller}"
-                                            Command="{Binding GoVirtualControllerCommand}"
-                                            CornerRadius="8"
-                                            HorizontalContentAlignment="Left"
-                                            Height="40"
-                                            Width="204" />
-                                    <Button Content="{Binding PageStrings.Mouse}"
-                                            Command="{Binding GoVirtualTouchPadCommand}"
-                                            CornerRadius="8"
-                                            HorizontalContentAlignment="Left"
-                                            Height="40"
-                                            Width="204" />
-                                    <Button Content="{Binding PageStrings.Keyboard}"
-                                            Command="{Binding GoVirtualKeyboardCommand}"
-                                            CornerRadius="8"
-                                            HorizontalContentAlignment="Left"
-                                            Height="40"
-                                            Width="204" />
-                                </StackPanel>
                             </StackPanel>
                             </ScrollViewer>
 

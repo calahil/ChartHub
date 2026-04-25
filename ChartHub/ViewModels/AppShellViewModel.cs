@@ -13,6 +13,7 @@ public class AppShellViewModel : INotifyPropertyChanged
 {
     private readonly IServiceProvider _serviceProvider;
     private MainViewModel? _mainViewModel;
+    private InputShellViewModel? _inputShellViewModel;
 
     private object? _currentViewModel;
     public object? CurrentViewModel
@@ -43,9 +44,32 @@ public class AppShellViewModel : INotifyPropertyChanged
 
     private void SwitchToMain()
     {
-        _mainViewModel ??= _serviceProvider.GetRequiredService<MainViewModel>();
+        if (_mainViewModel is null)
+        {
+            _mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();
+            _mainViewModel.InputRequested += HandleInputRequested;
+        }
+
         CurrentViewModel = _mainViewModel;
         OnPropertyChanged(nameof(RootMargin));
+    }
+
+    private void HandleInputRequested(object? sender, EventArgs e)
+    {
+        if (_inputShellViewModel is null)
+        {
+            _inputShellViewModel = _serviceProvider.GetRequiredService<InputShellViewModel>();
+            _inputShellViewModel.BackRequested += HandleInputBackRequested;
+        }
+
+        _inputShellViewModel.ResetToController();
+        CurrentViewModel = _inputShellViewModel;
+    }
+
+    private void HandleInputBackRequested(object? sender, EventArgs e)
+    {
+        _mainViewModel?.GoDesktopEntryCommand.Execute(null);
+        CurrentViewModel = _mainViewModel;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

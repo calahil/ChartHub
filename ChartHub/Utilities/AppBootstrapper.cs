@@ -229,6 +229,13 @@ public static class AppBootstrapper
                 serviceProvider.GetRequiredService<AppGlobalSettings>()
             )
         );
+        services.AddSingleton<InputShellViewModel>(serviceProvider =>
+            new InputShellViewModel(
+                serviceProvider.GetRequiredService<VirtualControllerViewModel>(),
+                serviceProvider.GetRequiredService<VirtualTouchPadViewModel>(),
+                serviceProvider.GetRequiredService<VirtualKeyboardViewModel>()
+            )
+        );
         services.AddSingleton<Initializer>();
     }
 }

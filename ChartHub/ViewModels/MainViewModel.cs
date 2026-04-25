@@ -408,6 +408,8 @@ public class MainViewModel : INotifyPropertyChanged
     public IRelayCommand GoVirtualTouchPadCommand { get; }
     public IRelayCommand GoVirtualKeyboardCommand { get; }
 
+    public event EventHandler? InputRequested;
+
     public IRelayCommand<DownloadFile?> CancelSharedDownloadCommand { get; }
 
     public IRelayCommand<DownloadFile?> ClearSharedDownloadCommand { get; }
@@ -568,7 +570,7 @@ public class MainViewModel : INotifyPropertyChanged
         _desktopEntryViewModel = desktopEntryViewModel;
         if (_isAndroidMode)
         {
-            _desktopEntryViewModel.AppLaunched += (_, _) => NavigateToTab(7);
+            _desktopEntryViewModel.AppLaunched += (_, _) => InputRequested?.Invoke(this, EventArgs.Empty);
         }
         _volumeViewModel = volumeViewModel;
         _settingsViewModel = settingsViewModel;

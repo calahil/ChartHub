@@ -70,6 +70,7 @@ public class ViewLocator : IDataTemplate
             or SettingsViewModel
             or AppShellViewModel
             or SplashViewModel
+            or InputShellViewModel
             or VirtualControllerViewModel
             or VirtualTouchPadViewModel
             or VirtualKeyboardViewModel;

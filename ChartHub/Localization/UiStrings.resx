@@ -274,6 +274,8 @@
   <data name="Main.Mouse" xml:space="preserve"><value>Mouse</value></data>
   <data name="Main.Keyboard" xml:space="preserve"><value>Keyboard</value></data>
 
+  <data name="InputShell.Back" xml:space="preserve"><value>Back</value></data>
+
   <data name="Input.Controller.Status.Connected" xml:space="preserve"><value>Connected</value></data>
   <data name="Input.Controller.Status.Disconnected" xml:space="preserve"><value>Not connected</value></data>
   <data name="Input.Touchpad.Status.Connected" xml:space="preserve"><value>Connected</value></data>

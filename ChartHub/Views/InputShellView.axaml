@@ -1,0 +1,94 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewmodels="clr-namespace:ChartHub.ViewModels"
+             xmlns:utilities="clr-namespace:ChartHub.Utilities"
+             xmlns:strings="clr-namespace:ChartHub.Strings;assembly=ChartHub"
+             mc:Ignorable="d"
+             d:DesignWidth="400"
+             d:DesignHeight="800"
+             x:Class="ChartHub.Views.InputShellView"
+             x:DataType="viewmodels:InputShellViewModel">
+
+    <UserControl.Resources>
+        <utilities:AssetPathToImageConverter x:Key="AssetPathToImageConverter" />
+    </UserControl.Resources>
+
+    <SplitView IsPaneOpen="{Binding IsNavPaneOpen}"
+               OpenPaneLength="260"
+               PanePlacement="Left"
+               DisplayMode="Overlay"
+               CompactPaneLength="0">
+        <SplitView.Pane>
+            <Border BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                    BorderThickness="0,0,1,0"
+                    Background="{StaticResource ThemeBackgroundBrush}"
+                    Padding="10">
+                <StackPanel Spacing="10"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top">
+                    <Button Content="{Binding PageStrings.Back}"
+                            Command="{Binding GoBackCommand}"
+                            CornerRadius="10"
+                            HorizontalContentAlignment="Left"
+                            Height="44"
+                            Width="220" />
+                    <Separator Margin="0,4" />
+                    <Button Content="{Binding PageStrings.Controller}"
+                            Command="{Binding GoControllerCommand}"
+                            CornerRadius="10"
+                            HorizontalContentAlignment="Left"
+                            Height="44"
+                            Width="220" />
+                    <Button Content="{Binding PageStrings.Mouse}"
+                            Command="{Binding GoMouseCommand}"
+                            CornerRadius="10"
+                            HorizontalContentAlignment="Left"
+                            Height="44"
+                            Width="220" />
+                    <Button Content="{Binding PageStrings.Keyboard}"
+                            Command="{Binding GoKeyboardCommand}"
+                            CornerRadius="10"
+                            HorizontalContentAlignment="Left"
+                            Height="44"
+                            Width="220" />
+                </StackPanel>
+            </Border>
+        </SplitView.Pane>
+
+        <Grid RowDefinitions="Auto,*">
+            <Border Grid.Row="0"
+                    Padding="10"
+                    BorderBrush="{StaticResource ThemeBorderMidBrush}"
+                    BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Button Grid.Column="0"
+                            Width="40"
+                            Padding="0"
+                            CornerRadius="10"
+                            Height="40"
+                            ToolTip.Tip="{Binding PageStrings.Menu}"
+                            Command="{Binding ToggleNavPaneCommand}">
+                        <Button.Content>
+                            <Image Width="26"
+                                   Height="26"
+                                   Stretch="Uniform"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Source="{Binding Source={x:Static strings:UiIcons.MenuIcon}, Converter={StaticResource AssetPathToImageConverter}}" />
+                        </Button.Content>
+                    </Button>
+                    <TextBlock Grid.Column="1"
+                               Margin="10,0,0,0"
+                               VerticalAlignment="Center"
+                               FontWeight="Bold"
+                               Text="{Binding PageStrings.Input}" />
+                </Grid>
+            </Border>
+
+            <ContentControl Grid.Row="1"
+                            Content="{Binding CurrentInputViewModel}" />
+        </Grid>
+    </SplitView>
+</UserControl>
