@@ -144,8 +144,8 @@ public class RhythmVersePageStrings : SongSourcePageStrings
     public string ApplyFilters => UiLocalization.Get("RhythmVerse.ApplyFilters");
     public List<string> Filters { get; } =
     [
-        UiLocalization.Get("RhythmVerse.FilterArtist"),
         UiLocalization.Get("RhythmVerse.FilterDownloads"),
+        UiLocalization.Get("RhythmVerse.FilterArtist"),
         UiLocalization.Get("RhythmVerse.FilterSongLength"),
         UiLocalization.Get("RhythmVerse.FilterTitleText"),
         UiLocalization.Get("RhythmVerse.FilterUpdated"),

@@ -806,7 +806,7 @@ public class RhythmVerseViewModel : INotifyPropertyChanged
 
             if (string.IsNullOrEmpty(SelectedFilter) || string.IsNullOrEmpty(SelectedOrder))
             {
-                SelectedFilter = "Artist";
+                SelectedFilter = "Downloads";
                 SelectedOrder = "Ascending";
             }
             string filter = Toolbox.ConvertFilter(SelectedFilter);
