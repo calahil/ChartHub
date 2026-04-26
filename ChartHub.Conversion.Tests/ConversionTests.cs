@@ -933,6 +933,24 @@ public sealed class MoggExtractorTests
     }
 
     [Fact]
+    public void BuildStemChannelMapForCloneHero_WhenRawDrumChannelsMatchOnyxFiveChannelMix_InfersSplitDrums()
+    {
+        Dictionary<string, IReadOnlyList<int>> trackChannels = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["drum"] = [0, 1, 2, 3, 4],
+            ["guitar"] = [6, 7],
+        };
+
+        Dictionary<string, List<int>> stemMap = MoggExtractor.BuildStemChannelMapForCloneHero(trackChannels);
+
+        Assert.DoesNotContain("drums", stemMap.Keys);
+        Assert.Equal([0], stemMap["drums_1"]);
+        Assert.Equal([1, 2], stemMap["drums_2"]);
+        Assert.Equal([3, 4], stemMap["drums_3"]);
+        Assert.Equal([6, 7], stemMap["guitar"]);
+    }
+
+    [Fact]
     public void ShouldIncludeStemForCloneHero_DrumSplitStemsFollowDrumRank()
     {
         Dictionary<string, int> ranks = new(StringComparer.OrdinalIgnoreCase)
@@ -1846,10 +1864,8 @@ public sealed class ParityHardeningTests
             Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "song.ini")),
                 "song.ini must be present in every CON conversion output.");
 
-            // expert+.mid: emitted when drum rank > 0
-            // The sample fixture has drums, so expert+.mid must be present.
-            Assert.True(File.Exists(Path.Combine(result.OutputDirectory, "expert+.mid")),
-                "expert+.mid must be present when the source has a non-zero drum rank.");
+            Assert.False(File.Exists(Path.Combine(result.OutputDirectory, "expert+.mid")),
+                "Clone Hero folder output must not include expert+.mid; Onyx does not copy it into the final export directory.");
 
             // Audio: at minimum the backing stem must exist
             bool hasBacking = File.Exists(Path.Combine(result.OutputDirectory, "song.ogg"))
@@ -1984,10 +2000,10 @@ public sealed class ParityHardeningTests
         }
     }
 
-    // ------------------------------------------------------------------ expert+.mid content sanity
+    // ------------------------------------------------------------------ expert+.mid parity
 
     [Fact]
-    public async Task ConvertAsync_SampleRb3Con_ExpertPlusMidContainsNotesMidPartDrumsTrack()
+    public async Task ConvertAsync_SampleRb3Con_DoesNotEmitExpertPlusMid()
     {
         if (!File.Exists(SampleRb3ConPath))
         {
@@ -2002,27 +2018,8 @@ public sealed class ParityHardeningTests
             ConversionResult result = await service.ConvertAsync(SampleRb3ConPath, outputRoot);
 
             string expertPlusPath = Path.Combine(result.OutputDirectory, "expert+.mid");
-            string notesMidPath = Path.Combine(result.OutputDirectory, "notes.mid");
-
-            if (!File.Exists(expertPlusPath))
-            {
-                // If no drum rank, expert+.mid is correctly absent — skip the rest.
-                return;
-            }
-
-            byte[] expertPlus = await File.ReadAllBytesAsync(expertPlusPath);
-            byte[] notesMid = await File.ReadAllBytesAsync(notesMidPath);
-
-            // expert+.mid must be a valid MIDI (starts with MThd).
-            Assert.True(expertPlus.Length >= 14
-                && expertPlus[0] == 'M' && expertPlus[1] == 'T'
-                && expertPlus[2] == 'h' && expertPlus[3] == 'd',
-                "expert+.mid must be a valid Standard MIDI file (MThd header).");
-
-            // expert+.mid must not be larger than notes.mid by more than a trivial margin —
-            // the transform only remaps note bytes and cannot add new events.
-            Assert.True(expertPlus.Length <= notesMid.Length + 16,
-                $"expert+.mid ({expertPlus.Length} bytes) must not be significantly larger than notes.mid ({notesMid.Length} bytes).");
+            Assert.False(File.Exists(expertPlusPath),
+                "Clone Hero folder output must not include expert+.mid; Onyx only builds notes.mid in the final export directory.");
         }
         finally
         {

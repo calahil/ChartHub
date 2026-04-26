@@ -190,9 +190,14 @@ internal static class PngXboxDecoder
 
     private static (byte r, byte g, byte b) Rgb565ToRgb(ushort v)
     {
-        byte r = (byte)(((v >> 11) & 0x1F) * 255 / 31);
-        byte g = (byte)(((v >> 5) & 0x3F) * 255 / 63);
-        byte b = (byte)((v & 0x1F) * 255 / 31);
+        // Onyx bits5to8: (w5 << 3) | (w5 >> 2)  — exact bit-replication, not * 255/31.
+        // Onyx bits6to8: (w6 << 2) | (w6 >> 4)
+        int r5 = (v >> 11) & 0x1F;
+        int g6 = (v >> 5) & 0x3F;
+        int b5 = v & 0x1F;
+        byte r = (byte)((r5 << 3) | (r5 >> 2));
+        byte g = (byte)((g6 << 2) | (g6 >> 4));
+        byte b = (byte)((b5 << 3) | (b5 >> 2));
         return (r, g, b);
     }
 }

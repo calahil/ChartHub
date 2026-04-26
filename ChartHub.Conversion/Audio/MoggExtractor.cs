@@ -181,6 +181,8 @@ internal sealed class MoggExtractor
             }
         }
 
+        InferSplitDrumsFromRawDrumChannels(result);
+
         // Onyx output uses either combined drums or split drums_* outputs. If split channels are
         // present in source metadata, prefer them and omit the combined drums stem.
         if (HasAnySplitDrumStem(result))
@@ -189,6 +191,51 @@ internal sealed class MoggExtractor
         }
 
         return result;
+    }
+
+    private static void InferSplitDrumsFromRawDrumChannels(Dictionary<string, List<int>> tracks)
+    {
+        if (HasAnySplitDrumStem(tracks) || !tracks.TryGetValue("drums", out List<int>? drumChannels))
+        {
+            return;
+        }
+
+        var ordered = drumChannels
+            .Distinct()
+            .OrderBy(channel => channel)
+            .ToList();
+
+        // Match Onyx Import.RockBand drum-channel inference:
+        // 2  channels -> D0  = combined stereo drums.ogg
+        // 3  channels -> D4  = kick mono + kit stereo    => drums_1, drums_2
+        // 4  channels -> D1  = kick mono + snare mono + kit stereo => drums_1, drums_2, drums_3
+        // 5  channels -> D2  = kick mono + snare stereo + kit stereo => drums_1, drums_2, drums_3
+        // 6  channels -> D3  = kick stereo + snare stereo + kit stereo => drums_1, drums_2, drums_3
+        switch (ordered.Count)
+        {
+            case 3:
+                tracks["drums_1"] = [ordered[0]];
+                tracks["drums_2"] = [ordered[1], ordered[2]];
+                break;
+
+            case 4:
+                tracks["drums_1"] = [ordered[0]];
+                tracks["drums_2"] = [ordered[1]];
+                tracks["drums_3"] = [ordered[2], ordered[3]];
+                break;
+
+            case 5:
+                tracks["drums_1"] = [ordered[0]];
+                tracks["drums_2"] = [ordered[1], ordered[2]];
+                tracks["drums_3"] = [ordered[3], ordered[4]];
+                break;
+
+            case 6:
+                tracks["drums_1"] = [ordered[0], ordered[1]];
+                tracks["drums_2"] = [ordered[2], ordered[3]];
+                tracks["drums_3"] = [ordered[4], ordered[5]];
+                break;
+        }
     }
 
     internal static string NormaliseStemNameForCloneHero(string stem)

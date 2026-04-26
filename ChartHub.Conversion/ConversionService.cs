@@ -164,7 +164,6 @@ public sealed class ConversionService : IConversionService
             // --- Extract and convert MIDI ---
             ReportProgress(progress, ConversionProgressStages.ConvertMidi, 92.5, "Converting MIDI");
             await ExtractMidiAsync(stfs, songInfo, songDir, cancellationToken).ConfigureAwait(false);
-            await WriteExpertPlusMidiAsync(songDir, songInfo, cancellationToken).ConfigureAwait(false);
 
             // --- Extract and split MOGG audio ---
             ReportProgress(progress, ConversionProgressStages.DecodeMogg, 93.2, "Decrypting and decoding MOGG audio");
@@ -295,36 +294,6 @@ public sealed class ConversionService : IConversionService
         await File.WriteAllBytesAsync(
             Path.Combine(songDir, "notes.mid"),
             chMidi,
-            cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Writes expert+.mid alongside notes.mid when the song has a non-zero drum rank.
-    /// Mirrors Onyx's <c>Drums.expertWith2x</c>: 2x kick pedal (note 95) is merged
-    /// into the Expert kick (note 96) on the PART DRUMS track.
-    /// </summary>
-    private static async Task WriteExpertPlusMidiAsync(
-        string songDir,
-        DtaSongInfo songInfo,
-        CancellationToken cancellationToken)
-    {
-        int drumRank = songInfo.Ranks.TryGetValue("drum", out int r) ? r : 0;
-        if (drumRank <= 0)
-        {
-            return;
-        }
-
-        string notesMidPath = Path.Combine(songDir, "notes.mid");
-        if (!File.Exists(notesMidPath))
-        {
-            return;
-        }
-
-        byte[] notesMidiBytes = await File.ReadAllBytesAsync(notesMidPath, cancellationToken).ConfigureAwait(false);
-        byte[] expertPlusBytes = ExpertPlusMidiGenerator.Apply(notesMidiBytes);
-        await File.WriteAllBytesAsync(
-            Path.Combine(songDir, "expert+.mid"),
-            expertPlusBytes,
             cancellationToken).ConfigureAwait(false);
     }
 

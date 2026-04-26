@@ -331,8 +331,16 @@ internal sealed class StfsReader : IDisposable
     {
         int group = n / HashEntriesPerGroup;
         int idx = n % HashEntriesPerGroup;
+
+        // For packages with block_separation > 0 (typically fan-made CON files where the
+        // rounded-up header is smaller than the canonical 0xC000), each group G > 0 has
+        // _blockSeparation extra physical blocks inserted before its data blocks.  The hash
+        // table for group G therefore sits _blockSeparation blocks later than the naive
+        // G * 171 * BlockSize calculation would imply.  This mirrors the same adjustment
+        // applied in BlockFileOffset for data blocks.
         long hashOffset = _headerSize
             + ((long)group * (HashEntriesPerGroup + 1) * BlockSize)
+            + (group > 0 && _blockSeparation > 0 ? (long)_blockSeparation * BlockSize : 0L)
             + ((long)idx * HashEntrySize);
 
         if (hashOffset < 0 || hashOffset + HashEntrySize > _streamLength)
